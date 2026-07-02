@@ -1,0 +1,19 @@
+[package]
+name = "paredit-cli"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Structure-editing CLI for safe S-expression refactoring by AI coding agents"
+
+[[bin]]
+name = "paredit"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+thiserror = "2.0"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
