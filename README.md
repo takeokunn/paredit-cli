@@ -17,6 +17,8 @@ the exact form or symbol, apply a structural edit, then validate again.
 - Byte spans for every top-level form and atom occurrence.
 - Exact atom search and rename that ignore comments and string contents.
 - Multi-file exact atom rename plans with explicit `--write` application.
+- Dialect-aware function extraction for turning a selected expression into a
+  top-level helper definition.
 - JSON reports designed for coding-agent planning and verification loops.
 - Balanced edits: replace, kill, wrap, splice, raise, slurp, and barf.
 - A typed Rust library API behind the CLI for downstream automation.
@@ -34,6 +36,8 @@ paredit rename-symbol --file source.lisp --from old-name --to new-name --plan --
 paredit rename-symbol --file source.lisp --from old-name --to new-name
 paredit rename-symbols --from old-name --to new-name src/*.lisp lisp/*.el
 paredit rename-symbols --from old-name --to new-name --write src/*.lisp lisp/*.el
+paredit extract-function --file source.lisp --path 0.3 --name helper --output json
+paredit extract-function --file source.lisp --path 0.3 --name helper --write
 paredit format --file source.lisp --indent 2
 paredit select --file source.lisp --path 0.2
 paredit select --file source.lisp --at 42
@@ -79,9 +83,12 @@ do not carry a useful filename.
 6. Apply a project-wide exact atom rename only with
    `paredit rename-symbols --write`; the command re-parses every rewritten file
    before saving.
-7. Use structural edits for form movement: `wrap`, `splice`, `raise`,
+7. Extract duplicated or complex subexpressions with
+   `paredit extract-function --output json` first, then re-run with `--write`
+   after reviewing the generated call and top-level definition.
+8. Use structural edits for form movement: `wrap`, `splice`, `raise`,
    `slurp-*`, and `barf-*`.
-8. Run `paredit check` again, then run the project test suite.
+9. Run `paredit check` again, then run the project test suite.
 
 This workflow is intended for large Common Lisp and Emacs Lisp refactors where
 the safe primitive operations are: discover definitions, isolate forms, rename
@@ -137,6 +144,21 @@ paredit rename-symbols \
   --to session-name \
   --write \
   src/*.lisp elisp/*.el
+```
+
+Extract a complex expression into a top-level helper:
+
+```sh
+paredit extract-function \
+  --file src/renderer.lisp \
+  --path 0.3 \
+  --name render-fragment \
+  --output json
+paredit extract-function \
+  --file src/renderer.lisp \
+  --path 0.3 \
+  --name render-fragment \
+  --write
 ```
 
 ## Rust Quality Bar

@@ -152,6 +152,74 @@ fn cli_writes_multi_file_symbol_rename_without_string_or_comment_matches() {
 }
 
 #[test]
+fn cli_plans_extract_function_for_common_lisp() {
+    let mut cmd = paredit();
+    cmd.args([
+        "extract-function",
+        "--path",
+        "0.3",
+        "--name",
+        "compute-sum",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun render () (+ 1 2))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
+    .stdout(predicate::str::contains("\"call\": \"(compute-sum)\""))
+    .stdout(predicate::str::contains(
+        "\"definition\": \"(defun compute-sum () (+ 1 2))\"",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (compute-sum))\\n\\n(defun compute-sum () (+ 1 2))",
+    ));
+}
+
+#[test]
+fn cli_writes_extract_function_for_emacs_lisp_file() {
+    let dir = fresh_temp_dir("extract");
+    let elisp_file = dir.join("render.el");
+    fs::write(&elisp_file, "(defun render () (+ 1 2))\n").expect("write elisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("extract-function")
+        .arg("--file")
+        .arg(&elisp_file)
+        .arg("--path")
+        .arg("0.3")
+        .arg("--name")
+        .arg("render-sum")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect\": \"emacs-lisp\""))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(elisp_file).expect("read extracted elisp"),
+        "(defun render () (render-sum))\n\n(defun render-sum () (+ 1 2))\n"
+    );
+}
+
+#[test]
+fn cli_rejects_extract_function_write_without_file() {
+    let mut cmd = paredit();
+    cmd.args([
+        "extract-function",
+        "--path",
+        "0.3",
+        "--name",
+        "compute-sum",
+        "--write",
+    ])
+    .write_stdin("(defun render () (+ 1 2))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("--write requires --file"));
+}
+
+#[test]
 fn cli_prints_agent_report_json() {
     let mut cmd = paredit();
     cmd.args([

@@ -33,6 +33,8 @@ enum Command {
     RenameSymbol(RenameSymbolArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(RenameSymbolsArgs),
+    /// Extract the selected expression into a zero-argument top-level function.
+    ExtractFunction(ExtractFunctionArgs),
     /// Print a canonical, indentation-based rendering.
     Format(FormatArgs),
     /// Print the S-expression selected by --path or --at.
@@ -138,6 +140,31 @@ struct RenameSymbolsArgs {
 }
 
 #[derive(Debug, Args)]
+struct ExtractFunctionArgs {
+    /// Input file. Required when --write is used; reads stdin otherwise.
+    #[arg(short, long)]
+    file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Select by child index path, for example 0.2.1.
+    #[arg(long, conflicts_with = "at")]
+    path: Option<Path>,
+    /// Select the smallest expression containing byte offset.
+    #[arg(long, conflicts_with = "path")]
+    at: Option<usize>,
+    /// New top-level function name.
+    #[arg(long)]
+    name: SymbolName,
+    /// Rewrite the input file in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 struct FormatArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
@@ -225,6 +252,20 @@ struct RenameFileReport {
     written: bool,
 }
 
+#[derive(Debug)]
+struct ExtractFunctionPlan {
+    dialect: Dialect,
+    path: Option<Path>,
+    span_start: usize,
+    span_end: usize,
+    name: SymbolName,
+    call: String,
+    definition: String,
+    rewritten: String,
+    changed: bool,
+    written: bool,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -273,6 +314,7 @@ fn main() -> Result<()> {
             }
         }
         Command::RenameSymbols(args) => rename_symbols(args)?,
+        Command::ExtractFunction(args) => extract_function(args)?,
         Command::Format(args) => {
             let input = read_input(args.file)?;
             let _dialect = detect_dialect(&input, args.dialect);
@@ -301,6 +343,111 @@ fn main() -> Result<()> {
         Command::SlurpBackward(args) => edit_target(args, Edit::slurp_backward)?,
         Command::BarfForward(args) => edit_target(args, Edit::barf_forward)?,
         Command::BarfBackward(args) => edit_target(args, Edit::barf_backward)?,
+    }
+    Ok(())
+}
+
+fn extract_function(args: ExtractFunctionArgs) -> Result<()> {
+    if args.write && args.file.is_none() {
+        anyhow::bail!("--write requires --file");
+    }
+
+    let input = read_input(args.file.clone())?;
+    let dialect = detect_dialect(&input, args.dialect);
+    let tree = SyntaxTree::parse(&input.text)?;
+    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let span = selection.span();
+    let selected = selection.text(&input.text).to_owned();
+    let call = extracted_call(dialect, &args.name);
+    let definition = extracted_definition(dialect, &args.name, &selected);
+    let replaced = Edit::replace(&input.text, selection, &call);
+    let rewritten = append_top_level_definition(&replaced, &definition);
+
+    SyntaxTree::parse(&rewritten)
+        .context("extracted output is not a valid S-expression document")?;
+
+    let changed = rewritten != input.text;
+    let written = args.write && changed;
+    if written {
+        let file = input
+            .file
+            .as_ref()
+            .expect("--write was validated to require --file");
+        fs::write(file, &rewritten)
+            .with_context(|| format!("failed to write {}", file.display()))?;
+    }
+
+    let plan = ExtractFunctionPlan {
+        dialect,
+        path: args.path,
+        span_start: span.start().get(),
+        span_end: span.end().get(),
+        name: args.name,
+        call,
+        definition,
+        rewritten,
+        changed,
+        written,
+    };
+    print_extract_function_plan(&plan, args.output)
+}
+
+fn extracted_call(_dialect: Dialect, name: &SymbolName) -> String {
+    format!("({})", name.as_str())
+}
+
+fn extracted_definition(dialect: Dialect, name: &SymbolName, body: &str) -> String {
+    match dialect {
+        Dialect::Scheme => format!("(define ({}) {})", name.as_str(), body),
+        Dialect::Clojure | Dialect::Janet => format!("(defn {} [] {})", name.as_str(), body),
+        Dialect::Fennel => format!("(fn {} [] {})", name.as_str(), body),
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Unknown => {
+            format!("(defun {} () {})", name.as_str(), body)
+        }
+    }
+}
+
+fn append_top_level_definition(input: &str, definition: &str) -> String {
+    let mut output = input.trim_end().to_owned();
+    if !output.is_empty() {
+        output.push_str("\n\n");
+    }
+    output.push_str(definition);
+    output.push('\n');
+    output
+}
+
+fn print_extract_function_plan(plan: &ExtractFunctionPlan, output: OutputFormat) -> Result<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", plan.dialect.label());
+            if let Some(path) = &plan.path {
+                println!("path\t{path}");
+            }
+            println!("span\t{}..{}", plan.span_start, plan.span_end);
+            println!("name\t{}", plan.name);
+            println!("call\t{}", plan.call);
+            println!("definition\t{}", plan.definition);
+            println!("changed\t{}", plan.changed);
+            println!("written\t{}", plan.written);
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": plan.dialect.label(),
+                "path": plan.path.as_ref().map(ToString::to_string),
+                "span": {
+                    "start": plan.span_start,
+                    "end": plan.span_end,
+                },
+                "name": plan.name.as_str(),
+                "call": plan.call,
+                "definition": plan.definition,
+                "changed": plan.changed,
+                "written": plan.written,
+                "rewritten": plan.rewritten,
+            }))?
+        ),
     }
     Ok(())
 }

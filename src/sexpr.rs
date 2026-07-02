@@ -410,7 +410,7 @@ impl<'a> Selection<'a> {
         self.tree.node(self.node_id)
     }
 
-    fn span(self) -> ByteSpan {
+    pub fn span(self) -> ByteSpan {
         self.node().span
     }
 }
