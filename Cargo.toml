@@ -1,7 +1,8 @@
 [package]
 name = "paredit-cli"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT"
 description = "Structure-editing CLI for safe S-expression refactoring by AI coding agents"
 
@@ -12,8 +13,16 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "2.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = "warn"

@@ -1,12 +1,12 @@
-mod sexpr;
-
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::{Args, Parser, Subcommand};
-use sexpr::{Edit, Formatter, Path, Selection, SyntaxTree};
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use paredit_cli::dialect::Dialect;
+use paredit_cli::sexpr::{Edit, Formatter, Path, Selection, SymbolName, SyntaxTree};
+use serde_json::json;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -19,6 +19,18 @@ struct Cli {
 enum Command {
     /// Validate that input is a balanced S-expression document.
     Check(InputArgs),
+    /// Detect Lisp dialect from --file extension or explicit --dialect.
+    Dialect(AnalyzeArgs),
+    /// Print parse, dialect, and structural metrics for agent planning.
+    Stats(AnalyzeArgs),
+    /// Print a complete JSON report for AI coding agent refactor planning.
+    AgentReport(AnalyzeArgs),
+    /// Print top-level forms with paths, spans, and definition hints.
+    Outline(AnalyzeArgs),
+    /// Find exact atom occurrences without touching strings or comments.
+    FindSymbol(SymbolQueryArgs),
+    /// Rename exact atom occurrences without touching strings or comments.
+    RenameSymbol(RenameSymbolArgs),
     /// Print a canonical, indentation-based rendering.
     Format(FormatArgs),
     /// Print the S-expression selected by --path or --at.
@@ -51,10 +63,64 @@ struct InputArgs {
 }
 
 #[derive(Debug, Args)]
+struct AnalyzeArgs {
+    /// Input file. Reads stdin when omitted.
+    #[arg(short, long)]
+    file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+    output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
+struct SymbolQueryArgs {
+    /// Input file. Reads stdin when omitted.
+    #[arg(short, long)]
+    file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Exact symbol atom to find.
+    #[arg(long)]
+    symbol: SymbolName,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+    output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
+struct RenameSymbolArgs {
+    /// Input file. Reads stdin when omitted.
+    #[arg(short, long)]
+    file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Exact source symbol atom.
+    #[arg(long)]
+    from: SymbolName,
+    /// Exact replacement symbol atom.
+    #[arg(long)]
+    to: SymbolName,
+    /// Print occurrence metadata instead of rewritten source.
+    #[arg(long)]
+    plan: bool,
+    /// Output format for --plan.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+    output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 struct FormatArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
     file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
     /// Number of spaces per nesting level.
     #[arg(long, default_value_t = 2)]
     indent: usize,
@@ -89,32 +155,109 @@ struct ReplaceArgs {
     with: String,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum DialectArg {
+    CommonLisp,
+    EmacsLisp,
+    Scheme,
+    Clojure,
+    Janet,
+    Fennel,
+    Unknown,
+}
+
+impl From<DialectArg> for Dialect {
+    fn from(value: DialectArg) -> Self {
+        match value {
+            DialectArg::CommonLisp => Self::CommonLisp,
+            DialectArg::EmacsLisp => Self::EmacsLisp,
+            DialectArg::Scheme => Self::Scheme,
+            DialectArg::Clojure => Self::Clojure,
+            DialectArg::Janet => Self::Janet,
+            DialectArg::Fennel => Self::Fennel,
+            DialectArg::Unknown => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum OutputFormat {
+    Text,
+    Json,
+}
+
+#[derive(Debug)]
+struct SourceInput {
+    text: String,
+    file: Option<PathBuf>,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Check(args) => {
             let input = read_input(args.file)?;
-            SyntaxTree::parse(&input)?;
+            SyntaxTree::parse(&input.text)?;
             println!("ok");
+        }
+        Command::Dialect(args) => {
+            let input = read_input(args.file)?;
+            let dialect = detect_dialect(&input, args.dialect);
+            print_dialect(dialect, args.output)?;
+        }
+        Command::Stats(args) => {
+            let input = read_input(args.file)?;
+            let dialect = detect_dialect(&input, args.dialect);
+            let tree = SyntaxTree::parse(&input.text)?;
+            print_stats(&tree, dialect, args.output)?;
+        }
+        Command::AgentReport(args) => {
+            let input = read_input(args.file)?;
+            let dialect = detect_dialect(&input, args.dialect);
+            let tree = SyntaxTree::parse(&input.text)?;
+            print_agent_report(&tree, dialect, args.output)?;
+        }
+        Command::Outline(args) => {
+            let input = read_input(args.file)?;
+            let dialect = detect_dialect(&input, args.dialect);
+            let tree = SyntaxTree::parse(&input.text)?;
+            print_outline(&tree, dialect, args.output)?;
+        }
+        Command::FindSymbol(args) => {
+            let input = read_input(args.file)?;
+            let dialect = detect_dialect(&input, args.dialect);
+            let tree = SyntaxTree::parse(&input.text)?;
+            print_symbol_occurrences(&tree, dialect, &args.symbol, args.output)?;
+        }
+        Command::RenameSymbol(args) => {
+            let input = read_input(args.file)?;
+            let dialect = detect_dialect(&input, args.dialect);
+            let tree = SyntaxTree::parse(&input.text)?;
+            if args.plan {
+                print_rename_plan(&tree, dialect, &args.from, &args.to, args.output)?;
+            } else {
+                print!("{}", tree.rename_symbol(&input.text, &args.from, &args.to));
+            }
         }
         Command::Format(args) => {
             let input = read_input(args.file)?;
-            let tree = SyntaxTree::parse(&input)?;
+            let _dialect = detect_dialect(&input, args.dialect);
+            let tree = SyntaxTree::parse(&input.text)?;
             print!("{}", Formatter::new(args.indent).format(&tree));
         }
         Command::Select(args) => {
             let input = read_input(args.file)?;
-            let tree = SyntaxTree::parse(&input)?;
+            let tree = SyntaxTree::parse(&input.text)?;
             let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-            print!("{}", selection.text(&input));
+            print!("{}", selection.text(&input.text));
         }
         Command::Replace(args) => {
             let input = read_input(args.file)?;
             SyntaxTree::parse(&args.with)
                 .context("replacement is not a valid S-expression document")?;
-            let tree = SyntaxTree::parse(&input)?;
+            let tree = SyntaxTree::parse(&input.text)?;
             let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-            print!("{}", Edit::replace(&input, selection, &args.with));
+            print!("{}", Edit::replace(&input.text, selection, &args.with));
         }
         Command::Kill(args) => edit_target(args, Edit::kill)?,
         Command::Wrap(args) => edit_target(args, Edit::wrap)?,
@@ -128,14 +271,240 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()> {
+    match output {
+        OutputFormat::Text => println!("{dialect}"),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": dialect.label(),
+                "family": dialect.family(),
+            }))?
+        ),
+    }
+    Ok(())
+}
+
+fn print_stats(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+    let atoms = tree.atom_occurrences();
+    let outline = tree.outline(|head| dialect.is_definition_head(head));
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", dialect.label());
+            println!("top_level_forms\t{}", tree.root_children().len());
+            println!("outline_entries\t{}", outline.len());
+            println!("atom_occurrences\t{}", atoms.len());
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": dialect.label(),
+                "topLevelForms": tree.root_children().len(),
+                "outlineEntries": outline.len(),
+                "atomOccurrences": atoms.len(),
+            }))?
+        ),
+    }
+    Ok(())
+}
+
+fn print_agent_report(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+    let atoms = tree.atom_occurrences();
+    let outline = tree.outline(|head| dialect.is_definition_head(head));
+    let payload = json!({
+        "dialect": {
+            "label": dialect.label(),
+            "family": dialect.family(),
+        },
+        "metrics": {
+            "topLevelForms": tree.root_children().len(),
+            "outlineEntries": outline.len(),
+            "atomOccurrences": atoms.len(),
+        },
+        "outline": outline
+            .into_iter()
+            .map(|entry| {
+                json!({
+                    "path": entry.path.to_string(),
+                    "span": {
+                        "start": entry.span.start().get(),
+                        "end": entry.span.end().get(),
+                    },
+                    "head": entry.head,
+                    "definitionLike": entry.definition_like,
+                })
+            })
+            .collect::<Vec<_>>(),
+        "atoms": atoms
+            .into_iter()
+            .map(|occurrence| {
+                json!({
+                    "path": occurrence.path.to_string(),
+                    "span": {
+                        "start": occurrence.span.start().get(),
+                        "end": occurrence.span.end().get(),
+                    },
+                    "text": occurrence.text,
+                })
+            })
+            .collect::<Vec<_>>(),
+    });
+
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", dialect.label());
+            println!("top_level_forms\t{}", tree.root_children().len());
+            println!("use --output json for full outline and atom spans");
+        }
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&payload)?),
+    }
+    Ok(())
+}
+
+fn print_outline(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+    let entries = tree.outline(|head| dialect.is_definition_head(head));
+    match output {
+        OutputFormat::Text => {
+            for entry in entries {
+                println!(
+                    "{}\t{}..{}\t{}\t{}",
+                    entry.path,
+                    entry.span.start().get(),
+                    entry.span.end().get(),
+                    entry.head.as_deref().unwrap_or("<unknown>"),
+                    entry.definition_like
+                );
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(
+                &entries
+                    .into_iter()
+                    .map(|entry| {
+                        json!({
+                            "path": entry.path.to_string(),
+                            "span": {
+                                "start": entry.span.start().get(),
+                                "end": entry.span.end().get(),
+                            },
+                            "head": entry.head,
+                            "definitionLike": entry.definition_like,
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            )?
+        ),
+    }
+    Ok(())
+}
+
+fn print_symbol_occurrences(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    symbol: &SymbolName,
+    output: OutputFormat,
+) -> Result<()> {
+    let occurrences = matching_symbol_occurrences(tree, symbol);
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", dialect.label());
+            for occurrence in occurrences {
+                println!(
+                    "{}\t{}..{}\t{}",
+                    occurrence.path,
+                    occurrence.span.start().get(),
+                    occurrence.span.end().get(),
+                    occurrence.text
+                );
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": dialect.label(),
+                "symbol": symbol.as_str(),
+                "occurrences": occurrences
+                    .into_iter()
+                    .map(|occurrence| json!({
+                        "path": occurrence.path.to_string(),
+                        "span": {
+                            "start": occurrence.span.start().get(),
+                            "end": occurrence.span.end().get(),
+                        },
+                        "text": occurrence.text,
+                    }))
+                    .collect::<Vec<_>>(),
+            }))?
+        ),
+    }
+    Ok(())
+}
+
+fn print_rename_plan(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    from: &SymbolName,
+    to: &SymbolName,
+    output: OutputFormat,
+) -> Result<()> {
+    let occurrences = matching_symbol_occurrences(tree, from);
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", dialect.label());
+            println!("from\t{from}");
+            println!("to\t{to}");
+            println!("count\t{}", occurrences.len());
+            for occurrence in occurrences {
+                println!(
+                    "{}\t{}..{}",
+                    occurrence.path,
+                    occurrence.span.start().get(),
+                    occurrence.span.end().get()
+                );
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": dialect.label(),
+                "from": from.as_str(),
+                "to": to.as_str(),
+                "count": occurrences.len(),
+                "occurrences": occurrences
+                    .into_iter()
+                    .map(|occurrence| json!({
+                        "path": occurrence.path.to_string(),
+                        "span": {
+                            "start": occurrence.span.start().get(),
+                            "end": occurrence.span.end().get(),
+                        },
+                    }))
+                    .collect::<Vec<_>>(),
+            }))?
+        ),
+    }
+    Ok(())
+}
+
+fn matching_symbol_occurrences(
+    tree: &SyntaxTree,
+    symbol: &SymbolName,
+) -> Vec<paredit_cli::sexpr::AtomOccurrence> {
+    tree.atom_occurrences()
+        .into_iter()
+        .filter(|occurrence| occurrence.text == symbol.as_str())
+        .collect()
+}
+
 fn edit_target(
     args: TargetArgs,
-    f: fn(&str, &SyntaxTree, Selection) -> Result<String>,
+    f: fn(&str, &SyntaxTree, Selection<'_>) -> Result<String>,
 ) -> Result<()> {
     let input = read_input(args.file)?;
-    let tree = SyntaxTree::parse(&input)?;
+    let tree = SyntaxTree::parse(&input.text)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-    print!("{}", f(&input, &tree, selection)?);
+    print!("{}", f(&input.text, &tree, selection)?);
     Ok(())
 }
 
@@ -152,17 +521,26 @@ fn resolve_target<'a>(
     }
 }
 
-fn read_input(file: Option<PathBuf>) -> Result<String> {
+fn detect_dialect(input: &SourceInput, explicit: Option<DialectArg>) -> Dialect {
+    Dialect::detect(input.file.as_deref(), explicit.map(Into::into))
+}
+
+fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
     match file {
         Some(path) => {
-            fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))
+            let text = fs::read_to_string(&path)
+                .with_context(|| format!("failed to read {}", path.display()))?;
+            Ok(SourceInput {
+                text,
+                file: Some(path),
+            })
         }
         None => {
-            let mut input = String::new();
+            let mut text = String::new();
             io::stdin()
-                .read_to_string(&mut input)
+                .read_to_string(&mut text)
                 .context("failed to read stdin")?;
-            Ok(input)
+            Ok(SourceInput { text, file: None })
         }
     }
 }

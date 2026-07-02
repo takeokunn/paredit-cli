@@ -1,48 +1,147 @@
 # paredit-cli
 
-`paredit-cli` is a Rust command line tool for structure editing S-expressions.
-It is designed for AI coding agents that often break Lisp parentheses during refactors.
+`paredit-cli` is a Rust command line tool for safe S-expression refactoring.
+It gives AI coding agents deterministic tree paths, byte spans, dialect hints,
+and balanced structural edits so Lisp refactors do not devolve into manual
+parenthesis surgery.
 
-The core rule is: do not rewrite parentheses manually. Select an expression by tree path or byte offset, then ask `paredit` to perform a balanced edit.
+The core rule is: do not rewrite delimiters by hand. Validate the file, locate
+the exact form or symbol, apply a structural edit, then validate again.
+
+## What Agents Get
+
+- Extension-based Lisp dialect detection for Common Lisp, Emacs Lisp, Scheme,
+  Clojure, Janet, and Fennel.
+- Stable zero-based expression paths such as `0.2.1` from the virtual document
+  root.
+- Byte spans for every top-level form and atom occurrence.
+- Exact atom search and rename that ignore comments and string contents.
+- JSON reports designed for coding-agent planning and verification loops.
+- Balanced edits: replace, kill, wrap, splice, raise, slurp, and barf.
+- A typed Rust library API behind the CLI for downstream automation.
 
 ## Commands
 
 ```sh
-paredit check < file.lisp
-paredit format --indent 2 < file.lisp
-paredit select --path 0.2 < file.lisp
-paredit replace --path 0.1 --with new-name < file.lisp
-paredit wrap --path 0.2 < file.lisp
-paredit splice --path 0.2 < file.lisp
-paredit raise --path 0.2.1 < file.lisp
-paredit slurp-forward --path 0 < file.lisp
-paredit slurp-backward --path 1 < file.lisp
-paredit barf-forward --path 0 < file.lisp
-paredit barf-backward --path 0 < file.lisp
-paredit kill --path 0.3 < file.lisp
+paredit check --file file.lisp
+paredit dialect --file init.el
+paredit stats --file system.asd --output json
+paredit agent-report --file source.lisp --output json
+paredit outline --file source.lisp --output json
+paredit find-symbol --file source.lisp --symbol old-name --output json
+paredit rename-symbol --file source.lisp --from old-name --to new-name --plan --output json
+paredit rename-symbol --file source.lisp --from old-name --to new-name
+paredit format --file source.lisp --indent 2
+paredit select --file source.lisp --path 0.2
+paredit select --file source.lisp --at 42
+paredit replace --file source.lisp --path 0.1 --with new-name
+paredit wrap --file source.lisp --path 0.2
+paredit splice --file source.lisp --path 0.2
+paredit raise --file source.lisp --path 0.2.1
+paredit slurp-forward --file source.lisp --path 0
+paredit slurp-backward --file source.lisp --path 1
+paredit barf-forward --file source.lisp --path 0
+paredit barf-backward --file source.lisp --path 0
+paredit kill --file source.lisp --path 0.3
 ```
 
-Paths are zero-based child indexes from the virtual document root.
-For example, in `(defun add (x y) (+ x y))`, path `0.2` selects `(x y)`.
+All commands that accept `--file` read stdin when it is omitted.
 
-## AI Agent Workflow
+## Dialect Detection
 
-1. Run `paredit check` before editing.
-2. Use `paredit select --path ...` or `paredit select --at ...` to confirm the exact target.
-3. Pipe the source through one edit command.
-4. Run `paredit check` again after writing the result.
-5. Run the project test suite with explicit timeouts.
+| Dialect | Extensions |
+| --- | --- |
+| Common Lisp | `lisp`, `lsp`, `cl`, `asd` |
+| Emacs Lisp | `el` |
+| Scheme | `scm`, `ss`, `sld` |
+| Clojure | `clj`, `cljs`, `cljc`, `edn` |
+| Janet | `janet` |
+| Fennel | `fnl` |
+
+Use `--dialect` to override extension detection when stdin or generated files
+do not carry a useful filename.
+
+## Agent Refactoring Workflow
+
+1. Run `paredit check --file target.lisp`.
+2. Run `paredit agent-report --file target.lisp --output json` and cache the
+   top-level form paths and spans.
+3. Use `paredit outline --output json` to identify definition-like forms such as
+   `defun`, `defmacro`, `defclass`, `defpackage`, `asdf:defsystem`, and
+   Emacs Lisp `defcustom` or `define-minor-mode`.
+4. Use `paredit find-symbol --symbol name --output json` before any rename.
+5. Use `paredit rename-symbol --plan --output json` to review exact atom
+   occurrences, then run the same command without `--plan` to emit rewritten
+   source.
+6. Use structural edits for form movement: `wrap`, `splice`, `raise`,
+   `slurp-*`, and `barf-*`.
+7. Run `paredit check` again, then run the project test suite.
+
+This workflow is intended for large Common Lisp and Emacs Lisp refactors where
+the safe primitive operations are: discover definitions, isolate forms, rename
+symbols exactly, move balanced forms, and verify after every generated change.
+
+## Examples
+
+Detect an Emacs Lisp file:
+
+```sh
+paredit dialect --file init.el --output json
+```
+
+Find all exact uses of a Common Lisp symbol without matching strings or
+comments:
+
+```sh
+paredit find-symbol --file src/core.lisp --symbol make-session --output json
+```
+
+Plan a rename before applying it:
+
+```sh
+paredit rename-symbol \
+  --file src/core.lisp \
+  --from old-session-name \
+  --to session-name \
+  --plan \
+  --output json
+```
+
+Apply the rename into a temporary file and re-check it:
+
+```sh
+paredit rename-symbol \
+  --file src/core.lisp \
+  --from old-session-name \
+  --to session-name > /tmp/core.lisp
+paredit check --file /tmp/core.lisp
+```
+
+## Rust Quality Bar
+
+- Rust edition 2024 with a minimum supported Rust version in `Cargo.toml`.
+- `unsafe_code = "forbid"`.
+- Newtypes for byte offsets, byte spans, expression paths, node ids, child
+  indexes, and symbol names.
+- `thiserror` for parse errors and `anyhow` for CLI boundary errors.
+- Warning-clean `cargo clippy --all-targets -- -D warnings`.
+- Nix flake verification for reproducible development.
 
 ## Development
 
 ```sh
 nix develop
-cargo fmt
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
 cargo test
 nix flake check
+nix build .#
 ```
 
 ## Scope
 
-The first implementation focuses on deterministic S-expression structure edits.
-It preserves byte ranges for targeted edits and provides canonical formatting for generated or heavily rewritten code.
+`paredit-cli` is a structural S-expression tool, not a Lisp evaluator or full
+reader implementation. It preserves balanced list, vector, and map delimiters;
+tracks comments and strings safely for symbol operations; and provides
+dialect-aware definition hints. It does not macroexpand code or update ASDF,
+package, autoload, or module manifests automatically.
