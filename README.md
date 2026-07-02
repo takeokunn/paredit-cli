@@ -19,6 +19,8 @@ the exact form or symbol, apply a structural edit, then validate again.
 - Multi-file exact atom rename plans with explicit `--write` application.
 - Dialect-aware function extraction for turning a selected expression into a
   top-level helper definition.
+- Dialect-aware local binding introduction for naming subexpressions without
+  manual parenthesis surgery.
 - JSON reports designed for coding-agent planning and verification loops.
 - Balanced edits: replace, kill, wrap, splice, raise, slurp, and barf.
 - A typed Rust library API behind the CLI for downstream automation.
@@ -38,6 +40,8 @@ paredit rename-symbols --from old-name --to new-name src/*.lisp lisp/*.el
 paredit rename-symbols --from old-name --to new-name --write src/*.lisp lisp/*.el
 paredit extract-function --file source.lisp --path 0.3 --name helper --output json
 paredit extract-function --file source.lisp --path 0.3 --name helper --write
+paredit introduce-let --file source.lisp --path 0.3.1 --name value --output json
+paredit introduce-let --file source.lisp --path 0.3.1 --name value --write
 paredit format --file source.lisp --indent 2
 paredit select --file source.lisp --path 0.2
 paredit select --file source.lisp --at 42
@@ -86,9 +90,12 @@ do not carry a useful filename.
 7. Extract duplicated or complex subexpressions with
    `paredit extract-function --output json` first, then re-run with `--write`
    after reviewing the generated call and top-level definition.
-8. Use structural edits for form movement: `wrap`, `splice`, `raise`,
+8. Introduce names for complex intermediate expressions with
+   `paredit introduce-let --output json` first, then re-run with `--write`
+   after reviewing the binding value and enclosing replacement.
+9. Use structural edits for form movement: `wrap`, `splice`, `raise`,
    `slurp-*`, and `barf-*`.
-9. Run `paredit check` again, then run the project test suite.
+10. Run `paredit check` again, then run the project test suite.
 
 This workflow is intended for large Common Lisp and Emacs Lisp refactors where
 the safe primitive operations are: discover definitions, isolate forms, rename
@@ -158,6 +165,21 @@ paredit extract-function \
   --file src/renderer.lisp \
   --path 0.3 \
   --name render-fragment \
+  --write
+```
+
+Introduce a local name for a complex subexpression:
+
+```sh
+paredit introduce-let \
+  --file src/renderer.lisp \
+  --path 0.3.1 \
+  --name fragment \
+  --output json
+paredit introduce-let \
+  --file src/renderer.lisp \
+  --path 0.3.1 \
+  --name fragment \
   --write
 ```
 

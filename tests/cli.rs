@@ -220,6 +220,80 @@ fn cli_rejects_extract_function_write_without_file() {
 }
 
 #[test]
+fn cli_plans_introduce_let_for_common_lisp() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun render () (+ (* width height) margin))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
+    .stdout(predicate::str::contains(
+        "\"binding_value\": \"(* width height)\"",
+    ))
+    .stdout(predicate::str::contains(
+        "\"replacement\": \"(let ((product (* width height))) (+ product margin))\"",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product margin)))",
+    ));
+}
+
+#[test]
+fn cli_writes_introduce_let_for_emacs_lisp_file() {
+    let dir = fresh_temp_dir("introduce-let");
+    let elisp_file = dir.join("render.el");
+    fs::write(
+        &elisp_file,
+        "(defun render () (+ (* width height) margin))\n",
+    )
+    .expect("write elisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("introduce-let")
+        .arg("--file")
+        .arg(&elisp_file)
+        .arg("--path")
+        .arg("0.3.1")
+        .arg("--name")
+        .arg("product")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect\": \"emacs-lisp\""))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(elisp_file).expect("read introduced let elisp"),
+        "(defun render () (let ((product (* width height))) (+ product margin)))\n"
+    );
+}
+
+#[test]
+fn cli_rejects_introduce_let_write_without_file() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--write",
+    ])
+    .write_stdin("(defun render () (+ (* width height) margin))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("--write requires --file"));
+}
+
+#[test]
 fn cli_prints_agent_report_json() {
     let mut cmd = paredit();
     cmd.args([

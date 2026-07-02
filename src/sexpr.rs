@@ -413,6 +413,18 @@ impl<'a> Selection<'a> {
     pub fn span(self) -> ByteSpan {
         self.node().span
     }
+
+    pub fn enclosing_list_span(self) -> Result<ByteSpan> {
+        let parent_id = self
+            .node()
+            .parent
+            .ok_or_else(|| anyhow!("selection has no enclosing list"))?;
+        let parent = self.tree.node(parent_id);
+        if parent.kind != NodeKind::List {
+            anyhow::bail!("selection has no enclosing list");
+        }
+        Ok(parent.span)
+    }
 }
 
 struct Parser<'a> {

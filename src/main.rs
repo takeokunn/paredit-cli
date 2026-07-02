@@ -35,6 +35,8 @@ enum Command {
     RenameSymbols(RenameSymbolsArgs),
     /// Extract the selected expression into a zero-argument top-level function.
     ExtractFunction(ExtractFunctionArgs),
+    /// Replace the selected expression with a local binding in the enclosing list.
+    IntroduceLet(IntroduceLetArgs),
     /// Print a canonical, indentation-based rendering.
     Format(FormatArgs),
     /// Print the S-expression selected by --path or --at.
@@ -165,6 +167,31 @@ struct ExtractFunctionArgs {
 }
 
 #[derive(Debug, Args)]
+struct IntroduceLetArgs {
+    /// Input file. Required when --write is used; reads stdin otherwise.
+    #[arg(short, long)]
+    file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Select by child index path, for example 0.2.1.
+    #[arg(long, conflicts_with = "at")]
+    path: Option<Path>,
+    /// Select the smallest expression containing byte offset.
+    #[arg(long, conflicts_with = "path")]
+    at: Option<usize>,
+    /// New local binding name.
+    #[arg(long)]
+    name: SymbolName,
+    /// Rewrite the input file in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 struct FormatArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
@@ -266,6 +293,22 @@ struct ExtractFunctionPlan {
     written: bool,
 }
 
+#[derive(Debug)]
+struct IntroduceLetPlan {
+    dialect: Dialect,
+    path: Option<Path>,
+    selected_span_start: usize,
+    selected_span_end: usize,
+    enclosing_span_start: usize,
+    enclosing_span_end: usize,
+    name: SymbolName,
+    binding_value: String,
+    replacement: String,
+    rewritten: String,
+    changed: bool,
+    written: bool,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -315,6 +358,7 @@ fn main() -> Result<()> {
         }
         Command::RenameSymbols(args) => rename_symbols(args)?,
         Command::ExtractFunction(args) => extract_function(args)?,
+        Command::IntroduceLet(args) => introduce_let(args)?,
         Command::Format(args) => {
             let input = read_input(args.file)?;
             let _dialect = detect_dialect(&input, args.dialect);
@@ -443,6 +487,125 @@ fn print_extract_function_plan(plan: &ExtractFunctionPlan, output: OutputFormat)
                 "name": plan.name.as_str(),
                 "call": plan.call,
                 "definition": plan.definition,
+                "changed": plan.changed,
+                "written": plan.written,
+                "rewritten": plan.rewritten,
+            }))?
+        ),
+    }
+    Ok(())
+}
+
+fn introduce_let(args: IntroduceLetArgs) -> Result<()> {
+    if args.write && args.file.is_none() {
+        anyhow::bail!("--write requires --file");
+    }
+
+    let input = read_input(args.file.clone())?;
+    let dialect = detect_dialect(&input, args.dialect);
+    let tree = SyntaxTree::parse(&input.text)?;
+    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let selected_span = selection.span();
+    let enclosing_span = selection.enclosing_list_span()?;
+    let selected = selected_span.slice(&input.text).to_owned();
+    let enclosing = enclosing_span.slice(&input.text);
+    let relative_start = selected_span.start().get() - enclosing_span.start().get();
+    let relative_end = selected_span.end().get() - enclosing_span.start().get();
+    let mut enclosed_replacement =
+        String::with_capacity(enclosing.len() + args.name.as_str().len());
+    enclosed_replacement.push_str(&enclosing[..relative_start]);
+    enclosed_replacement.push_str(args.name.as_str());
+    enclosed_replacement.push_str(&enclosing[relative_end..]);
+    let replacement = introduced_let(dialect, &args.name, &selected, &enclosed_replacement);
+    let rewritten = replace_span(&input.text, enclosing_span, &replacement);
+
+    SyntaxTree::parse(&rewritten)
+        .context("introduced-let output is not a valid S-expression document")?;
+
+    let changed = rewritten != input.text;
+    let written = args.write && changed;
+    if written {
+        let file = input
+            .file
+            .as_ref()
+            .expect("--write was validated to require --file");
+        fs::write(file, &rewritten)
+            .with_context(|| format!("failed to write {}", file.display()))?;
+    }
+
+    let plan = IntroduceLetPlan {
+        dialect,
+        path: args.path,
+        selected_span_start: selected_span.start().get(),
+        selected_span_end: selected_span.end().get(),
+        enclosing_span_start: enclosing_span.start().get(),
+        enclosing_span_end: enclosing_span.end().get(),
+        name: args.name,
+        binding_value: selected,
+        replacement,
+        rewritten,
+        changed,
+        written,
+    };
+    print_introduce_let_plan(&plan, args.output)
+}
+
+fn introduced_let(dialect: Dialect, name: &SymbolName, value: &str, body: &str) -> String {
+    match dialect {
+        Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
+            format!("(let [{} {}] {})", name.as_str(), value, body)
+        }
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
+            format!("(let (({} {})) {})", name.as_str(), value, body)
+        }
+    }
+}
+
+fn replace_span(input: &str, span: paredit_cli::sexpr::ByteSpan, replacement: &str) -> String {
+    let mut output = String::with_capacity(input.len() - span.len() + replacement.len());
+    output.push_str(&input[..span.start().get()]);
+    output.push_str(replacement);
+    output.push_str(&input[span.end().get()..]);
+    output
+}
+
+fn print_introduce_let_plan(plan: &IntroduceLetPlan, output: OutputFormat) -> Result<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", plan.dialect.label());
+            if let Some(path) = &plan.path {
+                println!("path\t{path}");
+            }
+            println!(
+                "selected_span\t{}..{}",
+                plan.selected_span_start, plan.selected_span_end
+            );
+            println!(
+                "enclosing_span\t{}..{}",
+                plan.enclosing_span_start, plan.enclosing_span_end
+            );
+            println!("name\t{}", plan.name);
+            println!("binding_value\t{}", plan.binding_value);
+            println!("replacement\t{}", plan.replacement);
+            println!("changed\t{}", plan.changed);
+            println!("written\t{}", plan.written);
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": plan.dialect.label(),
+                "path": plan.path.as_ref().map(ToString::to_string),
+                "selected_span": {
+                    "start": plan.selected_span_start,
+                    "end": plan.selected_span_end,
+                },
+                "enclosing_span": {
+                    "start": plan.enclosing_span_start,
+                    "end": plan.enclosing_span_end,
+                },
+                "name": plan.name.as_str(),
+                "binding_value": plan.binding_value,
+                "replacement": plan.replacement,
                 "changed": plan.changed,
                 "written": plan.written,
                 "rewritten": plan.rewritten,
