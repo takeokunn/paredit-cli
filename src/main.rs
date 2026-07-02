@@ -31,6 +31,8 @@ enum Command {
     FindSymbol(SymbolQueryArgs),
     /// Rename exact atom occurrences without touching strings or comments.
     RenameSymbol(RenameSymbolArgs),
+    /// Plan or apply an exact atom rename across explicit files.
+    RenameSymbols(RenameSymbolsArgs),
     /// Print a canonical, indentation-based rendering.
     Format(FormatArgs),
     /// Print the S-expression selected by --path or --at.
@@ -114,6 +116,28 @@ struct RenameSymbolArgs {
 }
 
 #[derive(Debug, Args)]
+struct RenameSymbolsArgs {
+    /// Files to scan and optionally rewrite.
+    #[arg(required = true)]
+    files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Exact source symbol atom.
+    #[arg(long)]
+    from: SymbolName,
+    /// Exact replacement symbol atom.
+    #[arg(long)]
+    to: SymbolName,
+    /// Rewrite changed files in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 struct FormatArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
@@ -192,6 +216,15 @@ struct SourceInput {
     file: Option<PathBuf>,
 }
 
+#[derive(Debug)]
+struct RenameFileReport {
+    path: PathBuf,
+    dialect: Dialect,
+    count: usize,
+    changed: bool,
+    written: bool,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -239,6 +272,7 @@ fn main() -> Result<()> {
                 print!("{}", tree.rename_symbol(&input.text, &args.from, &args.to));
             }
         }
+        Command::RenameSymbols(args) => rename_symbols(args)?,
         Command::Format(args) => {
             let input = read_input(args.file)?;
             let _dialect = detect_dialect(&input, args.dialect);
@@ -267,6 +301,83 @@ fn main() -> Result<()> {
         Command::SlurpBackward(args) => edit_target(args, Edit::slurp_backward)?,
         Command::BarfForward(args) => edit_target(args, Edit::barf_forward)?,
         Command::BarfBackward(args) => edit_target(args, Edit::barf_backward)?,
+    }
+    Ok(())
+}
+
+fn rename_symbols(args: RenameSymbolsArgs) -> Result<()> {
+    let mut reports = Vec::with_capacity(args.files.len());
+
+    for file in &args.files {
+        let input = read_input(Some(file.clone()))?;
+        let dialect = detect_dialect(&input, args.dialect);
+        let tree = SyntaxTree::parse(&input.text)
+            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let count = matching_symbol_occurrences(&tree, &args.from).len();
+        let rewritten = tree.rename_symbol(&input.text, &args.from, &args.to);
+        let changed = rewritten != input.text;
+        let written = args.write && changed;
+
+        if written {
+            SyntaxTree::parse(&rewritten)
+                .with_context(|| format!("renamed output is invalid for {}", file.display()))?;
+            fs::write(file, rewritten)
+                .with_context(|| format!("failed to write {}", file.display()))?;
+        }
+
+        reports.push(RenameFileReport {
+            path: file.clone(),
+            dialect,
+            count,
+            changed,
+            written,
+        });
+    }
+
+    print_rename_symbols_report(&reports, &args.from, &args.to, args.write, args.output)
+}
+
+fn print_rename_symbols_report(
+    reports: &[RenameFileReport],
+    from: &SymbolName,
+    to: &SymbolName,
+    write: bool,
+    output: OutputFormat,
+) -> Result<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("from\t{from}");
+            println!("to\t{to}");
+            println!("write\t{write}");
+            for report in reports {
+                println!(
+                    "{}\t{}\tcount={}\tchanged={}\twritten={}",
+                    report.path.display(),
+                    report.dialect.label(),
+                    report.count,
+                    report.changed,
+                    report.written
+                );
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "from": from.as_str(),
+                "to": to.as_str(),
+                "write": write,
+                "files": reports
+                    .iter()
+                    .map(|report| json!({
+                        "path": report.path.display().to_string(),
+                        "dialect": report.dialect.label(),
+                        "count": report.count,
+                        "changed": report.changed,
+                        "written": report.written,
+                    }))
+                    .collect::<Vec<_>>(),
+            }))?
+        ),
     }
     Ok(())
 }

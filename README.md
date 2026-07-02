@@ -16,6 +16,7 @@ the exact form or symbol, apply a structural edit, then validate again.
   root.
 - Byte spans for every top-level form and atom occurrence.
 - Exact atom search and rename that ignore comments and string contents.
+- Multi-file exact atom rename plans with explicit `--write` application.
 - JSON reports designed for coding-agent planning and verification loops.
 - Balanced edits: replace, kill, wrap, splice, raise, slurp, and barf.
 - A typed Rust library API behind the CLI for downstream automation.
@@ -31,6 +32,8 @@ paredit outline --file source.lisp --output json
 paredit find-symbol --file source.lisp --symbol old-name --output json
 paredit rename-symbol --file source.lisp --from old-name --to new-name --plan --output json
 paredit rename-symbol --file source.lisp --from old-name --to new-name
+paredit rename-symbols --from old-name --to new-name src/*.lisp lisp/*.el
+paredit rename-symbols --from old-name --to new-name --write src/*.lisp lisp/*.el
 paredit format --file source.lisp --indent 2
 paredit select --file source.lisp --path 0.2
 paredit select --file source.lisp --at 42
@@ -70,12 +73,15 @@ do not carry a useful filename.
    `defun`, `defmacro`, `defclass`, `defpackage`, `asdf:defsystem`, and
    Emacs Lisp `defcustom` or `define-minor-mode`.
 4. Use `paredit find-symbol --symbol name --output json` before any rename.
-5. Use `paredit rename-symbol --plan --output json` to review exact atom
-   occurrences, then run the same command without `--plan` to emit rewritten
-   source.
-6. Use structural edits for form movement: `wrap`, `splice`, `raise`,
+5. Use `paredit rename-symbol --plan --output json` for one file or
+   `paredit rename-symbols --output json` for an explicit file set to review
+   exact atom occurrences.
+6. Apply a project-wide exact atom rename only with
+   `paredit rename-symbols --write`; the command re-parses every rewritten file
+   before saving.
+7. Use structural edits for form movement: `wrap`, `splice`, `raise`,
    `slurp-*`, and `barf-*`.
-7. Run `paredit check` again, then run the project test suite.
+8. Run `paredit check` again, then run the project test suite.
 
 This workflow is intended for large Common Lisp and Emacs Lisp refactors where
 the safe primitive operations are: discover definitions, isolate forms, rename
@@ -115,6 +121,22 @@ paredit rename-symbol \
   --from old-session-name \
   --to session-name > /tmp/core.lisp
 paredit check --file /tmp/core.lisp
+```
+
+Plan and then apply an exact atom rename across a Common Lisp or Emacs Lisp
+file set:
+
+```sh
+paredit rename-symbols \
+  --from old-session-name \
+  --to session-name \
+  --output json \
+  src/*.lisp elisp/*.el
+paredit rename-symbols \
+  --from old-session-name \
+  --to session-name \
+  --write \
+  src/*.lisp elisp/*.el
 ```
 
 ## Rust Quality Bar

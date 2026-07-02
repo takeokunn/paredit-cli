@@ -19,6 +19,8 @@ timeout 10s paredit agent-report --file target.lisp --output json
 timeout 10s paredit outline --file target.lisp --output json
 timeout 10s paredit find-symbol --file target.lisp --symbol old-name --output json
 timeout 10s paredit rename-symbol --file target.lisp --from old-name --to new-name --plan --output json
+timeout 10s paredit rename-symbols --from old-name --to new-name --output json src/*.lisp elisp/*.el
+timeout 10s paredit rename-symbols --from old-name --to new-name --write src/*.lisp elisp/*.el
 timeout 10s paredit select --file target.lisp --path 0.2
 timeout 10s paredit replace --file target.lisp --path 0.2 --with '(new-form ...)' > /tmp/target.lisp
 timeout 10s paredit check --file /tmp/target.lisp
@@ -30,6 +32,8 @@ mv /tmp/target.lisp target.lisp
 - Detect a Lisp dialect: `paredit dialect --file target.el --output json`
 - Plan a symbol rename: `paredit rename-symbol --file target.lisp --from old --to new --plan --output json`
 - Rename exact atom occurrences: `paredit rename-symbol --file target.lisp --from old --to new`
+- Plan a multi-file rename: `paredit rename-symbols --from old --to new --output json src/*.lisp elisp/*.el`
+- Apply a multi-file rename after review: `paredit rename-symbols --from old --to new --write src/*.lisp elisp/*.el`
 - Inspect top-level forms: `paredit outline --file target.lisp --output json`
 - Build an agent planning payload: `paredit agent-report --file target.lisp --output json`
 - Wrap an argument list: `paredit wrap --path 0.2`
