@@ -154,3 +154,27 @@ fn cli_plans_define_compiler_macro_environment_parameter_rename() {
         "(define-compiler-macro render (&whole whole &environment macro-env target) (list whole macro-env target))",
     ));
 }
+
+#[test]
+fn cli_plans_with_slots_binding_rename_preserving_slot_name() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "slot-value",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(with-slots (value (alias slot-name)) object (list value alias object))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"with-slots\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(with-slots ((slot-value value) (alias slot-name)) object (list slot-value alias object))",
+    ));
+}

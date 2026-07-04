@@ -129,6 +129,110 @@ fn plans_binding_rename_without_touching_with_accessors_scope() {
 }
 
 #[test]
+fn plans_dolist_iteration_binding_rename_without_touching_source() {
+    let input = "(dolist (value items value) (collect value) items)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("item").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "dolist");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(dolist (item items item) (collect item) items)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_dotimes_iteration_binding_rename_without_touching_count() {
+    let input = "(dotimes (index limit index) (push index result) limit)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("index").unwrap(),
+        to: SymbolName::new("i").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "dotimes");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(dotimes (i limit i) (push i result) limit)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_with_slots_binding_rename_preserves_bare_slot_name() {
+    let input = "(with-slots (value (alias slot-name)) object (list value alias object))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("slot-value").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "with-slots");
+    assert_eq!(plan.references.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(with-slots ((slot-value value) (alias slot-name)) object (list slot-value alias object))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_with_accessors_binding_rename_preserves_accessor_name() {
+    let input =
+        "(with-accessors ((value get-value) (alias get-alias)) object (list value alias object))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("slot-value").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "with-accessors");
+    assert_eq!(plan.references.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(with-accessors ((slot-value get-value) (alias get-alias)) object (list slot-value alias object))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn rejects_ambiguous_with_slots_binding_rename() {
+    let input = "(with-slots (value (value slot-name)) object value)";
+    let error = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("slot-value").unwrap(),
+    })
+    .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("binding 'value' was found in multiple selected with-slots specs")
+    );
+}
+
+#[test]
 fn plans_lambda_parameter_rename_without_shadowed_inner_binding() {
     let input = "(lambda (value) (list value (lambda (value) value) value))";
     let plan = plan_rename_binding(RenameBindingRequest {

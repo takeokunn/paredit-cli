@@ -34,6 +34,9 @@ pub(in crate::application::usecase::rename) struct BindingEdit {
 #[derive(Debug, Clone)]
 enum BindingEditKind {
     RenameAtom,
+    RewriteBareSlotSpec {
+        slot_name: String,
+    },
     RewriteClojureKeysMap {
         map_pattern: ExpressionView,
         renamed_name: String,
@@ -45,6 +48,13 @@ impl BindingEdit {
         Self {
             span,
             kind: BindingEditKind::RenameAtom,
+        }
+    }
+
+    pub(super) fn bare_slot_spec(span: ByteSpan, slot_name: String) -> Self {
+        Self {
+            span,
+            kind: BindingEditKind::RewriteBareSlotSpec { slot_name },
         }
     }
 
@@ -69,6 +79,9 @@ impl BindingEdit {
     ) -> String {
         match &self.kind {
             BindingEditKind::RenameAtom => to.as_str().to_owned(),
+            BindingEditKind::RewriteBareSlotSpec { slot_name } => {
+                format!("({} {})", to.as_str(), slot_name)
+            }
             BindingEditKind::RewriteClojureKeysMap {
                 map_pattern,
                 renamed_name,
