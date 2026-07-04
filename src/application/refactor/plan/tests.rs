@@ -134,6 +134,59 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     #[test]
+    fn pre_rename_verification_passes_iff_no_gate_blocks_automation(
+        blocking_gate_count in 0usize..4,
+        nonblocking_gate_count in 0usize..4,
+    ) {
+        let mut gates = Vec::new();
+        for index in 0..blocking_gate_count {
+            gates.push(RefactorPlanGate {
+                level: RefactorRiskLevel::Error,
+                code: "blocking-risk",
+                message: format!("blocking risk {index}"),
+                count: index + 1,
+                blocks_automation: true,
+            });
+        }
+        for index in 0..nonblocking_gate_count {
+            gates.push(RefactorPlanGate {
+                level: RefactorRiskLevel::Warning,
+                code: "advisory-risk",
+                message: format!("advisory risk {index}"),
+                count: index + 1,
+                blocks_automation: false,
+            });
+        }
+        let before = RefactorPlanSummary {
+            safe_to_automate: blocking_gate_count == 0,
+            ..summary()
+        };
+
+        let checks = refactor_verification_checks(
+            RefactorVerificationRequest {
+                operation: RefactorOperation::Rename,
+                phase: VerificationPhase::Pre,
+                symbol: "old-name",
+                new_symbol: Some("new-name"),
+                before,
+                after: None,
+            },
+            &gates,
+        );
+
+        prop_assert_eq!(
+            checks.iter().all(|check| check.passed),
+            blocking_gate_count == 0
+        );
+        let preflight = checks
+            .iter()
+            .find(|check| check.code == "preflight-gates")
+            .expect("preflight check");
+        prop_assert_eq!(preflight.passed, blocking_gate_count == 0);
+        prop_assert_eq!(preflight.count, blocking_gate_count);
+    }
+
+    #[test]
     fn post_rename_verification_passes_iff_old_symbol_is_removed_and_new_symbol_is_usable(
         old_definitions in 0usize..4,
         old_references in 0usize..4,

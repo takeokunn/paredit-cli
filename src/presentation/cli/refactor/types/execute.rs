@@ -4,5 +4,6 @@ use super::verification::RefactorVerification;
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct WorkspaceRefactorExecute {
     pub(in crate::presentation::cli) preview: RefactorPreview,
+    pub(in crate::presentation::cli) pre_verification: Option<RefactorVerification>,
     pub(in crate::presentation::cli) post_verification: Option<RefactorVerification>,
 }

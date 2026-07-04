@@ -316,8 +316,10 @@ fn cli_executes_workspace_refactor_with_post_verification() {
         .stdout(predicate::str::contains("\"discovered_file_count\": 2"))
         .stdout(predicate::str::contains("\"changed_file_count\": 2"))
         .stdout(predicate::str::contains("\"written_file_count\": 2"))
+        .stdout(predicate::str::contains("\"pre_verification\""))
         .stdout(predicate::str::contains("\"post_verification\""))
         .stdout(predicate::str::contains("\"passed\": true"))
+        .stdout(predicate::str::contains("\"code\": \"preflight-gates\""))
         .stdout(predicate::str::contains("\"code\": \"old-symbol-removed\""))
         .stdout(predicate::str::contains("\"code\": \"new-symbol-present\""));
 
@@ -361,6 +363,8 @@ fn cli_dry_runs_workspace_refactor_execute_without_writing() {
         .stdout(predicate::str::contains("\"write_requested\": false"))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
+        .stdout(predicate::str::contains("\"pre_verification\""))
+        .stdout(predicate::str::contains("\"code\": \"preflight-gates\""))
         .stdout(predicate::str::contains("\"post_verification\": null"));
 
     assert_eq!(
@@ -407,6 +411,52 @@ fn cli_fails_workspace_refactor_execute_before_write_on_policy_violation() {
 
     assert_eq!(
         fs::read_to_string(&file).expect("read unchanged policy failure fixture"),
+        original
+    );
+}
+
+#[test]
+fn cli_fails_workspace_refactor_execute_before_write_on_preflight_violation() {
+    let dir = fresh_temp_dir("workspace-refactor-execute-preflight");
+    let file = dir.join("core.lisp");
+    let original =
+        "(defun old-name (x) x)\n(defun old-name (y) y)\n(defun caller () (old-name 1))\n";
+    fs::write(&file, original).expect("write workspace refactor execute fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("workspace-refactor-execute")
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("symbol")
+        .arg("--write")
+        .arg("--fail-on-no-change")
+        .arg("--require-changed-files")
+        .arg("1")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "\"command\": \"workspace-refactor-execute\"",
+        ))
+        .stdout(predicate::str::contains("\"written_file_count\": 0"))
+        .stdout(predicate::str::contains("\"pre_verification\""))
+        .stdout(predicate::str::contains("\"phase\": \"pre\""))
+        .stdout(predicate::str::contains("\"passed\": false"))
+        .stdout(predicate::str::contains(
+            "\"code\": \"ambiguous-definition\"",
+        ))
+        .stdout(predicate::str::contains("\"post_verification\": null"))
+        .stderr(predicate::str::contains(
+            "workspace-refactor-execute preflight failed",
+        ));
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read unchanged preflight failure fixture"),
         original
     );
 }

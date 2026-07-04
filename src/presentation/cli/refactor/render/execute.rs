@@ -1,5 +1,6 @@
 use super::super::super::*;
 use super::super::types::execute::WorkspaceRefactorExecute;
+use super::super::types::verification::RefactorVerification;
 
 pub(in crate::presentation::cli) fn print_workspace_refactor_execute(
     execution: &WorkspaceRefactorExecute,
@@ -17,6 +18,19 @@ pub(in crate::presentation::cli) fn print_workspace_refactor_execute(
             println!("written_file_count\t{}", preview.summary.written_file_count);
             println!("edit_count\t{}", preview.summary.edit_count);
             println!("policy_passed\t{}", preview.policy.passed);
+            if let Some(verification) = &execution.pre_verification {
+                println!("pre_verification_passed\t{}", verification.passed);
+                for check in &verification.checks {
+                    println!(
+                        "pre_check\t{}\t{}\tpassed={}\tcount={}\t{}",
+                        check.level.label(),
+                        check.code,
+                        check.passed,
+                        check.count,
+                        check.message
+                    );
+                }
+            }
             if let Some(verification) = &execution.post_verification {
                 println!("post_verification_passed\t{}", verification.passed);
                 for check in &verification.checks {
@@ -92,34 +106,42 @@ pub(in crate::presentation::cli) fn print_workspace_refactor_execute(
                         }))
                         .collect::<Vec<_>>(),
                 },
+                "pre_verification": execution
+                    .pre_verification
+                    .as_ref()
+                    .map(refactor_verification_json),
                 "post_verification": execution
                     .post_verification
                     .as_ref()
-                    .map(|verification| json!({
-                        "operation": verification.operation.label(),
-                        "phase": verification.phase.label(),
-                        "symbol": verification.symbol.as_str(),
-                        "new_symbol": verification.new_symbol.as_deref(),
-                        "passed": verification.passed,
-                        "before": refactor_summary_json(verification.before),
-                        "after": verification.after.map(refactor_summary_json),
-                        "checks": verification
-                            .checks
-                            .iter()
-                            .map(|check| json!({
-                                "code": check.code,
-                                "level": check.level.label(),
-                                "passed": check.passed,
-                                "message": check.message.as_str(),
-                                "count": check.count,
-                            }))
-                            .collect::<Vec<_>>(),
-                    })),
+                    .map(refactor_verification_json),
             }))?
         ),
     }
 
     Ok(())
+}
+
+fn refactor_verification_json(verification: &RefactorVerification) -> serde_json::Value {
+    json!({
+        "operation": verification.operation.label(),
+        "phase": verification.phase.label(),
+        "symbol": verification.symbol.as_str(),
+        "new_symbol": verification.new_symbol.as_deref(),
+        "passed": verification.passed,
+        "before": refactor_summary_json(verification.before),
+        "after": verification.after.map(refactor_summary_json),
+        "checks": verification
+            .checks
+            .iter()
+            .map(|check| json!({
+                "code": check.code,
+                "level": check.level.label(),
+                "passed": check.passed,
+                "message": check.message.as_str(),
+                "count": check.count,
+            }))
+            .collect::<Vec<_>>(),
+    })
 }
 
 fn refactor_summary_json(summary: RefactorPlanSummary) -> serde_json::Value {
