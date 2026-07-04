@@ -2,6 +2,7 @@ pub(in crate::presentation::cli) mod args;
 pub(in crate::presentation::cli) mod rename_binding;
 pub(in crate::presentation::cli) mod rename_function;
 pub(in crate::presentation::cli) mod rename_in_form;
+pub(in crate::presentation::cli) mod rename_local_function;
 pub(in crate::presentation::cli) mod rename_macrolet;
 pub(in crate::presentation::cli) mod rename_symbol;
 pub(in crate::presentation::cli) mod rename_symbols;

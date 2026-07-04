@@ -69,10 +69,9 @@ fn all_calls_skip_labels_local_function_calls() {
     .unwrap();
 
     assert_eq!(plan.calls.len(), 1);
-    assert!(
-        plan.rewritten
-            .contains("(labels ((fetch-user (id) (fetch-user id))) (fetch-user user))")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(labels ((fetch-user (id) (fetch-user id))) (fetch-user user))"));
     assert!(plan.rewritten.contains("(load-user root)"));
     SyntaxTree::parse(&plan.rewritten).unwrap();
 }
@@ -90,10 +89,9 @@ fn all_calls_replaces_outer_calls_inside_flet_binding_bodies_only() {
     .unwrap();
 
     assert_eq!(plan.calls.len(), 2);
-    assert!(
-        plan.rewritten
-            .contains("(flet ((fetch-user (id) (load-user id))) (fetch-user user))")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(flet ((fetch-user (id) (load-user id))) (fetch-user user))"));
     assert!(plan.rewritten.contains("(load-user root)"));
     SyntaxTree::parse(&plan.rewritten).unwrap();
 }

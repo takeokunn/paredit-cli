@@ -49,11 +49,9 @@ fn rejects_wrapper_templates_without_exactly_one_placeholder() {
     })
     .unwrap_err();
 
-    assert!(
-        error
-            .to_string()
-            .contains("wrapper template must contain exactly one _ placeholder atom")
-    );
+    assert!(error
+        .to_string()
+        .contains("wrapper template must contain exactly one _ placeholder atom"));
 }
 
 proptest! {

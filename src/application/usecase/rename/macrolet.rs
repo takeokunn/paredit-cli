@@ -19,6 +19,21 @@ struct MacroletRenameScope {
     shadowed_depth: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum LocalCallableRenameKind {
+    Macro,
+    Function,
+}
+
+impl LocalCallableRenameKind {
+    fn matches_target_form(self, form: LocalCallableForm) -> bool {
+        match self {
+            Self::Macro => is_macro_callable_form(form),
+            Self::Function => matches!(form, LocalCallableForm::Flet | LocalCallableForm::Labels),
+        }
+    }
+}
+
 impl MacroletRenameScope {
     fn is_target_active(self) -> bool {
         self.active_target_depth > 0
@@ -57,6 +72,7 @@ pub fn collect_macrolet_binding_renames(
             dialect,
             from,
             to,
+            LocalCallableRenameKind::Macro,
             MacroletRenameScope::default(),
             &mut renames,
         );
@@ -84,6 +100,63 @@ pub fn collect_macrolet_call_head_renames(
             dialect,
             from,
             to,
+            LocalCallableRenameKind::Macro,
+            MacroletRenameScope::default(),
+            &mut renames,
+        );
+    }
+
+    renames.sort_by_key(|rename| rename.span.start());
+    Ok(renames)
+}
+
+pub fn collect_local_function_binding_renames(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    from: &SymbolName,
+    to: &SymbolName,
+) -> Result<Vec<RenameFunctionOccurrence>> {
+    let mut renames = Vec::new();
+
+    for (index, _) in tree.root_children().iter().enumerate() {
+        let path_indexes = vec![index];
+        let path = Path::from_indexes(path_indexes.clone());
+        let view = tree.select_path(&path)?.view();
+        collect_macrolet_binding_renames_from_view(
+            &view,
+            path_indexes,
+            dialect,
+            from,
+            to,
+            LocalCallableRenameKind::Function,
+            MacroletRenameScope::default(),
+            &mut renames,
+        );
+    }
+
+    renames.sort_by_key(|rename| rename.span.start());
+    Ok(renames)
+}
+
+pub fn collect_local_function_call_head_renames(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    from: &SymbolName,
+    to: &SymbolName,
+) -> Result<Vec<RenameFunctionOccurrence>> {
+    let mut renames = Vec::new();
+
+    for (index, _) in tree.root_children().iter().enumerate() {
+        let path_indexes = vec![index];
+        let path = Path::from_indexes(path_indexes.clone());
+        let view = tree.select_path(&path)?.view();
+        collect_macrolet_call_head_renames_from_view(
+            &view,
+            path_indexes,
+            dialect,
+            from,
+            to,
+            LocalCallableRenameKind::Function,
             MacroletRenameScope::default(),
             &mut renames,
         );
@@ -99,6 +172,7 @@ fn collect_macrolet_binding_renames_from_view(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
+    kind: LocalCallableRenameKind,
     scope: MacroletRenameScope,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
@@ -115,6 +189,7 @@ fn collect_macrolet_binding_renames_from_view(
                 dialect,
                 from,
                 to,
+                kind,
                 scope,
                 form,
                 renames,
@@ -135,7 +210,7 @@ fn collect_macrolet_binding_renames_from_view(
         let mut child_path = path_indexes.clone();
         child_path.push(index);
         collect_macrolet_binding_renames_from_view(
-            child, child_path, dialect, from, to, scope, renames,
+            child, child_path, dialect, from, to, kind, scope, renames,
         );
     }
 }
@@ -146,6 +221,7 @@ fn collect_macrolet_call_head_renames_from_view(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
+    kind: LocalCallableRenameKind,
     scope: MacroletRenameScope,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
@@ -162,6 +238,7 @@ fn collect_macrolet_call_head_renames_from_view(
                 dialect,
                 from,
                 to,
+                kind,
                 scope,
                 form,
                 renames,
@@ -197,7 +274,7 @@ fn collect_macrolet_call_head_renames_from_view(
         let mut child_path = path_indexes.clone();
         child_path.push(index);
         collect_macrolet_call_head_renames_from_view(
-            child, child_path, dialect, from, to, scope, renames,
+            child, child_path, dialect, from, to, kind, scope, renames,
         );
     }
 }
@@ -209,18 +286,19 @@ fn collect_local_callable_form_binding_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
+    kind: LocalCallableRenameKind,
     scope: MacroletRenameScope,
     form: LocalCallableForm,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
     let local_names = local_callable_names(view);
     let binds_from = local_names.iter().any(|name| name == from.as_str());
-    let body_scope = local_callable_body_scope(scope, form, binds_from);
+    let body_scope = local_callable_body_scope(scope, kind, form, binds_from);
 
     if let Some(bindings) = view.children.get(1) {
-        let binding_body_scope = local_callable_binding_body_scope(scope, form, binds_from);
+        let binding_body_scope = local_callable_binding_body_scope(scope, kind, form, binds_from);
         for (binding_index, binding) in bindings.children.iter().enumerate() {
-            if is_macro_callable_form(form)
+            if kind.matches_target_form(form)
                 && !scope.is_target_active()
                 && !scope.is_shadowed()
                 && binding
@@ -253,6 +331,7 @@ fn collect_local_callable_form_binding_renames(
                     dialect,
                     from,
                     to,
+                    kind,
                     binding_body_scope,
                     renames,
                 );
@@ -264,7 +343,7 @@ fn collect_local_callable_form_binding_renames(
         let mut child_path = path_indexes.clone();
         child_path.push(index);
         collect_macrolet_binding_renames_from_view(
-            child, child_path, dialect, from, to, body_scope, renames,
+            child, child_path, dialect, from, to, kind, body_scope, renames,
         );
     }
 }
@@ -276,16 +355,17 @@ fn collect_local_callable_form_call_renames(
     dialect: Dialect,
     from: &SymbolName,
     to: &SymbolName,
+    kind: LocalCallableRenameKind,
     scope: MacroletRenameScope,
     form: LocalCallableForm,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
     let local_names = local_callable_names(view);
     let binds_from = local_names.iter().any(|name| name == from.as_str());
-    let body_scope = local_callable_body_scope(scope, form, binds_from);
+    let body_scope = local_callable_body_scope(scope, kind, form, binds_from);
 
     if let Some(bindings) = view.children.get(1) {
-        let binding_body_scope = local_callable_binding_body_scope(scope, form, binds_from);
+        let binding_body_scope = local_callable_binding_body_scope(scope, kind, form, binds_from);
         for (binding_index, binding) in bindings.children.iter().enumerate() {
             if is_macro_callable_form(form) {
                 continue;
@@ -299,6 +379,7 @@ fn collect_local_callable_form_call_renames(
                     dialect,
                     from,
                     to,
+                    kind,
                     binding_body_scope,
                     renames,
                 );
@@ -310,13 +391,14 @@ fn collect_local_callable_form_call_renames(
         let mut child_path = path_indexes.clone();
         child_path.push(index);
         collect_macrolet_call_head_renames_from_view(
-            child, child_path, dialect, from, to, body_scope, renames,
+            child, child_path, dialect, from, to, kind, body_scope, renames,
         );
     }
 }
 
 fn local_callable_body_scope(
     scope: MacroletRenameScope,
+    kind: LocalCallableRenameKind,
     form: LocalCallableForm,
     binds_from: bool,
 ) -> MacroletRenameScope {
@@ -324,30 +406,49 @@ fn local_callable_body_scope(
         return scope;
     }
 
-    match form {
-        LocalCallableForm::Macrolet | LocalCallableForm::CompilerMacrolet
-            if !scope.is_target_active() && !scope.is_shadowed() =>
+    match kind {
+        LocalCallableRenameKind::Macro
+            if is_macro_callable_form(form)
+                && !scope.is_target_active()
+                && !scope.is_shadowed() =>
         {
             scope.enter_active_target()
         }
-        LocalCallableForm::Flet
-        | LocalCallableForm::Labels
-        | LocalCallableForm::Macrolet
-        | LocalCallableForm::CompilerMacrolet => scope.enter_shadowed(),
+        LocalCallableRenameKind::Function
+            if matches!(form, LocalCallableForm::Flet | LocalCallableForm::Labels)
+                && !scope.is_target_active()
+                && !scope.is_shadowed() =>
+        {
+            scope.enter_active_target()
+        }
+        LocalCallableRenameKind::Macro | LocalCallableRenameKind::Function => scope.enter_shadowed(),
     }
 }
 
 fn local_callable_binding_body_scope(
     scope: MacroletRenameScope,
+    kind: LocalCallableRenameKind,
     form: LocalCallableForm,
     binds_from: bool,
 ) -> MacroletRenameScope {
-    match form {
-        LocalCallableForm::Labels if binds_from => scope.enter_shadowed(),
-        LocalCallableForm::Flet
-        | LocalCallableForm::Labels
-        | LocalCallableForm::Macrolet
-        | LocalCallableForm::CompilerMacrolet => scope,
+    if !binds_from {
+        return scope;
+    }
+
+    match (kind, form) {
+        (LocalCallableRenameKind::Macro, LocalCallableForm::Labels) => scope.enter_shadowed(),
+        (LocalCallableRenameKind::Function, LocalCallableForm::Labels)
+            if !scope.is_target_active() && !scope.is_shadowed() =>
+        {
+            scope.enter_active_target()
+        }
+        (LocalCallableRenameKind::Function, LocalCallableForm::Labels) => scope.enter_shadowed(),
+        (
+            LocalCallableRenameKind::Macro | LocalCallableRenameKind::Function,
+            LocalCallableForm::Flet
+            | LocalCallableForm::Macrolet
+            | LocalCallableForm::CompilerMacrolet,
+        ) => scope,
     }
 }
 

@@ -14,10 +14,9 @@ fn plans_macrolet_rename_without_touching_expander_body_references() {
     assert_eq!(plan.definitions.len(), 1);
     assert_eq!(plan.calls.len(), 1);
     assert!(plan.changed);
-    assert!(
-        plan.rewritten
-            .contains("(macrolet ((bar (x) (list foo x))) (bar 1) foo)")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(macrolet ((bar (x) (list foo x))) (bar 1) foo)"));
 }
 
 #[test]
@@ -34,10 +33,9 @@ fn plans_compiler_macrolet_rename_without_touching_expander_body_references() {
     assert_eq!(plan.definitions.len(), 1);
     assert_eq!(plan.calls.len(), 1);
     assert!(plan.changed);
-    assert!(
-        plan.rewritten
-            .contains("(compiler-macrolet ((bar (x) (list foo x))) (bar 1) foo)")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(compiler-macrolet ((bar (x) (list foo x))) (bar 1) foo)"));
 }
 
 #[test]
@@ -54,10 +52,9 @@ fn skips_nested_macrolet_calls_when_renaming_outer_macrolet() {
     assert_eq!(plan.definitions.len(), 1);
     assert_eq!(plan.calls.len(), 1);
     assert!(plan.rewritten.contains("(macrolet ((bar (x) x))"));
-    assert!(
-        plan.rewritten
-            .contains("(macrolet ((foo (y) (foo y))) (foo 1))")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(macrolet ((foo (y) (foo y))) (foo 1))"));
     assert!(plan.rewritten.contains("(bar 2)"));
 }
 
@@ -93,10 +90,9 @@ fn skips_labels_calls_that_shadow_macrolet_binding() {
     assert_eq!(plan.definitions.len(), 1);
     assert_eq!(plan.calls.len(), 1);
     assert!(plan.rewritten.contains("(macrolet ((bar (x) x))"));
-    assert!(
-        plan.rewritten
-            .contains("(labels ((foo (y) (foo y))) (foo 1))")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(labels ((foo (y) (foo y))) (foo 1))"));
     assert!(plan.rewritten.contains("(bar 2)"));
 }
 

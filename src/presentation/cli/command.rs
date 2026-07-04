@@ -104,6 +104,8 @@ pub(super) enum Command {
     RenameFunction(rename::args::RenameFunctionArgs),
     /// Plan or apply a macrolet/compiler-macrolet binding and call-site rename across explicit files.
     RenameMacrolet(rename::args::RenameMacroletArgs),
+    /// Plan or apply a flet/labels local function binding and call-site rename across explicit files.
+    RenameLocalFunction(rename::args::RenameLocalFunctionArgs),
     /// Plan or replace callable call-site heads across explicit files.
     ReplaceFunctionCalls(rename::args::ReplaceFunctionCallsArgs),
     /// Plan or wrap callable call sites in another function or macro call.

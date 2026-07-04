@@ -34,11 +34,9 @@ fn explicit_path_rejects_non_wrapper_targets() {
     })
     .unwrap_err();
 
-    assert!(
-        error
-            .to_string()
-            .contains("call-path 0.2 is not a unary trace wrapper around foo")
-    );
+    assert!(error
+        .to_string()
+        .contains("call-path 0.2 is not a unary trace wrapper around foo"));
 }
 
 proptest! {

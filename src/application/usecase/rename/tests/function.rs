@@ -33,10 +33,9 @@ fn skips_labels_local_function_calls_when_renaming_function() {
     assert_eq!(plan.definitions.len(), 1);
     assert_eq!(plan.calls.len(), 1);
     assert!(plan.rewritten.contains("(defun renamed (x)"));
-    assert!(
-        plan.rewritten
-            .contains("(labels ((helper (x) (helper x))) (helper 1))")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(labels ((helper (x) (helper x))) (helper 1))"));
     assert!(plan.rewritten.contains("(defun caller () (renamed 2))"));
 }
 
@@ -53,10 +52,9 @@ fn renames_outer_function_calls_inside_flet_binding_bodies_only() {
 
     assert_eq!(plan.definitions.len(), 1);
     assert_eq!(plan.calls.len(), 1);
-    assert!(
-        plan.rewritten
-            .contains("(flet ((helper (x) (renamed x))) (helper 1))")
-    );
+    assert!(plan
+        .rewritten
+        .contains("(flet ((helper (x) (renamed x))) (helper 1))"));
 }
 
 proptest! {

@@ -63,6 +63,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::RenameSymbols(args) => rename::rename_symbols::rename_symbols(args)?,
         Command::RenameFunction(args) => rename::rename_function::rename_function(args)?,
         Command::RenameMacrolet(args) => rename::rename_macrolet::rename_macrolet(args)?,
+        Command::RenameLocalFunction(args) => {
+            rename::rename_local_function::rename_local_function(args)?
+        }
         Command::ReplaceFunctionCalls(args) => {
             rename::replace_function_calls::replace_function_calls(args)?
         }
