@@ -1,64 +1,12 @@
-use super::*;
+use anyhow::Result;
+use serde_json::json;
 
-use crate::application::call_report::{CallReportItem, build_call_report};
+use crate::domain::definition::DefinitionCategory;
+use crate::domain::sexpr::SymbolName;
+use crate::presentation::cli::args::OutputFormat;
+use crate::presentation::cli::call_report::types::CallReportFile;
 
-#[derive(Debug, Args)]
-pub(super) struct CallReportArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Exact list-head symbol to report. Reports every non-definition call when omitted.
-    #[arg(long)]
-    symbol: Option<SymbolName>,
-    /// Include definition-like forms such as defun and defmacro in the report.
-    #[arg(long)]
-    include_definitions: bool,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    output: OutputFormat,
-}
-
-#[derive(Debug)]
-struct CallReportFile {
-    path: PathBuf,
-    dialect: Dialect,
-    calls: Vec<CallReportItem>,
-}
-
-pub(super) fn call_report(args: CallReportArgs) -> Result<()> {
-    let mut reports = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        let calls = build_call_report(
-            &tree,
-            dialect,
-            args.symbol.as_ref(),
-            args.include_definitions,
-        )?;
-
-        reports.push(CallReportFile {
-            path: file.clone(),
-            dialect,
-            calls,
-        });
-    }
-
-    print_call_report(
-        &reports,
-        args.symbol.as_ref(),
-        args.include_definitions,
-        args.output,
-    )
-}
-
-fn print_call_report(
+pub(super) fn print_call_report(
     reports: &[CallReportFile],
     symbol: Option<&SymbolName>,
     include_definitions: bool,

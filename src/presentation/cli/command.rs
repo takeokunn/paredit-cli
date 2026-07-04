@@ -35,7 +35,7 @@ pub(super) enum Command {
     /// Report exact atom occurrences across explicit files for rename planning.
     SymbolReport(symbol_report::args::SymbolReportArgs),
     /// Report list-head call sites across explicit files for arity refactor planning.
-    CallReport(call_report::CallReportArgs),
+    CallReport(call_report::args::CallReportArgs),
     /// Compare callable definitions and call-site arity across explicit files.
     SignatureReport(signature_report::args::SignatureReportArgs),
     /// Report internal and optional external call graph edges across explicit files.
