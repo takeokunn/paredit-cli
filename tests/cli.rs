@@ -40,7 +40,7 @@ mod refactor_manifest;
 mod refactor_preview;
 #[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
-#[path = "cli/remove_unused_binding.rs"]
+#[path = "cli/remove_unused_binding/mod.rs"]
 mod remove_unused_binding;
 #[path = "cli/rename/mod.rs"]
 mod rename;
