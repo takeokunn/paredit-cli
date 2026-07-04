@@ -10,10 +10,10 @@ pub(super) fn count_lambda_parameters(lambda_list: &ExpressionView) -> usize {
     lambda_list
         .children
         .iter()
-        .filter(|child| {
-            atom_text(child)
-                .map(|text| !text.starts_with('&'))
-                .unwrap_or(false)
+        .filter(|child| match child.kind {
+            ExpressionKind::Atom => atom_text(child).is_some_and(|text| !text.starts_with('&')),
+            ExpressionKind::List => true,
+            ExpressionKind::Root => false,
         })
         .count()
 }

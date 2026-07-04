@@ -91,7 +91,7 @@ fn collect_call_report_items_from_view(
 
         if category.is_some() {
             child_enclosing_definition = definition_name(view, head).map(ToOwned::to_owned);
-            first_callable_child_index = definition_body_start_index(category);
+            first_callable_child_index = definition_body_start_index(view, head, category);
         }
     }
 

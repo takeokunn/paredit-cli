@@ -87,6 +87,43 @@ fn skips_common_lisp_local_callable_edges_to_shadowed_global_definitions() {
 }
 
 #[test]
+fn counts_common_lisp_macro_and_method_lambda_lists() {
+    let report = build_call_graph_report(
+        vec![source(
+            "(define-compiler-macro fast-add (x y) (helper x y))\n(defmethod render :around ((node widget) stream) (draw node stream))\n(defun helper (x y) y)\n(defun draw (node stream) stream)",
+        )],
+        false,
+        None,
+    )
+    .unwrap();
+
+    let definitions = &report.files[0].definitions;
+    let fast_add = definitions
+        .iter()
+        .find(|definition| definition.name.as_deref() == Some("fast-add"))
+        .expect("compiler macro definition");
+    let render = definitions
+        .iter()
+        .find(|definition| definition.name.as_deref() == Some("render"))
+        .expect("method definition");
+
+    assert_eq!(fast_add.parameter_count, 2);
+    assert_eq!(render.parameter_count, 2);
+    assert!(
+        !report.files[0]
+            .edges
+            .iter()
+            .any(|edge| edge.caller.as_deref() == Some("render") && edge.callee == "node")
+    );
+    assert!(
+        report.files[0]
+            .edges
+            .iter()
+            .any(|edge| edge.caller.as_deref() == Some("render") && edge.callee == "draw")
+    );
+}
+
+#[test]
 fn policy_counts_inbound_edges_without_self_recursive_calls() {
     let symbol = SymbolName::new("target").unwrap();
     let report = build_call_graph_report(

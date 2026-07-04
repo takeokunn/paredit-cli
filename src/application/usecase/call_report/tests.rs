@@ -92,6 +92,16 @@ fn skips_common_lisp_compiler_macrolet_local_macro_calls() {
     assert!(calls.is_empty());
 }
 
+#[test]
+fn skips_common_lisp_defmethod_specialized_lambda_list_calls() {
+    let tree = parse("(defmethod render :around ((node widget) stream) (draw node stream))");
+    let calls = build_call_report(&tree, Dialect::CommonLisp, None, false).unwrap();
+
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].head, "draw");
+    assert_eq!(calls[0].enclosing_definition.as_deref(), Some("render"));
+}
+
 fn symbol_strategy() -> impl Strategy<Value = String> {
     "[a-z][a-z0-9-]{0,8}".prop_filter("exclude definition heads", |symbol| {
         !matches!(

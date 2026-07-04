@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::domain::definition::{classify_definition_head, definition_name_child_index};
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionView, Path, SyntaxTree};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::syntax::{atom_child, count_lambda_parameters, list_child, list_head};
 use super::types::CallGraphDefinitionItem;
@@ -62,23 +62,34 @@ fn definition_name<'a>(view: &'a ExpressionView, head: &str) -> Option<&'a str> 
 
 fn lambda_list_index(view: &ExpressionView, head: &str) -> Option<usize> {
     match head {
-        "defun" | "defmacro" | "define" | "lambda" => Some(2),
-        "defmethod" => {
-            let mut index = 2;
-            while let Some(child) = list_child(view, index) {
-                if child.kind == crate::domain::sexpr::ExpressionKind::Atom {
-                    index += 1;
-                    continue;
-                }
-                if child.kind == crate::domain::sexpr::ExpressionKind::List
-                    && child.delimiter == Some(Delimiter::Paren)
-                {
-                    return Some(index);
-                }
-                index += 1;
-            }
-            None
-        }
+        "defun"
+        | "cl-defun"
+        | "defsubst"
+        | "definline"
+        | "defmacro"
+        | "cl-defmacro"
+        | "define-compiler-macro"
+        | "define-modify-macro"
+        | "define-setf-expander"
+        | "defsetf"
+        | "define"
+        | "lambda"
+        | "defn"
+        | "defn-" => list_child_index(view, 2),
+        "defmethod" | "cl-defmethod" => (2..view.children.len()).find(|&index| {
+            matches!(
+                view.children[index].delimiter,
+                Some(Delimiter::Paren | Delimiter::Bracket)
+            )
+        }),
+        "defgeneric" | "cl-defgeneric" => list_child_index(view, 2),
+        "deftest" | "ert-deftest" | "define-test" | "define-ert-test" => list_child_index(view, 2),
         _ => None,
     }
+}
+
+fn list_child_index(view: &ExpressionView, index: usize) -> Option<usize> {
+    view.children
+        .get(index)
+        .and_then(|child| (child.kind == ExpressionKind::List).then_some(index))
 }

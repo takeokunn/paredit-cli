@@ -47,6 +47,28 @@ fn cli_reports_call_graph_across_dialects() {
 }
 
 #[test]
+fn cli_skips_common_lisp_defmethod_specialized_lambda_list_edges() {
+    let dir = fresh_temp_dir("call-graph-defmethod-specializer");
+    let lisp_file = dir.join("methods.lisp");
+    fs::write(
+        &lisp_file,
+        "(defmethod render :around ((node widget) stream) (draw node stream))\n(defun draw (node stream) stream)\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("call-graph")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"caller\": \"render\""))
+        .stdout(predicate::str::contains("\"callee\": \"draw\""))
+        .stdout(predicate::str::contains("\"callee\": \"node\"").not());
+}
+
+#[test]
 fn cli_gates_call_graph_policy_for_ci() {
     let dir = fresh_temp_dir("call-graph-policy");
     let lisp_file = dir.join("core.lisp");
