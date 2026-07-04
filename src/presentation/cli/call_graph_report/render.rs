@@ -3,7 +3,9 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::call_graph_report::{CallGraphFile, CallGraphNode, CallGraphPolicy};
+use crate::application::usecase::call_graph_report::{
+    CallGraphFile, CallGraphNode, CallGraphPolicy,
+};
 use crate::domain::sexpr::SymbolName;
 use crate::presentation::cli::OutputFormat;
 

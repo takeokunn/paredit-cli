@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 
-use crate::application::call_graph_report::{
+use crate::application::usecase::call_graph_report::{
     CallGraphNode, build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node,
 };
 use crate::application::usecase::call_report::build_call_report;

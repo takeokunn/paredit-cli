@@ -1,5 +1,6 @@
 //! Application use cases.
 
+pub mod call_graph_report;
 pub mod call_report;
 pub mod definition_report;
 pub mod dependency_report;

@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::application::call_graph_report::CallGraphEdge;
+use crate::application::usecase::call_graph_report::CallGraphEdge;
 use crate::application::usecase::impact_report::{
     ImpactReportFile, ImpactReportPolicy, impact_risks, impact_status_counts,
 };
