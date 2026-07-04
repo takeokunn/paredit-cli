@@ -88,9 +88,9 @@ pub(super) fn collect_signature_definitions(
             continue;
         };
         let name = definition_name(&view, head).map(ToOwned::to_owned);
-        if !name
+        if name
             .as_deref()
-            .is_some_and(|name| symbol.is_none_or(|target| name == target.as_str()))
+            .is_none_or(|name| symbol.is_some_and(|target| name != target.as_str()))
         {
             continue;
         }

@@ -11,23 +11,22 @@ pub fn refactor_plan_gates(
         .into_iter()
         .map(|risk| {
             let blocks_automation = risk.level == RefactorRiskLevel::Error
-                || match (operation, risk.code) {
-                    (RefactorOperation::Rename, "signature-mismatch" | "ambiguous-definition") => {
-                        true
-                    }
+                || matches!(
+                    (operation, risk.code),
                     (
+                        RefactorOperation::Rename,
+                        "signature-mismatch" | "ambiguous-definition"
+                    ) | (
                         RefactorOperation::Remove | RefactorOperation::Move,
                         "inbound-callers" | "ambiguous-definition",
-                    ) => true,
-                    (
+                    ) | (
                         RefactorOperation::Signature,
                         "inbound-callers"
-                        | "non-call-references"
-                        | "signature-mismatch"
-                        | "ambiguous-definition",
-                    ) => true,
-                    _ => false,
-                };
+                            | "non-call-references"
+                            | "signature-mismatch"
+                            | "ambiguous-definition",
+                    )
+                );
             RefactorPlanGate {
                 level: risk.level,
                 code: risk.code,

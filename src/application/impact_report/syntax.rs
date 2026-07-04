@@ -52,11 +52,11 @@ pub(super) fn count_lambda_parameters(lambda_list: &ExpressionView) -> usize {
         .count()
 }
 
-pub(super) fn list_head<'a>(view: &'a ExpressionView) -> Option<&'a str> {
+pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
     view.children.first().and_then(atom_text)
 }
 
-pub(super) fn atom_child<'a>(view: &'a ExpressionView, index: usize) -> Option<&'a str> {
+pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 

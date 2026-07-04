@@ -6,20 +6,20 @@ use super::super::types::plan::{
 };
 
 pub(in crate::presentation::cli) fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
-    emit_refactor_plan(
-        &args.files,
-        args.dialect,
-        &args.symbol,
-        args.operation,
-        RefactorPlanPolicyOptions {
+    emit_refactor_plan(RefactorPlanEmission {
+        paths: &args.files,
+        dialect: args.dialect,
+        symbol: &args.symbol,
+        operation: args.operation,
+        policy_options: RefactorPlanPolicyOptions {
             fail_on_blocking_gate: args.fail_on_blocking_gate,
             require_definitions: args.require_definitions,
             require_references: args.require_references,
         },
-        None,
-        args.output,
-        "refactor-plan",
-    )
+        workspace: None,
+        output: args.output,
+        failure_label: "refactor-plan",
+    })
 }
 
 pub(in crate::presentation::cli) fn workspace_refactor_plan(
@@ -41,32 +41,44 @@ pub(in crate::presentation::cli) fn workspace_refactor_plan(
         skipped_symlink_count: discovery.skipped_symlink_count,
     };
 
-    emit_refactor_plan(
-        &discovery.files,
-        None,
-        &args.symbol,
-        args.operation,
-        RefactorPlanPolicyOptions {
+    emit_refactor_plan(RefactorPlanEmission {
+        paths: &discovery.files,
+        dialect: None,
+        symbol: &args.symbol,
+        operation: args.operation,
+        policy_options: RefactorPlanPolicyOptions {
             fail_on_blocking_gate: args.fail_on_blocking_gate,
             require_definitions: args.require_definitions,
             require_references: args.require_references,
         },
-        Some(workspace),
-        args.output,
-        "workspace-refactor-plan",
-    )
+        workspace: Some(workspace),
+        output: args.output,
+        failure_label: "workspace-refactor-plan",
+    })
 }
 
-fn emit_refactor_plan(
-    paths: &[PathBuf],
+struct RefactorPlanEmission<'a> {
+    paths: &'a [PathBuf],
     dialect: Option<DialectArg>,
-    symbol: &SymbolName,
+    symbol: &'a SymbolName,
     operation: RefactorOperation,
     policy_options: RefactorPlanPolicyOptions,
     workspace: Option<WorkspaceRefactorPlanDiscovery>,
     output: OutputFormat,
     failure_label: &'static str,
-) -> Result<()> {
+}
+
+fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
+    let RefactorPlanEmission {
+        paths,
+        dialect,
+        symbol,
+        operation,
+        policy_options,
+        workspace,
+        output,
+        failure_label,
+    } = request;
     let files = impact_report::workflow::collect_impact_reports(paths, dialect, symbol)?;
     let summary = summarize_impact_reports(&files);
     let operation = ApplicationRefactorOperation::from(operation);

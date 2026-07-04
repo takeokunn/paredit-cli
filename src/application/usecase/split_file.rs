@@ -119,7 +119,7 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
         anyhow::bail!("split-file selectors did not match any top-level definitions");
     }
 
-    items.sort_by(|left, right| left.span.start().get().cmp(&right.span.start().get()));
+    items.sort_by_key(|item| item.span.start().get());
     ensure_non_overlapping_spans(items.iter().map(|item| item.span))?;
 
     let definition_texts = items

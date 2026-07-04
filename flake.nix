@@ -22,9 +22,10 @@
           cargoLock.lockFile = ./Cargo.lock;
         };
 
-        apps.default = flake-utils.lib.mkApp {
-          drv = self.packages.${system}.default;
-          exePath = "/bin/paredit";
+        apps.default = {
+          type = "app";
+          program = "${self.packages.${system}.default}/bin/paredit";
+          meta.description = "Run paredit-cli";
         };
 
         devShells.default = pkgs.mkShell {
@@ -35,6 +36,44 @@
             pkgs.rustfmt
             pkgs.clippy
           ];
+        };
+
+        formatter = pkgs.writeShellApplication {
+          name = "fmt";
+          runtimeInputs = [
+            rustToolchain
+            pkgs.nixfmt
+          ];
+          text = ''
+            nixfmt "$@"
+            cargo fmt
+          '';
+        };
+
+        checks = {
+          default = pkgs.runCommand "paredit-cli-check"
+            {
+              nativeBuildInputs = [ rustToolchain ];
+              src = self;
+            }
+            ''
+              cp -r $src/. .
+              chmod -R u+w .
+              cargo fmt --check
+              touch $out
+            '';
+          clippy = (self.packages.${system}.default).overrideAttrs (old: {
+            pname = "paredit-cli-clippy";
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.clippy ];
+            doCheck = false;
+            buildPhase = ''
+              cargo clippy --all-targets -- -D warnings
+            '';
+            installPhase = ''
+              touch $out
+            '';
+          });
+          package = self.packages.${system}.default;
         };
       });
 }

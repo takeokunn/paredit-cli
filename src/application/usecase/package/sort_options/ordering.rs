@@ -24,7 +24,7 @@ pub(super) fn sort_slots(slots: &[OptionSlot]) -> (Vec<String>, Vec<OptionReplac
         .iter()
         .zip(sorted_slots)
         .filter_map(|(old_slot, new_slot)| {
-            (old_slot.text != new_slot.text).then(|| OptionReplacement {
+            (old_slot.text != new_slot.text).then_some(OptionReplacement {
                 span: old_slot.span,
                 replacement: new_slot.text,
             })

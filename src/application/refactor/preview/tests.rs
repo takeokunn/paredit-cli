@@ -92,9 +92,9 @@ proptest! {
         };
 
         let policy = evaluate_refactor_preview_policy(options, &summary);
-        let expected_passed = !(fail_on_no_change && changed == 0)
-            && !(fail_on_parse_error && !all_outputs_parse)
-            && !(fail_on_target_conflict && target_occurrences > 0)
+        let expected_passed = !(fail_on_no_change && changed == 0
+            || fail_on_parse_error && !all_outputs_parse
+            || fail_on_target_conflict && target_occurrences > 0)
             && require_changed.is_none_or(|required| changed >= required)
             && require_definitions.is_none_or(|required| definitions == required)
             && require_edits.is_none_or(|required| edits >= required);

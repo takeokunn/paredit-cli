@@ -8,13 +8,13 @@ pub(super) fn binding_pattern_name_spans(
     input: &str,
 ) -> Vec<ParameterNameSpan> {
     let mut names = Vec::new();
-    collect_binding_pattern_name_spans(pattern, input, &mut names);
+    let _ = input;
+    collect_binding_pattern_name_spans(pattern, &mut names);
     names
 }
 
 fn collect_binding_pattern_name_spans(
     pattern: &ExpressionView,
-    input: &str,
     output: &mut Vec<ParameterNameSpan>,
 ) {
     if let Some(name) = atom_text(pattern) {
@@ -45,13 +45,13 @@ fn collect_binding_pattern_name_spans(
             }
             if marker == ":as" {
                 if let Some(next) = pattern.children.get(index + 1) {
-                    collect_binding_pattern_name_spans(next, input, output);
+                    collect_binding_pattern_name_spans(next, output);
                     index += 2;
                     continue;
                 }
             }
         }
-        collect_binding_pattern_name_spans(child, input, output);
+        collect_binding_pattern_name_spans(child, output);
         index += 1;
     }
 }

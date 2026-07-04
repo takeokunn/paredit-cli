@@ -64,8 +64,9 @@ pub(super) fn defpackage_option_sort_edits(
         .with_context(|| format!("failed to inspect package form at {path}"))?;
     }
 
-    if package.is_some() && matched_defpackages == 0 {
-        let target = package.expect("checked is_some");
+    if matched_defpackages == 0
+        && let Some(target) = package
+    {
         anyhow::bail!("no matching defpackage form found for {target}");
     }
 

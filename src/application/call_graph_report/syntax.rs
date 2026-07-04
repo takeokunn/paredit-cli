@@ -27,7 +27,9 @@ pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
 }
 
 fn atom_text(view: &ExpressionView) -> Option<&str> {
-    (view.kind == ExpressionKind::Atom)
-        .then_some(())
-        .and_then(|_| view.text.as_deref())
+    if view.kind == ExpressionKind::Atom {
+        view.text.as_deref()
+    } else {
+        None
+    }
 }

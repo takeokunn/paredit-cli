@@ -11,7 +11,7 @@ use super::types::{
 use crate::application::usecase::rename::{self as rename_usecase, WrapFunctionCallsScope};
 
 pub(in crate::presentation::cli) fn wrap_function_calls(args: WrapFunctionCallsArgs) -> Result<()> {
-    if args.all_calls == !args.call_paths.is_empty() {
+    if args.all_calls != args.call_paths.is_empty() {
         anyhow::bail!("wrap-function-calls requires either --all-calls or repeated --call-path");
     }
 

@@ -27,17 +27,15 @@ pub(super) fn collect_wrap_all_call_sites(
         let path_indexes = vec![index];
         let path = Path::from_indexes(path_indexes.clone());
         let view = tree.select_path(&path)?.view();
-        collect_wrap_call_sites_from_view(
-            &view,
+        let mut collection = WrapCallSiteCollection {
             dialect,
             input,
-            path_indexes,
-            None,
             function,
             wrapper,
-            &mut candidates,
-            &mut skipped_already_wrapped,
-        );
+            candidates: &mut candidates,
+            skipped_already_wrapped: &mut skipped_already_wrapped,
+        };
+        collect_wrap_call_sites_from_view(&view, path_indexes, None, &mut collection);
     }
 
     let (calls, skipped_nested) = select_outermost_wrap_call_sites(candidates);
@@ -73,46 +71,42 @@ pub(super) fn collect_wrap_explicit_call_sites(
     Ok((calls, skipped_already_wrapped, Vec::new()))
 }
 
+struct WrapCallSiteCollection<'a> {
+    dialect: Dialect,
+    input: &'a str,
+    function: &'a SymbolName,
+    wrapper: &'a SymbolName,
+    candidates: &'a mut Vec<WrapFunctionCallSite>,
+    skipped_already_wrapped: &'a mut Vec<WrapFunctionCallSite>,
+}
+
 fn collect_wrap_call_sites_from_view(
     view: &ExpressionView,
-    dialect: Dialect,
-    input: &str,
     path_indexes: Vec<usize>,
     parent_head: Option<&str>,
-    function: &SymbolName,
-    wrapper: &SymbolName,
-    candidates: &mut Vec<WrapFunctionCallSite>,
-    skipped_already_wrapped: &mut Vec<WrapFunctionCallSite>,
+    collection: &mut WrapCallSiteCollection<'_>,
 ) {
     let current_head = list_head(view);
     if let Some(site) = wrap_call_site_from_view(
         view,
-        input,
+        collection.input,
         Path::from_indexes(path_indexes.clone()).to_string(),
-        function,
-        wrapper,
+        collection.function,
+        collection.wrapper,
     ) {
-        if parent_head == Some(wrapper.as_str()) {
-            skipped_already_wrapped.push(site);
-        } else if classify_definition_head(dialect, current_head.unwrap_or_default()).is_none() {
-            candidates.push(site);
+        if parent_head == Some(collection.wrapper.as_str()) {
+            collection.skipped_already_wrapped.push(site);
+        } else if classify_definition_head(collection.dialect, current_head.unwrap_or_default())
+            .is_none()
+        {
+            collection.candidates.push(site);
         }
     }
 
     for (index, child) in view.children.iter().enumerate() {
         let mut child_path = path_indexes.clone();
         child_path.push(index);
-        collect_wrap_call_sites_from_view(
-            child,
-            dialect,
-            input,
-            child_path,
-            current_head,
-            function,
-            wrapper,
-            candidates,
-            skipped_already_wrapped,
-        );
+        collect_wrap_call_sites_from_view(child, child_path, current_head, collection);
     }
 }
 

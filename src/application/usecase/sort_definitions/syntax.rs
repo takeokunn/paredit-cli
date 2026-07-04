@@ -1,7 +1,7 @@
 use crate::domain::definition::definition_name_child_index;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub(super) fn list_head<'a>(view: &'a ExpressionView) -> Option<&'a str> {
+pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return None;
     }

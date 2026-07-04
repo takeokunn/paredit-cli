@@ -14,15 +14,15 @@ pub(in crate::presentation::cli::refactor::workflow) use failure::finish_refacto
 pub(in crate::presentation::cli::refactor::workflow) use write::write_refactor_preview;
 
 pub(in crate::presentation::cli) fn refactor_preview(args: RefactorPreviewArgs) -> Result<()> {
-    emit_refactor_preview(
-        &args.files,
-        args.dialect,
-        &args.from,
-        &args.to,
-        args.mode,
-        args.max_preview_bytes,
-        args.write,
-        RefactorPreviewPolicyOptions {
+    emit_refactor_preview(RefactorPreviewEmission {
+        paths: &args.files,
+        dialect: args.dialect,
+        from: &args.from,
+        to: &args.to,
+        mode: args.mode,
+        max_preview_bytes: args.max_preview_bytes,
+        write: args.write,
+        policy_options: RefactorPreviewPolicyOptions {
             fail_on_no_change: args.fail_on_no_change,
             fail_on_parse_error: args.fail_on_parse_error,
             fail_on_target_conflict: args.fail_on_target_conflict,
@@ -30,10 +30,10 @@ pub(in crate::presentation::cli) fn refactor_preview(args: RefactorPreviewArgs) 
             require_definitions: args.require_definitions,
             require_edits: args.require_edits,
         },
-        None,
-        args.output,
-        "refactor-preview",
-    )
+        workspace: None,
+        output: args.output,
+        failure_label: "refactor-preview",
+    })
 }
 
 pub(in crate::presentation::cli) fn workspace_refactor_preview(
@@ -55,15 +55,15 @@ pub(in crate::presentation::cli) fn workspace_refactor_preview(
         skipped_symlink_count: discovery.skipped_symlink_count,
     };
 
-    emit_refactor_preview(
-        &discovery.files,
-        None,
-        &args.from,
-        &args.to,
-        args.mode,
-        args.max_preview_bytes,
-        args.write,
-        RefactorPreviewPolicyOptions {
+    emit_refactor_preview(RefactorPreviewEmission {
+        paths: &discovery.files,
+        dialect: None,
+        from: &args.from,
+        to: &args.to,
+        mode: args.mode,
+        max_preview_bytes: args.max_preview_bytes,
+        write: args.write,
+        policy_options: RefactorPreviewPolicyOptions {
             fail_on_no_change: args.fail_on_no_change,
             fail_on_parse_error: args.fail_on_parse_error,
             fail_on_target_conflict: args.fail_on_target_conflict,
@@ -71,17 +71,17 @@ pub(in crate::presentation::cli) fn workspace_refactor_preview(
             require_definitions: args.require_definitions,
             require_edits: args.require_edits,
         },
-        Some(workspace),
-        args.output,
-        "workspace-refactor-preview",
-    )
+        workspace: Some(workspace),
+        output: args.output,
+        failure_label: "workspace-refactor-preview",
+    })
 }
 
-fn emit_refactor_preview(
-    paths: &[PathBuf],
+struct RefactorPreviewEmission<'a> {
+    paths: &'a [PathBuf],
     dialect: Option<DialectArg>,
-    from: &SymbolName,
-    to: &SymbolName,
+    from: &'a SymbolName,
+    to: &'a SymbolName,
     mode: RefactorPreviewMode,
     max_preview_bytes: usize,
     write: bool,
@@ -89,7 +89,22 @@ fn emit_refactor_preview(
     workspace: Option<WorkspaceRefactorPlanDiscovery>,
     output: OutputFormat,
     failure_label: &'static str,
-) -> Result<()> {
+}
+
+fn emit_refactor_preview(request: RefactorPreviewEmission<'_>) -> Result<()> {
+    let RefactorPreviewEmission {
+        paths,
+        dialect,
+        from,
+        to,
+        mode,
+        max_preview_bytes,
+        write,
+        policy_options,
+        workspace,
+        output,
+        failure_label,
+    } = request;
     let mut preview = build_refactor_preview(BuildRefactorPreviewRequest {
         paths,
         dialect,

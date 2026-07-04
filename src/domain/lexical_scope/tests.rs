@@ -59,8 +59,7 @@ fn clojure_destructuring_shadows_keys_shorthand() {
 proptest! {
     #[test]
     fn pbt_shadowed_lambda_references_are_not_counted(count in 1usize..12) {
-        let lambdas = std::iter::repeat("(lambda (x) x)")
-            .take(count)
+        let lambdas = std::iter::repeat_n("(lambda (x) x)", count)
             .collect::<Vec<_>>()
             .join(" ");
         let input = format!("(list x {lambdas})");
