@@ -2,10 +2,10 @@ use super::*;
 
 pub(super) fn dispatch(command: Command) -> Result<()> {
     match command {
-        Command::Check(args) => analysis_report::check(args)?,
-        Command::Dialect(args) => analysis_report::dialect(args)?,
-        Command::Stats(args) => analysis_report::stats(args)?,
-        Command::AgentReport(args) => analysis_report::agent_report(args)?,
+        Command::Check(args) => analysis_report::workflow::check(args)?,
+        Command::Dialect(args) => analysis_report::workflow::dialect(args)?,
+        Command::Stats(args) => analysis_report::workflow::stats(args)?,
+        Command::AgentReport(args) => analysis_report::workflow::agent_report(args)?,
         Command::WorkspaceReport(args) => workspace_report::workflow::workspace_report(args)?,
         Command::WorkspaceRefactorPlan(args) => refactor::workflow::workspace_refactor_plan(args)?,
         Command::WorkspaceRefactorPreview(args) => {
@@ -14,7 +14,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::WorkspaceRefactorExecute(args) => {
             refactor::workflow::workspace_refactor_execute(args)?
         }
-        Command::Outline(args) => analysis_report::outline(args)?,
+        Command::Outline(args) => analysis_report::workflow::outline(args)?,
         Command::FormReport(args) => form_report::workflow::form_report(args)?,
         Command::FindSymbol(args) => symbol_report::workflow::find_symbol(args)?,
         Command::SymbolReport(args) => symbol_report::workflow::symbol_report(args)?,

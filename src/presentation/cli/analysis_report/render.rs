@@ -3,43 +3,9 @@ use crate::domain::sexpr::SyntaxTree;
 use anyhow::Result;
 use serde_json::json;
 
-use super::{AnalyzeArgs, InputArgs, OutputFormat, detect_dialect, read_input};
+use crate::presentation::cli::args::OutputFormat;
 
-pub(super) fn check(args: InputArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    SyntaxTree::parse(&input.text)?;
-    println!("ok");
-    Ok(())
-}
-
-pub(super) fn dialect(args: AnalyzeArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    print_dialect(dialect, args.output)
-}
-
-pub(super) fn stats(args: AnalyzeArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
-    print_stats(&tree, dialect, args.output)
-}
-
-pub(super) fn agent_report(args: AnalyzeArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
-    print_agent_report(&tree, dialect, args.output)
-}
-
-pub(super) fn outline(args: AnalyzeArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
-    print_outline(&tree, dialect, args.output)
-}
-
-fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()> {
+pub(super) fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => println!("{dialect}"),
         OutputFormat::Json => println!(
@@ -53,7 +19,7 @@ fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()> {
     Ok(())
 }
 
-fn print_stats(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+pub(super) fn print_stats(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
     let atoms = tree.atom_occurrences();
     let outline = tree.outline(|head| dialect.is_definition_head(head));
     match output {
@@ -76,7 +42,11 @@ fn print_stats(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Res
     Ok(())
 }
 
-fn print_agent_report(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+pub(super) fn print_agent_report(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    output: OutputFormat,
+) -> Result<()> {
     let atoms = tree.atom_occurrences();
     let outline = tree.outline(|head| dialect.is_definition_head(head));
     let payload = json!({
@@ -129,7 +99,11 @@ fn print_agent_report(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat)
     Ok(())
 }
 
-fn print_outline(tree: &SyntaxTree, dialect: Dialect, output: OutputFormat) -> Result<()> {
+pub(super) fn print_outline(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    output: OutputFormat,
+) -> Result<()> {
     let entries = tree.outline(|head| dialect.is_definition_head(head));
     match output {
         OutputFormat::Text => {
