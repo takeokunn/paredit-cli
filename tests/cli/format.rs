@@ -169,6 +169,27 @@ fn cli_formats_common_lisp_prefix_body_indentation() {
 }
 
 #[test]
+fn cli_formats_symbol_macrolet_indentation() {
+    let dir = fresh_temp_dir("format-symbol-macrolet");
+    let file = dir.join("symbol-macrolet.lisp");
+    fs::write(
+        &file,
+        "(symbol-macrolet ((value (compute value)) (used other)) (list value used))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(symbol-macrolet ((value (compute value))\n                  (used other))\n  (list value used))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_macrolet_indentation() {
     let dir = fresh_temp_dir("format-macrolet");
     let file = dir.join("macrolet.lisp");

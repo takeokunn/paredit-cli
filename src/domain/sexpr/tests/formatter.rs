@@ -233,6 +233,16 @@ fn formats_define_symbol_macro_like_a_definition() {
 }
 
 #[test]
+fn formats_symbol_macrolet_like_binding_form() {
+    let input = "(symbol-macrolet ((value (compute value)) (used other)) (list value used))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(symbol-macrolet ((value (compute value))\n                  (used other))\n  (list value used))\n"
+    );
+}
+
+#[test]
 fn formats_macrolet_like_local_functions() {
     let input = "(macrolet ((with-x (x) (list x outer))) (with-x 1) (with-x 2))";
     let tree = SyntaxTree::parse(input).expect("valid");

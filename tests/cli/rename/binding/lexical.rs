@@ -51,6 +51,30 @@ fn cli_plans_let_star_binding_rename_through_later_binding_values() {
 }
 
 #[test]
+fn cli_plans_symbol_macrolet_binding_rename_without_touching_expansion_reference() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "slot",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(symbol-macrolet ((value (compute value))) (list value value))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"symbol-macrolet\""))
+    .stdout(predicate::str::contains("\"reference_count\": 2"))
+    .stdout(predicate::str::contains(
+        "(symbol-macrolet ((slot (compute value))) (list slot slot))",
+    ));
+}
+
+#[test]
 fn cli_plans_lambda_parameter_rename_without_shadow_capture() {
     let mut cmd = paredit();
     cmd.args([
