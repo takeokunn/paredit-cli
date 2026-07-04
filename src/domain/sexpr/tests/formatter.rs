@@ -162,12 +162,22 @@ fn formats_multiple_local_callable_bindings_with_aligned_bindings() {
 }
 
 #[test]
-fn formats_declarations_as_head_body_forms() {
+fn formats_declarations_with_inline_specs() {
     let input =
         "(locally (declare (optimize speed)) (declaim (inline f)) (proclaim (special x)) (f))";
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(locally\n  (declare\n    (optimize speed))\n  (declaim\n    (inline f))\n  (proclaim\n    (special x))\n  (f))\n"
+        "(locally\n  (declare (optimize speed))\n  (declaim (inline f))\n  (proclaim (special x))\n  (f))\n"
+    );
+}
+
+#[test]
+fn formats_multiple_declaration_specs_with_alignment() {
+    let input = "(declare (optimize speed) (type fixnum index) (ignorable scratch))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(declare (optimize speed)\n         (type fixnum index)\n         (ignorable scratch))\n"
     );
 }

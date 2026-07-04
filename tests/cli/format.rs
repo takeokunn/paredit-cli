@@ -227,6 +227,27 @@ fn cli_formats_declarations_indentation() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(locally\n  (declare\n    (optimize speed))\n  (declaim\n    (inline f))\n  (proclaim\n    (special x))\n  (f))\n",
+            "(locally\n  (declare (optimize speed))\n  (declaim (inline f))\n  (proclaim (special x))\n  (f))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_multiple_declaration_specs() {
+    let dir = fresh_temp_dir("format-multiple-declarations");
+    let file = dir.join("declarations.lisp");
+    fs::write(
+        &file,
+        "(declare (optimize speed) (type fixnum index) (ignorable scratch))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(declare (optimize speed)\n         (type fixnum index)\n         (ignorable scratch))\n",
         ));
 }

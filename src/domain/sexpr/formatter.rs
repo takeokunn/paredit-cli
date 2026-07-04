@@ -71,6 +71,9 @@ impl Formatter {
                         ListStyle::ClauseForm => {
                             self.format_clause_form(tree, node_id, depth, output);
                         }
+                        ListStyle::Declaration => {
+                            self.format_declaration_form(tree, node_id, depth, head, output);
+                        }
                         ListStyle::HeadBody => {
                             self.format_head_body(tree, node_id, depth, output);
                         }
@@ -337,6 +340,37 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
+    fn format_declaration_form(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        head: &str,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        let continuation_column = depth * self.indent + head.len() + 2;
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    output.push('\n');
+                    output.push_str(&" ".repeat(continuation_column));
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
     fn format_general_list(
         &self,
         tree: &SyntaxTree,
@@ -435,8 +469,8 @@ impl Formatter {
             "handler-case" | "restart-case" => ListStyle::ClauseForm,
             "progn" | "prog1" | "prog2" | "cond" | "case" | "ccase" | "ecase" | "typecase"
             | "ctypecase" | "etypecase" | "unwind-protect" | "block" | "catch" | "tagbody"
-            | "loop" | "defpackage" | "declaim" | "declare" | "locally" | "proclaim"
-            | "eval-when" => ListStyle::HeadBody,
+            | "loop" | "defpackage" | "locally" | "eval-when" => ListStyle::HeadBody,
+            "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
             _ => ListStyle::General,
         }
     }
@@ -456,6 +490,7 @@ enum ListStyle {
     OneArgumentBody,
     TwoArgumentBody,
     ClauseForm,
+    Declaration,
     HeadBody,
     If,
     General,
