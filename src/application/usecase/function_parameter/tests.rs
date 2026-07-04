@@ -1,10 +1,11 @@
 use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::{
-    plan_add_function_parameter, plan_move_function_parameter, plan_remove_function_parameter,
-    plan_reorder_function_parameters, plan_swap_function_parameters, AddFunctionParameterRequest,
-    FunctionParameterInsert, MoveFunctionParameterRequest, RemoveFunctionParameterRequest,
-    ReorderFunctionParametersRequest, SwapFunctionParametersRequest,
+    AddFunctionParameterRequest, FunctionParameterInsert, MoveFunctionParameterRequest,
+    RemoveFunctionParameterRequest, ReorderFunctionParametersRequest,
+    SwapFunctionParametersRequest, plan_add_function_parameter, plan_move_function_parameter,
+    plan_remove_function_parameter, plan_reorder_function_parameters,
+    plan_swap_function_parameters,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
@@ -39,7 +40,8 @@ fn adds_parameter_to_definition_and_call() {
 
 #[test]
 fn adds_common_lisp_key_parameter_to_definition_and_call() {
-    let input = "(defun render (node &key color) (list node color margin))\n(render item :color :red)";
+    let input =
+        "(defun render (node &key color) (list node color margin))\n(render item :color :red)";
     let plan = plan_add_function_parameter(AddFunctionParameterRequest {
         input,
         dialect: Dialect::CommonLisp,
@@ -80,8 +82,74 @@ fn adds_common_lisp_key_parameter_before_allow_other_keys() {
 }
 
 #[test]
+fn adds_common_lisp_optional_parameter_to_definition_and_call() {
+    let input =
+        "(defun render (node &optional stream) (list node stream style))\n(render item out)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":compact".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun render (node &optional stream style) (list node stream style))\n(render item out :compact)"
+    );
+}
+
+#[test]
+fn adds_common_lisp_optional_parameter_at_start() {
+    let input = "(defun render (node &optional stream mode) (list node stream mode style))\n(render item out :wide)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":compact".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::Start,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun render (node &optional style stream mode) (list node stream mode style))\n(render item :compact out :wide)"
+    );
+}
+
+#[test]
+fn rejects_add_common_lisp_optional_parameter_when_call_omits_existing_optional_argument() {
+    let input = "(defun render (node &optional stream) (list node stream style))\n(render item)";
+    let error = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":compact".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect_err("missing optional position must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("does not have 2 positional argument(s) before optional argument")
+    );
+}
+
+#[test]
 fn rejects_add_common_lisp_key_parameter_with_duplicate_call_keyword() {
-    let input = "(defun render (node &key color) (list node color margin))\n(render item :margin 4)";
+    let input =
+        "(defun render (node &key color) (list node color margin))\n(render item :margin 4)";
     let error = plan_add_function_parameter(AddFunctionParameterRequest {
         input,
         dialect: Dialect::CommonLisp,
@@ -94,9 +162,11 @@ fn rejects_add_common_lisp_key_parameter_with_duplicate_call_keyword() {
     })
     .expect_err("duplicate keyword must fail");
 
-    assert!(error
-        .to_string()
-        .contains("already contains keyword argument :margin"));
+    assert!(
+        error
+            .to_string()
+            .contains("already contains keyword argument :margin")
+    );
 }
 
 #[test]
@@ -287,9 +357,11 @@ fn rejects_common_lisp_key_parameter_named_as_keyword() {
     })
     .expect_err("keyword-named parameter must fail");
 
-    assert!(error
-        .to_string()
-        .contains("currently supports only simple parameters"));
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only simple parameters")
+    );
 }
 
 #[test]
@@ -306,9 +378,11 @@ fn rejects_common_lisp_key_parameter_with_non_keyword_designator() {
     })
     .expect_err("non-keyword external designator must fail");
 
-    assert!(error
-        .to_string()
-        .contains("currently supports only simple parameters"));
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only simple parameters")
+    );
 }
 
 #[test]
@@ -347,7 +421,7 @@ fn rejects_duplicate_common_lisp_keyword_argument_removal() {
 
 #[test]
 fn rejects_add_parameter_to_common_lisp_lambda_list_marker() {
-    let input = "(defun f (a &optional b) (list a b))\n(print (f 1 2))";
+    let input = "(defun f (a &rest b) (list a b))\n(print (f 1 2))";
     let error = plan_add_function_parameter(AddFunctionParameterRequest {
         input,
         dialect: Dialect::CommonLisp,
@@ -362,7 +436,7 @@ fn rejects_add_parameter_to_common_lisp_lambda_list_marker() {
 
     assert!(error
         .to_string()
-        .contains("currently supports only flat positional parameter lists or existing Common Lisp &key parameter lists"));
+        .contains("currently supports only flat positional parameter lists, existing Common Lisp &optional parameter lists, or existing Common Lisp &key parameter lists"));
 }
 
 #[test]
@@ -379,9 +453,11 @@ fn rejects_move_parameter_across_common_lisp_lambda_list_marker() {
     })
     .expect_err("lambda-list marker must fail");
 
-    assert!(error
-        .to_string()
-        .contains("currently supports only flat positional parameter lists"));
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only flat positional parameter lists")
+    );
 }
 
 #[test]
@@ -398,9 +474,11 @@ fn rejects_swap_parameter_across_common_lisp_lambda_list_marker() {
     })
     .expect_err("lambda-list marker must fail");
 
-    assert!(error
-        .to_string()
-        .contains("currently supports only flat positional parameter lists"));
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only flat positional parameter lists")
+    );
 }
 
 #[test]

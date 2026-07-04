@@ -408,7 +408,7 @@ fn plans_unused_macrolet_without_counting_expander_body_reference() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(macrolet ((used (y) (list y)))\n  (list used))"
+        "(macrolet ((used (y)\n             (list y)))\n  (list used))"
     );
 }
 
@@ -450,7 +450,7 @@ fn plans_unused_compiler_macrolet_without_counting_expander_body_reference() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(compiler-macrolet ((used (y) (list y)))\n  (list used))"
+        "(compiler-macrolet ((used (y)\n                      (list y)))\n  (list used))"
     );
 }
 
@@ -488,7 +488,10 @@ fn plans_unused_flet_binding_ignoring_definition_body_reference() {
     assert_eq!(plan.form, "flet");
     assert_eq!(plan.binding_name.as_deref(), Some("unused"));
     assert_eq!(plan.reference_count, Some(0));
-    assert_eq!(plan.replacement, "(flet ((used () (used)))\n  (used))");
+    assert_eq!(
+        plan.replacement,
+        "(flet ((used ()\n         (used)))\n  (used))"
+    );
 }
 
 #[test]

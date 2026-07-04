@@ -103,7 +103,7 @@ fn cli_plans_remove_unused_macrolet_without_counting_expander_body_reference() {
     ))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(macrolet ((used (y) (list y)))\\n  (list used))",
+        "(macrolet ((used (y)\\n             (list y)))\\n  (list used))",
     ));
 }
 
@@ -203,7 +203,7 @@ fn cli_plans_remove_unused_compiler_macrolet_without_counting_expander_body_refe
     ))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(compiler-macrolet ((used (y) (list y)))\\n  (list used))",
+        "(compiler-macrolet ((used (y)\\n                      (list y)))\\n  (list used))",
     ));
 }
 
@@ -238,7 +238,7 @@ fn cli_plans_remove_unused_flet_binding_ignoring_definition_body_reference() {
     .stdout(predicate::str::contains("\"binding_name\": \"unused\""))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(flet ((used () (used)))\\n  (used))",
+        "(flet ((used ()\\n         (used)))\\n  (used))",
     ));
 }
 

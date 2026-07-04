@@ -270,7 +270,7 @@ impl Formatter {
                 0 => self.format_node(tree, *child, depth + 1, output),
                 1 => {
                     output.push(' ');
-                    self.format_sequence_list(
+                    self.format_local_callable_bindings(
                         tree,
                         *child,
                         depth + 1,
@@ -286,6 +286,71 @@ impl Formatter {
             }
         }
 
+        output.push(delimiter.close());
+    }
+
+    fn format_local_callable_bindings(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        continuation_column: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        if node.kind != NodeKind::List || node.children.is_empty() {
+            self.format_inline_or_node(tree, node_id, depth, output);
+            return;
+        }
+
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+        for (position, child) in node.children.iter().enumerate() {
+            if position > 0 {
+                output.push('\n');
+                output.push_str(&" ".repeat(continuation_column));
+            }
+            self.format_local_callable_binding(
+                tree,
+                *child,
+                depth + 1,
+                continuation_column + self.indent,
+                output,
+            );
+        }
+        output.push(delimiter.close());
+    }
+
+    fn format_local_callable_binding(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        body_column: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        if node.kind != NodeKind::List || node.children.len() <= 2 {
+            self.format_inline_or_node(tree, node_id, depth, output);
+            return;
+        }
+
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    output.push('\n');
+                    output.push_str(&" ".repeat(body_column));
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
         output.push(delimiter.close());
     }
 

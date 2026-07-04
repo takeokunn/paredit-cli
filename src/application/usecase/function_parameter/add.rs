@@ -4,7 +4,7 @@ use crate::domain::sexpr::SyntaxTree;
 
 use super::calls::{
     add_function_parameter_call_edit, add_keyword_function_parameter_call_edit,
-    resolve_function_call_paths,
+    add_optional_function_parameter_call_edit, resolve_function_call_paths,
 };
 use super::definition::parse_add_function_parameter_definition;
 use super::list_edit::{
@@ -36,9 +36,13 @@ pub fn plan_add_function_parameter(
         &request.name,
     )?;
     let keyword_parameter_insertion = target.keyword_parameter_insertion.as_ref();
-    if target.has_lambda_list_marker && keyword_parameter_insertion.is_none() {
+    let optional_parameter_insertion = target.optional_parameter_insertion.as_ref();
+    if target.has_lambda_list_marker
+        && keyword_parameter_insertion.is_none()
+        && optional_parameter_insertion.is_none()
+    {
         anyhow::bail!(
-            "add-function-parameter currently supports only flat positional parameter lists or existing Common Lisp &key parameter lists"
+            "add-function-parameter currently supports only flat positional parameter lists, existing Common Lisp &optional parameter lists, or existing Common Lisp &key parameter lists"
         );
     }
     let call_paths = resolve_function_call_paths(
@@ -52,20 +56,30 @@ pub fn plan_add_function_parameter(
     )?;
 
     let mut edits = Vec::with_capacity(call_paths.len() + 1);
-    edits.push(match keyword_parameter_insertion {
-        Some(keyword_insertion) => insertion_edit_for_list_item(
-            &target.parameter_container,
-            keyword_insertion.item_index(request.insert),
-            request.name.as_str(),
-            FunctionParameterInsert::Start,
-        )?,
-        None => insertion_edit_for_list_item(
-            &target.parameter_container,
-            target.protected_prefix_count,
-            request.name.as_str(),
-            request.insert,
-        )?,
-    });
+    edits.push(
+        if let Some(keyword_insertion) = keyword_parameter_insertion {
+            insertion_edit_for_list_item(
+                &target.parameter_container,
+                keyword_insertion.item_index(request.insert),
+                request.name.as_str(),
+                FunctionParameterInsert::Start,
+            )?
+        } else if let Some(optional_insertion) = optional_parameter_insertion {
+            insertion_edit_for_list_item(
+                &target.parameter_container,
+                optional_insertion.item_index(request.insert),
+                request.name.as_str(),
+                FunctionParameterInsert::Start,
+            )?
+        } else {
+            insertion_edit_for_list_item(
+                &target.parameter_container,
+                target.protected_prefix_count,
+                request.name.as_str(),
+                request.insert,
+            )?
+        },
+    );
 
     let mut call_spans = Vec::with_capacity(call_paths.len());
     for call_path in &call_paths {
@@ -76,21 +90,29 @@ pub fn plan_add_function_parameter(
                 call_path
             );
         }
-        let edit = match keyword_parameter_insertion {
-            Some(keyword_insertion) => add_keyword_function_parameter_call_edit(
+        let edit = if let Some(keyword_insertion) = keyword_parameter_insertion {
+            add_keyword_function_parameter_call_edit(
                 call_selection.view(),
                 &target.function_name,
                 &keyword_insertion.keyword,
                 &argument,
                 keyword_insertion.positional_prefix_count,
                 request.insert,
-            )?,
-            None => add_function_parameter_call_edit(
+            )?
+        } else if let Some(optional_insertion) = optional_parameter_insertion {
+            add_optional_function_parameter_call_edit(
+                call_selection.view(),
+                &target.function_name,
+                &argument,
+                optional_insertion.call_argument_index(request.insert),
+            )?
+        } else {
+            add_function_parameter_call_edit(
                 call_selection.view(),
                 &target.function_name,
                 &argument,
                 request.insert,
-            )?,
+            )?
         };
         call_spans.push(call_selection.span());
         edits.push(edit);

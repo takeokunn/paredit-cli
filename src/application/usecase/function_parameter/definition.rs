@@ -14,6 +14,7 @@ pub(super) struct FunctionParameterTarget {
     pub(super) definition_span: ByteSpan,
     pub(super) has_lambda_list_marker: bool,
     pub(super) keyword_parameter_insertion: Option<KeywordParameterInsertion>,
+    pub(super) optional_parameter_insertion: Option<OptionalParameterInsertion>,
     parameters: Vec<ParameterLocation>,
 }
 
@@ -44,6 +45,32 @@ impl KeywordParameterInsertion {
         match insert {
             FunctionParameterInsert::Start => self.first_item_index,
             FunctionParameterInsert::End => self.end_item_index,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct OptionalParameterInsertion {
+    pub(super) first_item_index: usize,
+    pub(super) end_item_index: usize,
+    pub(super) positional_prefix_count: usize,
+    pub(super) optional_parameter_count: usize,
+}
+
+impl OptionalParameterInsertion {
+    pub(super) fn item_index(&self, insert: FunctionParameterInsert) -> usize {
+        match insert {
+            FunctionParameterInsert::Start => self.first_item_index,
+            FunctionParameterInsert::End => self.end_item_index,
+        }
+    }
+
+    pub(super) fn call_argument_index(&self, insert: FunctionParameterInsert) -> usize {
+        match insert {
+            FunctionParameterInsert::Start => self.positional_prefix_count,
+            FunctionParameterInsert::End => {
+                self.positional_prefix_count + self.optional_parameter_count
+            }
         }
     }
 }
@@ -170,6 +197,12 @@ fn parse_function_parameter_definition(
         )?,
         None => None,
     };
+    let optional_parameter_insertion = match (new_parameter, &keyword_parameter_insertion) {
+        (Some(_), None) => {
+            optional_parameter_insertion(dialect, &parameter_container, protected_prefix_count)?
+        }
+        _ => None,
+    };
 
     if let Some(new_parameter) = new_parameter {
         if new_parameter.as_str().starts_with(['&', ':']) {
@@ -197,6 +230,7 @@ fn parse_function_parameter_definition(
         definition_span: view.span,
         has_lambda_list_marker,
         keyword_parameter_insertion,
+        optional_parameter_insertion,
         parameters,
     })
 }
@@ -426,6 +460,70 @@ fn keyword_parameter_insertion(
         end_item_index,
         positional_prefix_count,
         keyword: default_keyword_for_parameter(new_parameter.as_str()),
+    }))
+}
+
+fn optional_parameter_insertion(
+    dialect: Dialect,
+    parameter_form: &ExpressionView,
+    protected_prefix_count: usize,
+) -> Result<Option<OptionalParameterInsertion>> {
+    if !matches!(
+        dialect,
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Unknown
+    ) {
+        return Ok(None);
+    }
+
+    let mut positional_prefix_count = 0usize;
+    let mut optional_parameter_count = 0usize;
+    let mut in_optional_section = false;
+    let mut first_item_index = None;
+    let mut end_item_index = None;
+    let mut found_trailing_marker = false;
+
+    for (item_index, child) in parameter_form
+        .children
+        .iter()
+        .enumerate()
+        .skip(protected_prefix_count)
+    {
+        if let Some(marker) = atom_text(child).filter(|name| name.starts_with('&')) {
+            if marker == "&optional" {
+                if first_item_index.is_some() {
+                    anyhow::bail!("add-function-parameter found duplicate &optional marker");
+                }
+                in_optional_section = true;
+                first_item_index = Some(item_index + 1);
+            } else {
+                if in_optional_section && end_item_index.is_none() {
+                    end_item_index = Some(item_index);
+                    found_trailing_marker = true;
+                }
+                in_optional_section = false;
+            }
+            continue;
+        }
+
+        if first_item_index.is_none() {
+            positional_prefix_count += 1;
+        } else if in_optional_section {
+            optional_parameter_count += 1;
+        }
+    }
+
+    let Some(first_item_index) = first_item_index else {
+        return Ok(None);
+    };
+    if found_trailing_marker {
+        return Ok(None);
+    }
+    let end_item_index = end_item_index.unwrap_or(parameter_form.children.len());
+    Ok(Some(OptionalParameterInsertion {
+        first_item_index,
+        end_item_index,
+        positional_prefix_count,
+        optional_parameter_count,
     }))
 }
 

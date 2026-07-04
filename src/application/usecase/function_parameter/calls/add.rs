@@ -19,6 +19,33 @@ pub(in crate::application::usecase::function_parameter) fn add_function_paramete
     insertion_edit_for_list_item(&view, 1, argument, insert)
 }
 
+pub(in crate::application::usecase::function_parameter) fn add_optional_function_parameter_call_edit(
+    view: ExpressionView,
+    function_name: &SymbolName,
+    argument: &str,
+    argument_index: usize,
+) -> Result<(ByteSpan, String)> {
+    ensure_matching_function_call(&view, function_name, "add-function-parameter")?;
+
+    let insertion_item_index = argument_index + 1;
+    if insertion_item_index > view.children.len() {
+        anyhow::bail!(
+            "add-function-parameter call to '{}' at {}..{} does not have {} positional argument(s) before optional argument",
+            function_name,
+            view.span.start().get(),
+            view.span.end().get(),
+            argument_index
+        );
+    }
+
+    insertion_edit_for_list_item(
+        &view,
+        insertion_item_index,
+        argument,
+        FunctionParameterInsert::Start,
+    )
+}
+
 pub(in crate::application::usecase::function_parameter) fn add_keyword_function_parameter_call_edit(
     view: ExpressionView,
     function_name: &SymbolName,

@@ -269,7 +269,7 @@ fn cli_formats_macrolet_indentation() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(macrolet ((with-x (x) (list x outer)))\n  (with-x 1)\n  (with-x 2))\n",
+            "(macrolet ((with-x (x)\n             (list x outer)))\n  (with-x 1)\n  (with-x 2))\n",
         ));
 }
 
@@ -290,7 +290,7 @@ fn cli_formats_compiler_macrolet_indentation() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(compiler-macrolet ((with-x (x) (list x outer)))\n  (with-x 1)\n  (with-x 2))\n",
+            "(compiler-macrolet ((with-x (x)\n                      (list x outer)))\n  (with-x 1)\n  (with-x 2))\n",
         ));
 }
 
@@ -311,7 +311,28 @@ fn cli_formats_multiple_local_callable_bindings() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(macrolet ((with-a (x) (list x outer))\n           (with-b (y) (list y outer)))\n  (with-a 1)\n  (with-b 2))\n",
+            "(macrolet ((with-a (x)\n             (list x outer))\n           (with-b (y)\n             (list y outer)))\n  (with-a 1)\n  (with-b 2))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_local_callable_bodies_on_dedicated_lines() {
+    let dir = fresh_temp_dir("format-local-callable-bodies");
+    let file = dir.join("local-callable-bodies.lisp");
+    fs::write(
+        &file,
+        "(labels ((parse (x) (validate x) (build x)) (emit (y) (write y) (finish))) (parse input) (emit output))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(labels ((parse (x)\n           (validate x)\n           (build x))\n         (emit (y)\n           (write y)\n           (finish)))\n  (parse input)\n  (emit output))\n",
         ));
 }
 

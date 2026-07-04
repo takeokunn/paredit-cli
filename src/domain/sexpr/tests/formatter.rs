@@ -285,7 +285,7 @@ fn formats_macrolet_like_local_functions() {
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(macrolet ((with-x (x) (list x outer)))\n  (with-x 1)\n  (with-x 2))\n"
+        "(macrolet ((with-x (x)\n             (list x outer)))\n  (with-x 1)\n  (with-x 2))\n"
     );
 }
 
@@ -295,7 +295,7 @@ fn formats_compiler_macrolet_like_local_functions() {
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(compiler-macrolet ((with-x (x) (list x outer)))\n  (with-x 1)\n  (with-x 2))\n"
+        "(compiler-macrolet ((with-x (x)\n                      (list x outer)))\n  (with-x 1)\n  (with-x 2))\n"
     );
 }
 
@@ -305,7 +305,17 @@ fn formats_multiple_local_callable_bindings_with_aligned_bindings() {
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(macrolet ((with-a (x) (list x outer))\n           (with-b (y) (list y outer)))\n  (with-a 1)\n  (with-b 2))\n"
+        "(macrolet ((with-a (x)\n             (list x outer))\n           (with-b (y)\n             (list y outer)))\n  (with-a 1)\n  (with-b 2))\n"
+    );
+}
+
+#[test]
+fn formats_local_callable_bodies_on_dedicated_lines() {
+    let input = "(labels ((parse (x) (validate x) (build x)) (emit (y) (write y) (finish))) (parse input) (emit output))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(labels ((parse (x)\n           (validate x)\n           (build x))\n         (emit (y)\n           (write y)\n           (finish)))\n  (parse input)\n  (emit output))\n"
     );
 }
 

@@ -93,6 +93,36 @@ fn cli_plans_add_function_parameter_for_common_lisp_key_parameter() {
 }
 
 #[test]
+fn cli_plans_add_function_parameter_for_common_lisp_optional_parameter() {
+    let mut cmd = paredit();
+    cmd.args([
+        "add-function-parameter",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--name",
+        "style",
+        "--argument",
+        ":compact",
+        "--call-path",
+        "1",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render (node &optional stream) (list node stream style))\n(render item out)",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"parameter_name\": \"style\""))
+    .stdout(predicate::str::contains(
+        "(defun render (node &optional stream style)",
+    ))
+    .stdout(predicate::str::contains("(render item out :compact)"));
+}
+
+#[test]
 fn cli_plans_add_function_parameter_with_all_calls() {
     let mut cmd = paredit();
     cmd.args([
