@@ -1,4 +1,11 @@
-use super::*;
+use anyhow::Result;
+
+use crate::domain::sexpr::SymbolName;
+
+use super::super::types::{
+    AddExportPlan, MergePackageOptionsPlan, PackageReportFile, RenamePackageFilePlan,
+    SortPackageExportsPlan, SortPackageOptionsPlan,
+};
 
 pub(super) fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -> Result<()> {
     let merge_count = plan.merges.len();

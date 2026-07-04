@@ -59,7 +59,7 @@ pub(super) enum Command {
     /// Report package, system, load, and qualified-symbol dependencies across explicit files.
     DependencyReport(dependency_report::DependencyReportArgs),
     /// Report Common Lisp package declarations across explicit files.
-    PackageReport(package::PackageReportArgs),
+    PackageReport(package::types::PackageReportArgs),
     /// Report definition-like top-level forms across explicit files.
     DefinitionReport(definition_report::args::DefinitionReportArgs),
     /// Report definition-like top-level forms with no external exact atom references.
@@ -83,15 +83,15 @@ pub(super) enum Command {
     /// Plan or replace multiple reviewed forms in one file.
     ReplaceForms(replace_forms::ReplaceFormsArgs),
     /// Plan or add a symbol to a Common Lisp defpackage :export option.
-    AddExport(package::AddExportArgs),
+    AddExport(package::types::AddExportArgs),
     /// Plan or sort Common Lisp defpackage :export symbol designators.
-    SortPackageExports(package::SortPackageExportsArgs),
+    SortPackageExports(package::types::SortPackageExportsArgs),
     /// Plan or sort Common Lisp defpackage option forms.
-    SortPackageOptions(package::SortPackageOptionsArgs),
+    SortPackageOptions(package::types::SortPackageOptionsArgs),
     /// Plan or merge duplicate Common Lisp defpackage option forms.
-    MergePackageOptions(package::MergePackageOptionsArgs),
+    MergePackageOptions(package::types::MergePackageOptionsArgs),
     /// Plan or rename Common Lisp package designators and qualified prefixes.
-    RenamePackage(package::RenamePackageArgs),
+    RenamePackage(package::types::RenamePackageArgs),
     /// Rename exact atom occurrences without touching strings or comments.
     RenameSymbol(rename::args::RenameSymbolArgs),
     /// Rename exact atom occurrences inside one selected form.

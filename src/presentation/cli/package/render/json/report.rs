@@ -1,4 +1,6 @@
-use super::super::*;
+use anyhow::Result;
+
+use super::super::super::types::PackageReportFile;
 use crate::presentation::cli::package::render::json::shared::span_json;
 use serde_json::json;
 

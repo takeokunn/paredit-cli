@@ -1,6 +1,12 @@
-use super::*;
+use std::path::PathBuf;
+
 use crate::application::package_report::PackageReport as ApplicationPackageReport;
 use crate::application::usecase::package::{self as package_usecase, PackageRenameOccurrence};
+use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::{ByteSpan, SymbolName};
+use crate::presentation::cli::args::{DialectArg, OutputFormat};
+
+use clap::{Args, ValueEnum};
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub(super) enum PackageOptionOrderArg {

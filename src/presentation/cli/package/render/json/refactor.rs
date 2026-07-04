@@ -1,4 +1,11 @@
-use super::super::*;
+use anyhow::Result;
+
+use crate::domain::sexpr::SymbolName;
+
+use super::super::super::types::{
+    AddExportPlan, MergePackageOptionsPlan, RenamePackageFilePlan, SortPackageExportsPlan,
+    SortPackageOptionsPlan,
+};
 use crate::presentation::cli::package::render::json::shared::span_json;
 use serde_json::json;
 
