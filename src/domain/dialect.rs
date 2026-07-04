@@ -73,6 +73,7 @@ impl Dialect {
                     | "defsetf"
                     | "define-modify-macro"
                     | "define-setf-expander"
+                    | "define-symbol-macro"
                     | "defpackage"
                     | "in-package"
                     | "defparameter"

@@ -50,6 +50,9 @@ impl Formatter {
                         ListStyle::Definition => {
                             self.format_definition(tree, node_id, depth, output);
                         }
+                        ListStyle::DefinitionNameBody => {
+                            self.format_prefix_body(tree, node_id, depth, 1, output);
+                        }
                         ListStyle::Lambda => {
                             self.format_prefix_body(tree, node_id, depth, 1, output);
                         }
@@ -640,6 +643,7 @@ impl Formatter {
             | "defparameter"
             | "defvar"
             | "defconstant" => ListStyle::Definition,
+            "define-symbol-macro" => ListStyle::DefinitionNameBody,
             "lambda" => ListStyle::Lambda,
             "named-lambda" => ListStyle::NamedLambda,
             "let" | "let*" | "symbol-macrolet" | "handler-bind" | "restart-bind" => {
@@ -675,6 +679,7 @@ impl Formatter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ListStyle {
     Definition,
+    DefinitionNameBody,
     Lambda,
     NamedLambda,
     Binding,

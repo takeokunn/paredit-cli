@@ -55,7 +55,8 @@ fn does_not_cross_non_definition_barriers() {
 fn kind_then_name_groups_categories_before_names() {
     let input = "(defmacro alpha () nil)\n\
                  (defun zeta () :z)\n\
-                 (defun beta () :b)\n";
+                 (defun beta () :b)\n\
+                 (define-symbol-macro current-user (session-user *session*))\n";
 
     let plan = plan_sort_definitions(request(input, SortDefinitionsStrategy::KindThenName))
         .expect("sort plan should be built");
@@ -63,8 +64,13 @@ fn kind_then_name_groups_categories_before_names() {
     let beta = plan.rewritten.find("(defun beta").expect("beta");
     let zeta = plan.rewritten.find("(defun zeta").expect("zeta");
     let alpha = plan.rewritten.find("(defmacro alpha").expect("alpha");
+    let current_user = plan
+        .rewritten
+        .find("(define-symbol-macro current-user")
+        .expect("current-user");
     assert!(beta < zeta);
     assert!(zeta < alpha);
+    assert!(alpha < current_user);
 }
 
 fn symbol_name() -> impl Strategy<Value = String> {

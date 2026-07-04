@@ -8,7 +8,8 @@ fn cli_plans_definition_sort_without_writing() {
     let original = "(in-package #:demo)\n\n\
                     (defun zeta () :z)\n\
                     (defmacro alpha () nil)\n\
-                    (defun beta () :b)\n";
+                    (defun beta () :b)\n\
+                    (define-symbol-macro current-user (session-user *session*))\n";
     fs::write(&file, original).expect("write source fixture");
 
     let mut cmd = paredit();
@@ -23,9 +24,10 @@ fn cli_plans_definition_sort_without_writing() {
             "\"command\": \"sort-definitions\"",
         ))
         .stdout(predicate::str::contains("\"strategy\": \"name\""))
-        .stdout(predicate::str::contains("\"definition_count\": 3"))
+        .stdout(predicate::str::contains("\"definition_count\": 4"))
         .stdout(predicate::str::contains("\"name\": \"alpha\""))
         .stdout(predicate::str::contains("\"name\": \"beta\""))
+        .stdout(predicate::str::contains("\"name\": \"current-user\""))
         .stdout(predicate::str::contains("\"name\": \"zeta\""))
         .stdout(predicate::str::contains("\"changed\": true"))
         .stdout(predicate::str::contains("\"written\": false"));

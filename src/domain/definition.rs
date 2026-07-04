@@ -93,7 +93,9 @@ pub fn classify_definition_head(dialect: Dialect, head: &str) -> Option<Definiti
         "defclass" | "cl-defclass" => DefinitionCategory::Class,
         "defstruct" | "cl-defstruct" | "defrecord" | "deftype" => DefinitionCategory::Struct,
         "define-condition" => DefinitionCategory::Condition,
-        "defvar" | "defglobal" | "def" | "setq-default" => DefinitionCategory::Variable,
+        "defvar" | "defglobal" | "define-symbol-macro" | "def" | "setq-default" => {
+            DefinitionCategory::Variable
+        }
         "defconstant" | "defconst" => DefinitionCategory::Constant,
         "defparameter" | "defcustom" => {
             if normalized == "defcustom" {
@@ -168,6 +170,10 @@ mod tests {
         assert_eq!(
             classify_definition_head(Dialect::CommonLisp, "define-setf-expander"),
             Some(DefinitionCategory::Macro)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "define-symbol-macro"),
+            Some(DefinitionCategory::Variable)
         );
         assert_eq!(
             classify_definition_head(Dialect::EmacsLisp, "defcustom"),

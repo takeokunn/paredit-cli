@@ -101,24 +101,37 @@ fn plan_split_file_rejects_duplicate_paths() {
 #[test]
 fn plan_split_file_selects_definitions_by_name_and_kind() {
     let mut request = split_request(
-        "(in-package #:demo)\n\n(defun keep () :keep)\n\n(defun render () :render)\n\n(defmacro with-render () nil)\n",
+        "(in-package #:demo)\n\n(defun keep () :keep)\n\n(defun render () :render)\n\n(defmacro with-render () nil)\n\n(define-symbol-macro current-user (slot-value *session* 'user))\n",
         "",
     );
     request.paths = Vec::new();
     request.names = vec!["render".to_owned()];
-    request.categories = vec![DefinitionCategory::Macro];
+    request.categories = vec![DefinitionCategory::Macro, DefinitionCategory::Variable];
 
     let plan = plan_split_file(request).expect("name and kind selectors should be valid");
 
-    assert_eq!(plan.items.len(), 2);
+    assert_eq!(plan.items.len(), 3);
     assert_eq!(plan.items[0].definition.name.as_deref(), Some("render"));
     assert_eq!(
         plan.items[1].definition.name.as_deref(),
         Some("with-render")
     );
+    assert_eq!(
+        plan.items[2].definition.name.as_deref(),
+        Some("current-user")
+    );
+    assert_eq!(
+        plan.items[2].definition.category,
+        DefinitionCategory::Variable
+    );
     assert!(plan.from_rewritten.contains("defun keep"));
     assert!(!plan.from_rewritten.contains("defun render"));
     assert!(!plan.from_rewritten.contains("defmacro with-render"));
+    assert!(
+        !plan
+            .from_rewritten
+            .contains("define-symbol-macro current-user")
+    );
 }
 
 #[test]

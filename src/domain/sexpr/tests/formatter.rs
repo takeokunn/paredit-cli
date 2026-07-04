@@ -223,6 +223,16 @@ fn formats_setf_definition_forms_like_definitions() {
 }
 
 #[test]
+fn formats_define_symbol_macro_like_a_definition() {
+    let input = "(define-symbol-macro current-user (slot-value *session* 'user))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(define-symbol-macro current-user\n  (slot-value *session* 'user))\n"
+    );
+}
+
+#[test]
 fn formats_macrolet_like_local_functions() {
     let input = "(macrolet ((with-x (x) (list x outer))) (with-x 1) (with-x 2))";
     let tree = SyntaxTree::parse(input).expect("valid");

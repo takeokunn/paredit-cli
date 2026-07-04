@@ -102,6 +102,7 @@ fn cli_plans_file_split_by_name_and_kind() {
          (defun keep () :ok)\n\
          (defun render-pane () :render)\n\
          (defmacro with-render (() &body body) `(progn ,@body))\n\
+         (define-symbol-macro current-user (slot-value *session* 'user))\n\
          (defclass renderer () ())\n",
     )
     .expect("write source fixture");
@@ -116,15 +117,19 @@ fn cli_plans_file_split_by_name_and_kind() {
         .arg("render-pane")
         .arg("--kind")
         .arg("macro")
+        .arg("--kind")
+        .arg("variable")
         .arg("--output")
         .arg("json")
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"definition_count\": 2"))
+        .stdout(predicate::str::contains("\"definition_count\": 3"))
         .stdout(predicate::str::contains("\"name\": \"render-pane\""))
         .stdout(predicate::str::contains("\"category\": \"function\""))
         .stdout(predicate::str::contains("\"name\": \"with-render\""))
         .stdout(predicate::str::contains("\"category\": \"macro\""))
+        .stdout(predicate::str::contains("\"name\": \"current-user\""))
+        .stdout(predicate::str::contains("\"category\": \"variable\""))
         .stdout(predicate::str::contains("\"written\": false"));
 
     assert!(

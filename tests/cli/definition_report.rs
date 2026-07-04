@@ -10,6 +10,7 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
         "(in-package #:demo)\n\
          (defun render-pane (session pane) (list session pane))\n\
          (defmacro with-pane ((pane) &body body) `(progn ,pane ,@body))\n\
+         (define-symbol-macro current-user (slot-value *session* 'user))\n\
          (deftest split-window () (is (= 2 (pane-count))))\n",
     )
     .expect("write lisp fixture");
@@ -29,15 +30,17 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"file_count\": 2"))
-        .stdout(predicate::str::contains("\"definition_count\": 5"))
+        .stdout(predicate::str::contains("\"definition_count\": 6"))
         .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
         .stdout(predicate::str::contains("\"dialect\": \"emacs-lisp\""))
         .stdout(predicate::str::contains("\"package\": \"#:demo\""))
         .stdout(predicate::str::contains("\"category\": \"function\""))
         .stdout(predicate::str::contains("\"category\": \"macro\""))
+        .stdout(predicate::str::contains("\"category\": \"variable\""))
         .stdout(predicate::str::contains("\"category\": \"test\""))
         .stdout(predicate::str::contains("\"category\": \"mode\""))
         .stdout(predicate::str::contains("\"parameter_count\": 2"))
+        .stdout(predicate::str::contains("\"name\": \"current-user\""))
         .stdout(predicate::str::contains("\"name\": \"render-pane\""))
         .stdout(predicate::str::contains("\"name\": \"demo-mode\""));
 }
