@@ -339,3 +339,24 @@ fn formats_multiple_declaration_specs_with_alignment() {
         "(declare (optimize speed)\n         (type fixnum index)\n         (ignorable scratch))\n"
     );
 }
+
+#[test]
+fn formats_loop_clauses_with_common_lisp_indentation() {
+    let input = "(loop for item in items when (valid-p item) collect (transform item) finally (return result))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(loop for item in items\n      when (valid-p item)\n        collect (transform item)\n      finally (return result))\n"
+    );
+}
+
+#[test]
+fn formats_loop_binding_and_action_clauses() {
+    let input =
+        "(loop with total = 0 for item in items do (incf total item) finally (return total))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(loop with total = 0\n      for item in items\n      do (incf total item)\n      finally (return total))\n"
+    );
+}

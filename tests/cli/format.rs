@@ -337,6 +337,27 @@ fn cli_formats_local_callable_bodies_on_dedicated_lines() {
 }
 
 #[test]
+fn cli_formats_loop_clause_indentation() {
+    let dir = fresh_temp_dir("format-loop");
+    let file = dir.join("loop.lisp");
+    fs::write(
+        &file,
+        "(loop for item in items when (valid-p item) collect (transform item) finally (return result))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(loop for item in items\n      when (valid-p item)\n        collect (transform item)\n      finally (return result))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_define_compiler_macro_indentation() {
     let dir = fresh_temp_dir("format-define-compiler-macro");
     let file = dir.join("compiler-macro.lisp");
