@@ -12,4 +12,3 @@ pub mod package_report;
 pub mod refactor;
 pub mod signature_report;
 pub mod usecase;
-pub mod workspace_report;

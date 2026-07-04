@@ -16,3 +16,4 @@ pub mod split_file;
 pub mod thread_expression;
 pub mod unthread_expression;
 pub mod unwrap_call;
+pub mod workspace_report;

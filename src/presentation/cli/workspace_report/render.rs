@@ -3,9 +3,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::workspace_report::{
-    WorkspaceFileMetrics, WorkspaceFileStatus, summarize_workspace_report,
+use crate::application::usecase::workspace_report::types::{
+    WorkspaceFileMetrics, WorkspaceFileStatus, WorkspaceReportSummary,
 };
+use crate::application::usecase::workspace_report::workflow::summarize_workspace_report;
 use crate::infrastructure::workspace::WorkspaceDiscovery;
 use crate::presentation::cli::OutputFormat;
 
@@ -39,7 +40,7 @@ fn print_text_workspace_report(
     roots: &[PathBuf],
     discovery: &WorkspaceDiscovery,
     reports: &[WorkspaceFileReport],
-    summary: &crate::application::workspace_report::WorkspaceReportSummary,
+    summary: &WorkspaceReportSummary,
 ) {
     println!(
         "roots\t{}",
@@ -83,7 +84,7 @@ fn print_json_workspace_report(
     roots: &[PathBuf],
     discovery: &WorkspaceDiscovery,
     reports: &[WorkspaceFileReport],
-    summary: &crate::application::workspace_report::WorkspaceReportSummary,
+    summary: &WorkspaceReportSummary,
 ) -> Result<()> {
     println!(
         "{}",

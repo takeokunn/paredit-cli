@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::application::workspace_report::WorkspaceFileStatus;
+use crate::application::usecase::workspace_report::types::WorkspaceFileStatus;
 use crate::domain::dialect::Dialect;
 
 #[derive(Debug)]
