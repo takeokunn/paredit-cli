@@ -1,6 +1,7 @@
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::selection::atom_text;
+use super::destructure::binding_pattern_name_spans;
 use super::forms::{
     binding_binds, generic_binding_groups, parameter_form_binds, specialized_parameter_form_binds,
 };
@@ -392,8 +393,7 @@ fn collect_loop_references(
             if view
                 .children
                 .get(binding_index)
-                .and_then(atom_text)
-                .is_some_and(|name| name == symbol.as_str())
+                .is_some_and(|binding| binding_pattern_binds(binding, symbol, input))
             {
                 *shadowed_scope_count += 1;
                 return;
@@ -418,8 +418,7 @@ fn collect_loop_references(
             if view
                 .children
                 .get(binding_index)
-                .and_then(atom_text)
-                .is_some_and(|name| name == symbol.as_str())
+                .is_some_and(|binding| binding_pattern_binds(binding, symbol, input))
             {
                 *shadowed_scope_count += 1;
                 return;
@@ -432,6 +431,12 @@ fn collect_loop_references(
         collect_symbol_atom_spans_unshadowed(child, symbol, output, shadowed_scope_count, input);
         index += 1;
     }
+}
+
+fn binding_pattern_binds(pattern: &ExpressionView, symbol: &SymbolName, input: &str) -> bool {
+    binding_pattern_name_spans(pattern, input)
+        .iter()
+        .any(|name| name.name == symbol.as_str())
 }
 
 fn collect_loop_outer_references(

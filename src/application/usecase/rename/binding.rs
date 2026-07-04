@@ -10,8 +10,10 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::selection::{atom_text, list_head};
+use destructure::binding_pattern_name_spans;
 use forms::{binding_groups, parameter_name_spans, specialized_parameter_name_spans};
 use scope::collect_symbol_atom_spans_unshadowed;
+use types::BindingEdit;
 pub(super) use types::BindingRenameParts;
 
 pub(super) fn binding_rename_parts(
@@ -415,12 +417,12 @@ fn loop_binding_rename_parts(
     let mut target = None;
     let mut duplicate_count = 0usize;
 
-    for spec in loop_binding_specs(view) {
+    for spec in loop_binding_specs(view, input) {
         if spec.name != from.as_str() {
             continue;
         }
         duplicate_count += 1;
-        target = Some(spec);
+        target = Some(spec.clone());
     }
 
     if duplicate_count > 1 {
@@ -449,7 +451,7 @@ fn loop_binding_rename_parts(
         form,
         form_span: view.span,
         binding_span: target.name_span,
-        binding_edit: types::BindingEdit::rename_atom(target.name_span),
+        binding_edit: target.binding_edit,
         reference_spans,
         shadowed_scope_count,
     })
@@ -595,14 +597,15 @@ fn slot_binding_rename_parts(
     })
 }
 
-#[derive(Clone, Copy)]
-struct LoopBindingSpec<'a> {
-    name: &'a str,
+#[derive(Clone)]
+struct LoopBindingSpec {
+    name: String,
     name_span: ByteSpan,
+    binding_edit: BindingEdit,
     reference_start_index: usize,
 }
 
-fn loop_binding_specs(view: &ExpressionView) -> Vec<LoopBindingSpec<'_>> {
+fn loop_binding_specs(view: &ExpressionView, input: &str) -> Vec<LoopBindingSpec> {
     let mut specs = Vec::new();
     let mut index = 1usize;
 
@@ -610,16 +613,9 @@ fn loop_binding_specs(view: &ExpressionView) -> Vec<LoopBindingSpec<'_>> {
         let child = &view.children[index];
         if loop_keyword_is(child, "for") || loop_keyword_is(child, "as") {
             if let Some(name_form) = view.children.get(index + 1) {
-                if let Some(name) = atom_text(name_form) {
-                    specs.push(LoopBindingSpec {
-                        name,
-                        name_span: name_form.span,
-                        reference_start_index: loop_for_reference_start_index(
-                            &view.children,
-                            index + 2,
-                        ),
-                    });
-                }
+                let reference_start_index =
+                    loop_for_reference_start_index(&view.children, index + 2);
+                push_loop_binding_specs(&mut specs, name_form, reference_start_index, input);
             }
             index += 2;
             continue;
@@ -627,16 +623,9 @@ fn loop_binding_specs(view: &ExpressionView) -> Vec<LoopBindingSpec<'_>> {
 
         if loop_keyword_is(child, "with") {
             if let Some(name_form) = view.children.get(index + 1) {
-                if let Some(name) = atom_text(name_form) {
-                    specs.push(LoopBindingSpec {
-                        name,
-                        name_span: name_form.span,
-                        reference_start_index: loop_with_reference_start_index(
-                            &view.children,
-                            index + 2,
-                        ),
-                    });
-                }
+                let reference_start_index =
+                    loop_with_reference_start_index(&view.children, index + 2);
+                push_loop_binding_specs(&mut specs, name_form, reference_start_index, input);
             }
             index += 2;
             continue;
@@ -646,6 +635,24 @@ fn loop_binding_specs(view: &ExpressionView) -> Vec<LoopBindingSpec<'_>> {
     }
 
     specs
+}
+
+fn push_loop_binding_specs(
+    specs: &mut Vec<LoopBindingSpec>,
+    name_form: &ExpressionView,
+    reference_start_index: usize,
+    input: &str,
+) {
+    specs.extend(
+        binding_pattern_name_spans(name_form, input)
+            .into_iter()
+            .map(|name| LoopBindingSpec {
+                name: name.name,
+                name_span: name.name_span,
+                binding_edit: name.binding_edit,
+                reference_start_index,
+            }),
+    );
 }
 
 fn loop_for_reference_start_index(children: &[ExpressionView], mut index: usize) -> usize {
