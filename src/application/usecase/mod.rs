@@ -1,6 +1,7 @@
 //! Application use cases.
 
 pub mod extract_function;
+pub mod form_report;
 pub mod function_parameter;
 pub mod inline_function;
 pub mod inline_let;

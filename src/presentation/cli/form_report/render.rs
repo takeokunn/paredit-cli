@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::form_report::FormReport;
+use crate::application::usecase::form_report::types::FormReport;
 use crate::domain::sexpr::Delimiter;
 use crate::presentation::cli::args::OutputFormat;
 

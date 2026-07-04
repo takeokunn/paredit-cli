@@ -1,6 +1,7 @@
 use anyhow::Result;
 
-use crate::application::form_report::{FormReportRequest, build_form_report};
+use crate::application::usecase::form_report::types::FormReportRequest;
+use crate::application::usecase::form_report::workflow::build_form_report;
 use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::form_report::{args::FormReportArgs, render::print_form_report};
 use crate::presentation::cli::shared::{detect_dialect, read_input, resolve_target};
