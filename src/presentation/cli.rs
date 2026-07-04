@@ -103,7 +103,7 @@ enum Command {
     /// Report list-head call sites across explicit files for arity refactor planning.
     CallReport(call_report::CallReportArgs),
     /// Compare callable definitions and call-site arity across explicit files.
-    SignatureReport(signature_report::SignatureReportArgs),
+    SignatureReport(signature_report::args::SignatureReportArgs),
     /// Report internal and optional external call graph edges across explicit files.
     CallGraph(call_graph_report::args::CallGraphArgs),
     /// Report refactoring impact risks for one symbol across explicit files.

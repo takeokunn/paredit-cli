@@ -19,7 +19,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::FindSymbol(args) => symbol_report::workflow::find_symbol(args)?,
         Command::SymbolReport(args) => symbol_report::workflow::symbol_report(args)?,
         Command::CallReport(args) => call_report::call_report(args)?,
-        Command::SignatureReport(args) => signature_report::signature_report(args)?,
+        Command::SignatureReport(args) => signature_report::workflow::signature_report(args)?,
         Command::CallGraph(args) => call_graph_report::workflow::call_graph(args)?,
         Command::ImpactReport(args) => impact_report::workflow::impact_report(args)?,
         Command::RefactorPlan(args) => refactor::workflow::refactor_plan(args)?,
