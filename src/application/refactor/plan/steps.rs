@@ -11,6 +11,8 @@ pub fn refactor_plan_steps(
     let file_args = shell_file_args(files);
     let symbol_arg = shell_quote(symbol);
     let impact_command = gated_impact_report_command(&symbol_arg, &file_args);
+    let verification_command =
+        verification_command(operation, &symbol_arg, &file_args, &impact_command);
     let mut steps = vec![
         RefactorPlanStep {
             order: 1,
@@ -56,9 +58,9 @@ pub fn refactor_plan_steps(
             None,
         ),
         RefactorOperation::Remove => (
-            "apply-remove",
-            "No blocking removal gates were found; remove the selected top-level definition with a dry-run plan first.",
-            Some("paredit remove-definition --file <file> --path <definition-path> --plan --output json".to_owned()),
+            "apply-unused-definition-removal",
+            "No blocking removal gates were found; remove unused definition candidates across the reviewed file set with a dry-run plan first.",
+            Some(format!("paredit remove-unused-definitions --output json {file_args}")),
         ),
         RefactorOperation::Move if blocked => (
             "review-move-scope",
@@ -93,12 +95,26 @@ pub fn refactor_plan_steps(
         action: "verify-after-edit",
         rationale: "Re-run impact, dependency, signature, and workspace checks after the edit to detect regressions."
             .to_owned(),
-        command: Some(format!(
-            "{impact_command} && paredit dependency-report --output json {file_args}"
-        )),
+        command: Some(verification_command),
     });
 
     steps
+}
+
+fn verification_command(
+    operation: RefactorOperation,
+    symbol_arg: &str,
+    file_args: &str,
+    impact_command: &str,
+) -> String {
+    match operation {
+        RefactorOperation::Remove => format!(
+            "paredit verify-refactor --symbol {symbol_arg} --operation remove --phase post --output json {file_args} && paredit dependency-report --output json {file_args}"
+        ),
+        RefactorOperation::Rename | RefactorOperation::Move | RefactorOperation::Signature => {
+            format!("{impact_command} && paredit dependency-report --output json {file_args}")
+        }
+    }
 }
 
 fn gated_impact_report_command(symbol_arg: &str, file_args: &str) -> String {

@@ -172,6 +172,47 @@ fn cli_builds_workspace_refactor_plan_from_directory_roots() {
 }
 
 #[test]
+fn cli_builds_workspace_remove_plan_with_unused_definition_cleanup_command() {
+    let dir = fresh_temp_dir("workspace-remove-plan");
+    let src_dir = dir.join("src");
+    fs::create_dir_all(&src_dir).expect("create source dir");
+
+    let file = src_dir.join("core.lisp");
+    fs::write(
+        &file,
+        r#"(defpackage #:demo.core (:use #:cl))
+(in-package #:demo.core)
+(defun stale-helper (value) value)
+(defun caller () 42)
+"#,
+    )
+    .expect("write workspace remove fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("workspace-refactor-plan")
+        .arg("--symbol")
+        .arg("stale-helper")
+        .arg("--operation")
+        .arg("remove")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"operation\": \"remove\""))
+        .stdout(predicate::str::contains("\"symbol\": \"stale-helper\""))
+        .stdout(predicate::str::contains(
+            "\"action\": \"apply-unused-definition-removal\"",
+        ))
+        .stdout(predicate::str::contains(
+            "paredit remove-unused-definitions --output json",
+        ))
+        .stdout(predicate::str::contains(
+            "paredit verify-refactor --symbol 'stale-helper' --operation remove --phase post --output json",
+        ));
+}
+
+#[test]
 fn cli_previews_workspace_refactor_from_directory_roots() {
     let dir = fresh_temp_dir("workspace-refactor-preview");
     let src_dir = dir.join("src");

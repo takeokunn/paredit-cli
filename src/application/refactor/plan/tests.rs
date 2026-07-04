@@ -1,5 +1,6 @@
 use super::*;
 use proptest::prelude::*;
+use std::path::PathBuf;
 
 fn summary() -> RefactorPlanSummary {
     RefactorPlanSummary {
@@ -130,6 +131,33 @@ fn post_rename_verification_requires_old_symbol_removed_and_new_symbol_present()
     );
 }
 
+#[test]
+fn remove_plan_uses_unused_definition_cleanup_usecase() {
+    let files = vec![PathBuf::from("src/core.lisp"), PathBuf::from("src/ui.el")];
+    let steps = refactor_plan_steps(RefactorOperation::Remove, "stale-helper", &files, &[]);
+
+    let apply = steps
+        .iter()
+        .find(|step| step.order == 3)
+        .expect("apply step");
+    assert_eq!(apply.action, "apply-unused-definition-removal");
+    let apply_command = apply.command.as_deref().expect("apply command");
+    assert!(apply_command.contains("paredit remove-unused-definitions --output json"));
+    assert!(apply_command.contains("'src/core.lisp'"));
+    assert!(apply_command.contains("'src/ui.el'"));
+
+    let verify = steps
+        .iter()
+        .find(|step| step.order == 4)
+        .expect("verify step");
+    let verify_command = verify.command.as_deref().expect("verify command");
+    assert!(verify_command.contains(
+        "paredit verify-refactor --symbol 'stale-helper' --operation remove --phase post --output json"
+    ));
+    assert!(!verify_command.contains("--require-definitions 1"));
+    assert!(!verify_command.contains("--require-references 1"));
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
@@ -251,5 +279,51 @@ proptest! {
                 .passed,
             signature_mismatches == 0
         );
+    }
+
+    #[test]
+    fn remove_plan_apply_step_tracks_blocking_gate_invariants(
+        blocking_gate_count in 0usize..4,
+        nonblocking_gate_count in 0usize..4,
+    ) {
+        let mut gates = Vec::new();
+        for index in 0..blocking_gate_count {
+            gates.push(RefactorPlanGate {
+                level: RefactorRiskLevel::Error,
+                code: "blocking-risk",
+                message: format!("blocking risk {index}"),
+                count: index + 1,
+                blocks_automation: true,
+            });
+        }
+        for index in 0..nonblocking_gate_count {
+            gates.push(RefactorPlanGate {
+                level: RefactorRiskLevel::Warning,
+                code: "advisory-risk",
+                message: format!("advisory risk {index}"),
+                count: index + 1,
+                blocks_automation: false,
+            });
+        }
+
+        let files = vec![PathBuf::from("src/core.lisp")];
+        let steps = refactor_plan_steps(RefactorOperation::Remove, "stale-helper", &files, &gates);
+        let apply = steps
+            .iter()
+            .find(|step| step.order == 3)
+            .expect("apply step");
+
+        if blocking_gate_count == 0 {
+            prop_assert_eq!(apply.action, "apply-unused-definition-removal");
+            prop_assert!(
+                apply
+                    .command
+                    .as_deref()
+                    .is_some_and(|command| command.contains("paredit remove-unused-definitions --output json"))
+            );
+        } else {
+            prop_assert_eq!(apply.action, "review-remove-scope");
+            prop_assert!(apply.command.is_none());
+        }
     }
 }
