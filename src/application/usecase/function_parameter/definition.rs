@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
+use super::FunctionParameterInsert;
 use super::list_edit::{atom_child, atom_text};
 
 #[derive(Debug)]
@@ -12,6 +13,7 @@ pub(super) struct FunctionParameterTarget {
     pub(super) protected_prefix_count: usize,
     pub(super) definition_span: ByteSpan,
     pub(super) has_lambda_list_marker: bool,
+    pub(super) keyword_parameter_insertion: Option<KeywordParameterInsertion>,
     parameters: Vec<ParameterLocation>,
 }
 
@@ -27,6 +29,23 @@ pub(super) struct ParameterLocation {
 pub(super) struct KeywordArgumentLocation {
     pub(super) keyword: String,
     pub(super) positional_prefix_count: usize,
+}
+
+#[derive(Debug)]
+pub(super) struct KeywordParameterInsertion {
+    pub(super) first_item_index: usize,
+    pub(super) end_item_index: usize,
+    pub(super) positional_prefix_count: usize,
+    pub(super) keyword: String,
+}
+
+impl KeywordParameterInsertion {
+    pub(super) fn item_index(&self, insert: FunctionParameterInsert) -> usize {
+        match insert {
+            FunctionParameterInsert::Start => self.first_item_index,
+            FunctionParameterInsert::End => self.end_item_index,
+        }
+    }
 }
 
 struct LambdaListBinding<'a> {
@@ -142,8 +161,23 @@ fn parse_function_parameter_definition(
     let has_lambda_list_marker = parameter_container.children[protected_prefix_count..]
         .iter()
         .any(|child| atom_text(child).is_some_and(|name| name.starts_with('&')));
+    let keyword_parameter_insertion = match new_parameter {
+        Some(new_parameter) => keyword_parameter_insertion(
+            dialect,
+            &parameter_container,
+            protected_prefix_count,
+            new_parameter,
+        )?,
+        None => None,
+    };
 
     if let Some(new_parameter) = new_parameter {
+        if new_parameter.as_str().starts_with(['&', ':']) {
+            anyhow::bail!(
+                "add-function-parameter found invalid parameter symbol '{}'",
+                new_parameter
+            );
+        }
         if parameters
             .iter()
             .any(|parameter| parameter.name == new_parameter.as_str())
@@ -162,6 +196,7 @@ fn parse_function_parameter_definition(
         protected_prefix_count,
         definition_span: view.span,
         has_lambda_list_marker,
+        keyword_parameter_insertion,
         parameters,
     })
 }
@@ -315,6 +350,83 @@ fn parameter_locations_from_children(
         });
     }
     Ok(locations)
+}
+
+fn keyword_parameter_insertion(
+    dialect: Dialect,
+    parameter_form: &ExpressionView,
+    protected_prefix_count: usize,
+    new_parameter: &SymbolName,
+) -> Result<Option<KeywordParameterInsertion>> {
+    if !matches!(
+        dialect,
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Unknown
+    ) {
+        return Ok(None);
+    }
+
+    let mut positional_prefix_count = 0usize;
+    let mut in_keyword_section = false;
+    let mut first_item_index = None;
+    let mut end_item_index = None;
+    let mut positional_call_arguments = true;
+
+    for (item_index, child) in parameter_form
+        .children
+        .iter()
+        .enumerate()
+        .skip(protected_prefix_count)
+    {
+        if let Some(marker) = atom_text(child).filter(|name| name.starts_with('&')) {
+            match marker {
+                "&key" => {
+                    if first_item_index.is_some() {
+                        anyhow::bail!("add-function-parameter found duplicate &key marker");
+                    }
+                    positional_call_arguments = false;
+                    in_keyword_section = true;
+                    first_item_index = Some(item_index + 1);
+                }
+                "&allow-other-keys" => {
+                    positional_call_arguments = false;
+                    if in_keyword_section && end_item_index.is_none() {
+                        end_item_index = Some(item_index);
+                    }
+                    in_keyword_section = false;
+                }
+                "&optional" => {
+                    positional_call_arguments = true;
+                    if in_keyword_section && end_item_index.is_none() {
+                        end_item_index = Some(item_index);
+                    }
+                    in_keyword_section = false;
+                }
+                _ => {
+                    positional_call_arguments = false;
+                    if in_keyword_section && end_item_index.is_none() {
+                        end_item_index = Some(item_index);
+                    }
+                    in_keyword_section = false;
+                }
+            }
+            continue;
+        }
+
+        if first_item_index.is_none() && positional_call_arguments {
+            positional_prefix_count += 1;
+        }
+    }
+
+    let Some(first_item_index) = first_item_index else {
+        return Ok(None);
+    };
+    let end_item_index = end_item_index.unwrap_or(parameter_form.children.len());
+    Ok(Some(KeywordParameterInsertion {
+        first_item_index,
+        end_item_index,
+        positional_prefix_count,
+        keyword: default_keyword_for_parameter(new_parameter.as_str()),
+    }))
 }
 
 fn lambda_list_binding<'a>(

@@ -61,6 +61,38 @@ fn cli_plans_add_function_parameter_for_common_lisp_defmethod() {
 }
 
 #[test]
+fn cli_plans_add_function_parameter_for_common_lisp_key_parameter() {
+    let mut cmd = paredit();
+    cmd.args([
+        "add-function-parameter",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--name",
+        "margin",
+        "--argument",
+        "8",
+        "--call-path",
+        "1",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render (node &key color) (list node color margin))\n(render item :color :red)",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"parameter_name\": \"margin\""))
+    .stdout(predicate::str::contains(
+        "(defun render (node &key color margin)",
+    ))
+    .stdout(predicate::str::contains(
+        "(render item :color :red :margin 8)",
+    ));
+}
+
+#[test]
 fn cli_plans_add_function_parameter_with_all_calls() {
     let mut cmd = paredit();
     cmd.args([

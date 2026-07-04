@@ -211,6 +211,27 @@ fn cli_formats_common_lisp_prefix_body_indentation() {
 }
 
 #[test]
+fn cli_formats_common_lisp_with_body_macros() {
+    let dir = fresh_temp_dir("format-with-body-macros");
+    let file = dir.join("with-body-macros.lisp");
+    fs::write(
+        &file,
+        "(with-input-from-string (stream text) (read stream) (finish stream))\n(with-output-to-string (stream) (write value :stream stream) (finish-output stream))\n(with-hash-table-iterator (next table) (multiple-value-bind (more key value) (next) (when more (collect key value))))\n(with-package-iterator (next package :internal :external) (multiple-value-bind (more symbol status package) (next) (when more (collect symbol status package))))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(with-input-from-string (stream text)\n  (read stream)\n  (finish stream))\n\n(with-output-to-string (stream)\n  (write value :stream stream)\n  (finish-output stream))\n\n(with-hash-table-iterator (next table)\n  (multiple-value-bind (more key value) (next)\n    (when more\n      (collect key value))))\n\n(with-package-iterator (next package :internal :external)\n  (multiple-value-bind (more symbol status package) (next)\n    (when more\n      (collect symbol status package))))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_symbol_macrolet_indentation() {
     let dir = fresh_temp_dir("format-symbol-macrolet");
     let file = dir.join("symbol-macrolet.lisp");

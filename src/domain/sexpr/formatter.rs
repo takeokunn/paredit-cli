@@ -724,10 +724,22 @@ impl Formatter {
             }
             "flet" | "labels" | "macrolet" | "compiler-macrolet" => ListStyle::LocalFunctions,
             "if" => ListStyle::If,
-            "when" | "unless" | "dolist" | "dotimes" | "with-open-file" | "with-slots"
-            | "with-accessors" | "block" | "catch" | "unwind-protect" | "eval-when" => {
-                ListStyle::OneArgumentBody
-            }
+            "when"
+            | "unless"
+            | "dolist"
+            | "dotimes"
+            | "with-open-file"
+            | "with-open-stream"
+            | "with-input-from-string"
+            | "with-output-to-string"
+            | "with-slots"
+            | "with-accessors"
+            | "with-hash-table-iterator"
+            | "with-package-iterator"
+            | "block"
+            | "catch"
+            | "unwind-protect"
+            | "eval-when" => ListStyle::OneArgumentBody,
             "destructuring-bind" | "multiple-value-bind" => ListStyle::TwoArgumentBody,
             "handler-case" | "restart-case" => ListStyle::ClauseForm,
             "cond" => ListStyle::CondClauses,

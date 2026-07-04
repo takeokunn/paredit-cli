@@ -133,6 +133,16 @@ fn formats_common_lisp_prefix_body_forms() {
 }
 
 #[test]
+fn formats_common_lisp_with_body_macros() {
+    let input = "(with-input-from-string (stream text) (read stream) (finish stream))\n(with-output-to-string (stream) (write value :stream stream) (finish-output stream))\n(with-hash-table-iterator (next table) (multiple-value-bind (more key value) (next) (when more (collect key value))))\n(with-package-iterator (next package :internal :external) (multiple-value-bind (more symbol status package) (next) (when more (collect symbol status package))))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(with-input-from-string (stream text)\n  (read stream)\n  (finish stream))\n\n(with-output-to-string (stream)\n  (write value :stream stream)\n  (finish-output stream))\n\n(with-hash-table-iterator (next table)\n  (multiple-value-bind (more key value) (next)\n    (when more\n      (collect key value))))\n\n(with-package-iterator (next package :internal :external)\n  (multiple-value-bind (more symbol status package) (next)\n    (when more\n      (collect symbol status package))))\n"
+    );
+}
+
+#[test]
 fn formats_eval_when_body_after_situation_list() {
     let input = "(eval-when (:compile-toplevel :load-toplevel :execute) (declaim (optimize speed)) (defun boot () (start)))";
     let tree = SyntaxTree::parse(input).expect("valid");

@@ -38,6 +38,68 @@ fn adds_parameter_to_definition_and_call() {
 }
 
 #[test]
+fn adds_common_lisp_key_parameter_to_definition_and_call() {
+    let input = "(defun render (node &key color) (list node color margin))\n(render item :color :red)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("margin"),
+        argument: "8".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun render (node &key color margin) (list node color margin))\n(render item :color :red :margin 8)"
+    );
+}
+
+#[test]
+fn adds_common_lisp_key_parameter_before_allow_other_keys() {
+    let input = "(defun render (node &key color &allow-other-keys) (list node color margin))\n(render item :color :red)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("margin"),
+        argument: "8".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun render (node &key color margin &allow-other-keys) (list node color margin))\n(render item :color :red :margin 8)"
+    );
+}
+
+#[test]
+fn rejects_add_common_lisp_key_parameter_with_duplicate_call_keyword() {
+    let input = "(defun render (node &key color) (list node color margin))\n(render item :margin 4)";
+    let error = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("margin"),
+        argument: "8".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect_err("duplicate keyword must fail");
+
+    assert!(error
+        .to_string()
+        .contains("already contains keyword argument :margin"));
+}
+
+#[test]
 fn moves_parameter_and_call_argument() {
     let input = "(defun f (a b c) (list a b c))\n(print (f 1 2 3))";
     let plan = plan_move_function_parameter(MoveFunctionParameterRequest {
@@ -300,7 +362,7 @@ fn rejects_add_parameter_to_common_lisp_lambda_list_marker() {
 
     assert!(error
         .to_string()
-        .contains("currently supports only flat positional parameter lists"));
+        .contains("currently supports only flat positional parameter lists or existing Common Lisp &key parameter lists"));
 }
 
 #[test]

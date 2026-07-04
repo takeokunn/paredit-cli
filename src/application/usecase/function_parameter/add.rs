@@ -2,13 +2,18 @@ use anyhow::{Context, Result};
 
 use crate::domain::sexpr::SyntaxTree;
 
-use super::calls::{add_function_parameter_call_edit, resolve_function_call_paths};
+use super::calls::{
+    add_function_parameter_call_edit, add_keyword_function_parameter_call_edit,
+    resolve_function_call_paths,
+};
 use super::definition::parse_add_function_parameter_definition;
 use super::list_edit::{
     apply_byte_span_edits, ensure_non_overlapping_spans, insertion_edit_for_list_item,
     spans_overlap,
 };
-use super::types::{AddFunctionParameterPlan, AddFunctionParameterRequest};
+use super::types::{
+    AddFunctionParameterPlan, AddFunctionParameterRequest, FunctionParameterInsert,
+};
 
 pub fn plan_add_function_parameter(
     request: AddFunctionParameterRequest<'_>,
@@ -30,9 +35,10 @@ pub fn plan_add_function_parameter(
         definition_selection.view(),
         &request.name,
     )?;
-    if target.has_lambda_list_marker {
+    let keyword_parameter_insertion = target.keyword_parameter_insertion.as_ref();
+    if target.has_lambda_list_marker && keyword_parameter_insertion.is_none() {
         anyhow::bail!(
-            "add-function-parameter currently supports only flat positional parameter lists"
+            "add-function-parameter currently supports only flat positional parameter lists or existing Common Lisp &key parameter lists"
         );
     }
     let call_paths = resolve_function_call_paths(
@@ -46,12 +52,20 @@ pub fn plan_add_function_parameter(
     )?;
 
     let mut edits = Vec::with_capacity(call_paths.len() + 1);
-    edits.push(insertion_edit_for_list_item(
-        &target.parameter_container,
-        target.protected_prefix_count,
-        request.name.as_str(),
-        request.insert,
-    )?);
+    edits.push(match keyword_parameter_insertion {
+        Some(keyword_insertion) => insertion_edit_for_list_item(
+            &target.parameter_container,
+            keyword_insertion.item_index(request.insert),
+            request.name.as_str(),
+            FunctionParameterInsert::Start,
+        )?,
+        None => insertion_edit_for_list_item(
+            &target.parameter_container,
+            target.protected_prefix_count,
+            request.name.as_str(),
+            request.insert,
+        )?,
+    });
 
     let mut call_spans = Vec::with_capacity(call_paths.len());
     for call_path in &call_paths {
@@ -62,12 +76,22 @@ pub fn plan_add_function_parameter(
                 call_path
             );
         }
-        let edit = add_function_parameter_call_edit(
-            call_selection.view(),
-            &target.function_name,
-            &argument,
-            request.insert,
-        )?;
+        let edit = match keyword_parameter_insertion {
+            Some(keyword_insertion) => add_keyword_function_parameter_call_edit(
+                call_selection.view(),
+                &target.function_name,
+                &keyword_insertion.keyword,
+                &argument,
+                keyword_insertion.positional_prefix_count,
+                request.insert,
+            )?,
+            None => add_function_parameter_call_edit(
+                call_selection.view(),
+                &target.function_name,
+                &argument,
+                request.insert,
+            )?,
+        };
         call_spans.push(call_selection.span());
         edits.push(edit);
     }
