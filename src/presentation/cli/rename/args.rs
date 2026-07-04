@@ -162,6 +162,40 @@ pub(in crate::presentation::cli) struct WrapFunctionCallsArgs {
 }
 
 #[derive(Debug, Args)]
+pub(in crate::presentation::cli) struct ReplaceFunctionCallsArgs {
+    /// Files to scan and optionally rewrite.
+    #[arg(required = true)]
+    pub(super) files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
+    /// Existing callable call head.
+    #[arg(long)]
+    pub(super) from: SymbolName,
+    /// Replacement callable call head.
+    #[arg(long)]
+    pub(super) to: SymbolName,
+    /// Replace all matching call sites.
+    #[arg(long)]
+    pub(super) all_calls: bool,
+    /// Replace only the call sites at these expression paths.
+    #[arg(long = "call-path")]
+    pub(super) call_paths: Vec<Path>,
+    /// Rewrite changed files in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Fail if no selected call site changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
+    /// Require at least this many call-site rewrites.
+    #[arg(long)]
+    pub(super) require_calls: Option<usize>,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub(super) output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct UnwrapFunctionCallsArgs {
     /// Files to scan and optionally rewrite.
     #[arg(required = true)]

@@ -62,6 +62,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::RenameBinding(args) => rename::rename_binding::rename_binding(args)?,
         Command::RenameSymbols(args) => rename::rename_symbols::rename_symbols(args)?,
         Command::RenameFunction(args) => rename::rename_function::rename_function(args)?,
+        Command::ReplaceFunctionCalls(args) => {
+            rename::replace_function_calls::replace_function_calls(args)?
+        }
         Command::WrapFunctionCalls(args) => rename::wrap_function_calls::wrap_function_calls(args)?,
         Command::UnwrapFunctionCalls(args) => {
             rename::unwrap_function_calls::unwrap_function_calls(args)?

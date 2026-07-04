@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 use crate::application::usecase::rename::{
-    RenameFunctionOccurrence, UnwrapFunctionCallSite, WrapFunctionCallSite,
+    RenameFunctionOccurrence, ReplaceFunctionCallSite, UnwrapFunctionCallSite, WrapFunctionCallSite,
 };
 
 pub(super) fn rename_occurrences_json(occurrences: &[RenameFunctionOccurrence]) -> Vec<Value> {
@@ -30,6 +30,27 @@ pub(super) fn wrap_call_sites_json(sites: &[WrapFunctionCallSite]) -> Vec<Value>
                 "span": {
                     "start": site.span.start().get(),
                     "end": site.span.end().get(),
+                },
+                "text": site.text,
+                "replacement": site.replacement,
+            })
+        })
+        .collect()
+}
+
+pub(super) fn replace_call_sites_json(sites: &[ReplaceFunctionCallSite]) -> Vec<Value> {
+    sites
+        .iter()
+        .map(|site| {
+            json!({
+                "path": site.path,
+                "span": {
+                    "start": site.span.start().get(),
+                    "end": site.span.end().get(),
+                },
+                "headSpan": {
+                    "start": site.head_span.start().get(),
+                    "end": site.head_span.end().get(),
                 },
                 "text": site.text,
                 "replacement": site.replacement,

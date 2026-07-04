@@ -1,5 +1,6 @@
 mod binding;
 mod function;
+mod replace_call;
 mod scoped_form;
 mod unwrap;
 mod wrap;
