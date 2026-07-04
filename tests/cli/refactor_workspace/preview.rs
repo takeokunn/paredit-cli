@@ -44,10 +44,25 @@ fn cli_previews_workspace_refactor_from_directory_roots() {
         .stdout(predicate::str::contains("\"mode\": \"function\""))
         .stdout(predicate::str::contains("\"from\": \"render-pane\""))
         .stdout(predicate::str::contains("\"to\": \"paint-pane\""))
+        .stdout(predicate::str::contains("\"write_plan\""))
+        .stdout(predicate::str::contains("\"write_allowed\": false"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 0"))
+        .stdout(predicate::str::contains("\"writable_files\": []"))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains("\"decision\""))
+        .stdout(predicate::str::contains("\"status\": \"dry-run-ready\""))
+        .stdout(predicate::str::contains("\"write_parse_refused\": false"))
+        .stdout(predicate::str::contains("\"apply_preview\": false"))
+        .stdout(predicate::str::contains("\"name\": \"apply-preview\""))
+        .stdout(predicate::str::contains("\"status\": \"scheduled\""))
         .stdout(predicate::str::contains("\"workspace\""))
         .stdout(predicate::str::contains("\"discovered_file_count\": 1"))
         .stdout(predicate::str::contains("\"unknown\": 1"))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
         .stdout(predicate::str::contains("\"definition_count\": 1"))
         .stdout(predicate::str::contains("\"edit_count\": 2"))
         .stdout(predicate::str::contains("\"output_parse_ok\": true"))
@@ -81,11 +96,20 @@ fn cli_fails_workspace_refactor_preview_when_target_symbol_already_exists() {
         .assert()
         .failure()
         .stdout(predicate::str::contains("\"workspace\""))
+        .stdout(predicate::str::contains(
+            "\"status\": \"blocked-by-policy\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-policy-violations\"",
+        ))
+        .stdout(predicate::str::contains("\"apply_preview\": false"))
         .stdout(predicate::str::contains("\"target_occurrence_count\": 1"))
         .stdout(predicate::str::contains(
             "\"fail_on_target_conflict\": true",
         ))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
         .stdout(predicate::str::contains(
             "--fail-on-target-conflict found 1 existing replacement symbol occurrence(s)",
         ))

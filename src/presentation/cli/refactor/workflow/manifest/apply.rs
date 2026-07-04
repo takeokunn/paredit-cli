@@ -21,15 +21,8 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
         .map(RefactorRootGuard::new)
         .transpose()?;
 
-    if !manifest.policy_passed {
-        anyhow::bail!("refactor-apply refused manifest because preview policy did not pass");
-    }
-    if !manifest.all_outputs_parse {
-        anyhow::bail!("refactor-apply refused manifest because preview outputs did not all parse");
-    }
-
     let mut files = Vec::with_capacity(manifest.files.len());
-    let mut rewritten_outputs = Vec::new();
+    let mut rewritten_outputs = Vec::with_capacity(manifest.files.len());
 
     for file in &manifest.files {
         let resolved_path = resolve_refactor_manifest_path(&file.path, root_guard.as_ref())?;
@@ -68,7 +61,7 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
             expected_output_parse_ok: file.output_parse_ok,
             manifest_flags_match,
         });
-        rewritten_outputs.push((file.path.clone(), resolved_path, rewritten));
+        rewritten_outputs.push((resolved_path, rewritten));
     }
 
     let stale_file_count = files.iter().filter(|file| !file.input_hash_matches).count();
@@ -81,18 +74,16 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
         .iter()
         .filter(|file| !file.manifest_flags_match)
         .count();
-    let can_apply = stale_file_count == 0
+    let can_apply = manifest.policy_passed
+        && manifest.all_outputs_parse
+        && stale_file_count == 0
         && output_hash_mismatch_count == 0
         && parse_error_count == 0
         && manifest_flag_mismatch_count == 0;
 
     if args.write && can_apply {
-        for (path, resolved_path, rewritten) in &rewritten_outputs {
-            if let Some(file) = files
-                .iter_mut()
-                .find(|candidate| candidate.path.as_path() == path.as_path())
-                .filter(|file| file.changed)
-            {
+        for (index, (resolved_path, rewritten)) in rewritten_outputs.iter().enumerate() {
+            if let Some(file) = files.get_mut(index).filter(|file| file.changed) {
                 fs::write(resolved_path, rewritten)
                     .with_context(|| format!("failed to write {}", resolved_path.display()))?;
                 file.written = true;
@@ -100,9 +91,15 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
         }
     }
 
+    let changed_files = files
+        .iter()
+        .filter(|file| file.changed)
+        .map(|file| file.path.display().to_string())
+        .collect::<Vec<_>>();
     let summary = RefactorApplySummary {
         file_count: files.len(),
-        changed_file_count: files.iter().filter(|file| file.changed).count(),
+        changed_file_count: changed_files.len(),
+        changed_files,
         written_file_count: files.iter().filter(|file| file.written).count(),
         edit_count: files.iter().map(|file| file.edit_count).sum(),
         stale_file_count,
@@ -121,6 +118,8 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
         },
         root: RefactorRootReport::from_guard(root_guard.as_ref()),
         write_requested: args.write,
+        manifest_policy_passed: manifest.policy_passed,
+        manifest_outputs_parse: manifest.all_outputs_parse,
         files,
         summary,
     };
@@ -129,7 +128,9 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
 
     if !can_apply {
         anyhow::bail!(
-            "refactor-apply validation failed: stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
+            "refactor-apply validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
+            result.manifest_policy_passed,
+            result.manifest_outputs_parse,
             result.summary.stale_file_count,
             result.summary.output_hash_mismatch_count,
             result.summary.parse_error_count,

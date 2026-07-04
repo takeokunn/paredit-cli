@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::usecase::unthread_expression::{
-    UnthreadExpressionPlan, UnthreadExpressionRequest, UnthreadStyle as ApplicationUnthreadStyle,
-    plan_unthread_expression,
+    plan_unthread_expression, UnthreadExpressionPlan, UnthreadExpressionRequest,
+    UnthreadStyle as ApplicationUnthreadStyle,
 };
 
 #[derive(Debug, Args)]

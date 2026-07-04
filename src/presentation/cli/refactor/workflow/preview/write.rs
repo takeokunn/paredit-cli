@@ -4,15 +4,7 @@ use super::super::super::types::preview::RefactorPreview;
 pub(in crate::presentation::cli::refactor::workflow) fn write_refactor_preview(
     preview: &mut RefactorPreview,
 ) -> Result<()> {
-    let candidates = preview
-        .files
-        .iter()
-        .map(|file| RefactorWriteCandidate {
-            changed: file.changed,
-            output_parse_ok: file.output_parse_ok,
-        })
-        .collect::<Vec<_>>();
-    let write_plan = build_refactor_write_plan(preview.write_requested, &candidates);
+    let write_plan = preview.write_plan();
 
     if !write_plan.write_requested {
         return Ok(());

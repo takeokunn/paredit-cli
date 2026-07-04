@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::function_parameter::{
-    AddFunctionParameterRequest, plan_add_function_parameter,
+    plan_add_function_parameter, AddFunctionParameterRequest,
 };
 use crate::presentation::cli::{detect_dialect, read_input};
 

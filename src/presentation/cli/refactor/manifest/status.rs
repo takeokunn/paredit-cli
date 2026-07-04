@@ -1,27 +1,145 @@
 use super::super::types::check::RefactorCheckResult;
-use super::super::types::status::{RefactorStatusBlockedReason, RefactorStatusNextAction};
+use super::super::types::status::{
+    RefactorApplyDecision, RefactorApplyDecisionStatus, RefactorApplyNextAction,
+    RefactorManifestDecision, RefactorStatusBlockedReason, RefactorStatusKind,
+    RefactorStatusNextAction,
+};
+
+pub(in crate::presentation::cli) fn refactor_status_decision(
+    check: &RefactorCheckResult,
+) -> RefactorManifestDecision {
+    refactor_manifest_decision_from_blocked_reasons(refactor_status_blocked_reasons(check))
+}
+
+pub(in crate::presentation::cli) fn refactor_manifest_decision(
+    manifest_policy_passed: bool,
+    manifest_outputs_parse: bool,
+    stale_file_count: usize,
+    output_hash_mismatch_count: usize,
+    parse_error_count: usize,
+    manifest_flag_mismatch_count: usize,
+) -> RefactorManifestDecision {
+    let blocked_reasons = refactor_manifest_blocked_reasons(
+        manifest_policy_passed,
+        manifest_outputs_parse,
+        stale_file_count,
+        output_hash_mismatch_count,
+        parse_error_count,
+        manifest_flag_mismatch_count,
+    );
+    refactor_manifest_decision_from_blocked_reasons(blocked_reasons)
+}
+
+fn refactor_manifest_decision_from_blocked_reasons(
+    blocked_reasons: Vec<RefactorStatusBlockedReason>,
+) -> RefactorManifestDecision {
+    let status = if blocked_reasons.is_empty() {
+        RefactorStatusKind::Ready
+    } else {
+        RefactorStatusKind::Blocked
+    };
+    let next_action = refactor_status_next_action(&blocked_reasons);
+
+    RefactorManifestDecision {
+        status,
+        next_action,
+        blocked_reasons,
+    }
+}
+
+pub(in crate::presentation::cli) fn refactor_apply_decision(
+    manifest_policy_passed: bool,
+    manifest_outputs_parse: bool,
+    stale_file_count: usize,
+    output_hash_mismatch_count: usize,
+    parse_error_count: usize,
+    manifest_flag_mismatch_count: usize,
+    applied: bool,
+) -> RefactorApplyDecision {
+    let decision = refactor_manifest_decision(
+        manifest_policy_passed,
+        manifest_outputs_parse,
+        stale_file_count,
+        output_hash_mismatch_count,
+        parse_error_count,
+        manifest_flag_mismatch_count,
+    );
+
+    let (status, next_action) = if applied {
+        (
+            RefactorApplyDecisionStatus::Applied,
+            RefactorApplyNextAction::RunVerificationOrReviewDiff,
+        )
+    } else if decision.blocked_reasons.is_empty() {
+        (
+            RefactorApplyDecisionStatus::DryRunReady,
+            RefactorApplyNextAction::RerunWithWrite,
+        )
+    } else {
+        (
+            RefactorApplyDecisionStatus::Blocked,
+            refactor_apply_next_action_from_status(decision.next_action),
+        )
+    };
+
+    RefactorApplyDecision {
+        status,
+        next_action,
+        blocked_reasons: decision.blocked_reasons,
+    }
+}
+
+fn refactor_apply_next_action_from_status(
+    next_action: RefactorStatusNextAction,
+) -> RefactorApplyNextAction {
+    match next_action {
+        RefactorStatusNextAction::RunDiffThenApplyWrite => RefactorApplyNextAction::RerunWithWrite,
+        RefactorStatusNextAction::RegeneratePreview => RefactorApplyNextAction::RegeneratePreview,
+        RefactorStatusNextAction::FixManifestOrParser => {
+            RefactorApplyNextAction::FixManifestOrParser
+        }
+    }
+}
 
 pub(in crate::presentation::cli) fn refactor_status_blocked_reasons(
     check: &RefactorCheckResult,
 ) -> Vec<RefactorStatusBlockedReason> {
+    refactor_manifest_blocked_reasons(
+        check.manifest_policy_passed,
+        check.manifest_outputs_parse,
+        check.summary.stale_file_count,
+        check.summary.output_hash_mismatch_count,
+        check.summary.parse_error_count,
+        check.summary.manifest_flag_mismatch_count,
+    )
+}
+
+pub(in crate::presentation::cli) fn refactor_manifest_blocked_reasons(
+    manifest_policy_passed: bool,
+    manifest_outputs_parse: bool,
+    stale_file_count: usize,
+    output_hash_mismatch_count: usize,
+    parse_error_count: usize,
+    manifest_flag_mismatch_count: usize,
+) -> Vec<RefactorStatusBlockedReason> {
     let mut reasons = Vec::new();
 
-    if !check.manifest_policy_passed {
+    if !manifest_policy_passed {
         reasons.push(RefactorStatusBlockedReason::ManifestPolicyFailed);
     }
-    if !check.manifest_outputs_parse {
+    if !manifest_outputs_parse {
         reasons.push(RefactorStatusBlockedReason::ManifestOutputsDoNotParse);
     }
-    if check.summary.stale_file_count > 0 {
+    if stale_file_count > 0 {
         reasons.push(RefactorStatusBlockedReason::StaleFiles);
     }
-    if check.summary.output_hash_mismatch_count > 0 {
+    if output_hash_mismatch_count > 0 {
         reasons.push(RefactorStatusBlockedReason::OutputHashMismatches);
     }
-    if check.summary.parse_error_count > 0 {
+    if parse_error_count > 0 {
         reasons.push(RefactorStatusBlockedReason::ParseErrors);
     }
-    if check.summary.manifest_flag_mismatch_count > 0 {
+    if manifest_flag_mismatch_count > 0 {
         reasons.push(RefactorStatusBlockedReason::ManifestFlagMismatches);
     }
 
@@ -60,6 +178,7 @@ mod tests {
     use crate::presentation::cli::refactor::types::check::RefactorCheckSummary;
     use crate::presentation::cli::refactor::types::manifest::RefactorApplyManifestHeader;
     use crate::presentation::cli::refactor::types::root::RefactorRootReport;
+    use crate::presentation::cli::refactor::types::status::RefactorManifestDecisionStepStatus;
 
     fn check_result(
         manifest_policy_passed: bool,
@@ -87,6 +206,7 @@ mod tests {
             summary: RefactorCheckSummary {
                 file_count: 0,
                 changed_file_count: 0,
+                changed_files: Vec::new(),
                 edit_count: 0,
                 stale_file_count,
                 output_hash_mismatch_count,
@@ -193,6 +313,150 @@ mod tests {
             };
 
             prop_assert_eq!(refactor_status_next_action(&reasons), expected);
+        }
+
+        #[test]
+        fn pbt_manifest_decision_matches_blocked_reasons_and_next_action(
+            manifest_policy_passed in any::<bool>(),
+            manifest_outputs_parse in any::<bool>(),
+            stale_file_count in 0usize..4,
+            output_hash_mismatch_count in 0usize..4,
+            parse_error_count in 0usize..4,
+            manifest_flag_mismatch_count in 0usize..4,
+        ) {
+            let decision = refactor_manifest_decision(
+                manifest_policy_passed,
+                manifest_outputs_parse,
+                stale_file_count,
+                output_hash_mismatch_count,
+                parse_error_count,
+                manifest_flag_mismatch_count,
+            );
+
+            let expected_status = if decision.blocked_reasons.is_empty() {
+                RefactorStatusKind::Ready
+            } else {
+                RefactorStatusKind::Blocked
+            };
+
+            prop_assert_eq!(decision.status, expected_status);
+            prop_assert_eq!(
+                decision.next_action,
+                refactor_status_next_action(&decision.blocked_reasons)
+            );
+
+            let steps = decision.steps();
+            prop_assert_eq!(steps[0].name, "manifest-policy");
+            prop_assert_eq!(
+                steps[0].status,
+                if manifest_policy_passed {
+                    RefactorManifestDecisionStepStatus::Passed
+                } else {
+                    RefactorManifestDecisionStepStatus::Failed
+                }
+            );
+            prop_assert_eq!(steps[1].name, "manifest-outputs-parse");
+            prop_assert_eq!(
+                steps[1].status,
+                if manifest_outputs_parse {
+                    RefactorManifestDecisionStepStatus::Passed
+                } else {
+                    RefactorManifestDecisionStepStatus::Failed
+                }
+            );
+            prop_assert_eq!(steps[2].name, "file-freshness");
+            prop_assert_eq!(
+                steps[2].status,
+                if stale_file_count == 0 {
+                    RefactorManifestDecisionStepStatus::Passed
+                } else {
+                    RefactorManifestDecisionStepStatus::Failed
+                }
+            );
+            prop_assert_eq!(steps[3].name, "output-validation");
+            prop_assert_eq!(
+                steps[3].status,
+                if output_hash_mismatch_count == 0
+                    && parse_error_count == 0
+                    && manifest_flag_mismatch_count == 0
+                {
+                    RefactorManifestDecisionStepStatus::Passed
+                } else {
+                    RefactorManifestDecisionStepStatus::Failed
+                }
+            );
+            prop_assert_eq!(steps[4].name, "apply-write");
+            prop_assert_eq!(
+                steps[4].status,
+                if decision.blocked_reasons.is_empty() {
+                    RefactorManifestDecisionStepStatus::Scheduled
+                } else {
+                    RefactorManifestDecisionStepStatus::Skipped
+                }
+            );
+        }
+
+        #[test]
+        fn pbt_apply_decision_keeps_operation_aware_status_contract(
+            manifest_policy_passed in any::<bool>(),
+            manifest_outputs_parse in any::<bool>(),
+            stale_file_count in 0usize..4,
+            output_hash_mismatch_count in 0usize..4,
+            parse_error_count in 0usize..4,
+            manifest_flag_mismatch_count in 0usize..4,
+            applied in any::<bool>(),
+        ) {
+            let manifest_decision = refactor_manifest_decision(
+                manifest_policy_passed,
+                manifest_outputs_parse,
+                stale_file_count,
+                output_hash_mismatch_count,
+                parse_error_count,
+                manifest_flag_mismatch_count,
+            );
+            let apply_decision = refactor_apply_decision(
+                manifest_policy_passed,
+                manifest_outputs_parse,
+                stale_file_count,
+                output_hash_mismatch_count,
+                parse_error_count,
+                manifest_flag_mismatch_count,
+                applied,
+            );
+
+            let expected_status = if applied {
+                RefactorApplyDecisionStatus::Applied
+            } else if manifest_decision.blocked_reasons.is_empty() {
+                RefactorApplyDecisionStatus::DryRunReady
+            } else {
+                RefactorApplyDecisionStatus::Blocked
+            };
+            let expected_next_action = if applied {
+                RefactorApplyNextAction::RunVerificationOrReviewDiff
+            } else if manifest_decision.blocked_reasons.is_empty() {
+                RefactorApplyNextAction::RerunWithWrite
+            } else if manifest_decision.next_action == RefactorStatusNextAction::RegeneratePreview {
+                RefactorApplyNextAction::RegeneratePreview
+            } else {
+                RefactorApplyNextAction::FixManifestOrParser
+            };
+
+            prop_assert_eq!(apply_decision.status, expected_status);
+            prop_assert_eq!(apply_decision.next_action, expected_next_action);
+            prop_assert_eq!(
+                apply_decision.steps()[4].status,
+                if applied {
+                    RefactorManifestDecisionStepStatus::Passed
+                } else if manifest_decision.blocked_reasons.is_empty() {
+                    RefactorManifestDecisionStepStatus::Scheduled
+                } else {
+                    RefactorManifestDecisionStepStatus::Skipped
+                }
+            );
+            prop_assert_eq!(
+                apply_decision.blocked_reasons,
+                manifest_decision.blocked_reasons
+            );
         }
     }
 }

@@ -1,4 +1,5 @@
 use super::super::super::*;
+use crate::application::refactor::plan::RefactorPlanAutomationDecision;
 
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct RefactorPlan {
@@ -9,6 +10,7 @@ pub(in crate::presentation::cli) struct RefactorPlan {
     pub(in crate::presentation::cli) gates: Vec<RefactorPlanGate>,
     pub(in crate::presentation::cli) steps: Vec<RefactorPlanStep>,
     pub(in crate::presentation::cli) policy: RefactorPlanPolicy,
+    pub(in crate::presentation::cli) automation: RefactorPlanAutomationDecision,
 }
 
 #[derive(Debug)]

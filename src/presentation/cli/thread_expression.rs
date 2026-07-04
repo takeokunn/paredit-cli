@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::usecase::thread_expression::{
-    ThreadExpressionPlan, ThreadExpressionRequest, ThreadStyle as ApplicationThreadStyle,
-    plan_thread_expression,
+    plan_thread_expression, ThreadExpressionPlan, ThreadExpressionRequest,
+    ThreadStyle as ApplicationThreadStyle,
 };
 
 #[derive(Debug, Args)]

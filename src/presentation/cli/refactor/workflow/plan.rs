@@ -95,6 +95,7 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
         risks: raw_refactor_risks(&summary),
     });
     let policy = decision.policy;
+    let automation = decision.automation;
     let policy_passed = policy.passed;
     let policy_message = policy.violations.join("; ");
     let plan = RefactorPlan {
@@ -105,6 +106,7 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
         gates: decision.gates,
         steps: decision.steps,
         policy,
+        automation,
     };
 
     print_refactor_plan(&plan, output)?;

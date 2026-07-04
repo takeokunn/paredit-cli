@@ -3,6 +3,7 @@ mod manifest;
 mod plan;
 mod preview;
 mod verification;
+mod write_plan;
 
 pub(in crate::presentation::cli) use execute::print_workspace_refactor_execute;
 pub(in crate::presentation::cli) use manifest::apply::print_refactor_apply_result;

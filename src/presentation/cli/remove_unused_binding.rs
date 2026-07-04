@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::remove_unused_binding::{
-    RemoveUnusedBindingPlan, RemoveUnusedBindingRequest, plan_remove_unused_binding,
+    plan_remove_unused_binding, RemoveUnusedBindingPlan, RemoveUnusedBindingRequest,
 };
 
 #[derive(Debug, Args)]

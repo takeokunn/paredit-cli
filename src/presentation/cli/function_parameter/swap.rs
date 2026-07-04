@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::function_parameter::{
-    SwapFunctionParametersRequest, plan_swap_function_parameters,
+    plan_swap_function_parameters, SwapFunctionParametersRequest,
 };
 use crate::presentation::cli::{detect_dialect, read_input};
 

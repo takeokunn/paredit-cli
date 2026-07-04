@@ -34,6 +34,7 @@ pub(in crate::presentation::cli) struct RefactorCheckFileResult {
 pub(in crate::presentation::cli) struct RefactorCheckSummary {
     pub(in crate::presentation::cli) file_count: usize,
     pub(in crate::presentation::cli) changed_file_count: usize,
+    pub(in crate::presentation::cli) changed_files: Vec<String>,
     pub(in crate::presentation::cli) edit_count: usize,
     pub(in crate::presentation::cli) stale_file_count: usize,
     pub(in crate::presentation::cli) output_hash_mismatch_count: usize,

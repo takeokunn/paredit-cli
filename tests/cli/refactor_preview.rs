@@ -22,7 +22,29 @@ fn cli_previews_function_refactor_without_writing_files() {
         .success()
         .stdout(predicate::str::contains("\"mode\": \"function\""))
         .stdout(predicate::str::contains("\"write_requested\": false"))
+        .stdout(predicate::str::contains("\"write_plan\""))
+        .stdout(predicate::str::contains("\"write_allowed\": false"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 0"))
+        .stdout(predicate::str::contains("\"writable_files\": []"))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains("\"decision\""))
+        .stdout(predicate::str::contains("\"status\": \"dry-run-ready\""))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"all-dry-run-gates-passed\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-preview-or-rerun-with-write\"",
+        ))
+        .stdout(predicate::str::contains("\"apply_preview\": false"))
+        .stdout(predicate::str::contains("\"name\": \"preview-policy\""))
+        .stdout(predicate::str::contains("\"name\": \"write-output-parse\""))
+        .stdout(predicate::str::contains("\"name\": \"apply-preview\""))
+        .stdout(predicate::str::contains("\"status\": \"scheduled\""))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"edit_count\": 2"))
         .stdout(predicate::str::contains("\"written\": false"))
@@ -68,7 +90,25 @@ fn cli_writes_refactor_preview_after_policy_and_parse_gates() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"write_requested\": true"))
+        .stdout(predicate::str::contains("\"write_allowed\": true"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 1"))
+        .stdout(predicate::str::contains("\"writable_files\": ["))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains("\"status\": \"write-applied\""))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"preview-write-applied\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"run-verification-or-review-diff\"",
+        ))
+        .stdout(predicate::str::contains("\"apply_preview\": true"))
+        .stdout(predicate::str::contains("\"name\": \"apply-preview\""))
+        .stdout(predicate::str::contains("\"status\": \"passed\""))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
         .stdout(predicate::str::contains("\"written_file_count\": 1"))
         .stdout(predicate::str::contains("\"definition_count\": 1"))
         .stdout(predicate::str::contains("\"require_definitions\": 1"))
@@ -105,6 +145,22 @@ fn cli_refuses_refactor_preview_write_when_policy_fails() {
         .assert()
         .failure()
         .stdout(predicate::str::contains("\"write_requested\": true"))
+        .stdout(predicate::str::contains("\"write_allowed\": true"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 1"))
+        .stdout(predicate::str::contains("\"writable_files\": ["))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains(
+            "\"status\": \"blocked-by-policy\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"preview-policy-failed\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-policy-violations\"",
+        ))
+        .stdout(predicate::str::contains("\"apply_preview\": false"))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"written\": false"))
         .stdout(predicate::str::contains("\"passed\": false"))

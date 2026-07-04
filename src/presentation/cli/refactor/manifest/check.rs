@@ -78,6 +78,11 @@ pub(in crate::presentation::cli) fn build_refactor_check_result(
         && output_hash_mismatch_count == 0
         && parse_error_count == 0
         && manifest_flag_mismatch_count == 0;
+    let changed_files = files
+        .iter()
+        .filter(|file| file.changed)
+        .map(|file| file.path.display().to_string())
+        .collect::<Vec<_>>();
 
     Ok(RefactorCheckResult {
         manifest: RefactorApplyManifestHeader {
@@ -92,7 +97,8 @@ pub(in crate::presentation::cli) fn build_refactor_check_result(
         manifest_outputs_parse,
         summary: RefactorCheckSummary {
             file_count: files.len(),
-            changed_file_count: files.iter().filter(|file| file.changed).count(),
+            changed_file_count: changed_files.len(),
+            changed_files,
             edit_count: files.iter().map(|file| file.edit_count).sum(),
             stale_file_count,
             output_hash_mismatch_count,

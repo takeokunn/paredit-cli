@@ -4,8 +4,8 @@ use super::super::render::print_workspace_refactor_execute;
 use super::super::types::execute::WorkspaceRefactorExecute;
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::preview::{
-    BuildRefactorPreviewRequest, build_refactor_preview, finish_refactor_preview_failure,
-    write_refactor_preview,
+    build_refactor_preview, finish_refactor_preview_failure, write_refactor_preview,
+    BuildRefactorPreviewRequest,
 };
 use super::verification::build_refactor_verification;
 
@@ -100,6 +100,8 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         .is_none_or(|verification| verification.passed);
     let execution = WorkspaceRefactorExecute {
         preview,
+        preflight_decision,
+        execute_decision,
         pre_verification,
         post_verification,
     };

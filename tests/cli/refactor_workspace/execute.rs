@@ -47,7 +47,32 @@ fn cli_executes_workspace_refactor_with_post_verification() {
         .stdout(predicate::str::contains("\"mode\": \"symbol\""))
         .stdout(predicate::str::contains("\"discovered_file_count\": 2"))
         .stdout(predicate::str::contains("\"changed_file_count\": 2"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
+        .stdout(predicate::str::contains("ui.el"))
         .stdout(predicate::str::contains("\"written_file_count\": 2"))
+        .stdout(predicate::str::contains("\"write_plan\""))
+        .stdout(predicate::str::contains("\"write_allowed\": true"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 2"))
+        .stdout(predicate::str::contains("\"writable_files\": ["))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains("\"preflight_decision\""))
+        .stdout(predicate::str::contains("\"execute_decision\""))
+        .stdout(predicate::str::contains("\"status\": \"ready-to-write\""))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"all-execute-gates-passed\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"write-preview-and-run-post-verification\"",
+        ))
+        .stdout(predicate::str::contains("\"steps\""))
+        .stdout(predicate::str::contains("\"name\": \"preview-policy\""))
+        .stdout(predicate::str::contains("\"name\": \"post-verification\""))
+        .stdout(predicate::str::contains("\"status\": \"scheduled\""))
+        .stdout(predicate::str::contains("\"run_pre_verification\": true"))
+        .stdout(predicate::str::contains("\"apply_preview\": true"))
         .stdout(predicate::str::contains("\"pre_verification\""))
         .stdout(predicate::str::contains("\"post_verification\""))
         .stdout(predicate::str::contains("\"passed\": true"))
@@ -131,7 +156,28 @@ fn cli_dry_runs_workspace_refactor_execute_without_writing() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"write_requested\": false"))
+        .stdout(predicate::str::contains("\"write_plan\""))
+        .stdout(predicate::str::contains("\"write_allowed\": false"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 0"))
+        .stdout(predicate::str::contains("\"writable_files\": []"))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains("\"preflight_decision\""))
+        .stdout(predicate::str::contains("\"execute_decision\""))
+        .stdout(predicate::str::contains("\"status\": \"dry-run-ready\""))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"all-dry-run-gates-passed\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-preview-or-rerun-with-write\"",
+        ))
+        .stdout(predicate::str::contains("\"name\": \"post-verification\""))
+        .stdout(predicate::str::contains("\"status\": \"skipped\""))
+        .stdout(predicate::str::contains("\"run_post_verification\": false"))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"pre_verification\""))
         .stdout(predicate::str::contains("\"code\": \"preflight-gates\""))
@@ -170,6 +216,28 @@ fn cli_fails_workspace_refactor_execute_before_write_on_policy_violation() {
         .stdout(predicate::str::contains(
             "\"command\": \"workspace-refactor-execute\"",
         ))
+        .stdout(predicate::str::contains("\"preflight_decision\""))
+        .stdout(predicate::str::contains("\"execute_decision\""))
+        .stdout(predicate::str::contains("\"write_plan\""))
+        .stdout(predicate::str::contains("\"write_allowed\": true"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 1"))
+        .stdout(predicate::str::contains("\"writable_files\": ["))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains(
+            "\"status\": \"blocked-by-policy\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"preview-policy-failed\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-policy-violations\"",
+        ))
+        .stdout(predicate::str::contains("\"name\": \"preview-policy\""))
+        .stdout(predicate::str::contains("\"status\": \"failed\""))
+        .stdout(predicate::str::contains("\"name\": \"write-output-parse\""))
+        .stdout(predicate::str::contains("\"status\": \"skipped\""))
         .stdout(predicate::str::contains("\"passed\": false"))
         .stdout(predicate::str::contains("\"target_occurrence_count\": 1"))
         .stdout(predicate::str::contains(
@@ -213,6 +281,26 @@ fn cli_fails_workspace_refactor_execute_before_write_on_preflight_violation() {
         .stdout(predicate::str::contains(
             "\"command\": \"workspace-refactor-execute\"",
         ))
+        .stdout(predicate::str::contains("\"preflight_decision\""))
+        .stdout(predicate::str::contains("\"execute_decision\""))
+        .stdout(predicate::str::contains("\"write_plan\""))
+        .stdout(predicate::str::contains("\"write_allowed\": true"))
+        .stdout(predicate::str::contains("\"writable_file_count\": 1"))
+        .stdout(predicate::str::contains("\"writable_files\": ["))
+        .stdout(predicate::str::contains("\"refused_file_count\": 0"))
+        .stdout(predicate::str::contains("\"refused_files\": []"))
+        .stdout(predicate::str::contains("\"refusal\": null"))
+        .stdout(predicate::str::contains(
+            "\"status\": \"blocked-by-pre-verification\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"pre-verification-failed\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-pre-verification-checks\"",
+        ))
+        .stdout(predicate::str::contains("\"name\": \"pre-verification\""))
+        .stdout(predicate::str::contains("\"status\": \"failed\""))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"pre_verification\""))
         .stdout(predicate::str::contains("\"phase\": \"pre\""))

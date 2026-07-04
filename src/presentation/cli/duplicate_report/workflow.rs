@@ -2,8 +2,8 @@ use super::super::*;
 use super::args::{DuplicateReportArgs, ReplacementPlanArgs};
 use super::render::{print_duplicate_report, print_replacement_plan};
 use crate::application::usecase::duplicate_report::{
-    DuplicateCandidateGroups, build_duplicate_shape_reports, collect_duplicate_candidates,
-    collect_replacement_plan_batches,
+    build_duplicate_shape_reports, collect_duplicate_candidates, collect_replacement_plan_batches,
+    DuplicateCandidateGroups,
 };
 
 pub(in crate::presentation::cli) fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {

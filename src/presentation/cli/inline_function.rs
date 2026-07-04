@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::inline_function::{
-    InlineFunctionPlan, InlineFunctionRequest, plan_inline_function,
+    plan_inline_function, InlineFunctionPlan, InlineFunctionRequest,
 };
 
 #[derive(Debug, Args)]

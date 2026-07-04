@@ -3,10 +3,15 @@ use serde_json::{Value, json};
 use super::super::super::super::*;
 use super::super::super::types::execute::WorkspaceRefactorExecute;
 use super::super::super::types::verification::RefactorVerification;
+use super::super::write_plan::refactor_write_plan_json;
+use crate::application::refactor::execute::RefactorExecuteDecision;
 
 pub(super) fn print_workspace_refactor_execute_json(
     execution: &WorkspaceRefactorExecute,
 ) -> Result<()> {
+    let write_plan = execution.preview.write_plan();
+    let writable_files = execution.preview.writable_paths_for_write_plan(&write_plan);
+    let refused_files = execution.preview.refused_paths_for_write_plan(&write_plan);
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -33,6 +38,7 @@ pub(super) fn print_workspace_refactor_execute_json(
                 "summary": {
                     "file_count": execution.preview.summary.file_count,
                     "changed_file_count": execution.preview.summary.changed_file_count,
+                    "changed_files": &execution.preview.summary.changed_files,
                     "unchanged_file_count": execution.preview.summary.unchanged_file_count,
                     "written_file_count": execution.preview.summary.written_file_count,
                     "definition_count": execution.preview.summary.definition_count,
@@ -68,6 +74,9 @@ pub(super) fn print_workspace_refactor_execute_json(
                     }))
                     .collect::<Vec<_>>(),
             },
+            "write_plan": refactor_write_plan_json(&write_plan, &writable_files, &refused_files),
+            "preflight_decision": refactor_execute_decision_json(&execution.preflight_decision),
+            "execute_decision": refactor_execute_decision_json(&execution.execute_decision),
             "pre_verification": execution
                 .pre_verification
                 .as_ref()
@@ -102,6 +111,26 @@ fn refactor_verification_json(verification: &RefactorVerification) -> Value {
                 "count": check.count,
             }))
             .collect::<Vec<_>>(),
+    })
+}
+
+fn refactor_execute_decision_json(decision: &RefactorExecuteDecision) -> Value {
+    json!({
+        "status": decision.status.label(),
+        "reason": decision.status.reason(),
+        "next_action": decision.status.next_action(),
+        "steps": decision
+            .steps()
+            .iter()
+            .map(|step| json!({
+                "name": step.name,
+                "status": step.status.label(),
+            }))
+            .collect::<Vec<_>>(),
+        "write_parse_refused": decision.write_parse_refused,
+        "run_pre_verification": decision.run_pre_verification,
+        "apply_preview": decision.apply_preview,
+        "run_post_verification": decision.run_post_verification,
     })
 }
 

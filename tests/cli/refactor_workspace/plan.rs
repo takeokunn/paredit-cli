@@ -27,6 +27,20 @@ fn cli_builds_gated_refactor_plan_for_agents() {
         .success()
         .stdout(predicate::str::contains("\"operation\": \"rename\""))
         .stdout(predicate::str::contains("\"symbol\": \"render-pane\""))
+        .stdout(predicate::str::contains("\"decision\""))
+        .stdout(predicate::str::contains("\"status\": \"ready\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"apply-symbol-rename\"",
+        ))
+        .stdout(predicate::str::contains("\"safe_to_automate\": true"))
+        .stdout(predicate::str::contains("\"policy_passed\": true"))
+        .stdout(predicate::str::contains("\"blocking_gate_count\": 0"))
+        .stdout(predicate::str::contains("\"name\": \"plan-policy\""))
+        .stdout(predicate::str::contains(
+            "\"name\": \"manual-review-gates\"",
+        ))
+        .stdout(predicate::str::contains("\"name\": \"apply-plan\""))
+        .stdout(predicate::str::contains("\"status\": \"scheduled\""))
         .stdout(predicate::str::contains("\"definition_count\": 1"))
         .stdout(predicate::str::contains("\"call_count\": 1"))
         .stdout(predicate::str::contains(
@@ -158,10 +172,66 @@ fn cli_fails_refactor_plan_policy_after_printing_json() {
         .assert()
         .failure()
         .stdout(predicate::str::contains("\"policy\""))
+        .stdout(predicate::str::contains("\"decision\""))
+        .stdout(predicate::str::contains("\"status\": \"policy_failed\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"resolve-policy-violations\"",
+        ))
+        .stdout(predicate::str::contains("\"safe_to_automate\": false"))
+        .stdout(predicate::str::contains("\"policy_passed\": false"))
+        .stdout(predicate::str::contains("\"name\": \"plan-policy\""))
+        .stdout(predicate::str::contains("\"status\": \"failed\""))
+        .stdout(predicate::str::contains("\"name\": \"apply-plan\""))
+        .stdout(predicate::str::contains("\"status\": \"skipped\""))
         .stdout(predicate::str::contains("\"passed\": false"))
         .stdout(predicate::str::contains("\"fail_on_blocking_gate\": true"))
         .stdout(predicate::str::contains(
             "--require-definitions expected at least 2, found 1",
         ))
         .stderr(predicate::str::contains("refactor-plan policy failed"));
+}
+
+#[test]
+fn cli_marks_refactor_plan_manual_review_when_blocking_gates_do_not_fail_policy() {
+    let dir = fresh_temp_dir("refactor-plan-manual-review");
+    let file = dir.join("core.lisp");
+    fs::write(
+        &file,
+        r#"(defpackage #:demo.core (:use #:cl))
+(in-package #:demo.core)
+(defun render-pane (pane) (draw-pane pane))
+(defun render-pane (pane theme) (draw-themed-pane pane theme))
+(defun caller () (render-pane window))
+"#,
+    )
+    .expect("write manual review refactor plan fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("refactor-plan")
+        .arg("--symbol")
+        .arg("render-pane")
+        .arg("--operation")
+        .arg("rename")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"decision\""))
+        .stdout(predicate::str::contains("\"status\": \"manual_review\""))
+        .stdout(predicate::str::contains("\"policy_passed\": true"))
+        .stdout(predicate::str::contains("\"safe_to_automate\": false"))
+        .stdout(predicate::str::contains("\"blocking_gate_count\": 2"))
+        .stdout(predicate::str::contains(
+            "\"name\": \"manual-review-gates\"",
+        ))
+        .stdout(predicate::str::contains("\"status\": \"scheduled\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-rename-scope\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"code\": \"ambiguous-definition\"",
+        ))
+        .stdout(predicate::str::contains("\"code\": \"signature-mismatch\""))
+        .stdout(predicate::str::contains("\"command\": null"));
 }

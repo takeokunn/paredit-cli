@@ -36,32 +36,31 @@ use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 
 use crate::application::refactor::execute::{
-    RefactorExecuteGateInputs, RefactorWriteCandidate, RefactorWriteRefusal,
-    build_refactor_execute_decision, build_refactor_write_plan,
+    build_refactor_execute_decision, RefactorExecuteGateInputs, RefactorWriteRefusal,
 };
 use crate::application::refactor::plan::{
+    build_refactor_plan_decision, refactor_plan_gates as application_refactor_plan_gates,
+    refactor_verification_checks as application_refactor_verification_checks,
     RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
     RefactorPlanPolicyRequest, RefactorPlanRequest, RefactorPlanStep, RefactorPlanSummary,
     RefactorVerificationCheck, RefactorVerificationRequest,
-    VerificationPhase as ApplicationVerificationPhase, build_refactor_plan_decision,
-    refactor_plan_gates as application_refactor_plan_gates,
-    refactor_verification_checks as application_refactor_verification_checks,
+    VerificationPhase as ApplicationVerificationPhase,
 };
 use crate::application::refactor::preview::{
-    RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewPolicyOptions,
-    RefactorPreviewSummary, evaluate_refactor_preview_policy, refactor_preview_edits,
+    evaluate_refactor_preview_policy, refactor_preview_edits, RefactorPreviewEdit,
+    RefactorPreviewPolicy, RefactorPreviewPolicyOptions, RefactorPreviewSummary,
 };
 use crate::application::usecase::impact_report::{
-    ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
-    summarize_impact_reports,
+    raw_refactor_risks, summarize_impact_reports, ImpactReportFile,
+    ImpactRiskLevel as ApplicationImpactRiskLevel,
 };
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
 use anyhow::{Context, Result};
 use clap::{Args, Parser, ValueEnum};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use args::*;
 use command::Command;

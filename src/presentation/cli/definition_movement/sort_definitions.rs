@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::sort_definitions::{
-    SortDefinitionsRequest, plan_sort_definitions,
+    plan_sort_definitions, SortDefinitionsRequest,
 };
 
 use super::super::shared::{detect_dialect, read_input};

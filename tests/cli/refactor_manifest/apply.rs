@@ -57,8 +57,19 @@ fn cli_applies_refactor_preview_manifest_with_hash_guards() {
         .stdout(predicate::str::contains("\"hash\": \"fnv1a64:"))
         .stdout(predicate::str::contains(manifest_hash.clone()))
         .stdout(predicate::str::contains("\"write_requested\": false"))
+        .stdout(predicate::str::contains("\"status\": \"dry-run-ready\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"rerun_refactor_apply_with_write\"",
+        ))
+        .stdout(predicate::str::contains("\"blocked_reasons\": []"))
+        .stdout(predicate::str::contains("\"steps\": ["))
+        .stdout(predicate::str::contains("\"name\": \"manifest-policy\""))
+        .stdout(predicate::str::contains("\"name\": \"apply-write\""))
+        .stdout(predicate::str::contains("\"status\": \"scheduled\""))
         .stdout(predicate::str::contains("\"applied\": false"))
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"stale_file_count\": 0"))
         .stdout(predicate::str::contains(
@@ -92,6 +103,12 @@ fn cli_applies_refactor_preview_manifest_with_hash_guards() {
         .success()
         .stdout(predicate::str::contains("\"enforced\": true"))
         .stdout(predicate::str::contains("\"write_requested\": true"))
+        .stdout(predicate::str::contains("\"status\": \"applied\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"run_verification_or_review_diff\"",
+        ))
+        .stdout(predicate::str::contains("\"name\": \"apply-write\""))
+        .stdout(predicate::str::contains("\"status\": \"passed\""))
         .stdout(predicate::str::contains("\"applied\": true"))
         .stdout(predicate::str::contains("\"written_file_count\": 1"))
         .stdout(predicate::str::contains("\"written\": true"));
@@ -202,6 +219,11 @@ fn cli_refuses_stale_refactor_apply_manifest_without_writing() {
         .arg("json")
         .assert()
         .failure()
+        .stdout(predicate::str::contains("\"status\": \"blocked\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"regenerate_refactor_preview\"",
+        ))
+        .stdout(predicate::str::contains("\"stale_files\""))
         .stdout(predicate::str::contains("\"applied\": false"))
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"stale_file_count\": 1"))
@@ -211,5 +233,128 @@ fn cli_refuses_stale_refactor_apply_manifest_without_writing() {
     assert_eq!(
         fs::read_to_string(&lisp_file).expect("read stale fixture"),
         stale
+    );
+}
+
+#[test]
+fn cli_refactor_apply_reports_policy_failed_manifest_without_writing() {
+    let dir = fresh_temp_dir("refactor-apply-policy-failed");
+    let lisp_file = dir.join("core.lisp");
+    let manifest_file = dir.join("rename.preview.json");
+    let original = "(defun old-name (x) x)\n";
+    fs::write(&lisp_file, original).expect("write lisp fixture");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .arg("refactor-preview")
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let manifest_text = String::from_utf8(preview_output)
+        .expect("preview output is utf8")
+        .replace("\"passed\": true", "\"passed\": false");
+    fs::write(&manifest_file, manifest_text).expect("write failed refactor manifest");
+
+    let mut apply = paredit();
+    apply
+        .arg("refactor-apply")
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\": \"blocked\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"regenerate_refactor_preview\"",
+        ))
+        .stdout(predicate::str::contains(
+            "\"manifest_policy_passed\": false",
+        ))
+        .stdout(predicate::str::contains("\"manifest_outputs_parse\": true"))
+        .stdout(predicate::str::contains("\"manifest_policy_failed\""))
+        .stdout(predicate::str::contains("\"applied\": false"))
+        .stdout(predicate::str::contains("\"written_file_count\": 0"))
+        .stderr(predicate::str::contains("manifest_policy_passed=false"));
+
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read policy failed fixture"),
+        original
+    );
+}
+
+#[test]
+fn cli_refactor_apply_reports_unparseable_manifest_outputs_without_writing() {
+    let dir = fresh_temp_dir("refactor-apply-unparseable-outputs");
+    let lisp_file = dir.join("core.lisp");
+    let manifest_file = dir.join("rename.preview.json");
+    let original = "(defun old-name (x) x)\n";
+    fs::write(&lisp_file, original).expect("write lisp fixture");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .arg("refactor-preview")
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let manifest_text = String::from_utf8(preview_output)
+        .expect("preview output is utf8")
+        .replace(
+            "\"all_outputs_parse\": true",
+            "\"all_outputs_parse\": false",
+        );
+    fs::write(&manifest_file, manifest_text).expect("write unparseable-output manifest");
+
+    let mut apply = paredit();
+    apply
+        .arg("refactor-apply")
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\": \"blocked\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"regenerate_refactor_preview\"",
+        ))
+        .stdout(predicate::str::contains("\"manifest_policy_passed\": true"))
+        .stdout(predicate::str::contains(
+            "\"manifest_outputs_parse\": false",
+        ))
+        .stdout(predicate::str::contains(
+            "\"manifest_outputs_do_not_parse\"",
+        ))
+        .stdout(predicate::str::contains("\"applied\": false"))
+        .stdout(predicate::str::contains("\"written_file_count\": 0"))
+        .stderr(predicate::str::contains("manifest_outputs_parse=false"));
+
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read unparseable-output apply fixture"),
+        original
     );
 }

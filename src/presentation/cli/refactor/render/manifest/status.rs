@@ -27,11 +27,21 @@ pub(in crate::presentation::cli) fn print_refactor_status_result(
                     .collect::<Vec<_>>()
                     .join(",")
             );
+            for step in result.steps() {
+                println!(
+                    "decision_step\t{}\tstatus={}",
+                    step.name,
+                    step.status.label()
+                );
+            }
             println!("manifest_policy_passed\t{}", result.manifest_policy_passed);
             println!("manifest_outputs_parse\t{}", result.manifest_outputs_parse);
             println!("can_apply\t{}", result.summary.can_apply);
             println!("files\t{}", result.summary.file_count);
             println!("changed_file_count\t{}", result.summary.changed_file_count);
+            for path in &result.summary.changed_files {
+                println!("changed_file\t{path}");
+            }
             println!("edit_count\t{}", result.summary.edit_count);
             println!("stale_file_count\t{}", result.summary.stale_file_count);
             println!(
@@ -89,12 +99,21 @@ pub(in crate::presentation::cli) fn print_refactor_status_result(
                     .iter()
                     .map(|reason| reason.label())
                     .collect::<Vec<_>>(),
+                "steps": result
+                    .steps()
+                    .into_iter()
+                    .map(|step| json!({
+                        "name": step.name,
+                        "status": step.status.label(),
+                    }))
+                    .collect::<Vec<_>>(),
                 "manifest_policy_passed": result.manifest_policy_passed,
                 "manifest_outputs_parse": result.manifest_outputs_parse,
-                "summary": {
-                    "file_count": result.summary.file_count,
-                    "changed_file_count": result.summary.changed_file_count,
-                    "edit_count": result.summary.edit_count,
+                    "summary": {
+                        "file_count": result.summary.file_count,
+                        "changed_file_count": result.summary.changed_file_count,
+                        "changed_files": &result.summary.changed_files,
+                        "edit_count": result.summary.edit_count,
                     "stale_file_count": result.summary.stale_file_count,
                     "output_hash_mismatch_count": result.summary.output_hash_mismatch_count,
                     "parse_error_count": result.summary.parse_error_count,

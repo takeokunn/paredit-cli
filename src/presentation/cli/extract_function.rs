@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::extract_function::{
-    ExtractFunctionPlan, ExtractFunctionRequest, plan_extract_function,
+    plan_extract_function, ExtractFunctionPlan, ExtractFunctionRequest,
 };
 
 #[derive(Debug, Args)]

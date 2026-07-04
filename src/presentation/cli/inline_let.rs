@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::usecase::inline_let::{InlineLetPlan, InlineLetRequest, plan_inline_let};
+use crate::application::usecase::inline_let::{plan_inline_let, InlineLetPlan, InlineLetRequest};
 
 #[derive(Debug, Args)]
 pub(super) struct InlineLetArgs {

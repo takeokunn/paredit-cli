@@ -6,6 +6,7 @@ fn summary() -> RefactorPreviewSummary {
     RefactorPreviewSummary {
         file_count: 2,
         changed_file_count: 1,
+        changed_files: vec!["changed.lisp".to_string()],
         unchanged_file_count: 1,
         written_file_count: 0,
         definition_count: 1,
@@ -74,6 +75,9 @@ proptest! {
         let summary = RefactorPreviewSummary {
             file_count: changed + 1,
             changed_file_count: changed,
+            changed_files: (0..changed)
+                .map(|index| format!("changed-{index}.lisp"))
+                .collect(),
             unchanged_file_count: 1,
             written_file_count: 0,
             definition_count: definitions,

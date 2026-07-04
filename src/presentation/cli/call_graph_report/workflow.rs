@@ -1,7 +1,7 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 
 use crate::application::usecase::call_graph_report::{
-    CallGraphReportSource, build_call_graph_report, evaluate_call_graph_policy,
+    build_call_graph_report, evaluate_call_graph_policy, CallGraphReportSource,
 };
 use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::call_graph_report::args::CallGraphArgs;

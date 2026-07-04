@@ -68,8 +68,8 @@ pub(in crate::presentation::cli::refactor::workflow) fn build_refactor_preview(
         };
         total_definitions += definition_count;
 
-        let output_parse_ok = SyntaxTree::parse(&rewritten).is_ok();
         let changed = rewritten != input.text;
+        let output_parse_ok = !changed || SyntaxTree::parse(&rewritten).is_ok();
         let edit_count = edits.len();
         let preview = bounded_preview(&rewritten, request.max_preview_bytes);
         files.push(RefactorPreviewFile {
@@ -96,9 +96,16 @@ pub(in crate::presentation::cli::refactor::workflow) fn build_refactor_preview(
         );
     }
 
+    let changed_files = files
+        .iter()
+        .filter(|file| file.changed)
+        .map(|file| file.path.display().to_string())
+        .collect::<Vec<_>>();
+
     let summary = RefactorPreviewSummary {
         file_count: files.len(),
-        changed_file_count: files.iter().filter(|file| file.changed).count(),
+        changed_file_count: changed_files.len(),
+        changed_files,
         unchanged_file_count: files.iter().filter(|file| !file.changed).count(),
         written_file_count: 0,
         definition_count: total_definitions,

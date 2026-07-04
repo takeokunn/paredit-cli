@@ -65,6 +65,9 @@ fn cli_e2e_applies_workspace_refactor_manifest_across_lisp_dialects() {
         .stdout(predicate::str::contains("\"mode\": \"function\""))
         .stdout(predicate::str::contains("\"file_count\": 2"))
         .stdout(predicate::str::contains("\"changed_file_count\": 2"))
+        .stdout(predicate::str::contains("\"changed_files\": ["))
+        .stdout(predicate::str::contains("core.lisp"))
+        .stdout(predicate::str::contains("ui.el"))
         .stdout(predicate::str::contains("\"written_file_count\": 2"))
         .stdout(predicate::str::contains("\"edit_count\": 3"))
         .stdout(predicate::str::contains("\"applied\": true"));

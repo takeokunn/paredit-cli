@@ -1,10 +1,21 @@
 use super::super::super::super::*;
+use super::super::super::manifest::status::refactor_apply_decision;
 use super::super::super::types::apply::RefactorApplyResult;
 
 pub(in crate::presentation::cli) fn print_refactor_apply_result(
     result: &RefactorApplyResult,
     output: OutputFormat,
 ) -> Result<()> {
+    let decision = refactor_apply_decision(
+        result.manifest_policy_passed,
+        result.manifest_outputs_parse,
+        result.summary.stale_file_count,
+        result.summary.output_hash_mismatch_count,
+        result.summary.parse_error_count,
+        result.summary.manifest_flag_mismatch_count,
+        result.summary.applied,
+    );
+
     match output {
         OutputFormat::Text => {
             println!("manifest_path\t{}", result.manifest.path.display());
@@ -17,9 +28,32 @@ pub(in crate::presentation::cli) fn print_refactor_apply_result(
                 println!("root\t{}", path.display());
             }
             println!("write_requested\t{}", result.write_requested);
+            println!("status\t{}", decision.status.label());
+            println!("next_action\t{}", decision.next_action.label());
+            println!("manifest_policy_passed\t{}", result.manifest_policy_passed);
+            println!("manifest_outputs_parse\t{}", result.manifest_outputs_parse);
+            println!(
+                "blocked_reasons\t{}",
+                decision
+                    .blocked_reasons
+                    .iter()
+                    .map(|reason| reason.label())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+            for step in decision.steps() {
+                println!(
+                    "decision_step\t{}\tstatus={}",
+                    step.name,
+                    step.status.label()
+                );
+            }
             println!("applied\t{}", result.summary.applied);
             println!("files\t{}", result.summary.file_count);
             println!("changed_file_count\t{}", result.summary.changed_file_count);
+            for path in &result.summary.changed_files {
+                println!("changed_file\t{path}");
+            }
             println!("written_file_count\t{}", result.summary.written_file_count);
             println!("edit_count\t{}", result.summary.edit_count);
             println!("stale_file_count\t{}", result.summary.stale_file_count);
@@ -63,10 +97,28 @@ pub(in crate::presentation::cli) fn print_refactor_apply_result(
                     "path": result.root.path.as_ref().map(|path| path.display().to_string()),
                 },
                 "write_requested": result.write_requested,
-                "summary": {
-                    "file_count": result.summary.file_count,
-                    "changed_file_count": result.summary.changed_file_count,
-                    "written_file_count": result.summary.written_file_count,
+                "status": decision.status.label(),
+                "next_action": decision.next_action.label(),
+                "manifest_policy_passed": result.manifest_policy_passed,
+                "manifest_outputs_parse": result.manifest_outputs_parse,
+                "blocked_reasons": decision
+                    .blocked_reasons
+                    .iter()
+                    .map(|reason| reason.label())
+                    .collect::<Vec<_>>(),
+                "steps": decision
+                    .steps()
+                    .into_iter()
+                    .map(|step| json!({
+                        "name": step.name,
+                        "status": step.status.label(),
+                    }))
+                    .collect::<Vec<_>>(),
+                    "summary": {
+                        "file_count": result.summary.file_count,
+                        "changed_file_count": result.summary.changed_file_count,
+                        "changed_files": &result.summary.changed_files,
+                        "written_file_count": result.summary.written_file_count,
                     "edit_count": result.summary.edit_count,
                     "stale_file_count": result.summary.stale_file_count,
                     "output_hash_mismatch_count": result.summary.output_hash_mismatch_count,

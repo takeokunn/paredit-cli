@@ -9,8 +9,8 @@ use super::args::RemoveDefinitionArgs;
 use super::render::print_remove_definition_plan;
 use super::types::RemoveDefinitionPlan;
 use crate::application::usecase::definition_report::{
-    DefinitionReportItem, body_form_count, count_lambda_parameters, definition_name,
-    lambda_list_index,
+    body_form_count, count_lambda_parameters, definition_name, lambda_list_index,
+    DefinitionReportItem,
 };
 use crate::domain::definition::classify_definition_head;
 use crate::domain::sexpr::{Edit, SyntaxTree};

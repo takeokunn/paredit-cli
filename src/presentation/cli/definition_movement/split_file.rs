@@ -3,7 +3,7 @@ use std::path::Path as FsPath;
 
 use anyhow::{Context, Result};
 
-use crate::application::usecase::split_file::{SplitFileRequest, plan_split_file};
+use crate::application::usecase::split_file::{plan_split_file, SplitFileRequest};
 
 use super::super::shared::{detect_dialect, read_file_or_empty, read_input};
 use super::args::SplitFileArgs;

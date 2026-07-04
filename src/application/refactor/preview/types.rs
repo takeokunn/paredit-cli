@@ -1,7 +1,8 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct RefactorPreviewSummary {
     pub file_count: usize,
     pub changed_file_count: usize,
+    pub changed_files: Vec<String>,
     pub unchanged_file_count: usize,
     pub written_file_count: usize,
     pub definition_count: usize,
