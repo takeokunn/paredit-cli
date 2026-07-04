@@ -38,6 +38,25 @@ fn reports_clojure_vector_bindings() {
     assert_eq!(reports[0].bindings[1].reference_count, 1);
 }
 
+#[test]
+fn reports_ignore_shadowed_body_references() {
+    let reports = reports_for("(let ((x 1)) (let ((x 2)) x))", Dialect::CommonLisp);
+
+    assert_eq!(reports.len(), 2);
+    assert_eq!(reports[0].bindings[0].reference_count, 0);
+    assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+    assert_eq!(reports[1].bindings[0].reference_count, 1);
+}
+
+#[test]
+fn reports_ignore_lambda_parameter_shadowed_references() {
+    let reports = reports_for("(let ((x 1)) (lambda (x) x))", Dialect::CommonLisp);
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].bindings[0].reference_count, 0);
+    assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(32))]
 
@@ -61,5 +80,16 @@ proptest! {
             reports[0].bindings[0].risks.contains(&"unused-binding"),
             ref_count == 0
         );
+    }
+
+    #[test]
+    fn pbt_shadowed_nested_let_references_do_not_count(value in 0i64..100, shadow_value in 0i64..100) {
+        let input = format!("(let ((x {value})) (let ((x {shadow_value})) (+ x x)))");
+        let reports = reports_for(&input, Dialect::CommonLisp);
+
+        prop_assert_eq!(reports.len(), 2);
+        prop_assert_eq!(reports[0].bindings[0].reference_count, 0);
+        prop_assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+        prop_assert_eq!(reports[1].bindings[0].reference_count, 2);
     }
 }
