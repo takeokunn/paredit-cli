@@ -50,9 +50,14 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
 
     let policy_passed = preview.policy.passed;
     let policy_message = preview.policy.violations.join("; ");
-    let write_parse_refused = args.write && !preview.summary.all_outputs_parse;
+    let preflight_decision = build_refactor_execute_decision(RefactorExecuteGateInputs {
+        write_requested: args.write,
+        policy_passed,
+        outputs_parse: preview.summary.all_outputs_parse,
+        preflight_passed: true,
+    });
 
-    let pre_verification = if policy_passed && !write_parse_refused {
+    let pre_verification = if preflight_decision.run_pre_verification {
         Some(build_refactor_verification(
             &paths,
             None,
@@ -67,12 +72,18 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
     let pre_passed = pre_verification
         .as_ref()
         .is_none_or(|verification| verification.passed);
+    let execute_decision = build_refactor_execute_decision(RefactorExecuteGateInputs {
+        write_requested: args.write,
+        policy_passed,
+        outputs_parse: preview.summary.all_outputs_parse,
+        preflight_passed: pre_passed,
+    });
 
-    if policy_passed && !write_parse_refused && pre_passed {
+    if execute_decision.apply_preview {
         write_refactor_preview(&mut preview)?;
     }
 
-    let post_verification = if args.write && policy_passed && !write_parse_refused && pre_passed {
+    let post_verification = if execute_decision.run_post_verification {
         Some(build_refactor_verification(
             &paths,
             None,
@@ -98,7 +109,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         "workspace-refactor-execute",
         policy_passed,
         &policy_message,
-        write_parse_refused,
+        execute_decision.write_parse_refused,
     )?;
 
     if !pre_passed {

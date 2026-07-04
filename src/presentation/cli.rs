@@ -43,7 +43,8 @@ use crate::application::impact_report::{
     summarize_impact_reports,
 };
 use crate::application::refactor::execute::{
-    RefactorWriteCandidate, RefactorWriteRefusal, build_refactor_write_plan,
+    RefactorExecuteGateInputs, RefactorWriteCandidate, RefactorWriteRefusal,
+    build_refactor_execute_decision, build_refactor_write_plan,
 };
 use crate::application::refactor::plan::{
     RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
