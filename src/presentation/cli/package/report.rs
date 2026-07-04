@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::application::package_report::build_package_report;
+use crate::application::usecase::package_report::build_package_report;
 use crate::domain::sexpr::SyntaxTree;
 
 use super::super::{detect_dialect, read_input};

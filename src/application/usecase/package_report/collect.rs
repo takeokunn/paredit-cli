@@ -1,9 +1,9 @@
 use anyhow::Result;
 
-use crate::application::package_report::analyze::{
+use crate::application::usecase::package_report::analyze::{
     analyze_defpackage_form, analyze_in_package_form,
 };
-use crate::application::package_report::types::{
+use crate::application::usecase::package_report::types::{
     InPackageReport, PackageDefinitionReport, PackageReport,
 };
 use crate::domain::sexpr::{ExpressionView, Path, SyntaxTree};

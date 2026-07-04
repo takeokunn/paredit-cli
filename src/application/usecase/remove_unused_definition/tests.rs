@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 
 use super::*;
-use crate::application::package_report::PackageDefinitionReport;
+use crate::application::usecase::package_report::PackageDefinitionReport;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};

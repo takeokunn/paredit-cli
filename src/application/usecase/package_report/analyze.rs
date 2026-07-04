@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 
-use crate::application::package_report::syntax::{
+use crate::application::usecase::package_report::syntax::{
     atom_text, is_package_head, package_option_atoms, package_option_name,
 };
-use crate::application::package_report::types::{
+use crate::application::usecase::package_report::types::{
     InPackageReport, PackageDefinitionReport, PackageImportReport,
 };
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};

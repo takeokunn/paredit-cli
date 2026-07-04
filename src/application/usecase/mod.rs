@@ -8,6 +8,7 @@ pub mod inline_function;
 pub mod inline_let;
 pub mod introduce_let;
 pub mod package;
+pub mod package_report;
 pub mod remove_unused_binding;
 pub mod remove_unused_definition;
 pub mod rename;

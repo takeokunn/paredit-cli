@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::application::package_report::PackageDefinitionReport;
+use crate::application::usecase::package_report::PackageDefinitionReport;
 use crate::application::usecase::remove_unused_definition::types::UnusedDefinitionDefinition;
 use crate::domain::definition::DefinitionCategory;
 
