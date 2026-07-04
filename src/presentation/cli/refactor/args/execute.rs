@@ -5,6 +5,7 @@ use clap::Args;
 use crate::domain::sexpr::SymbolName;
 
 use super::super::super::OutputFormat;
+use super::plan::RefactorOperation;
 use super::preview::RefactorPreviewMode;
 
 #[derive(Debug, Args)]
@@ -30,6 +31,9 @@ pub(in crate::presentation::cli) struct WorkspaceRefactorExecuteArgs {
     /// Exact replacement symbol.
     #[arg(long)]
     pub(in crate::presentation::cli) to: SymbolName,
+    /// Refactoring intent used to choose execute verification invariants.
+    #[arg(long, value_enum, default_value_t = RefactorOperation::Rename)]
+    pub(in crate::presentation::cli) operation: RefactorOperation,
     /// Rewrite strategy.
     #[arg(long, value_enum, default_value_t = RefactorPreviewMode::Symbol)]
     pub(in crate::presentation::cli) mode: RefactorPreviewMode,

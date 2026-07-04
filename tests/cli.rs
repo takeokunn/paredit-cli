@@ -38,7 +38,7 @@ mod package;
 mod refactor_manifest;
 #[path = "cli/refactor_preview.rs"]
 mod refactor_preview;
-#[path = "cli/refactor_workspace.rs"]
+#[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding.rs"]
 mod remove_unused_binding;

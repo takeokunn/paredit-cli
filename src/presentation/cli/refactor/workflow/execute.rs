@@ -63,7 +63,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
             None,
             &args.from,
             Some(&args.to),
-            RefactorOperation::Rename,
+            args.operation,
             VerificationPhase::Pre,
         )?)
     } else {
@@ -89,7 +89,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
             None,
             &args.from,
             Some(&args.to),
-            RefactorOperation::Rename,
+            args.operation,
             VerificationPhase::Post,
         )?)
     } else {
