@@ -22,6 +22,27 @@ fn cli_formats_common_lisp_indentation() {
 }
 
 #[test]
+fn cli_formats_handler_bind_indentation() {
+    let dir = fresh_temp_dir("format-handler-bind");
+    let file = dir.join("handler-bind.lisp");
+    fs::write(
+        &file,
+        "(handler-bind ((error #'handle-error) (warning #'muffle-warning)) (risky) (recover))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(handler-bind ((error #'handle-error)\n               (warning #'muffle-warning))\n  (risky)\n  (recover))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_macrolet_indentation() {
     let dir = fresh_temp_dir("format-macrolet");
     let file = dir.join("macrolet.lisp");
@@ -38,7 +59,7 @@ fn cli_formats_macrolet_indentation() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(macrolet ((with-x (x) (list x outer))) (with-x 1)\n  (with-x 2))\n",
+            "(macrolet ((with-x (x) (list x outer)))\n  (with-x 1)\n  (with-x 2))\n",
         ));
 }
 
@@ -59,7 +80,28 @@ fn cli_formats_compiler_macrolet_indentation() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(compiler-macrolet ((with-x (x) (list x outer))) (with-x 1)\n  (with-x 2))\n",
+            "(compiler-macrolet ((with-x (x) (list x outer)))\n  (with-x 1)\n  (with-x 2))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_multiple_local_callable_bindings() {
+    let dir = fresh_temp_dir("format-multiple-local-callables");
+    let file = dir.join("local-callables.lisp");
+    fs::write(
+        &file,
+        "(macrolet ((with-a (x) (list x outer)) (with-b (y) (list y outer))) (with-a 1) (with-b 2))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(macrolet ((with-a (x) (list x outer))\n           (with-b (y) (list y outer)))\n  (with-a 1)\n  (with-b 2))\n",
         ));
 }
 

@@ -57,7 +57,7 @@ impl Formatter {
                             self.format_binding_form(tree, node_id, depth, output);
                         }
                         ListStyle::LocalFunctions => {
-                            self.format_prefix_body(tree, node_id, depth, 2, output);
+                            self.format_local_callable_form(tree, node_id, depth, head, output);
                         }
                         ListStyle::OneArgumentBody => {
                             self.format_prefix_body(tree, node_id, depth, 2, output);
@@ -159,6 +159,42 @@ impl Formatter {
         let head = self
             .head_text(tree, node_id)
             .expect("binding form has head");
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_sequence_list(
+                        tree,
+                        *child,
+                        depth + 1,
+                        depth * self.indent + head.len() + 3,
+                        output,
+                    );
+                }
+                _ => {
+                    output.push('\n');
+                    output.push_str(&self.indent(depth + 1));
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    fn format_local_callable_form(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        head: &str,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
@@ -323,7 +359,9 @@ impl Formatter {
             | "defvar"
             | "defconstant" => ListStyle::Definition,
             "lambda" | "named-lambda" => ListStyle::Lambda,
-            "let" | "let*" | "symbol-macrolet" => ListStyle::Binding,
+            "let" | "let*" | "symbol-macrolet" | "handler-bind" | "restart-bind" => {
+                ListStyle::Binding
+            }
             "flet" | "labels" | "macrolet" | "compiler-macrolet" => ListStyle::LocalFunctions,
             "if" => ListStyle::If,
             "when"
