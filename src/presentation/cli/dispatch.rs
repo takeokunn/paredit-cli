@@ -15,7 +15,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             refactor::workflow::workspace_refactor_execute(args)?
         }
         Command::Outline(args) => analysis_report::outline(args)?,
-        Command::FormReport(args) => form_report::form_report(args)?,
+        Command::FormReport(args) => form_report::workflow::form_report(args)?,
         Command::FindSymbol(args) => symbol_report::workflow::find_symbol(args)?,
         Command::SymbolReport(args) => symbol_report::workflow::symbol_report(args)?,
         Command::CallReport(args) => call_report::call_report(args)?,

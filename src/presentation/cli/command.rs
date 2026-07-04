@@ -1,8 +1,8 @@
 use super::{
-    args::{AnalyzeArgs, FormReportArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
+    args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_report, extract_function, function_parameter, impact_report,
-    inline_function, inline_let, introduce_let, let_report, package, refactor,
+    dependency_report, duplicate_report, extract_function, form_report, function_parameter,
+    impact_report, inline_function, inline_let, introduce_let, let_report, package, refactor,
     remove_unused_binding, rename, replace_forms, signature_report, symbol_report,
     thread_expression, unthread_expression, unwrap_call, workspace_report,
 };
@@ -29,7 +29,7 @@ pub(super) enum Command {
     /// Print top-level forms with paths, spans, and definition hints.
     Outline(AnalyzeArgs),
     /// Report one selected form with local structure for agent refactor planning.
-    FormReport(FormReportArgs),
+    FormReport(form_report::args::FormReportArgs),
     /// Find exact atom occurrences without touching strings or comments.
     FindSymbol(symbol_report::args::SymbolQueryArgs),
     /// Report exact atom occurrences across explicit files for rename planning.

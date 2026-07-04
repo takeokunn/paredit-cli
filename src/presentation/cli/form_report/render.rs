@@ -1,23 +1,11 @@
-use super::*;
-use crate::application::form_report::{FormReport, FormReportRequest, build_form_report};
+use anyhow::Result;
+use serde_json::json;
 
-pub(super) fn form_report(args: FormReportArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-    let report = build_form_report(FormReportRequest {
-        input: &input.text,
-        dialect,
-        path: args.path,
-        target: selection.view(),
-        include_source: args.include_source,
-    })?;
+use crate::application::form_report::FormReport;
+use crate::domain::sexpr::Delimiter;
+use crate::presentation::cli::args::OutputFormat;
 
-    print_form_report(&report, args.output)
-}
-
-fn print_form_report(report: &FormReport, output: OutputFormat) -> Result<()> {
+pub(super) fn print_form_report(report: &FormReport, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", report.dialect.label());

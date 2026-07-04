@@ -57,9 +57,7 @@ use crate::application::refactor::preview::{
 };
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
-    ByteOffset, ByteSpan, Delimiter, Edit, Formatter, Path, SymbolName, SyntaxTree,
-};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Edit, Formatter, Path, SymbolName, SyntaxTree};
 use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 use anyhow::{Context, Result};
 use clap::{Args, Parser, ValueEnum};
