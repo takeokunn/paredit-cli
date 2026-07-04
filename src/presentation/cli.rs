@@ -34,7 +34,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 
-use crate::application::definition_report::collect_definition_forms;
 use crate::application::impact_report::{
     ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
     summarize_impact_reports,

@@ -1,53 +1,16 @@
-use super::*;
+use std::collections::BTreeMap;
 
-use crate::application::dependency_report::{
-    DependencyKind, DependencyReportItem, build_dependency_report,
-};
+use anyhow::Result;
+use serde_json::json;
 
-#[derive(Debug, Args)]
-pub(super) struct DependencyReportArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+use crate::application::dependency_report::DependencyKind;
+use crate::presentation::cli::args::OutputFormat;
+use crate::presentation::cli::dependency_report::types::DependencyReportFile;
+
+pub(super) fn print_dependency_report(
+    reports: &[DependencyReportFile],
     output: OutputFormat,
-}
-
-#[derive(Debug)]
-struct DependencyReportFile {
-    path: PathBuf,
-    dialect: Dialect,
-    package: Option<String>,
-    dependencies: Vec<DependencyReportItem>,
-}
-
-pub(super) fn dependency_report(args: DependencyReportArgs) -> Result<()> {
-    let mut reports = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        let (package, _) = collect_definition_forms(&tree, dialect)?;
-        let dependency_report = build_dependency_report(&tree)?;
-
-        reports.push(DependencyReportFile {
-            path: file.clone(),
-            dialect,
-            package,
-            dependencies: dependency_report.dependencies,
-        });
-    }
-
-    print_dependency_report(&reports, args.output)
-}
-
-fn print_dependency_report(reports: &[DependencyReportFile], output: OutputFormat) -> Result<()> {
+) -> Result<()> {
     let dependency_count = reports
         .iter()
         .map(|report| report.dependencies.len())

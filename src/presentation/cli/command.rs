@@ -57,7 +57,7 @@ pub(super) enum Command {
     /// Render a verified diff from a refactor preview manifest without writing files.
     RefactorDiff(refactor::args::RefactorDiffArgs),
     /// Report package, system, load, and qualified-symbol dependencies across explicit files.
-    DependencyReport(dependency_report::DependencyReportArgs),
+    DependencyReport(dependency_report::args::DependencyReportArgs),
     /// Report Common Lisp package declarations across explicit files.
     PackageReport(package::types::PackageReportArgs),
     /// Report definition-like top-level forms across explicit files.

@@ -29,7 +29,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::RefactorStatus(args) => refactor::workflow::refactor_status(args)?,
         Command::RefactorApply(args) => refactor::workflow::refactor_apply(args)?,
         Command::RefactorDiff(args) => refactor::workflow::refactor_diff(args)?,
-        Command::DependencyReport(args) => dependency_report::dependency_report(args)?,
+        Command::DependencyReport(args) => dependency_report::workflow::dependency_report(args)?,
         Command::PackageReport(args) => package::report::package_report(args)?,
         Command::DefinitionReport(args) => definition_report::workflow::definition_report(args)?,
         Command::UnusedDefinitionReport(args) => {
