@@ -97,9 +97,9 @@ enum Command {
     /// Report one selected form with local structure for agent refactor planning.
     FormReport(FormReportArgs),
     /// Find exact atom occurrences without touching strings or comments.
-    FindSymbol(symbol_report::SymbolQueryArgs),
+    FindSymbol(symbol_report::args::SymbolQueryArgs),
     /// Report exact atom occurrences across explicit files for rename planning.
-    SymbolReport(symbol_report::SymbolReportArgs),
+    SymbolReport(symbol_report::args::SymbolReportArgs),
     /// Report list-head call sites across explicit files for arity refactor planning.
     CallReport(call_report::CallReportArgs),
     /// Compare callable definitions and call-site arity across explicit files.

@@ -16,8 +16,8 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         }
         Command::Outline(args) => analysis_report::outline(args)?,
         Command::FormReport(args) => form_report::form_report(args)?,
-        Command::FindSymbol(args) => symbol_report::find_symbol(args)?,
-        Command::SymbolReport(args) => symbol_report::symbol_report(args)?,
+        Command::FindSymbol(args) => symbol_report::workflow::find_symbol(args)?,
+        Command::SymbolReport(args) => symbol_report::workflow::symbol_report(args)?,
         Command::CallReport(args) => call_report::call_report(args)?,
         Command::SignatureReport(args) => signature_report::signature_report(args)?,
         Command::CallGraph(args) => call_graph_report::call_graph(args)?,
