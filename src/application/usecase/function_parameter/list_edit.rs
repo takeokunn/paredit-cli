@@ -133,6 +133,48 @@ pub(super) fn move_list_item_edit(
     Ok((container.span, replacement))
 }
 
+pub(super) fn swap_list_item_edit(
+    input: &str,
+    container: &ExpressionView,
+    left_item_index: usize,
+    right_item_index: usize,
+    protected_prefix_count: usize,
+    operation: &str,
+) -> Result<SpanEdit> {
+    if container.kind != ExpressionKind::List || container.delimiter.is_none() {
+        anyhow::bail!("{operation} swap target must be a list");
+    }
+    if left_item_index >= container.children.len() || right_item_index >= container.children.len() {
+        anyhow::bail!(
+            "{operation} swap item index out of bounds: {} and {} for {} items",
+            left_item_index,
+            right_item_index,
+            container.children.len()
+        );
+    }
+    if left_item_index < protected_prefix_count || right_item_index < protected_prefix_count {
+        anyhow::bail!("{operation} cannot swap protected list prefix items");
+    }
+
+    let start = container.span.start().get();
+    let end = container.span.end().get();
+    let open = &input[start..start + 1];
+    let close = &input[end - 1..end];
+    let mut items = container
+        .children
+        .iter()
+        .map(|child| child.span.slice(input).to_owned())
+        .collect::<Vec<_>>();
+    items.swap(left_item_index, right_item_index);
+
+    let replacement = if items.is_empty() {
+        format!("{open}{close}")
+    } else {
+        format!("{open}{}{close}", items.join(" "))
+    };
+    Ok((container.span, replacement))
+}
+
 pub(super) fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;

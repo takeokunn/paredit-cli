@@ -2,8 +2,8 @@ use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::{
     AddFunctionParameterRequest, FunctionParameterInsert, MoveFunctionParameterRequest,
-    RemoveFunctionParameterRequest, plan_add_function_parameter, plan_move_function_parameter,
-    plan_remove_function_parameter,
+    RemoveFunctionParameterRequest, SwapFunctionParametersRequest, plan_add_function_parameter,
+    plan_move_function_parameter, plan_remove_function_parameter, plan_swap_function_parameters,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
@@ -73,6 +73,32 @@ fn removes_parameter_and_call_argument() {
 
     assert_eq!(plan.rewritten, "(defun f (a) (+ a b))\n(print (f 1))");
     assert_eq!(plan.removed_arguments, vec![Some("2".to_owned())]);
+}
+
+#[test]
+fn swaps_parameters_and_call_arguments() {
+    let input = "(defun f (a b c) (list a b c))\n(print (f 1 2 3))";
+    let plan = plan_swap_function_parameters(SwapFunctionParametersRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        left_name: symbol("a"),
+        right_name: symbol("c"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun f (c b a) (list a b c))\n(print (f 3 2 1))"
+    );
+    assert_eq!(plan.left_index, 0);
+    assert_eq!(plan.right_index, 2);
+    assert_eq!(
+        plan.swapped_arguments,
+        vec![("1".to_owned(), "3".to_owned())]
+    );
 }
 
 #[test]
@@ -187,6 +213,42 @@ proptest! {
         prop_assert_eq!(
             &plan.rewritten,
             &format!("(defun {name} ({a}) {a})\n(print ({name} {first}))")
+        );
+        SyntaxTree::parse(&plan.rewritten)
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
+    }
+
+    #[test]
+    fn pbt_swap_parameters_output_remains_parseable(
+        name in "[a-z][a-z0-9]{0,8}",
+        a in "[a-z][a-z0-9]{0,8}",
+        b in "[a-z][a-z0-9]{0,8}",
+        c in "[a-z][a-z0-9]{0,8}",
+        first in "[-]?[0-9]{1,4}",
+        second in "[-]?[0-9]{1,4}",
+        third in "[-]?[0-9]{1,4}",
+    ) {
+        prop_assume!(name != a);
+        prop_assume!(name != b);
+        prop_assume!(name != c);
+        prop_assume!(a != b);
+        prop_assume!(a != c);
+        prop_assume!(b != c);
+        let input = format!("(defun {name} ({a} {b} {c}) (list {a} {b} {c}))\n(print ({name} {first} {second} {third}))");
+        let plan = plan_swap_function_parameters(SwapFunctionParametersRequest {
+            input: &input,
+            dialect: Dialect::CommonLisp,
+            definition_path: path("0"),
+            left_name: symbol(&a),
+            right_name: symbol(&c),
+            call_paths: vec![path("1.1")],
+            all_calls: false,
+        })
+        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+        prop_assert_eq!(
+            &plan.rewritten,
+            &format!("(defun {name} ({c} {b} {a}) (list {a} {b} {c}))\n(print ({name} {third} {second} {first}))")
         );
         SyntaxTree::parse(&plan.rewritten)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;

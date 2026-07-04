@@ -74,6 +74,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::MoveFunctionParameter(args) => {
             function_parameter::move_parameter::move_function_parameter(args)?
         }
+        Command::SwapFunctionParameters(args) => {
+            function_parameter::swap::swap_function_parameters(args)?
+        }
         Command::RemoveFunctionParameter(args) => {
             function_parameter::remove::remove_function_parameter(args)?
         }

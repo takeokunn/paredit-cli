@@ -25,6 +25,17 @@ pub struct MoveFunctionParameterRequest<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub struct SwapFunctionParametersRequest<'a> {
+    pub input: &'a str,
+    pub dialect: Dialect,
+    pub definition_path: Path,
+    pub left_name: SymbolName,
+    pub right_name: SymbolName,
+    pub call_paths: Vec<Path>,
+    pub all_calls: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct RemoveFunctionParameterRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
@@ -81,6 +92,25 @@ pub struct MoveFunctionParameterPlan {
     pub from_index: usize,
     pub to_index: usize,
     pub moved_arguments: Vec<String>,
+    pub rewritten: String,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SwapFunctionParametersPlan {
+    pub dialect: Dialect,
+    pub definition_path: Path,
+    pub call_paths: Vec<Path>,
+    pub all_calls: bool,
+    pub definition_span: ByteSpan,
+    pub parameter_list_span: ByteSpan,
+    pub call_spans: Vec<ByteSpan>,
+    pub function_name: SymbolName,
+    pub left_name: SymbolName,
+    pub right_name: SymbolName,
+    pub left_index: usize,
+    pub right_index: usize,
+    pub swapped_arguments: Vec<(String, String)>,
     pub rewritten: String,
     pub changed: bool,
 }

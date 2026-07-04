@@ -143,6 +143,8 @@ paredit add-function-parameter --file source.lisp --definition-path 0 --name con
 paredit add-function-parameter --file source.lisp --definition-path 0 --name context --argument '*context*' --all-calls --output json
 paredit move-function-parameter --file source.lisp --definition-path 0 --name context --to-index 0 --call-path 1.3 --output json
 paredit move-function-parameter --file source.lisp --definition-path 0 --name context --to-index 0 --all-calls --write
+paredit swap-function-parameters --file source.lisp --definition-path 0 --left-name width --right-name height --call-path 1.3 --output json
+paredit swap-function-parameters --file source.lisp --definition-path 0 --left-name width --right-name height --all-calls --write
 paredit remove-function-parameter --file source.lisp --definition-path 0 --name context --call-path 1.3 --output json
 paredit remove-function-parameter --file source.lisp --definition-path 0 --name context --all-calls --write
 paredit introduce-let --file source.lisp --path 0.3.1 --name value --output json
@@ -427,6 +429,10 @@ do not carry a useful filename.
    `paredit move-function-parameter --output json` first. Review `from_index`,
    `to_index`, every explicit or discovered `call_paths` entry, and
    `moved_arguments` before applying `--write`.
+1. Swap two required function parameters with
+   `paredit swap-function-parameters --output json` first. Review
+   `left_index`, `right_index`, every explicit or discovered `call_paths`
+   entry, and `swapped_arguments` before applying `--write`.
 1. Remove obsolete required function parameters with
    `paredit remove-function-parameter --output json` first. Review
    `parameter_index`, each selected or discovered call, and
@@ -703,6 +709,33 @@ selected definition and moves the same positional argument in each reviewed
 reports `from_index`, `to_index`, `call_paths`, and `moved_arguments`, verifies
 each call head against the selected definition, and re-parses the rewritten
 file.
+
+Swap two required parameters within a reviewed definition and selected call
+sites:
+
+```sh
+paredit swap-function-parameters \
+  --file src/renderer.lisp \
+  --definition-path 0 \
+  --left-name width \
+  --right-name height \
+  --call-path 3.2 \
+  --output json
+paredit swap-function-parameters \
+  --file src/renderer.lisp \
+  --definition-path 0 \
+  --left-name width \
+  --right-name height \
+  --all-calls \
+  --write
+```
+
+`swap-function-parameters` swaps only simple positional parameters in the
+selected definition and swaps the same positional arguments in each reviewed
+`--call-path` entry, or each same-file call discovered by `--all-calls`. It
+reports `left_index`, `right_index`, `call_paths`, and `swapped_arguments`,
+verifies each call head against the selected definition, refuses calls missing
+either argument, and re-parses the rewritten file.
 
 Remove an obsolete required parameter from a reviewed definition and selected
 call sites:

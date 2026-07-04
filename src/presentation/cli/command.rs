@@ -118,6 +118,8 @@ pub(super) enum Command {
     AddFunctionParameter(function_parameter::args::AddFunctionParameterArgs),
     /// Move one required parameter in a selected function and explicit call sites.
     MoveFunctionParameter(function_parameter::args::MoveFunctionParameterArgs),
+    /// Swap two required parameters in a selected function and explicit call sites.
+    SwapFunctionParameters(function_parameter::args::SwapFunctionParametersArgs),
     /// Remove one required parameter from a selected function and explicit call sites.
     RemoveFunctionParameter(function_parameter::args::RemoveFunctionParameterArgs),
     /// Replace the selected expression with a local binding in the enclosing list.
