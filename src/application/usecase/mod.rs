@@ -1,5 +1,6 @@
 //! Application use cases.
 
+pub mod call_report;
 pub mod extract_function;
 pub mod form_report;
 pub mod function_parameter;

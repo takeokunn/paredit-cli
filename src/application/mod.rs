@@ -1,7 +1,6 @@
 //! Application use-case orchestration layer.
 
 pub mod call_graph_report;
-pub mod call_report;
 pub mod definition_report;
 pub mod dependency_report;
 pub mod duplicate_report;

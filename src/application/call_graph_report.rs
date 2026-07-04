@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 
-use crate::application::call_report::build_call_report;
+use crate::application::usecase::call_report::build_call_report;
 use crate::domain::sexpr::SymbolName;
 
 mod definitions;

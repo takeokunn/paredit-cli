@@ -2,8 +2,8 @@ use std::fs;
 
 use anyhow::{Context, Result};
 
-use crate::application::call_report::build_call_report;
 use crate::application::definition_report::collect_definition_forms;
+use crate::application::usecase::call_report::build_call_report;
 use crate::application::usecase::workspace_report::types::WorkspaceFileStatus;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;

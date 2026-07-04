@@ -5,8 +5,8 @@ use anyhow::Result;
 use crate::application::call_graph_report::{
     CallGraphNode, build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node,
 };
-use crate::application::call_report::build_call_report;
 use crate::application::signature_report::{SignatureCallItem, classify_signature_call};
+use crate::application::usecase::call_report::build_call_report;
 use crate::domain::sexpr::SymbolName;
 
 mod definitions;

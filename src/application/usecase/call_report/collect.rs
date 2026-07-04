@@ -1,9 +1,9 @@
 use anyhow::Result;
 
-use crate::application::call_report::syntax::{
+use crate::application::usecase::call_report::syntax::{
     definition_body_start_index, definition_name, list_head,
 };
-use crate::application::call_report::types::CallReportItem;
+use crate::application::usecase::call_report::types::CallReportItem;
 use crate::domain::definition::classify_definition_head;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{

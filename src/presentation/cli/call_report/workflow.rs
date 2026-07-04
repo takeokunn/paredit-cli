@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::application::call_report::build_call_report;
+use crate::application::usecase::call_report::build_call_report;
 use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::call_report::{
     args::CallReportArgs, render::print_call_report, types::CallReportFile,

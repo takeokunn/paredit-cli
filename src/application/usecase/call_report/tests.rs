@@ -1,6 +1,6 @@
 use proptest::prelude::*;
 
-use crate::application::call_report::build_call_report;
+use crate::application::usecase::call_report::build_call_report;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{SymbolName, SyntaxTree};
