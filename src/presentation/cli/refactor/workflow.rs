@@ -1,8 +1,10 @@
+mod execute;
 mod manifest;
 mod plan;
 mod preview;
 mod verification;
 
+pub(in crate::presentation::cli) use execute::workspace_refactor_execute;
 pub(in crate::presentation::cli) use manifest::apply::refactor_apply;
 pub(in crate::presentation::cli) use manifest::check::refactor_check;
 pub(in crate::presentation::cli) use manifest::diff::refactor_diff;

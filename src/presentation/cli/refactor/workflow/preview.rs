@@ -68,6 +68,18 @@ pub(in crate::presentation::cli) fn workspace_refactor_preview(
     )
 }
 
+pub(super) struct BuildRefactorPreviewRequest<'a> {
+    pub(super) paths: &'a [PathBuf],
+    pub(super) dialect: Option<DialectArg>,
+    pub(super) from: &'a SymbolName,
+    pub(super) to: &'a SymbolName,
+    pub(super) mode: RefactorPreviewMode,
+    pub(super) max_preview_bytes: usize,
+    pub(super) write: bool,
+    pub(super) policy_options: RefactorPreviewPolicyOptions,
+    pub(super) workspace: Option<WorkspaceRefactorPlanDiscovery>,
+}
+
 fn emit_refactor_preview(
     paths: &[PathBuf],
     dialect: Option<DialectArg>,
@@ -81,30 +93,69 @@ fn emit_refactor_preview(
     output: OutputFormat,
     failure_label: &'static str,
 ) -> Result<()> {
-    let mut files = Vec::with_capacity(paths.len());
+    let mut preview = build_refactor_preview(BuildRefactorPreviewRequest {
+        paths,
+        dialect,
+        from,
+        to,
+        mode,
+        max_preview_bytes,
+        write,
+        policy_options,
+        workspace,
+    })?;
+    let policy_passed = preview.policy.passed;
+    let policy_message = preview.policy.violations.join("; ");
+    let write_parse_refused = write && !preview.summary.all_outputs_parse;
+
+    if policy_passed && !write_parse_refused {
+        write_refactor_preview(&mut preview)?;
+    }
+
+    print_refactor_preview(&preview, output)?;
+    finish_refactor_preview_failure(
+        failure_label,
+        policy_passed,
+        &policy_message,
+        write_parse_refused,
+    )
+}
+
+pub(super) fn build_refactor_preview(
+    request: BuildRefactorPreviewRequest<'_>,
+) -> Result<RefactorPreview> {
+    let mut files = Vec::with_capacity(request.paths.len());
     let mut total_definitions = 0usize;
     let mut total_target_occurrences = 0usize;
 
-    for file in paths {
+    for file in request.paths {
         let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, dialect);
+        let dialect = detect_dialect(&input, request.dialect);
         let tree = SyntaxTree::parse(&input.text)
             .with_context(|| format!("failed to parse {}", file.display()))?;
-        total_target_occurrences += matching_symbol_occurrences(&tree, to).len();
-        let (rewritten, edits, definition_count) = match mode {
+        total_target_occurrences += matching_symbol_occurrences(&tree, request.to).len();
+        let (rewritten, edits, definition_count) = match request.mode {
             RefactorPreviewMode::Symbol => {
-                let raw_edits = matching_symbol_occurrences(&tree, from)
+                let raw_edits = matching_symbol_occurrences(&tree, request.from)
                     .into_iter()
-                    .map(|occurrence| (occurrence.span, to.as_str().to_owned()))
+                    .map(|occurrence| (occurrence.span, request.to.as_str().to_owned()))
                     .collect::<Vec<_>>();
                 let rewritten = apply_byte_span_edits(&input.text, raw_edits.clone())?;
                 (rewritten, refactor_preview_edits(&raw_edits), 0)
             }
             RefactorPreviewMode::Function => {
-                let definitions =
-                    rename::shared::collect_callable_definition_renames(&tree, dialect, from, to)?;
-                let calls =
-                    rename::shared::collect_function_call_head_renames(&tree, dialect, from, to)?;
+                let definitions = rename::shared::collect_callable_definition_renames(
+                    &tree,
+                    dialect,
+                    request.from,
+                    request.to,
+                )?;
+                let calls = rename::shared::collect_function_call_head_renames(
+                    &tree,
+                    dialect,
+                    request.from,
+                    request.to,
+                )?;
                 let raw_edits = definitions
                     .iter()
                     .chain(calls.iter())
@@ -124,7 +175,7 @@ fn emit_refactor_preview(
         let output_parse_ok = SyntaxTree::parse(&rewritten).is_ok();
         let changed = rewritten != input.text;
         let edit_count = edits.len();
-        let preview = bounded_preview(&rewritten, max_preview_bytes);
+        let preview = bounded_preview(&rewritten, request.max_preview_bytes);
         files.push(RefactorPreviewFile {
             path: file.clone(),
             dialect,
@@ -142,10 +193,10 @@ fn emit_refactor_preview(
         });
     }
 
-    if mode == RefactorPreviewMode::Function && total_definitions == 0 {
+    if request.mode == RefactorPreviewMode::Function && total_definitions == 0 {
         anyhow::bail!(
             "function '{}' was not found in callable definitions",
-            from.as_str()
+            request.from.as_str()
         );
     }
 
@@ -160,33 +211,41 @@ fn emit_refactor_preview(
         parse_error_count: files.iter().filter(|file| !file.output_parse_ok).count(),
         all_outputs_parse: files.iter().all(|file| file.output_parse_ok),
     };
-    let policy = evaluate_refactor_preview_policy(policy_options, &summary);
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
-    let mut preview = RefactorPreview {
-        workspace,
-        mode,
-        from: from.as_str().to_owned(),
-        to: to.as_str().to_owned(),
-        write_requested: write,
+    let policy = evaluate_refactor_preview_policy(request.policy_options, &summary);
+
+    Ok(RefactorPreview {
+        workspace: request.workspace,
+        mode: request.mode,
+        from: request.from.as_str().to_owned(),
+        to: request.to.as_str().to_owned(),
+        write_requested: request.write,
         files,
         summary,
         policy,
-    };
-    let write_parse_refused = write && !preview.summary.all_outputs_parse;
+    })
+}
 
-    if write && policy_passed && !write_parse_refused {
-        for file in preview.files.iter_mut().filter(|file| file.changed) {
-            fs::write(&file.path, &file.rewritten)
-                .with_context(|| format!("failed to write {}", file.path.display()))?;
-            file.written = true;
-        }
-        preview.summary.written_file_count =
-            preview.files.iter().filter(|file| file.written).count();
+pub(super) fn write_refactor_preview(preview: &mut RefactorPreview) -> Result<()> {
+    if !preview.write_requested {
+        return Ok(());
     }
 
-    print_refactor_preview(&preview, output)?;
+    for file in preview.files.iter_mut().filter(|file| file.changed) {
+        fs::write(&file.path, &file.rewritten)
+            .with_context(|| format!("failed to write {}", file.path.display()))?;
+        file.written = true;
+    }
+    preview.summary.written_file_count = preview.files.iter().filter(|file| file.written).count();
 
+    Ok(())
+}
+
+pub(super) fn finish_refactor_preview_failure(
+    failure_label: &'static str,
+    policy_passed: bool,
+    policy_message: &str,
+    write_parse_refused: bool,
+) -> Result<()> {
     if !policy_passed {
         anyhow::bail!("{failure_label} policy failed: {policy_message}");
     }

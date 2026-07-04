@@ -1,6 +1,7 @@
 pub(in crate::presentation::cli::refactor) mod apply;
 pub(in crate::presentation::cli::refactor) mod check;
 pub(in crate::presentation::cli::refactor) mod diff;
+pub(in crate::presentation::cli::refactor) mod execute;
 pub(in crate::presentation::cli::refactor) mod manifest;
 pub(in crate::presentation::cli::refactor) mod plan;
 pub(in crate::presentation::cli::refactor) mod preview;

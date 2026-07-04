@@ -1,4 +1,5 @@
 use super::*;
+use proptest::prelude::*;
 
 fn summary() -> RefactorPlanSummary {
     RefactorPlanSummary {
@@ -127,4 +128,75 @@ fn post_rename_verification_requires_old_symbol_removed_and_new_symbol_present()
             .iter()
             .any(|check| check.code == "new-symbol-signature-compatible")
     );
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    #[test]
+    fn post_rename_verification_passes_iff_old_symbol_is_removed_and_new_symbol_is_usable(
+        old_definitions in 0usize..4,
+        old_references in 0usize..4,
+        new_definitions in 0usize..4,
+        new_references in 0usize..4,
+        signature_mismatches in 0usize..4,
+    ) {
+        let before = RefactorPlanSummary {
+            definition_count: old_definitions,
+            reference_count: old_references,
+            ..summary()
+        };
+        let after = RefactorPlanSummary {
+            definition_count: new_definitions,
+            reference_count: new_references,
+            signature_mismatch_count: signature_mismatches,
+            ..summary()
+        };
+
+        let checks = refactor_verification_checks(
+            RefactorVerificationRequest {
+                operation: RefactorOperation::Rename,
+                phase: VerificationPhase::Post,
+                symbol: "old-name",
+                new_symbol: Some("new-name"),
+                before,
+                after: Some(after),
+            },
+            &[],
+        );
+        let expected_passed = old_definitions == 0
+            && old_references == 0
+            && new_definitions > 0
+            && new_references > 0
+            && signature_mismatches == 0;
+
+        prop_assert_eq!(
+            checks.iter().all(|check| check.passed),
+            expected_passed
+        );
+        prop_assert_eq!(
+            checks
+                .iter()
+                .find(|check| check.code == "old-symbol-removed")
+                .expect("old symbol check")
+                .passed,
+            old_definitions == 0 && old_references == 0
+        );
+        prop_assert_eq!(
+            checks
+                .iter()
+                .find(|check| check.code == "new-symbol-present")
+                .expect("new symbol check")
+                .passed,
+            new_definitions > 0 && new_references > 0
+        );
+        prop_assert_eq!(
+            checks
+                .iter()
+                .find(|check| check.code == "new-symbol-signature-compatible")
+                .expect("signature check")
+                .passed,
+            signature_mismatches == 0
+        );
+    }
 }

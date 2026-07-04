@@ -90,6 +90,8 @@ enum Command {
     WorkspaceRefactorPlan(refactor::args::WorkspaceRefactorPlanArgs),
     /// Discover Lisp sources under roots and preview exact refactoring rewrites.
     WorkspaceRefactorPreview(refactor::args::WorkspaceRefactorPreviewArgs),
+    /// Execute a workspace refactor with preview gates and post-write verification.
+    WorkspaceRefactorExecute(refactor::args::WorkspaceRefactorExecuteArgs),
     /// Print top-level forms with paths, spans, and definition hints.
     Outline(AnalyzeArgs),
     /// Report one selected form with local structure for agent refactor planning.
@@ -227,6 +229,9 @@ pub fn run() -> Result<()> {
         Command::WorkspaceRefactorPlan(args) => refactor::workflow::workspace_refactor_plan(args)?,
         Command::WorkspaceRefactorPreview(args) => {
             refactor::workflow::workspace_refactor_preview(args)?
+        }
+        Command::WorkspaceRefactorExecute(args) => {
+            refactor::workflow::workspace_refactor_execute(args)?
         }
         Command::Outline(args) => analysis_report::outline(args)?,
         Command::FormReport(args) => form_report::form_report(args)?,
