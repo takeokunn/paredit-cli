@@ -30,7 +30,7 @@ mod function_parameter;
 mod impact_report;
 #[path = "cli/inline_function.rs"]
 mod inline_function;
-#[path = "cli/let_refactor.rs"]
+#[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
 #[path = "cli/package/mod.rs"]
 mod package;
