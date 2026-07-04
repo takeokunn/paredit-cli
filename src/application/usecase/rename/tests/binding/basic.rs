@@ -62,6 +62,73 @@ fn plans_symbol_macrolet_binding_rename_without_touching_expansion_reference() {
 }
 
 #[test]
+fn plans_binding_rename_without_touching_dolist_iteration_scope() {
+    let input = "(let ((value 1) (items 2)) (list value (dolist (value items value) value) value))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("seed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(plan.shadowed_scope_count, 1);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((seed 1) (items 2)) (list seed (dolist (value items value) value) seed))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_binding_rename_without_touching_with_slots_scope() {
+    let input =
+        "(let ((value 1)) (with-slots (value (alias value)) value (list value alias)) value)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("outer").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(plan.shadowed_scope_count, 1);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((outer 1)) (with-slots (value (alias value)) outer (list value alias)) outer)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_binding_rename_without_touching_with_accessors_scope() {
+    let input = "(let ((value 1)) (with-accessors ((value get-value) (alias value)) value (list value alias)) value)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("outer").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(plan.shadowed_scope_count, 1);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((outer 1)) (with-accessors ((value get-value) (alias value)) outer (list value alias)) outer)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
 fn plans_lambda_parameter_rename_without_shadowed_inner_binding() {
     let input = "(lambda (value) (list value (lambda (value) value) value))";
     let plan = plan_rename_binding(RenameBindingRequest {

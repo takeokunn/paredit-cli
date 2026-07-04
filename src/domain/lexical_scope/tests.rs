@@ -90,8 +90,7 @@ fn multiple_value_bind_checks_value_before_body_shadowing() {
 
 #[test]
 fn handler_case_clause_parameters_shadow_only_clause_body() {
-    let input =
-        "(list condition (handler-case (risky condition) (error (condition) condition) (:no-error (value) condition)) condition)";
+    let input = "(list condition (handler-case (risky condition) (error (condition) condition) (:no-error (value) condition)) condition)";
 
     assert_eq!(
         reference_texts(input, "condition"),
@@ -101,12 +100,45 @@ fn handler_case_clause_parameters_shadow_only_clause_body() {
 
 #[test]
 fn restart_case_clause_parameters_shadow_only_clause_body() {
-    let input =
-        "(list condition (restart-case (risky condition) (retry (condition) condition) (skip () condition)) condition)";
+    let input = "(list condition (restart-case (risky condition) (retry (condition) condition) (skip () condition)) condition)";
 
     assert_eq!(
         reference_texts(input, "condition"),
         vec!["condition", "condition", "condition", "condition"]
+    );
+}
+
+#[test]
+fn dolist_iteration_variable_shadows_body_and_result() {
+    let input = "(list value (dolist (value values value) value) value)";
+
+    assert_eq!(reference_texts(input, "value"), vec!["value", "value"]);
+}
+
+#[test]
+fn dotimes_iteration_variable_shadows_body_and_result() {
+    let input = "(list limit (dotimes (limit limit limit) limit) limit)";
+
+    assert_eq!(
+        reference_texts(input, "limit"),
+        vec!["limit", "limit", "limit"]
+    );
+}
+
+#[test]
+fn with_slots_bindings_shadow_body_but_not_instance_form() {
+    let input = "(list slot (with-slots (slot (alias slot)) slot (list slot alias)) slot)";
+
+    assert_eq!(reference_texts(input, "slot"), vec!["slot", "slot", "slot"]);
+}
+
+#[test]
+fn with_accessors_bindings_shadow_body_but_not_instance_form() {
+    let input = "(list value (with-accessors ((value get-value) (alias value)) value (list value alias)) value)";
+
+    assert_eq!(
+        reference_texts(input, "value"),
+        vec!["value", "value", "value"]
     );
 }
 

@@ -69,6 +69,14 @@ fn collect_shadow_aware_special_form(
             collect_clause_form_references(view, symbol, output, shadowed_scope_count, input);
             true
         }
+        "dolist" | "dotimes" => {
+            collect_iteration_binding_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
+        "with-slots" | "with-accessors" => {
+            collect_slot_binding_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
         _ => false,
     }
 }
@@ -172,6 +180,97 @@ fn collect_sequential_let_references(
     for body in &view.children[2..] {
         collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
     }
+}
+
+fn collect_iteration_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+
+    if let Some(source_form) = binding_form.children.get(1) {
+        collect_symbol_atom_spans_unshadowed(
+            source_form,
+            symbol,
+            output,
+            shadowed_scope_count,
+            input,
+        );
+    }
+
+    if iteration_binding_form_binds(binding_form, symbol) {
+        *shadowed_scope_count += 1;
+        return;
+    }
+
+    if let Some(result_form) = binding_form.children.get(2) {
+        collect_symbol_atom_spans_unshadowed(
+            result_form,
+            symbol,
+            output,
+            shadowed_scope_count,
+            input,
+        );
+    }
+
+    for body in &view.children[2..] {
+        collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn collect_slot_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    let Some(slot_specs) = view.children.get(1) else {
+        return;
+    };
+    let Some(instance_form) = view.children.get(2) else {
+        return;
+    };
+
+    collect_symbol_atom_spans_unshadowed(
+        instance_form,
+        symbol,
+        output,
+        shadowed_scope_count,
+        input,
+    );
+
+    if slot_specs
+        .children
+        .iter()
+        .any(|spec| slot_spec_binds(spec, symbol))
+    {
+        *shadowed_scope_count += 1;
+        return;
+    }
+
+    for body in &view.children[3..] {
+        collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn iteration_binding_form_binds(binding_form: &ExpressionView, symbol: &SymbolName) -> bool {
+    binding_form
+        .children
+        .first()
+        .and_then(atom_text)
+        .is_some_and(|name| name == symbol.as_str())
+}
+
+fn slot_spec_binds(slot_spec: &ExpressionView, symbol: &SymbolName) -> bool {
+    atom_text(slot_spec)
+        .or_else(|| slot_spec.children.first().and_then(atom_text))
+        .is_some_and(|name| name == symbol.as_str())
 }
 
 fn collect_clause_form_references(

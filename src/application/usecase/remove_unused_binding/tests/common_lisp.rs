@@ -99,6 +99,50 @@ fn plans_unused_binding_ignoring_shadowed_inner_let() {
 }
 
 #[test]
+fn plans_unused_binding_ignoring_shadowed_dolist_variable() {
+    let input = "(let ((value 1) (used 2)) (list used (dolist (value items value) value)))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.binding_name.as_deref(), Some("value"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(
+        plan.replacement,
+        "(let ( (used 2)) (list used (dolist (value items value) value)))"
+    );
+}
+
+#[test]
+fn plans_unused_binding_ignoring_shadowed_with_slots_variable() {
+    let input = "(let ((value 1) (used 2)) (list used (with-slots (value) object value)))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.binding_name.as_deref(), Some("value"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(
+        plan.replacement,
+        "(let ( (used 2)) (list used (with-slots (value) object value)))"
+    );
+}
+
+#[test]
 fn plans_all_unused_bindings_by_replacing_form_with_body() {
     let input = "(let ((unused 1)) body)";
     let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {

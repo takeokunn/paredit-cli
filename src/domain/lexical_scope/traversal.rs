@@ -54,6 +54,14 @@ fn collect_shadow_aware_special_form(
             collect_clause_binding_references(view, symbol, input, output);
             true
         }
+        "dolist" | "dotimes" => {
+            collect_iteration_binding_references(view, symbol, input, output);
+            true
+        }
+        "with-slots" | "with-accessors" => {
+            collect_slot_binding_references(view, symbol, input, output);
+            true
+        }
         "lambda" | "fn" => parameter_form_binds(&view.children[1], symbol),
         "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => true,
         _ => false,
@@ -156,6 +164,75 @@ fn collect_clause_body_references(
     for body in &clause.children[2..] {
         collect_unshadowed_symbol_references(body, symbol, input, output);
     }
+}
+
+fn collect_iteration_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+
+    if let Some(source_form) = binding_form.children.get(1) {
+        collect_unshadowed_symbol_references(source_form, symbol, input, output);
+    }
+
+    if iteration_binding_form_binds(binding_form, symbol) {
+        return;
+    }
+
+    if let Some(result_form) = binding_form.children.get(2) {
+        collect_unshadowed_symbol_references(result_form, symbol, input, output);
+    }
+
+    for body in &view.children[2..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn collect_slot_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) {
+    let Some(slot_specs) = view.children.get(1) else {
+        return;
+    };
+    let Some(instance_form) = view.children.get(2) else {
+        return;
+    };
+
+    collect_unshadowed_symbol_references(instance_form, symbol, input, output);
+
+    if slot_specs
+        .children
+        .iter()
+        .any(|spec| slot_spec_binds(spec, symbol))
+    {
+        return;
+    }
+
+    for body in &view.children[3..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn iteration_binding_form_binds(binding_form: &ExpressionView, symbol: &SymbolName) -> bool {
+    binding_form
+        .children
+        .first()
+        .and_then(atom_text)
+        .is_some_and(|name| name == symbol.as_str())
+}
+
+fn slot_spec_binds(slot_spec: &ExpressionView, symbol: &SymbolName) -> bool {
+    atom_text(slot_spec)
+        .or_else(|| slot_spec.children.first().and_then(atom_text))
+        .is_some_and(|name| name == symbol.as_str())
 }
 
 fn collect_sequential_let_references(
