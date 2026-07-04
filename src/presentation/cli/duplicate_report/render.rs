@@ -1,124 +1,10 @@
-use super::*;
-use crate::application::duplicate_report::{
-    DuplicateCandidateGroups, DuplicateShapeReport, ReplacementPlanBatch,
-    build_duplicate_shape_reports, collect_duplicate_candidates, collect_replacement_plan_batches,
-};
+use super::super::*;
+use crate::application::duplicate_report::{DuplicateShapeReport, ReplacementPlanBatch};
 
-#[derive(Debug, Args)]
-pub(super) struct DuplicateReportArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Minimum number of matching forms required for a reported group.
-    #[arg(long, default_value_t = 2)]
-    min_group_size: usize,
-    /// Minimum expression node count for a candidate form.
-    #[arg(long, default_value_t = 4)]
-    min_node_count: usize,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+pub(in crate::presentation::cli) fn print_duplicate_report(
+    reports: &[DuplicateShapeReport],
     output: OutputFormat,
-}
-
-#[derive(Debug, Args)]
-pub(super) struct ReplacementPlanArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Minimum number of matching forms required in one file for a batch.
-    #[arg(long, default_value_t = 2)]
-    min_group_size: usize,
-    /// Minimum expression node count for a candidate form.
-    #[arg(long, default_value_t = 4)]
-    min_node_count: usize,
-    /// Placeholder replacement form for generated replace-forms commands.
-    #[arg(long, default_value = "(TODO-refactor)")]
-    replacement: String,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    output: OutputFormat,
-}
-
-pub(super) fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
-    anyhow::ensure!(
-        args.min_group_size >= 2,
-        "--min-group-size must be at least 2"
-    );
-    anyhow::ensure!(
-        args.min_node_count >= 2,
-        "--min-node-count must be at least 2"
-    );
-
-    let mut grouped = DuplicateCandidateGroups::new();
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        collect_duplicate_candidates(
-            &tree,
-            &input.text,
-            file,
-            dialect,
-            args.min_node_count,
-            &mut grouped,
-        )?;
-    }
-
-    let reports = build_duplicate_shape_reports(grouped, args.min_group_size);
-
-    print_duplicate_report(&reports, args.output)
-}
-
-pub(super) fn replacement_plan(args: ReplacementPlanArgs) -> Result<()> {
-    anyhow::ensure!(
-        args.min_group_size >= 2,
-        "--min-group-size must be at least 2"
-    );
-    anyhow::ensure!(
-        args.min_node_count >= 2,
-        "--min-node-count must be at least 2"
-    );
-
-    let mut grouped = DuplicateCandidateGroups::new();
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        collect_duplicate_candidates(
-            &tree,
-            &input.text,
-            file,
-            dialect,
-            args.min_node_count,
-            &mut grouped,
-        )?;
-    }
-
-    let mut batches =
-        collect_replacement_plan_batches(grouped, args.min_group_size, args.replacement);
-    batches.sort_by(|left, right| {
-        right
-            .forms
-            .len()
-            .cmp(&left.forms.len())
-            .then_with(|| left.file.cmp(&right.file))
-            .then_with(|| left.shape.cmp(&right.shape))
-    });
-
-    print_replacement_plan(&batches, args.output)
-}
-
-fn print_duplicate_report(reports: &[DuplicateShapeReport], output: OutputFormat) -> Result<()> {
+) -> Result<()> {
     let form_count = reports
         .iter()
         .map(|report| report.forms.len())
@@ -179,7 +65,10 @@ fn print_duplicate_report(reports: &[DuplicateShapeReport], output: OutputFormat
     Ok(())
 }
 
-fn print_replacement_plan(batches: &[ReplacementPlanBatch], output: OutputFormat) -> Result<()> {
+pub(in crate::presentation::cli) fn print_replacement_plan(
+    batches: &[ReplacementPlanBatch],
+    output: OutputFormat,
+) -> Result<()> {
     let form_count = batches.iter().map(|batch| batch.forms.len()).sum::<usize>();
 
     match output {

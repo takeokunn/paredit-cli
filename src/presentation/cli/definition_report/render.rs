@@ -1,83 +1,12 @@
-use super::*;
+use super::super::*;
+use crate::application::definition_report::{
+    DefinitionReportFile, UnusedDefinitionFile, UnusedDefinitionPolicy,
+};
 
-#[derive(Debug, Args)]
-pub(super) struct DefinitionReportArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+pub(in crate::presentation::cli) fn print_definition_report(
+    reports: &[DefinitionReportFile],
     output: OutputFormat,
-}
-
-#[derive(Debug, Args)]
-pub(super) struct UnusedDefinitionReportArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Exit with failure when at least one externally unreferenced definition is found.
-    #[arg(long)]
-    fail_on_unused: bool,
-    /// Require at least this many externally unreferenced definitions.
-    #[arg(long)]
-    require_unused_definitions: Option<usize>,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    output: OutputFormat,
-}
-
-pub(super) fn definition_report(args: DefinitionReportArgs) -> Result<()> {
-    let mut reports = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        reports.push(build_definition_report(file.clone(), dialect, &tree)?);
-    }
-
-    print_definition_report(&reports, args.output)
-}
-
-pub(super) fn unused_definition_report(args: UnusedDefinitionReportArgs) -> Result<()> {
-    let mut parsed = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        parsed.push(build_parsed_definition_file(file.clone(), dialect, &tree)?);
-    }
-
-    let reports = collect_unused_definition_candidates(&parsed);
-    let policy = evaluate_unused_definition_policy(
-        UnusedDefinitionPolicyOptions {
-            fail_on_unused: args.fail_on_unused,
-            require_unused_definitions: args.require_unused_definitions,
-        },
-        &reports,
-    );
-    let policy_passed = policy.passed;
-    let policy_message = policy.violations.join("; ");
-
-    print_unused_definition_report(&reports, &policy, args.output)?;
-
-    if !policy_passed {
-        anyhow::bail!("unused-definition-report policy failed: {policy_message}");
-    }
-
-    Ok(())
-}
-
-fn print_definition_report(reports: &[DefinitionReportFile], output: OutputFormat) -> Result<()> {
+) -> Result<()> {
     let definition_count = reports
         .iter()
         .map(|report| report.definitions.len())
@@ -168,7 +97,7 @@ fn print_definition_report(reports: &[DefinitionReportFile], output: OutputForma
     Ok(())
 }
 
-fn print_unused_definition_report(
+pub(in crate::presentation::cli) fn print_unused_definition_report(
     reports: &[UnusedDefinitionFile],
     policy: &UnusedDefinitionPolicy,
     output: OutputFormat,

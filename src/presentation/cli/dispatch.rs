@@ -31,8 +31,10 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::RefactorDiff(args) => refactor::workflow::refactor_diff(args)?,
         Command::DependencyReport(args) => dependency_report::dependency_report(args)?,
         Command::PackageReport(args) => package::package_report(args)?,
-        Command::DefinitionReport(args) => definition_report::definition_report(args)?,
-        Command::UnusedDefinitionReport(args) => definition_report::unused_definition_report(args)?,
+        Command::DefinitionReport(args) => definition_report::workflow::definition_report(args)?,
+        Command::UnusedDefinitionReport(args) => {
+            definition_report::workflow::unused_definition_report(args)?
+        }
         Command::RemoveDefinition(args) => {
             definition_removal::remove_definition::remove_definition(args)?
         }
@@ -47,8 +49,8 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             definition_movement::sort_definitions::sort_definitions(args)?
         }
         Command::MoveForm(args) => definition_movement::move_form::move_form(args)?,
-        Command::DuplicateReport(args) => duplicate_report::duplicate_report(args)?,
-        Command::ReplacementPlan(args) => duplicate_report::replacement_plan(args)?,
+        Command::DuplicateReport(args) => duplicate_report::workflow::duplicate_report(args)?,
+        Command::ReplacementPlan(args) => duplicate_report::workflow::replacement_plan(args)?,
         Command::ReplaceForms(args) => replace_forms::replace_forms(args)?,
         Command::AddExport(args) => package::add_export(args)?,
         Command::SortPackageExports(args) => package::sort_package_exports(args)?,

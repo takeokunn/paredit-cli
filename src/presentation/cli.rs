@@ -33,12 +33,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 
-use crate::application::definition_report::{
-    DefinitionReportFile, UnusedDefinitionFile, UnusedDefinitionPolicy,
-    UnusedDefinitionPolicyOptions, build_definition_report, build_parsed_definition_file,
-    collect_definition_forms, collect_unused_definition_candidates,
-    evaluate_unused_definition_policy,
-};
+use crate::application::definition_report::collect_definition_forms;
 use crate::application::impact_report::{
     ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
     summarize_impact_reports,
@@ -132,9 +127,9 @@ enum Command {
     /// Report Common Lisp package declarations across explicit files.
     PackageReport(package::PackageReportArgs),
     /// Report definition-like top-level forms across explicit files.
-    DefinitionReport(definition_report::DefinitionReportArgs),
+    DefinitionReport(definition_report::args::DefinitionReportArgs),
     /// Report definition-like top-level forms with no external exact atom references.
-    UnusedDefinitionReport(definition_report::UnusedDefinitionReportArgs),
+    UnusedDefinitionReport(definition_report::args::UnusedDefinitionReportArgs),
     /// Plan or remove a top-level definition from one file.
     RemoveDefinition(definition_removal::args::RemoveDefinitionArgs),
     /// Plan or remove unused top-level definitions across explicit files.
@@ -148,9 +143,9 @@ enum Command {
     /// Plan or move any top-level form between files.
     MoveForm(definition_movement::args::MoveFormArgs),
     /// Report repeated structural S-expression shapes across explicit files.
-    DuplicateReport(duplicate_report::DuplicateReportArgs),
+    DuplicateReport(duplicate_report::args::DuplicateReportArgs),
     /// Convert duplicate groups into reviewed replace-forms batches.
-    ReplacementPlan(duplicate_report::ReplacementPlanArgs),
+    ReplacementPlan(duplicate_report::args::ReplacementPlanArgs),
     /// Plan or replace multiple reviewed forms in one file.
     ReplaceForms(replace_forms::ReplaceFormsArgs),
     /// Plan or add a symbol to a Common Lisp defpackage :export option.
