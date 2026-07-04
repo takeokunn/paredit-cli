@@ -8,7 +8,7 @@ use crate::application::usecase::function_parameter::{
 use crate::presentation::cli::{detect_dialect, read_input};
 
 use super::args::AddFunctionParameterArgs;
-use super::render::print_add_function_parameter_plan;
+use super::render::add::print_add_function_parameter_plan;
 
 pub(in crate::presentation::cli) fn add_function_parameter(
     args: AddFunctionParameterArgs,

@@ -8,7 +8,7 @@ use crate::application::usecase::function_parameter::{
 use crate::presentation::cli::{detect_dialect, read_input};
 
 use super::args::RemoveFunctionParameterArgs;
-use super::render::print_remove_function_parameter_plan;
+use super::render::remove::print_remove_function_parameter_plan;
 
 pub(in crate::presentation::cli) fn remove_function_parameter(
     args: RemoveFunctionParameterArgs,
