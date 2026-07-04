@@ -6,6 +6,7 @@ mod selection;
 #[cfg(test)]
 mod tests;
 mod types;
+mod unwrap;
 mod wrap;
 
 use anyhow::{Context, Result};
@@ -19,6 +20,10 @@ pub use function::{collect_callable_definition_renames, collect_function_call_he
 pub use types::{
     RenameBindingPlan, RenameBindingRequest, RenameFunctionOccurrence, RenameFunctionPlan,
     RenameFunctionRequest, RenameInFormPlan, RenameInFormRequest, RenameTarget,
+};
+pub use unwrap::{
+    UnwrapFunctionCallSite, UnwrapFunctionCallsPlan, UnwrapFunctionCallsRequest,
+    UnwrapFunctionCallsScope, plan_unwrap_function_calls,
 };
 pub use wrap::{
     WrapFunctionCallSite, WrapFunctionCallsPlan, WrapFunctionCallsRequest, WrapFunctionCallsScope,

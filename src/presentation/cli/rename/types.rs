@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::rename::{RenameFunctionOccurrence, WrapFunctionCallSite};
+use crate::application::usecase::rename::{
+    RenameFunctionOccurrence, UnwrapFunctionCallSite, WrapFunctionCallSite,
+};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::ByteSpan;
 
@@ -60,6 +62,37 @@ pub(super) struct PendingWrapFunctionCallsFile {
 
 #[derive(Debug)]
 pub(super) struct WrapFunctionCallsPolicy {
+    pub(super) fail_on_no_change: bool,
+    pub(super) require_calls: Option<usize>,
+    pub(super) passed: bool,
+    pub(super) violations: Vec<String>,
+}
+
+#[derive(Debug)]
+pub(super) struct UnwrapFunctionCallsFileReport {
+    pub(super) path: PathBuf,
+    pub(super) dialect: Dialect,
+    pub(super) calls: Vec<UnwrapFunctionCallSite>,
+    pub(super) skipped_non_unary_wrapper: Vec<UnwrapFunctionCallSite>,
+    pub(super) skipped_nested: Vec<UnwrapFunctionCallSite>,
+    pub(super) changed: bool,
+    pub(super) written: bool,
+    pub(super) rewritten: String,
+}
+
+#[derive(Debug)]
+pub(super) struct PendingUnwrapFunctionCallsFile {
+    pub(super) path: PathBuf,
+    pub(super) dialect: Dialect,
+    pub(super) calls: Vec<UnwrapFunctionCallSite>,
+    pub(super) skipped_non_unary_wrapper: Vec<UnwrapFunctionCallSite>,
+    pub(super) skipped_nested: Vec<UnwrapFunctionCallSite>,
+    pub(super) rewritten: String,
+    pub(super) changed: bool,
+}
+
+#[derive(Debug)]
+pub(super) struct UnwrapFunctionCallsPolicy {
     pub(super) fail_on_no_change: bool,
     pub(super) require_calls: Option<usize>,
     pub(super) passed: bool,

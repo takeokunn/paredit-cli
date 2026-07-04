@@ -63,6 +63,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::RenameSymbols(args) => rename::rename_symbols::rename_symbols(args)?,
         Command::RenameFunction(args) => rename::rename_function::rename_function(args)?,
         Command::WrapFunctionCalls(args) => rename::wrap_function_calls::wrap_function_calls(args)?,
+        Command::UnwrapFunctionCalls(args) => {
+            rename::unwrap_function_calls::unwrap_function_calls(args)?
+        }
         Command::UnwrapCall(args) => unwrap_call::unwrap_call(args)?,
         Command::ThreadExpression(args) => thread_expression::thread_expression(args)?,
         Command::UnthreadExpression(args) => unthread_expression::unthread_expression(args)?,

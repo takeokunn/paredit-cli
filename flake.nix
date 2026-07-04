@@ -7,8 +7,15 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      rust-overlay,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
@@ -73,17 +80,18 @@
         };
 
         checks = {
-          default = pkgs.runCommand "paredit-cli-check"
-            {
-              nativeBuildInputs = [ rustToolchain ];
-              src = self;
-            }
-            ''
-              cp -r $src/. .
-              chmod -R u+w .
-              cargo fmt --check
-              touch $out
-            '';
+          default =
+            pkgs.runCommand "paredit-cli-check"
+              {
+                nativeBuildInputs = [ rustToolchain ];
+                src = self;
+              }
+              ''
+                cp -r $src/. .
+                chmod -R u+w .
+                cargo fmt --check
+                touch $out
+              '';
           clippy = (self.packages.${system}.default).overrideAttrs (old: {
             pname = "paredit-cli-clippy";
             nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.clippy ];
@@ -97,5 +105,6 @@
           });
           package = self.packages.${system}.default;
         };
-      });
+      }
+    );
 }

@@ -104,6 +104,8 @@ pub(super) enum Command {
     RenameFunction(rename::args::RenameFunctionArgs),
     /// Plan or wrap callable call sites in another function or macro call.
     WrapFunctionCalls(rename::args::WrapFunctionCallsArgs),
+    /// Plan or remove a unary wrapper around callable call sites.
+    UnwrapFunctionCalls(rename::args::UnwrapFunctionCallsArgs),
     /// Replace one selected wrapper call with one selected argument.
     UnwrapCall(unwrap_call::UnwrapCallArgs),
     /// Convert a selected nested call chain into a thread-first or thread-last pipeline.
