@@ -105,6 +105,33 @@ fn cli_plans_introduce_let_skips_symbol_macrolet_shadowed_all_occurrences() {
 }
 
 #[test]
+fn cli_plans_introduce_let_keeps_let_star_same_initializer_outer_scope() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--all-occurrences",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render () (+ (* width height) (let* ((product (* width height))) (* width height))))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"occurrence_count\": 2"))
+    .stdout(predicate::str::contains(
+        "\"skipped_shadowed_occurrence_count\": 1",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product (let* ((product product)) (* width height)))))",
+    ));
+}
+
+#[test]
 fn cli_plans_introduce_let_skips_define_setf_expander_shadowed_all_occurrences() {
     let mut cmd = paredit();
     cmd.args([
@@ -155,6 +182,56 @@ fn cli_plans_introduce_let_skips_define_compiler_macro_shadowed_all_occurrences(
     ))
     .stdout(predicate::str::contains(
         "(defun render () (let ((product (* width height))) (+ product (define-compiler-macro slot (&environment product place) (* width height)))))",
+    ));
+}
+
+#[test]
+fn cli_plans_introduce_let_skips_handler_case_clause_shadow_only() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--all-occurrences",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun render () (+ (* width height) (handler-case (* width height) (error (product) (* width height)) (:no-error (value) (* width height)))))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"occurrence_count\": 3"))
+    .stdout(predicate::str::contains(
+        "\"skipped_shadowed_occurrence_count\": 1",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product (handler-case product (error (product) (* width height)) (:no-error (value) product)))))",
+    ));
+}
+
+#[test]
+fn cli_plans_introduce_let_skips_macrolet_lambda_body_shadow_only() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--all-occurrences",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun render () (+ (* width height) (macrolet ((with-product (product) (* width height))) (* width height))))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"occurrence_count\": 2"))
+    .stdout(predicate::str::contains(
+        "\"skipped_shadowed_occurrence_count\": 1",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product (macrolet ((with-product (product) (* width height))) product))))",
     ));
 }
 
