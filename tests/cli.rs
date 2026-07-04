@@ -24,7 +24,7 @@ mod duplicate_report;
 mod extract_function;
 #[path = "cli/form_report.rs"]
 mod form_report;
-#[path = "cli/function_parameter.rs"]
+#[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
 #[path = "cli/impact_report.rs"]
 mod impact_report;
