@@ -1,0 +1,138 @@
+use super::*;
+
+use crate::application::dependency_report::{
+    DependencyKind, DependencyReportItem, build_dependency_report,
+};
+
+#[derive(Debug, Args)]
+pub(super) struct DependencyReportArgs {
+    /// Files to scan.
+    #[arg(required = true)]
+    files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    output: OutputFormat,
+}
+
+#[derive(Debug)]
+struct DependencyReportFile {
+    path: PathBuf,
+    dialect: Dialect,
+    package: Option<String>,
+    dependencies: Vec<DependencyReportItem>,
+}
+
+pub(super) fn dependency_report(args: DependencyReportArgs) -> Result<()> {
+    let mut reports = Vec::with_capacity(args.files.len());
+
+    for file in &args.files {
+        let input = read_input(Some(file.clone()))?;
+        let dialect = detect_dialect(&input, args.dialect);
+        let tree = SyntaxTree::parse(&input.text)
+            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (package, _) = collect_definition_forms(&tree, dialect)?;
+        let dependency_report = build_dependency_report(&tree)?;
+
+        reports.push(DependencyReportFile {
+            path: file.clone(),
+            dialect,
+            package,
+            dependencies: dependency_report.dependencies,
+        });
+    }
+
+    print_dependency_report(&reports, args.output)
+}
+
+fn print_dependency_report(reports: &[DependencyReportFile], output: OutputFormat) -> Result<()> {
+    let dependency_count = reports
+        .iter()
+        .map(|report| report.dependencies.len())
+        .sum::<usize>();
+    let mut by_kind = BTreeMap::<DependencyKind, usize>::new();
+    let mut by_target = BTreeMap::<String, usize>::new();
+
+    for dependency in reports.iter().flat_map(|report| &report.dependencies) {
+        *by_kind.entry(dependency.kind).or_default() += 1;
+        *by_target.entry(dependency.target.clone()).or_default() += 1;
+    }
+
+    match output {
+        OutputFormat::Text => {
+            println!("files\t{}", reports.len());
+            println!("dependency_count\t{dependency_count}");
+            for (kind, count) in &by_kind {
+                println!("kind\t{}\t{count}", kind.label());
+            }
+            for report in reports {
+                println!(
+                    "{}\t{}\tpackage={}\tdependencies={}",
+                    report.path.display(),
+                    report.dialect.label(),
+                    report.package.as_deref().unwrap_or("<none>"),
+                    report.dependencies.len()
+                );
+                for dependency in &report.dependencies {
+                    println!(
+                        "\tdependency\t{}\t{}\t{}..{}\ttarget={}\tsource={}",
+                        dependency.kind.label(),
+                        dependency.path,
+                        dependency.span.start().get(),
+                        dependency.span.end().get(),
+                        dependency.target,
+                        dependency.source.as_deref().unwrap_or("<none>")
+                    );
+                }
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "file_count": reports.len(),
+                "dependency_count": dependency_count,
+                "by_kind": by_kind
+                    .iter()
+                    .map(|(kind, count)| json!({
+                        "kind": kind.label(),
+                        "count": count,
+                    }))
+                    .collect::<Vec<_>>(),
+                "by_target": by_target
+                    .iter()
+                    .map(|(target, count)| json!({
+                        "target": target.as_str(),
+                        "count": count,
+                    }))
+                    .collect::<Vec<_>>(),
+                "files": reports
+                    .iter()
+                    .map(|report| json!({
+                        "path": report.path.display().to_string(),
+                        "dialect": report.dialect.label(),
+                        "package": report.package.as_deref(),
+                        "dependency_count": report.dependencies.len(),
+                        "dependencies": report
+                            .dependencies
+                            .iter()
+                            .map(|dependency| json!({
+                                "kind": dependency.kind.label(),
+                                "target": dependency.target.as_str(),
+                                "path": dependency.path.as_str(),
+                                "span": {
+                                    "start": dependency.span.start().get(),
+                                    "end": dependency.span.end().get(),
+                                },
+                                "source": dependency.source.as_deref(),
+                            }))
+                            .collect::<Vec<_>>(),
+                    }))
+                    .collect::<Vec<_>>(),
+            }))?
+        ),
+    }
+
+    Ok(())
+}

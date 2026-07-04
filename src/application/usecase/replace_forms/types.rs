@@ -1,0 +1,29 @@
+use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
+
+#[derive(Debug)]
+pub struct ReplaceFormsRequest<'a> {
+    pub input: &'a str,
+    pub tree: &'a SyntaxTree,
+    pub paths: Vec<Path>,
+    pub replacement: &'a str,
+    pub require_same_shape: bool,
+}
+
+#[derive(Debug)]
+pub struct ReplaceFormsPlan {
+    pub targets: Vec<ReplaceFormsTarget>,
+    pub replacement: String,
+    pub replacement_shape: String,
+    pub require_same_shape: bool,
+    pub original_shape: Option<String>,
+    pub changed: bool,
+    pub rewritten: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplaceFormsTarget {
+    pub form_path: Path,
+    pub span: ByteSpan,
+    pub shape: String,
+    pub text: String,
+}

@@ -1,0 +1,155 @@
+use super::super::super::*;
+use super::super::types::preview::RefactorPreview;
+
+pub(in crate::presentation::cli) fn print_refactor_preview(
+    preview: &RefactorPreview,
+    output: OutputFormat,
+) -> Result<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("mode\t{}", preview.mode.label());
+            println!("from\t{}", preview.from);
+            println!("to\t{}", preview.to);
+            println!("write_requested\t{}", preview.write_requested);
+            if let Some(workspace) = &preview.workspace {
+                println!(
+                    "workspace_roots\t{}",
+                    workspace
+                        .roots
+                        .iter()
+                        .map(|root| root.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                );
+                println!(
+                    "workspace_discovered_file_count\t{}",
+                    workspace.discovered_file_count
+                );
+                println!(
+                    "workspace_skipped_unknown_count\t{}",
+                    workspace.skipped_unknown_count
+                );
+                println!(
+                    "workspace_skipped_hidden_count\t{}",
+                    workspace.skipped_hidden_count
+                );
+                println!(
+                    "workspace_skipped_generated_count\t{}",
+                    workspace.skipped_generated_count
+                );
+                println!(
+                    "workspace_skipped_symlink_count\t{}",
+                    workspace.skipped_symlink_count
+                );
+            }
+            println!("files\t{}", preview.summary.file_count);
+            println!("changed_file_count\t{}", preview.summary.changed_file_count);
+            println!("written_file_count\t{}", preview.summary.written_file_count);
+            println!("definition_count\t{}", preview.summary.definition_count);
+            println!(
+                "target_occurrence_count\t{}",
+                preview.summary.target_occurrence_count
+            );
+            println!("edit_count\t{}", preview.summary.edit_count);
+            println!("all_outputs_parse\t{}", preview.summary.all_outputs_parse);
+            println!("policy_passed\t{}", preview.policy.passed);
+            for violation in &preview.policy.violations {
+                println!("policy_violation\t{violation}");
+            }
+            for file in &preview.files {
+                println!(
+                    "file\t{}\t{}\tchanged={}\twritten={}\tedits={}\tparse={}\tinput_hash={}\toutput_hash={}",
+                    file.path.display(),
+                    file.dialect.label(),
+                    file.changed,
+                    file.written,
+                    file.edit_count,
+                    file.output_parse_ok,
+                    file.input_hash,
+                    file.output_hash
+                );
+                for edit in &file.edits {
+                    println!(
+                        "edit\t{}\tstart={}\tend={}\treplacement={}",
+                        file.path.display(),
+                        edit.start,
+                        edit.end,
+                        edit.replacement
+                    );
+                }
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "mode": preview.mode.label(),
+                "from": preview.from.as_str(),
+                "to": preview.to.as_str(),
+                "write_requested": preview.write_requested,
+                "workspace": preview.workspace.as_ref().map(|workspace| json!({
+                    "roots": workspace
+                        .roots
+                        .iter()
+                        .map(|root| root.display().to_string())
+                        .collect::<Vec<_>>(),
+                    "discovered_file_count": workspace.discovered_file_count,
+                    "skipped": {
+                        "unknown": workspace.skipped_unknown_count,
+                        "hidden": workspace.skipped_hidden_count,
+                        "generated": workspace.skipped_generated_count,
+                        "symlink": workspace.skipped_symlink_count,
+                    },
+                })),
+                "summary": {
+                    "file_count": preview.summary.file_count,
+                    "changed_file_count": preview.summary.changed_file_count,
+                    "unchanged_file_count": preview.summary.unchanged_file_count,
+                    "written_file_count": preview.summary.written_file_count,
+                    "definition_count": preview.summary.definition_count,
+                    "target_occurrence_count": preview.summary.target_occurrence_count,
+                    "edit_count": preview.summary.edit_count,
+                    "parse_error_count": preview.summary.parse_error_count,
+                    "all_outputs_parse": preview.summary.all_outputs_parse,
+                },
+                "policy": {
+                    "fail_on_no_change": preview.policy.fail_on_no_change,
+                    "fail_on_parse_error": preview.policy.fail_on_parse_error,
+                    "fail_on_target_conflict": preview.policy.fail_on_target_conflict,
+                    "require_changed_files": preview.policy.require_changed_files,
+                    "require_definitions": preview.policy.require_definitions,
+                    "require_edits": preview.policy.require_edits,
+                    "passed": preview.policy.passed,
+                    "violations": preview.policy.violations.as_slice(),
+                },
+                "files": preview
+                    .files
+                    .iter()
+                    .map(|file| json!({
+                        "path": file.path.display().to_string(),
+                        "dialect": file.dialect.label(),
+                        "changed": file.changed,
+                        "written": file.written,
+                        "edit_count": file.edit_count,
+                        "input_bytes": file.input_bytes,
+                        "output_bytes": file.output_bytes,
+                        "output_parse_ok": file.output_parse_ok,
+                        "input_hash": file.input_hash.as_str(),
+                        "output_hash": file.output_hash.as_str(),
+                        "edits": file
+                            .edits
+                            .iter()
+                            .map(|edit| json!({
+                                "start": edit.start,
+                                "end": edit.end,
+                                "replacement": edit.replacement.as_str(),
+                            }))
+                            .collect::<Vec<_>>(),
+                        "preview": file.preview.as_str(),
+                    }))
+                    .collect::<Vec<_>>(),
+            }))?
+        ),
+    }
+
+    Ok(())
+}

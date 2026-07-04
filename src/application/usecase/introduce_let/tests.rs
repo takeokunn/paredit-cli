@@ -1,0 +1,126 @@
+use super::*;
+use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
+use proptest::prelude::*;
+
+fn request<'a>(input: &'a str, path: &str, all_occurrences: bool) -> IntroduceLetRequest<'a> {
+    let tree = SyntaxTree::parse(input).expect("parse");
+    let path = path.parse::<Path>().expect("path");
+    let selection = tree.select_path(&path).expect("select");
+    IntroduceLetRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: Some(path),
+        target: selection.view(),
+        enclosing_span: selection.enclosing_list_span().expect("enclosing"),
+        name: SymbolName::new("product").expect("symbol"),
+        all_occurrences,
+    }
+}
+
+#[test]
+fn introduces_single_selected_occurrence_by_default() {
+    let input = "(defun render () (+ (* width height) margin (* width height)))";
+    let plan = plan_introduce_let(request(input, "0.3.1", false)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product margin (* width height))))"
+    );
+}
+
+#[test]
+fn introduces_all_structurally_equivalent_occurrences() {
+    let input = "(defun render () (+ (* width height) margin (*  width height)))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 2);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 0);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product margin product)))"
+    );
+}
+
+#[test]
+fn skips_all_occurrences_inside_shadowing_binding_forms() {
+    let input = "(defun render () (+ (* width height) (let ((product 1)) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (let ((product 1)) (* width height)))))"
+    );
+}
+
+#[test]
+fn rejects_selected_expression_inside_shadowing_binding_form() {
+    let input = "(defun render () (let ((product 1)) (* width height)))";
+    let error = plan_introduce_let(request(input, "0.3.2", false)).expect_err("shadowed");
+
+    assert!(
+        error
+            .to_string()
+            .contains("inside an existing binding for 'product'")
+    );
+}
+
+#[test]
+fn keeps_different_atom_values_out_of_all_occurrences() {
+    let input = "(defun render () (+ (* width height) (* width depth)))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (* width depth))))"
+    );
+}
+
+fn repeated_products(count: usize) -> String {
+    let terms = (0..count)
+        .map(|_| "(* width height)")
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("(defun render () (+ {terms}))")
+}
+
+fn repeated_products_with_shadowed_duplicate(count: usize) -> String {
+    let terms = (0..count)
+        .map(|_| "(* width height)")
+        .chain(std::iter::once("(let ((product 0)) (* width height))"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("(defun render () (+ {terms}))")
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(24))]
+
+    #[test]
+    fn all_occurrences_replaces_every_generated_duplicate(count in 1usize..10) {
+        let input = repeated_products(count);
+        let plan = plan_introduce_let(request(&input, "0.3.1", true)).expect("plan");
+
+        prop_assert_eq!(plan.occurrence_spans.len(), count);
+        prop_assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 0);
+        prop_assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+        prop_assert_eq!(plan.rewritten.matches("(* width height)").count(), 1);
+        prop_assert_eq!(plan.rewritten.matches("product").count(), count + 1);
+    }
+
+    #[test]
+    fn all_occurrences_skips_generated_shadowed_duplicates(count in 1usize..10) {
+        let input = repeated_products_with_shadowed_duplicate(count);
+        let plan = plan_introduce_let(request(&input, "0.3.1", true)).expect("plan");
+
+        prop_assert_eq!(plan.occurrence_spans.len(), count);
+        prop_assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+        prop_assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+        prop_assert_eq!(plan.rewritten.matches("(* width height)").count(), 2);
+        prop_assert_eq!(plan.rewritten.matches("product").count(), count + 2);
+    }
+}

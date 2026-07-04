@@ -1,0 +1,209 @@
+use super::*;
+
+use crate::application::call_graph_report::{
+    CallGraphFile, CallGraphNode, CallGraphPolicy, CallGraphReportSource, build_call_graph_report,
+    evaluate_call_graph_policy,
+};
+
+#[derive(Debug, Args)]
+pub(super) struct CallGraphArgs {
+    /// Files to scan.
+    #[arg(required = true)]
+    files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Exact callable symbol to focus on as caller or callee.
+    #[arg(long)]
+    symbol: Option<SymbolName>,
+    /// Include calls to symbols that have no definition in the scanned file set.
+    #[arg(long)]
+    include_external: bool,
+    /// Exit with failure when the focused symbol has inbound internal caller edges.
+    #[arg(long)]
+    fail_on_inbound_callers: bool,
+    /// Require at least this many reported call graph edges.
+    #[arg(long)]
+    require_edges: Option<usize>,
+    /// Require at least this many reported internal call graph edges.
+    #[arg(long)]
+    require_internal_edges: Option<usize>,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    output: OutputFormat,
+}
+
+pub(super) fn call_graph(args: CallGraphArgs) -> Result<()> {
+    let symbol = args.symbol.as_ref();
+    let mut sources = Vec::with_capacity(args.files.len());
+
+    for file in &args.files {
+        let input = read_input(Some(file.clone()))?;
+        let dialect = detect_dialect(&input, args.dialect);
+        let tree = SyntaxTree::parse(&input.text)
+            .with_context(|| format!("failed to parse {}", file.display()))?;
+
+        sources.push(CallGraphReportSource {
+            path: file.clone(),
+            dialect,
+            tree,
+        });
+    }
+
+    let report = build_call_graph_report(sources, args.include_external, symbol)?;
+    let policy = evaluate_call_graph_policy(
+        &report.files,
+        symbol,
+        args.fail_on_inbound_callers,
+        args.require_edges,
+        args.require_internal_edges,
+    );
+    print_call_graph_report(
+        &report.files,
+        &report.nodes_by_name,
+        symbol,
+        args.include_external,
+        &policy,
+        args.output,
+    )?;
+    if !policy.passed {
+        anyhow::bail!("call-graph policy failed");
+    }
+    Ok(())
+}
+
+fn print_call_graph_report(
+    reports: &[CallGraphFile],
+    nodes_by_name: &BTreeMap<String, CallGraphNode>,
+    symbol: Option<&SymbolName>,
+    include_external: bool,
+    policy: &CallGraphPolicy,
+    output: OutputFormat,
+) -> Result<()> {
+    let definition_count = reports
+        .iter()
+        .map(|report| report.definitions.len())
+        .sum::<usize>();
+    let external_edge_count = policy.edge_count.saturating_sub(policy.internal_edge_count);
+
+    match output {
+        OutputFormat::Text => {
+            println!("symbol\t{}", symbol.map_or("<all>", SymbolName::as_str));
+            println!("include_external\t{include_external}");
+            println!("files\t{}", reports.len());
+            println!("definition_count\t{definition_count}");
+            println!("edge_count\t{}", policy.edge_count);
+            println!("internal_edge_count\t{}", policy.internal_edge_count);
+            println!("external_edge_count\t{external_edge_count}");
+            println!("inbound_edge_count\t{}", policy.inbound_edge_count);
+            println!("policy_passed\t{}", policy.passed);
+            for violation in &policy.violations {
+                println!("policy_violation\t{violation}");
+            }
+            for node in nodes_by_name.values() {
+                let categories = node
+                    .categories
+                    .iter()
+                    .map(|category| category.label())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                println!(
+                    "node\t{}\tdefinitions={}\tcategories={}",
+                    node.name, node.definition_count, categories
+                );
+            }
+            for report in reports {
+                println!(
+                    "{}\t{}\tdefinitions={}\tedges={}",
+                    report.path.display(),
+                    report.dialect.label(),
+                    report.definitions.len(),
+                    report.edges.len()
+                );
+                for edge in &report.edges {
+                    let caller = edge.caller.as_deref().unwrap_or("<top-level>");
+                    let categories = edge
+                        .callee_categories
+                        .iter()
+                        .map(|category| category.label())
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    println!(
+                        "\tedge\t{}\t{}\t{}..{}\tcallee={}\targs={}\tinternal={}\tcategories={}",
+                        caller,
+                        edge.path,
+                        edge.span.start().get(),
+                        edge.span.end().get(),
+                        edge.callee,
+                        edge.argument_count,
+                        edge.internal,
+                        categories,
+                    );
+                }
+            }
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "symbol": symbol.map(SymbolName::as_str),
+                "includeExternal": include_external,
+                "file_count": reports.len(),
+                "definition_count": definition_count,
+                "edge_count": policy.edge_count,
+                "internal_edge_count": policy.internal_edge_count,
+                "external_edge_count": external_edge_count,
+                "inbound_edge_count": policy.inbound_edge_count,
+                "policy": {
+                    "fail_on_inbound_callers": policy.fail_on_inbound_callers,
+                    "require_edges": policy.require_edges,
+                    "require_internal_edges": policy.require_internal_edges,
+                    "passed": policy.passed,
+                    "violations": &policy.violations,
+                },
+                "nodes": nodes_by_name
+                    .values()
+                    .map(|node| json!({
+                        "name": node.name.as_str(),
+                        "definitionCount": node.definition_count,
+                        "categories": node
+                            .categories
+                            .iter()
+                            .map(|category| category.label())
+                            .collect::<Vec<_>>(),
+                    }))
+                    .collect::<Vec<_>>(),
+                "files": reports
+                    .iter()
+                    .map(|report| json!({
+                        "path": report.path.display().to_string(),
+                        "dialect": report.dialect.label(),
+                        "definition_count": report.definitions.len(),
+                        "edge_count": report.edges.len(),
+                        "edges": report
+                            .edges
+                            .iter()
+                            .map(|edge| json!({
+                                "caller": edge.caller.as_deref(),
+                                "callee": edge.callee.as_str(),
+                                "path": edge.path.as_str(),
+                                "span": {
+                                    "start": edge.span.start().get(),
+                                    "end": edge.span.end().get(),
+                                },
+                                "argumentCount": edge.argument_count,
+                                "internal": edge.internal,
+                                "calleeCategories": edge
+                                    .callee_categories
+                                    .iter()
+                                    .map(|category| category.label())
+                                    .collect::<Vec<_>>(),
+                            }))
+                            .collect::<Vec<_>>(),
+                    }))
+                    .collect::<Vec<_>>(),
+            }))?
+        ),
+    }
+
+    Ok(())
+}

@@ -30,6 +30,7 @@
         devShells.default = pkgs.mkShell {
           packages = [
             rustToolchain
+            pkgs.rust-analyzer
             pkgs.cargo-nextest
             pkgs.rustfmt
             pkgs.clippy

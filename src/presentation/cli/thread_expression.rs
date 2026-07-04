@@ -1,0 +1,142 @@
+use super::*;
+use crate::application::usecase::thread_expression::{
+    ThreadExpressionPlan, ThreadExpressionRequest, ThreadStyle as ApplicationThreadStyle,
+    plan_thread_expression,
+};
+
+#[derive(Debug, Args)]
+pub(super) struct ThreadExpressionArgs {
+    /// Input file. Required when --write is used; reads stdin otherwise.
+    #[arg(short, long)]
+    file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    dialect: Option<DialectArg>,
+    /// Select by child index path, for example 0.2.1.
+    #[arg(long, conflicts_with = "at")]
+    path: Option<Path>,
+    /// Select the smallest expression containing byte offset.
+    #[arg(long, conflicts_with = "path")]
+    at: Option<usize>,
+    /// Threading style: first inserts into the first argument, last into the final argument.
+    #[arg(long, value_enum)]
+    style: ThreadStyleArg,
+    /// Threading operator to emit. Defaults to -> for first and ->> for last.
+    #[arg(long)]
+    operator: Option<SymbolName>,
+    /// Rewrite the input file in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    output: OutputFormat,
+}
+
+impl ThreadStyleArg {
+    fn application_style(self) -> ApplicationThreadStyle {
+        match self {
+            Self::First => ApplicationThreadStyle::First,
+            Self::Last => ApplicationThreadStyle::Last,
+        }
+    }
+}
+
+pub(super) fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
+    let input = read_input(args.file.clone())?;
+    let dialect = detect_dialect(&input, args.dialect);
+    let tree = SyntaxTree::parse(&input.text)?;
+    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
+    let selected = selection.view();
+    let path = args.path.clone();
+    let style = args.style.application_style();
+    let operator = match args.operator {
+        Some(operator) => operator,
+        None => SymbolName::new(style.default_operator())?,
+    };
+    let plan = plan_thread_expression(ThreadExpressionRequest {
+        input: &input.text,
+        dialect,
+        path,
+        target: selected,
+        style,
+        operator,
+    })?;
+    let mut written = false;
+
+    if args.write {
+        let file = input.file.as_ref().context("--write requires --file")?;
+        if plan.changed {
+            fs::write(file, &plan.rewritten)
+                .with_context(|| format!("write {}", file.display()))?;
+        }
+        written = true;
+    }
+
+    print_thread_expression_plan(&plan, written, args.output)
+}
+
+fn print_thread_expression_plan(
+    plan: &ThreadExpressionPlan,
+    written: bool,
+    output: OutputFormat,
+) -> Result<()> {
+    match output {
+        OutputFormat::Text => {
+            println!("dialect\t{}", plan.dialect.label());
+            if let Some(path) = &plan.path {
+                println!("path\t{path}");
+            }
+            println!("style\t{}", plan.style.label());
+            println!("operator\t{}", plan.operator);
+            println!(
+                "span\t{}..{}",
+                plan.span.start().get(),
+                plan.span.end().get()
+            );
+            println!("base\t{}", plan.base);
+            for step in &plan.steps {
+                println!(
+                    "step\t{}\targs={}\tthreaded_arg={}\tspan={}..{}\t{}",
+                    step.head,
+                    step.argument_count,
+                    step.threaded_argument_index,
+                    step.span.start().get(),
+                    step.span.end().get(),
+                    step.step
+                );
+            }
+            println!("replacement\t{}", plan.replacement);
+            println!("changed\t{}", plan.changed);
+            println!("written\t{written}");
+        }
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dialect": plan.dialect.label(),
+                "path": plan.path.as_ref().map(ToString::to_string),
+                "style": plan.style.label(),
+                "operator": plan.operator.as_str(),
+                "span": {
+                    "start": plan.span.start().get(),
+                    "end": plan.span.end().get(),
+                },
+                "base": &plan.base,
+                "steps": plan.steps.iter().map(|step| json!({
+                    "head": &step.head,
+                    "argument_count": step.argument_count,
+                    "threaded_argument_index": step.threaded_argument_index,
+                    "span": {
+                        "start": step.span.start().get(),
+                        "end": step.span.end().get(),
+                    },
+                    "step": &step.step,
+                })).collect::<Vec<_>>(),
+                "replacement": &plan.replacement,
+                "changed": plan.changed,
+                "written": written,
+                "rewritten": &plan.rewritten,
+            }))?
+        ),
+    }
+    Ok(())
+}
