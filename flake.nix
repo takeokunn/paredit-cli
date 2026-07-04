@@ -36,6 +36,16 @@
             pkgs.rustfmt
             pkgs.clippy
           ];
+          shellHook = ''
+            cat <<'USAGE_EOF'
+
+            === paredit-cli Development Shell ===
+
+            Quick verification:
+              nix flake check  # fmt check + clippy -D warnings + package build/tests
+
+            USAGE_EOF
+          '';
         };
 
         formatter = pkgs.writeShellApplication {

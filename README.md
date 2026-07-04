@@ -1,5 +1,8 @@
 # paredit-cli
 
+[![CI](https://github.com/takeokunn/paredit-cli/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/takeokunn/paredit-cli/actions/workflows/ci.yml)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
 `paredit-cli` is a Rust command line tool for safe S-expression refactoring.
 It gives AI coding agents deterministic tree paths, byte spans, dialect hints,
 and balanced structural edits so Lisp refactors do not devolve into manual
