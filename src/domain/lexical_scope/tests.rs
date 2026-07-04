@@ -75,6 +75,42 @@ fn lambda_list_default_forms_remain_outer_references() {
 }
 
 #[test]
+fn destructuring_bind_checks_value_before_body_shadowing() {
+    let input = "(list x (destructuring-bind (x) x x) x)";
+
+    assert_eq!(reference_texts(input, "x"), vec!["x", "x", "x"]);
+}
+
+#[test]
+fn multiple_value_bind_checks_value_before_body_shadowing() {
+    let input = "(list x (multiple-value-bind (x) x x) x)";
+
+    assert_eq!(reference_texts(input, "x"), vec!["x", "x", "x"]);
+}
+
+#[test]
+fn handler_case_clause_parameters_shadow_only_clause_body() {
+    let input =
+        "(list condition (handler-case (risky condition) (error (condition) condition) (:no-error (value) condition)) condition)";
+
+    assert_eq!(
+        reference_texts(input, "condition"),
+        vec!["condition", "condition", "condition", "condition"]
+    );
+}
+
+#[test]
+fn restart_case_clause_parameters_shadow_only_clause_body() {
+    let input =
+        "(list condition (restart-case (risky condition) (retry (condition) condition) (skip () condition)) condition)";
+
+    assert_eq!(
+        reference_texts(input, "condition"),
+        vec!["condition", "condition", "condition", "condition"]
+    );
+}
+
+#[test]
 fn define_setf_expander_body_is_definition_scope_boundary() {
     let input = "(list outer (define-setf-expander slot (place) (list outer place)) outer)";
 

@@ -46,6 +46,14 @@ fn collect_shadow_aware_special_form(
             collect_sequential_let_references(view, symbol, input, output);
             true
         }
+        "destructuring-bind" | "multiple-value-bind" => {
+            collect_value_binding_references(view, symbol, input, output);
+            true
+        }
+        "handler-case" | "restart-case" => {
+            collect_clause_binding_references(view, symbol, input, output);
+            true
+        }
         "lambda" | "fn" => parameter_form_binds(&view.children[1], symbol),
         "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => true,
         _ => false,
@@ -81,6 +89,71 @@ fn collect_parallel_let_references(
     }
 
     for body in &view.children[2..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn collect_value_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+    let Some(value_form) = view.children.get(2) else {
+        return;
+    };
+
+    collect_unshadowed_symbol_references(value_form, symbol, input, output);
+
+    if parameter_form_binds(binding_form, symbol) {
+        return;
+    }
+
+    for body in &view.children[3..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn collect_clause_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) {
+    let Some(protected_form) = view.children.get(1) else {
+        return;
+    };
+
+    collect_unshadowed_symbol_references(protected_form, symbol, input, output);
+
+    for clause in &view.children[2..] {
+        collect_clause_body_references(clause, symbol, input, output);
+    }
+}
+
+fn collect_clause_body_references(
+    clause: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) {
+    if clause.kind != ExpressionKind::List {
+        collect_unshadowed_symbol_references(clause, symbol, input, output);
+        return;
+    }
+
+    let Some(parameter_form) = clause.children.get(1) else {
+        return;
+    };
+
+    if parameter_form_binds(parameter_form, symbol) {
+        return;
+    }
+
+    for body in &clause.children[2..] {
         collect_unshadowed_symbol_references(body, symbol, input, output);
     }
 }
