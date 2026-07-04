@@ -54,7 +54,7 @@ mod sort_definitions;
 mod split_file;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
-#[path = "cli/thread_expression.rs"]
+#[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
