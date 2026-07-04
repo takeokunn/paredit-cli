@@ -13,6 +13,7 @@ use super::list_edit::{
 };
 use super::types::{
     AddFunctionParameterPlan, AddFunctionParameterRequest, FunctionParameterInsert,
+    FunctionParameterSection,
 };
 
 pub fn plan_add_function_parameter(
@@ -35,8 +36,18 @@ pub fn plan_add_function_parameter(
         definition_selection.view(),
         &request.name,
     )?;
-    let keyword_parameter_insertion = target.keyword_parameter_insertion.as_ref();
-    let optional_parameter_insertion = target.optional_parameter_insertion.as_ref();
+    let keyword_parameter_insertion = match request.section {
+        FunctionParameterSection::Auto | FunctionParameterSection::Keyword => {
+            target.keyword_parameter_insertion.as_ref()
+        }
+        FunctionParameterSection::Positional | FunctionParameterSection::Optional => None,
+    };
+    let optional_parameter_insertion = match request.section {
+        FunctionParameterSection::Auto | FunctionParameterSection::Optional => {
+            target.optional_parameter_insertion.as_ref()
+        }
+        FunctionParameterSection::Positional | FunctionParameterSection::Keyword => None,
+    };
     if target.has_lambda_list_marker
         && keyword_parameter_insertion.is_none()
         && optional_parameter_insertion.is_none()
@@ -104,6 +115,7 @@ pub fn plan_add_function_parameter(
                 call_selection.view(),
                 &target.function_name,
                 &argument,
+                optional_insertion.positional_prefix_count,
                 optional_insertion.call_argument_index(request.insert),
             )?
         } else {
@@ -138,6 +150,7 @@ pub fn plan_add_function_parameter(
         parameter_name: request.name,
         argument,
         insert: request.insert,
+        section: request.section,
         rewritten,
         changed,
     })

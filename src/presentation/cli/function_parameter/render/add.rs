@@ -28,6 +28,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_add_function_param
             println!("parameter_name\t{}", plan.parameter_name);
             println!("argument\t{}", plan.argument);
             println!("insert\t{}", plan.insert.label());
+            println!("parameter_section\t{}", plan.section.label());
             for (path, span) in plan.call_paths.iter().zip(&plan.call_spans) {
                 println!(
                     "call\t{}\t{}..{}",
@@ -64,6 +65,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_add_function_param
                 "parameter_name": plan.parameter_name.as_str(),
                 "argument": &plan.argument,
                 "insert": plan.insert.label(),
+                "parameter_section": plan.section.label(),
                 "changed": plan.changed,
                 "written": written,
                 "rewritten": &plan.rewritten,

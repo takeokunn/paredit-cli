@@ -7,8 +7,8 @@ use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName
 use super::calls::{reorder_function_parameter_call_edit, resolve_function_call_paths};
 use super::definition::parse_reorder_function_parameters_definition;
 use super::list_edit::{
-    apply_byte_span_edits, atom_text, ensure_non_overlapping_spans, reorder_list_items_edit,
-    spans_overlap, SpanEdit,
+    SpanEdit, apply_byte_span_edits, atom_text, ensure_non_overlapping_spans,
+    reorder_list_items_edit, spans_overlap,
 };
 use super::types::{ReorderFunctionParametersPlan, ReorderFunctionParametersRequest};
 

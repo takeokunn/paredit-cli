@@ -19,7 +19,7 @@ pub use reorder::plan_reorder_function_parameters;
 pub use swap::plan_swap_function_parameters;
 pub use types::{
     AddFunctionParameterPlan, AddFunctionParameterRequest, FunctionParameterInsert,
-    MoveFunctionParameterPlan, MoveFunctionParameterRequest, RemoveFunctionParameterPlan,
-    RemoveFunctionParameterRequest, ReorderFunctionParametersPlan,
+    FunctionParameterSection, MoveFunctionParameterPlan, MoveFunctionParameterRequest,
+    RemoveFunctionParameterPlan, RemoveFunctionParameterRequest, ReorderFunctionParametersPlan,
     ReorderFunctionParametersRequest, SwapFunctionParametersPlan, SwapFunctionParametersRequest,
 };

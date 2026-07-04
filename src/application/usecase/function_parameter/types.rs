@@ -11,6 +11,7 @@ pub struct AddFunctionParameterRequest<'a> {
     pub call_paths: Vec<Path>,
     pub all_calls: bool,
     pub insert: FunctionParameterInsert,
+    pub section: FunctionParameterSection,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +72,25 @@ impl FunctionParameterInsert {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionParameterSection {
+    Auto,
+    Positional,
+    Optional,
+    Keyword,
+}
+
+impl FunctionParameterSection {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Positional => "positional",
+            Self::Optional => "optional",
+            Self::Keyword => "keyword",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AddFunctionParameterPlan {
     pub dialect: Dialect,
@@ -84,6 +104,7 @@ pub struct AddFunctionParameterPlan {
     pub parameter_name: SymbolName,
     pub argument: String,
     pub insert: FunctionParameterInsert,
+    pub section: FunctionParameterSection,
     pub rewritten: String,
     pub changed: bool,
 }

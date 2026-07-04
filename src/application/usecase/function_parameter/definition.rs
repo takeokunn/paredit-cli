@@ -197,11 +197,11 @@ fn parse_function_parameter_definition(
         )?,
         None => None,
     };
-    let optional_parameter_insertion = match (new_parameter, &keyword_parameter_insertion) {
-        (Some(_), None) => {
+    let optional_parameter_insertion = match new_parameter {
+        Some(_) => {
             optional_parameter_insertion(dialect, &parameter_container, protected_prefix_count)?
         }
-        _ => None,
+        None => None,
     };
 
     if let Some(new_parameter) = new_parameter {
@@ -480,7 +480,6 @@ fn optional_parameter_insertion(
     let mut in_optional_section = false;
     let mut first_item_index = None;
     let mut end_item_index = None;
-    let mut found_trailing_marker = false;
 
     for (item_index, child) in parameter_form
         .children
@@ -498,7 +497,6 @@ fn optional_parameter_insertion(
             } else {
                 if in_optional_section && end_item_index.is_none() {
                     end_item_index = Some(item_index);
-                    found_trailing_marker = true;
                 }
                 in_optional_section = false;
             }
@@ -515,9 +513,6 @@ fn optional_parameter_insertion(
     let Some(first_item_index) = first_item_index else {
         return Ok(None);
     };
-    if found_trailing_marker {
-        return Ok(None);
-    }
     let end_item_index = end_item_index.unwrap_or(parameter_form.children.len());
     Ok(Some(OptionalParameterInsertion {
         first_item_index,

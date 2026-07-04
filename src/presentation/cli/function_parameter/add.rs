@@ -28,6 +28,7 @@ pub(in crate::presentation::cli) fn add_function_parameter(
         call_paths: args.call_paths,
         all_calls: args.all_calls,
         insert: args.insert.into_function_parameter_insert(),
+        section: args.section.into_function_parameter_section(),
     })?;
 
     let written = args.write && plan.changed;

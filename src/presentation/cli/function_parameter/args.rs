@@ -1,9 +1,31 @@
 use std::path::PathBuf;
 
-use clap::Args;
+use clap::{Args, ValueEnum};
 
+use crate::application::usecase::function_parameter::FunctionParameterSection;
 use crate::domain::sexpr::{Path, SymbolName};
 use crate::presentation::cli::args::{DialectArg, OutputFormat, ParameterInsert};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(in crate::presentation::cli::function_parameter) enum ParameterSection {
+    Auto,
+    Positional,
+    Optional,
+    Keyword,
+}
+
+impl ParameterSection {
+    pub(in crate::presentation::cli::function_parameter) fn into_function_parameter_section(
+        self,
+    ) -> FunctionParameterSection {
+        match self {
+            Self::Auto => FunctionParameterSection::Auto,
+            Self::Positional => FunctionParameterSection::Positional,
+            Self::Optional => FunctionParameterSection::Optional,
+            Self::Keyword => FunctionParameterSection::Keyword,
+        }
+    }
+}
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct AddFunctionParameterArgs {
@@ -23,6 +45,8 @@ pub(in crate::presentation::cli) struct AddFunctionParameterArgs {
     pub(in crate::presentation::cli::function_parameter) all_calls: bool,
     #[arg(long, value_enum, default_value_t = ParameterInsert::End)]
     pub(in crate::presentation::cli::function_parameter) insert: ParameterInsert,
+    #[arg(long = "parameter-section", value_enum, default_value_t = ParameterSection::Auto)]
+    pub(in crate::presentation::cli::function_parameter) section: ParameterSection,
     #[arg(long)]
     pub(in crate::presentation::cli::function_parameter) write: bool,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]

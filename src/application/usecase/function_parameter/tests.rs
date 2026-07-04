@@ -1,8 +1,8 @@
 use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::{
-    AddFunctionParameterRequest, FunctionParameterInsert, MoveFunctionParameterRequest,
-    RemoveFunctionParameterRequest, ReorderFunctionParametersRequest,
+    AddFunctionParameterRequest, FunctionParameterInsert, FunctionParameterSection,
+    MoveFunctionParameterRequest, RemoveFunctionParameterRequest, ReorderFunctionParametersRequest,
     SwapFunctionParametersRequest, plan_add_function_parameter, plan_move_function_parameter,
     plan_remove_function_parameter, plan_reorder_function_parameters,
     plan_swap_function_parameters,
@@ -30,6 +30,7 @@ fn adds_parameter_to_definition_and_call() {
         call_paths: vec![path("1.1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -51,6 +52,7 @@ fn adds_common_lisp_key_parameter_to_definition_and_call() {
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -72,6 +74,7 @@ fn adds_common_lisp_key_parameter_before_allow_other_keys() {
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -94,6 +97,7 @@ fn adds_common_lisp_optional_parameter_to_definition_and_call() {
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -115,12 +119,57 @@ fn adds_common_lisp_optional_parameter_at_start() {
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::Start,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
     assert_eq!(
         plan.rewritten,
         "(defun render (node &optional style stream mode) (list node stream mode style))\n(render item :compact out :wide)"
+    );
+}
+
+#[test]
+fn adds_common_lisp_optional_parameter_before_key_section() {
+    let input = "(defun render (node &optional stream &key color) (list node stream style color))\n(render item out :color :red)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":compact".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Optional,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun render (node &optional stream style &key color) (list node stream style color))\n(render item out :compact :color :red)"
+    );
+}
+
+#[test]
+fn adds_common_lisp_optional_parameter_at_start_before_key_section() {
+    let input = "(defun render (node &optional stream &key color) (list node stream style color))\n(render item out :color :red)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":compact".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::Start,
+        section: FunctionParameterSection::Optional,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun render (node &optional style stream &key color) (list node stream style color))\n(render item :compact out :color :red)"
     );
 }
 
@@ -136,8 +185,32 @@ fn rejects_add_common_lisp_optional_parameter_when_call_omits_existing_optional_
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect_err("missing optional position must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("does not have 2 positional argument(s) before optional argument")
+    );
+}
+
+#[test]
+fn rejects_add_optional_parameter_before_key_when_call_omits_existing_optional_argument() {
+    let input = "(defun render (node &optional stream &key color) (list node stream style color))\n(render item :color :red)";
+    let error = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":compact".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Optional,
+    })
+    .expect_err("missing optional position before keyword arguments must fail");
 
     assert!(
         error
@@ -159,6 +232,7 @@ fn rejects_add_common_lisp_key_parameter_with_duplicate_call_keyword() {
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect_err("duplicate keyword must fail");
 
@@ -221,6 +295,7 @@ fn adds_parameter_to_common_lisp_defmethod_and_call() {
         call_paths: vec![path("1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -431,6 +506,7 @@ fn rejects_add_parameter_to_common_lisp_lambda_list_marker() {
         call_paths: vec![path("1.1")],
         all_calls: false,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect_err("lambda-list marker must fail");
 
@@ -606,6 +682,7 @@ fn discovers_all_same_file_calls() {
         call_paths: Vec::new(),
         all_calls: true,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -633,6 +710,7 @@ fn discovers_all_calls_respects_common_lisp_flet_callable_shadowing() {
         call_paths: Vec::new(),
         all_calls: true,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -667,6 +745,7 @@ fn discovers_all_calls_respects_common_lisp_labels_callable_shadowing() {
         call_paths: Vec::new(),
         all_calls: true,
         insert: FunctionParameterInsert::End,
+        section: FunctionParameterSection::Auto,
     })
     .expect("plan");
 
@@ -706,6 +785,7 @@ proptest! {
             call_paths: vec![path("1.1")],
             all_calls: false,
             insert: FunctionParameterInsert::End,
+            section: FunctionParameterSection::Auto,
         })
         .map_err(|error| TestCaseError::fail(error.to_string()))?;
 

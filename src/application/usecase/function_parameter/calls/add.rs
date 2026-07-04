@@ -23,9 +23,31 @@ pub(in crate::application::usecase::function_parameter) fn add_optional_function
     view: ExpressionView,
     function_name: &SymbolName,
     argument: &str,
+    positional_prefix_count: usize,
     argument_index: usize,
 ) -> Result<(ByteSpan, String)> {
     ensure_matching_function_call(&view, function_name, "add-function-parameter")?;
+
+    let first_keyword_item_index = view
+        .children
+        .iter()
+        .enumerate()
+        .skip(positional_prefix_count + 1)
+        .find_map(|(item_index, child)| {
+            atom_text(child)
+                .is_some_and(|text| text.starts_with(':'))
+                .then_some(item_index)
+        });
+    let positional_argument_count = first_keyword_item_index.unwrap_or(view.children.len()) - 1;
+    if argument_index > positional_argument_count {
+        anyhow::bail!(
+            "add-function-parameter call to '{}' at {}..{} does not have {} positional argument(s) before optional argument",
+            function_name,
+            view.span.start().get(),
+            view.span.end().get(),
+            argument_index
+        );
+    }
 
     let insertion_item_index = argument_index + 1;
     if insertion_item_index > view.children.len() {
