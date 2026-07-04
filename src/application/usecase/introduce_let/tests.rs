@@ -175,6 +175,60 @@ fn skips_all_occurrences_inside_dotimes_shadowing_result_and_body() {
 }
 
 #[test]
+fn keeps_do_initializers_in_outer_scope_but_skips_steps_end_and_body() {
+    let input = "(defun render () (+ (* width height) (do ((product (* width height) (* width height)) (other (* width height))) ((* width height) (* width height)) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 3);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 4);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (do ((product product (* width height)) (other product)) ((* width height) (* width height)) (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_do_star_later_initializers_shadowed_by_previous_binding() {
+    let input = "(defun render () (+ (* width height) (do* ((product 1) (other (* width height))) ((* width height)) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 3);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (do* ((product 1) (other (* width height))) ((* width height)) (* width height)))))"
+    );
+}
+
+#[test]
+fn keeps_prog_initializers_in_outer_scope_but_skips_body() {
+    let input =
+        "(defun render () (+ (* width height) (prog ((product (* width height)) (other (* width height))) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 3);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (prog ((product product) (other product)) (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_prog_star_later_initializers_shadowed_by_previous_binding() {
+    let input =
+        "(defun render () (+ (* width height) (prog* ((product 1) (other (* width height))) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (prog* ((product 1) (other (* width height))) (* width height)))))"
+    );
+}
+
+#[test]
 fn skips_all_occurrences_inside_with_slots_shadowing_body_only() {
     let input =
         "(defun render () (+ (* width height) (with-slots (product) panel (* width height))))";
@@ -219,11 +273,9 @@ fn rejects_selected_expression_inside_shadowing_binding_form() {
     let input = "(defun render () (let ((product 1)) (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.2", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -231,11 +283,9 @@ fn rejects_selected_expression_inside_symbol_macrolet_shadowing_binding_form() {
     let input = "(defun render () (symbol-macrolet ((product 1)) (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.2", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -243,11 +293,9 @@ fn rejects_selected_expression_inside_define_setf_expander_shadowing_lambda_list
     let input = "(defun render () (define-setf-expander slot (&environment product place) (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -255,11 +303,9 @@ fn rejects_selected_expression_inside_define_compiler_macro_shadowing_lambda_lis
     let input = "(defun render () (define-compiler-macro slot (&environment product place) (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -267,11 +313,9 @@ fn rejects_selected_expression_inside_destructuring_bind_shadowing_body() {
     let input = "(defun render () (destructuring-bind (product) row (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -279,11 +323,9 @@ fn rejects_selected_expression_inside_handler_case_shadowing_clause() {
     let input = "(defun render () (handler-case (risky) (error (product) (* width height))))";
     let error = plan_introduce_let(request(input, "0.3.2.2", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -291,11 +333,29 @@ fn rejects_selected_expression_inside_dolist_shadowing_result() {
     let input = "(defun render () (dolist (product items (* width height)) (done)))";
     let error = plan_introduce_let(request(input, "0.3.1.2", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
+}
+
+#[test]
+fn rejects_selected_expression_inside_do_step_shadowing_binding() {
+    let input = "(defun render () (do ((product 1 (* width height))) ((done)) (finish)))";
+    let error = plan_introduce_let(request(input, "0.3.1.0.2", false)).expect_err("shadowed");
+
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
+}
+
+#[test]
+fn rejects_selected_expression_inside_prog_body_shadowing_binding() {
+    let input = "(defun render () (prog ((product 1)) (* width height)))";
+    let error = plan_introduce_let(request(input, "0.3.2", false)).expect_err("shadowed");
+
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -303,11 +363,9 @@ fn rejects_selected_expression_inside_with_slots_shadowing_body() {
     let input = "(defun render () (with-slots (product) panel (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]
@@ -315,11 +373,9 @@ fn rejects_selected_expression_inside_macrolet_lambda_body_shadowing_parameter()
     let input = "(defun render () (macrolet ((with-product (product) (* width height))) (done)))";
     let error = plan_introduce_let(request(input, "0.3.1.0.2", false)).expect_err("shadowed");
 
-    assert!(
-        error
-            .to_string()
-            .contains("inside an existing binding for 'product'")
-    );
+    assert!(error
+        .to_string()
+        .contains("inside an existing binding for 'product'"));
 }
 
 #[test]

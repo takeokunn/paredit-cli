@@ -31,6 +31,10 @@ pub(super) fn binding_form_binds_name(view: &ExpressionView, name: &str) -> bool
             .children
             .get(1)
             .is_some_and(|binding_form| iteration_binding_binds_name(binding_form, name)),
+        "do" | "do*" | "prog" | "prog*" => view
+            .children
+            .get(1)
+            .is_some_and(|bindings| variable_specs_bind_name(bindings, name)),
         "with-slots" | "with-accessors" => view
             .children
             .get(1)
@@ -65,6 +69,7 @@ pub(super) fn child_shadowed_by_binding(
             .get(child_index)
             .is_some_and(|clause| child_index >= 2 && clause_binds_name(clause, name)),
         "dolist" | "dotimes" => child_index >= 2 && binding_form_binds_name(view, name),
+        "do" | "do*" | "prog" | "prog*" => child_index >= 2 && binding_form_binds_name(view, name),
         "with-slots" | "with-accessors" => child_index >= 3 && binding_form_binds_name(view, name),
         _ => false,
     }
@@ -83,7 +88,30 @@ pub(super) fn iteration_bindings_child_index(view: &ExpressionView) -> Option<us
     matches!(list_head(view)?, "dolist" | "dotimes").then_some(1)
 }
 
+pub(super) fn variable_bindings_child_index(view: &ExpressionView) -> Option<usize> {
+    matches!(list_head(view)?, "do" | "do*" | "prog" | "prog*").then_some(1)
+}
+
+pub(super) fn variable_binding_form_is_sequential(view: &ExpressionView) -> bool {
+    matches!(list_head(view), Some("do*" | "prog*"))
+}
+
+pub(super) fn variable_binding_form_has_step_forms(view: &ExpressionView) -> bool {
+    matches!(list_head(view), Some("do" | "do*"))
+}
+
 pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> bool {
+    binding
+        .children
+        .first()
+        .is_some_and(|pattern| pattern_contains_name(pattern, name))
+}
+
+pub(super) fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> bool {
+    if atom_text(binding).is_some_and(|binding_name| binding_name == name) {
+        return true;
+    }
+
     binding
         .children
         .first()
@@ -140,6 +168,13 @@ fn iteration_binding_binds_name(binding_form: &ExpressionView, name: &str) -> bo
         .first()
         .and_then(atom_text)
         .is_some_and(|binding_name| binding_name == name)
+}
+
+fn variable_specs_bind_name(bindings: &ExpressionView, name: &str) -> bool {
+    bindings
+        .children
+        .iter()
+        .any(|binding| variable_spec_binds_name(binding, name))
 }
 
 fn slot_specs_bind_name(slot_specs: &ExpressionView, name: &str) -> bool {

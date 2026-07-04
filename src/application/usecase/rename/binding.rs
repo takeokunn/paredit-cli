@@ -37,6 +37,9 @@ pub(super) fn binding_rename_parts(
         }
         "handler-case" | "restart-case" => clause_binding_rename_parts(view, from, form, input),
         "dolist" | "dotimes" => iteration_binding_rename_parts(view, from, form, input),
+        "do" | "do*" | "prog" | "prog*" => {
+            common_lisp_variable_binding_rename_parts(view, from, form, input)
+        }
         "with-slots" | "with-accessors" => slot_binding_rename_parts(view, from, form, input),
         _ => anyhow::bail!("selected form is not a supported binding form"),
     }
@@ -293,6 +296,90 @@ fn iteration_binding_rename_parts(
     })
 }
 
+fn common_lisp_variable_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> Result<BindingRenameParts> {
+    let binding_form = view
+        .children
+        .get(1)
+        .with_context(|| format!("selected {form} form must contain variable specs"))?;
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for (index, spec) in binding_form.children.iter().enumerate() {
+        let Some((name, span)) = common_lisp_variable_spec_binding_name(spec) else {
+            continue;
+        };
+        if name != from.as_str() {
+            continue;
+        }
+        duplicate_count += 1;
+        target = Some((index, span));
+    }
+
+    if duplicate_count > 1 {
+        anyhow::bail!(
+            "binding '{from}' was found in multiple selected {form} specs; select an unambiguous binding form"
+        );
+    }
+
+    let (target_index, binding_span) = target
+        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    if matches!(form.as_str(), "do*" | "prog*") {
+        for spec in binding_form.children.iter().skip(target_index + 1) {
+            if let Some(init_form) = common_lisp_variable_spec_init_form(spec) {
+                collect_symbol_atom_spans_unshadowed(
+                    init_form,
+                    from,
+                    &mut reference_spans,
+                    &mut shadowed_scope_count,
+                    input,
+                );
+            }
+        }
+    }
+
+    if matches!(form.as_str(), "do" | "do*") {
+        for spec in &binding_form.children {
+            if let Some(step_form) = common_lisp_do_variable_spec_step_form(spec) {
+                collect_symbol_atom_spans_unshadowed(
+                    step_form,
+                    from,
+                    &mut reference_spans,
+                    &mut shadowed_scope_count,
+                    input,
+                );
+            }
+        }
+    }
+
+    for body in &view.children[2..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+    reference_spans.sort_by_key(|span| span.start());
+
+    Ok(BindingRenameParts {
+        form,
+        form_span: view.span,
+        binding_span,
+        binding_edit: types::BindingEdit::rename_atom(binding_span),
+        reference_spans,
+        shadowed_scope_count,
+    })
+}
+
 fn slot_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
@@ -347,6 +434,29 @@ fn slot_binding_rename_parts(
         reference_spans,
         shadowed_scope_count,
     })
+}
+
+fn common_lisp_variable_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan)> {
+    match &spec.kind {
+        ExpressionKind::Atom => Some((atom_text(spec)?, spec.span)),
+        ExpressionKind::List => {
+            let first = spec.children.first()?;
+            Some((atom_text(first)?, first.span))
+        }
+        ExpressionKind::Root => None,
+    }
+}
+
+fn common_lisp_variable_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+    (spec.kind == ExpressionKind::List)
+        .then(|| spec.children.get(1))
+        .flatten()
+}
+
+fn common_lisp_do_variable_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+    (spec.kind == ExpressionKind::List)
+        .then(|| spec.children.get(2))
+        .flatten()
 }
 
 fn slot_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan, types::BindingEdit)> {

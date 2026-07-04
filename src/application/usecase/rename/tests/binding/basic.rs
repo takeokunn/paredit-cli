@@ -171,6 +171,94 @@ fn plans_dotimes_iteration_binding_rename_without_touching_count() {
 }
 
 #[test]
+fn plans_binding_rename_without_touching_do_scope() {
+    let input =
+        "(let ((value 1)) (list value (do ((value value (1+ value))) ((done) value) value) value))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("outer").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 3);
+    assert_eq!(plan.shadowed_scope_count, 1);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((outer 1)) (list outer (do ((value outer (1+ value))) ((done) value) value) outer))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_binding_rename_without_touching_prog_scope() {
+    let input =
+        "(let ((value 1)) (list value (prog ((value value) (copy value)) (return value)) value))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("outer").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 4);
+    assert_eq!(plan.shadowed_scope_count, 1);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((outer 1)) (list outer (prog ((value outer) (copy outer)) (return value)) outer))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_do_binding_rename_across_steps_end_clause_and_body() {
+    let input = "(do ((value seed (1+ value))) ((done value) value) (collect value seed))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("item").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "do");
+    assert_eq!(plan.references.len(), 4);
+    assert_eq!(
+        plan.rewritten,
+        "(do ((item seed (1+ item))) ((done item) item) (collect item seed))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_prog_star_binding_rename_across_later_inits_and_body() {
+    let input = "(prog* ((value seed) (copy value)) (return (list value copy)))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("item").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "prog*");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(prog* ((item seed) (copy item)) (return (list item copy)))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
 fn plans_with_slots_binding_rename_preserves_bare_slot_name() {
     let input = "(with-slots (value (alias slot-name)) object (list value alias object))";
     let plan = plan_rename_binding(RenameBindingRequest {
@@ -225,11 +313,9 @@ fn rejects_ambiguous_with_slots_binding_rename() {
     })
     .unwrap_err();
 
-    assert!(
-        error
-            .to_string()
-            .contains("binding 'value' was found in multiple selected with-slots specs")
-    );
+    assert!(error
+        .to_string()
+        .contains("binding 'value' was found in multiple selected with-slots specs"));
 }
 
 #[test]
@@ -438,9 +524,7 @@ fn rejects_ambiguous_handler_case_clause_parameter_rename() {
     })
     .unwrap_err();
 
-    assert!(
-        error
-            .to_string()
-            .contains("multiple selected handler-case clauses")
-    );
+    assert!(error
+        .to_string()
+        .contains("multiple selected handler-case clauses"));
 }

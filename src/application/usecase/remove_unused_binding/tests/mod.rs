@@ -3,7 +3,7 @@ use proptest::{prelude::*, test_runner::TestCaseError};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
-use super::{RemoveUnusedBindingRequest, plan_remove_unused_binding};
+use super::{plan_remove_unused_binding, RemoveUnusedBindingRequest};
 
 mod clojure;
 mod common_lisp;

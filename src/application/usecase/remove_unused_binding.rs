@@ -15,13 +15,14 @@ mod tests;
 mod types;
 
 use candidates::{
-    let_binding_removal_candidates, local_callable_binding_removal_candidates,
-    macrolet_binding_removal_candidates, with_accessors_binding_removal_candidates,
+    do_binding_removal_candidates, let_binding_removal_candidates,
+    local_callable_binding_removal_candidates, macrolet_binding_removal_candidates,
+    prog_binding_removal_candidates, with_accessors_binding_removal_candidates,
     with_slots_binding_removal_candidates,
 };
 use references::{
-    body_binding_reference_spans, let_binding_reference_spans,
-    local_callable_binding_reference_spans,
+    body_binding_reference_spans, do_binding_reference_spans, let_binding_reference_spans,
+    local_callable_binding_reference_spans, prog_binding_reference_spans,
 };
 use rewrite::{apply_nested_span_edits, replace_span};
 use syntax::atom_text;
@@ -87,7 +88,7 @@ fn remove_unused_binding_parts(
 ) -> Result<RemoveUnusedBindingParts> {
     if target.kind != ExpressionKind::List || target.delimiter != Some(Delimiter::Paren) {
         anyhow::bail!(
-            "remove-unused-binding selection must be a let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, or with-accessors list"
+            "remove-unused-binding selection must be a let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog* list"
         );
     }
     if target.children.len() < 3 {
@@ -108,14 +109,23 @@ fn remove_unused_binding_parts(
             | "compiler-macrolet"
             | "with-slots"
             | "with-accessors"
+            | "do"
+            | "do*"
+            | "prog"
+            | "prog*"
     ) {
         anyhow::bail!(
-            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, or with-accessors"
+            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog*"
         );
     }
     if matches!(head, "with-slots" | "with-accessors") && target.children.len() < 4 {
         anyhow::bail!(
             "remove-unused-binding requires a with-slots or with-accessors form with bindings, an instance expression, and a body"
+        );
+    }
+    if matches!(head, "do" | "do*") && target.children.len() < 3 {
+        anyhow::bail!(
+            "remove-unused-binding requires a do or do* form with bindings and an end clause"
         );
     }
 
@@ -128,10 +138,14 @@ fn remove_unused_binding_parts(
         with_slots_binding_removal_candidates(dialect, binding_form)?
     } else if head == "with-accessors" {
         with_accessors_binding_removal_candidates(dialect, binding_form)?
+    } else if matches!(head, "do" | "do*") {
+        do_binding_removal_candidates(dialect, binding_form)?
+    } else if matches!(head, "prog" | "prog*") {
+        prog_binding_removal_candidates(dialect, binding_form)?
     } else {
         let_binding_removal_candidates(dialect, binding_form)?
     };
-    let body_start_index = if matches!(head, "with-slots" | "with-accessors") {
+    let body_start_index = if matches!(head, "with-slots" | "with-accessors" | "do" | "do*") {
         3
     } else {
         2
@@ -144,6 +158,24 @@ fn remove_unused_binding_parts(
                 local_callable_binding_reference_spans(dialect, target, &symbol)?
             } else if matches!(head, "with-slots" | "with-accessors") {
                 body_binding_reference_spans(input, target, &symbol, body_start_index)
+            } else if matches!(head, "do" | "do*") {
+                do_binding_reference_spans(
+                    input,
+                    target,
+                    binding_form,
+                    &candidates,
+                    candidate,
+                    &symbol,
+                )
+            } else if matches!(head, "prog" | "prog*") {
+                prog_binding_reference_spans(
+                    input,
+                    target,
+                    binding_form,
+                    &candidates,
+                    candidate,
+                    &symbol,
+                )
             } else {
                 let_binding_reference_spans(
                     input,
@@ -182,6 +214,10 @@ fn remove_unused_binding_parts(
             local_callable_binding_reference_spans(dialect, target, name)?
         } else if matches!(head, "with-slots" | "with-accessors") {
             body_binding_reference_spans(input, target, name, body_start_index)
+        } else if matches!(head, "do" | "do*") {
+            do_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)
+        } else if matches!(head, "prog" | "prog*") {
+            prog_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)
         } else {
             let_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)?
         };
@@ -199,7 +235,8 @@ fn remove_unused_binding_parts(
         }]
     };
 
-    let replacement = if selected.len() == candidates.len() {
+    let preserve_binding_form_when_empty = matches!(head, "do" | "do*" | "prog" | "prog*");
+    let replacement = if selected.len() == candidates.len() && !preserve_binding_form_when_empty {
         let first_body = &target.children[body_start_index];
         let last_body = target
             .children

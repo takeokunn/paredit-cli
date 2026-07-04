@@ -165,6 +165,83 @@ fn plans_all_unused_bindings_by_replacing_form_with_body() {
 }
 
 #[test]
+fn plans_unused_do_binding_without_counting_init_reference() {
+    let input = "(do ((unused (compute unused)) (i 0 (1+ i))) ((>= i limit) i) (print i))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("unused").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.form, "do");
+    assert_eq!(plan.binding_name.as_deref(), Some("unused"));
+    assert_eq!(plan.binding_value.as_deref(), Some("(compute unused)"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(
+        plan.replacement,
+        "(do ((i 0 (1+ i)))\n  ((>= i limit) i)\n  (print i))"
+    );
+}
+
+#[test]
+fn rejects_do_binding_used_in_step() {
+    let input = "(do ((unused 0 (1+ unused))) ((done) unused))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("unused").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("referenced do binding");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}
+
+#[test]
+fn plans_all_unused_prog_bindings_without_collapsing_form() {
+    let input = "(prog ((unused (compute))) (return done))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: None,
+        all_bindings: true,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.form, "prog");
+    assert_eq!(plan.bindings.len(), 1);
+    assert_eq!(plan.replacement, "(prog ()\n  (return done))");
+}
+
+#[test]
+fn rejects_prog_star_binding_used_in_later_init() {
+    let input = "(prog* ((seed (make)) (copy seed)) (return copy))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("seed").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("referenced prog* binding");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}
+
+#[test]
 fn plans_unused_symbol_macrolet_without_counting_expansion_reference() {
     let input = "(symbol-macrolet ((value (compute value)) (used other)) (list used))";
     let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {

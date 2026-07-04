@@ -107,6 +107,50 @@ fn treats_dotimes_iteration_variable_as_local_to_result_and_body() {
 }
 
 #[test]
+fn treats_do_variables_as_local_to_steps_end_clause_and_body() {
+    let params = infer_at(
+        "(do ((i start (1+ i)) (sum 0 (+ sum i))) ((>= i limit) (finish sum done)) (render i sum outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["start", "limit", "done", "outer"]);
+}
+
+#[test]
+fn treats_do_star_variables_as_local_to_later_inits_steps_and_body() {
+    let params = infer_at(
+        "(do* ((i start (1+ i)) (sum i (+ sum i))) ((>= sum limit) done) (render sum outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["start", "limit", "done", "outer"]);
+}
+
+#[test]
+fn treats_prog_variables_as_local_to_body_but_not_parallel_inits() {
+    let params = infer_at(
+        "(prog ((value seed) (copy value)) (setf value copy) (return (finish value outer)))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["seed", "value", "outer"]);
+}
+
+#[test]
+fn treats_prog_star_variables_as_local_to_later_inits_and_body() {
+    let params = infer_at(
+        "(prog* ((value seed) (copy value)) (setf value copy) (return outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["seed", "outer"]);
+}
+
+#[test]
 fn treats_with_slots_names_as_local_to_body() {
     let params = infer_at(
         "(with-slots (width (height slot-height)) panel (list width height outer))",

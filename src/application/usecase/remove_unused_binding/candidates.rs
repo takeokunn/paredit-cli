@@ -75,6 +75,30 @@ pub(super) fn with_accessors_binding_removal_candidates(
     }
 }
 
+pub(super) fn do_binding_removal_candidates(
+    dialect: Dialect,
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    match dialect {
+        Dialect::CommonLisp | Dialect::Unknown => {
+            list_pair_iteration_binding_removal_candidates(binding_form, "do", 3)
+        }
+        _ => anyhow::bail!("remove-unused-binding only supports do and do* in Common Lisp"),
+    }
+}
+
+pub(super) fn prog_binding_removal_candidates(
+    dialect: Dialect,
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    match dialect {
+        Dialect::CommonLisp | Dialect::Unknown => {
+            list_pair_iteration_binding_removal_candidates(binding_form, "prog", 2)
+        }
+        _ => anyhow::bail!("remove-unused-binding only supports prog and prog* in Common Lisp"),
+    }
+}
+
 fn vector_let_binding_removal_candidates(
     binding_form: &ExpressionView,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
@@ -103,6 +127,58 @@ fn vector_let_binding_removal_candidates(
             })
         })
         .collect()
+}
+
+fn list_pair_iteration_binding_removal_candidates(
+    binding_form: &ExpressionView,
+    form_name: &str,
+    max_children: usize,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
+    {
+        anyhow::bail!("dialect expects {form_name} bindings: (variable-spec ...)");
+    }
+
+    binding_form
+        .children
+        .iter()
+        .enumerate()
+        .map(|(index, spec)| {
+            let (name, value_span) =
+                iteration_variable_spec_name_and_value_span(spec, form_name, max_children)?;
+            Ok(LetBindingRemovalCandidate {
+                index,
+                name: name.to_owned(),
+                value_span,
+                removal_span: spec.span,
+            })
+        })
+        .collect()
+}
+
+fn iteration_variable_spec_name_and_value_span<'a>(
+    spec: &'a ExpressionView,
+    form_name: &str,
+    max_children: usize,
+) -> Result<(&'a str, ByteSpan)> {
+    if spec.kind == ExpressionKind::Atom {
+        let name = atom_text(spec).context("iteration binding name must be an atom")?;
+        return Ok((name, spec.span));
+    }
+
+    if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+        anyhow::bail!("{form_name} binding must be a symbol or variable spec list");
+    }
+    if spec.children.is_empty() || spec.children.len() > max_children {
+        anyhow::bail!("{form_name} variable spec has an unsupported arity");
+    }
+
+    let name = atom_text(&spec.children[0]).context("iteration binding name must be an atom")?;
+    let value_span = spec
+        .children
+        .get(1)
+        .map_or(spec.children[0].span, |child| child.span);
+    Ok((name, value_span))
 }
 
 fn list_pair_with_slots_binding_removal_candidates(

@@ -69,6 +69,22 @@ pub(super) fn collect_inferred_extract_function_special_form(
             bound_params,
             params,
         ),
+        "do" | "do*" => collect_inferred_extract_function_do(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+            head == "do*",
+        ),
+        "prog" | "prog*" => collect_inferred_extract_function_prog(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+            head == "prog*",
+        ),
         "with-slots" | "with-accessors" => collect_inferred_extract_function_slot_binding(
             dialect,
             view,
@@ -340,6 +356,147 @@ fn collect_inferred_extract_function_iteration_binding(
     true
 }
 
+fn collect_inferred_extract_function_do(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+    sequential_scope: bool,
+) -> bool {
+    let Some(binding_form) = view.children.get(1) else {
+        return false;
+    };
+
+    let mut body_bound_params = bound_params.to_vec();
+    if sequential_scope {
+        for spec in &binding_form.children {
+            if let Some(init_form) = iteration_spec_init_form(spec) {
+                super::collect_inferred_extract_function_params(
+                    dialect,
+                    init_form,
+                    false,
+                    explicit_params,
+                    &body_bound_params,
+                    params,
+                );
+            }
+            if let Some(name) = iteration_spec_bound_name(spec) {
+                push_extract_function_bound_param(&mut body_bound_params, name);
+            }
+        }
+    } else {
+        for spec in &binding_form.children {
+            if let Some(init_form) = iteration_spec_init_form(spec) {
+                super::collect_inferred_extract_function_params(
+                    dialect,
+                    init_form,
+                    false,
+                    explicit_params,
+                    bound_params,
+                    params,
+                );
+            }
+        }
+        body_bound_params = extend_extract_function_bound_params(
+            bound_params,
+            binding_form
+                .children
+                .iter()
+                .filter_map(iteration_spec_bound_name),
+        );
+    }
+
+    for spec in &binding_form.children {
+        if let Some(step_form) = iteration_spec_step_form(spec) {
+            super::collect_inferred_extract_function_params(
+                dialect,
+                step_form,
+                false,
+                explicit_params,
+                &body_bound_params,
+                params,
+            );
+        }
+    }
+
+    for body in &view.children[2..] {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            body,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+    true
+}
+
+fn collect_inferred_extract_function_prog(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+    sequential_scope: bool,
+) -> bool {
+    let Some(binding_form) = view.children.get(1) else {
+        return false;
+    };
+
+    let mut body_bound_params = bound_params.to_vec();
+    if sequential_scope {
+        for spec in &binding_form.children {
+            if let Some(init_form) = iteration_spec_init_form(spec) {
+                super::collect_inferred_extract_function_params(
+                    dialect,
+                    init_form,
+                    false,
+                    explicit_params,
+                    &body_bound_params,
+                    params,
+                );
+            }
+            if let Some(name) = iteration_spec_bound_name(spec) {
+                push_extract_function_bound_param(&mut body_bound_params, name);
+            }
+        }
+    } else {
+        for spec in &binding_form.children {
+            if let Some(init_form) = iteration_spec_init_form(spec) {
+                super::collect_inferred_extract_function_params(
+                    dialect,
+                    init_form,
+                    false,
+                    explicit_params,
+                    bound_params,
+                    params,
+                );
+            }
+        }
+        body_bound_params = extend_extract_function_bound_params(
+            bound_params,
+            binding_form
+                .children
+                .iter()
+                .filter_map(iteration_spec_bound_name),
+        );
+    }
+
+    for body in &view.children[2..] {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            body,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+    true
+}
+
 fn collect_inferred_extract_function_slot_binding(
     dialect: Dialect,
     view: &ExpressionView,
@@ -382,6 +539,22 @@ fn collect_inferred_extract_function_slot_binding(
 
 fn slot_spec_bound_name(slot_spec: &ExpressionView) -> Option<&str> {
     atom_text(slot_spec).or_else(|| slot_spec.children.first().and_then(atom_text))
+}
+
+fn iteration_spec_bound_name(spec: &ExpressionView) -> Option<&str> {
+    atom_text(spec).or_else(|| spec.children.first().and_then(atom_text))
+}
+
+fn iteration_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+    (spec.kind == ExpressionKind::List)
+        .then(|| spec.children.get(1))
+        .flatten()
+}
+
+fn iteration_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+    (spec.kind == ExpressionKind::List)
+        .then(|| spec.children.get(2))
+        .flatten()
 }
 
 fn collect_inferred_extract_function_lambda(

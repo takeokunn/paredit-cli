@@ -58,6 +58,14 @@ fn collect_shadow_aware_special_form(
             collect_iteration_binding_references(view, symbol, input, output);
             true
         }
+        "do" | "do*" => {
+            collect_do_binding_references(view, symbol, input, output, head == "do*");
+            true
+        }
+        "prog" | "prog*" => {
+            collect_prog_binding_references(view, symbol, input, output, head == "prog*");
+            true
+        }
         "with-slots" | "with-accessors" => {
             collect_slot_binding_references(view, symbol, input, output);
             true
@@ -193,6 +201,92 @@ fn collect_iteration_binding_references(
     }
 }
 
+fn collect_do_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+    sequential_scope: bool,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+
+    if sequential_scope {
+        for spec in &binding_form.children {
+            if let Some(init_form) = variable_spec_init_form(spec) {
+                collect_unshadowed_symbol_references(init_form, symbol, input, output);
+            }
+            if variable_spec_binds(spec, symbol) {
+                return;
+            }
+        }
+    } else {
+        for spec in &binding_form.children {
+            if let Some(init_form) = variable_spec_init_form(spec) {
+                collect_unshadowed_symbol_references(init_form, symbol, input, output);
+            }
+        }
+        if binding_form
+            .children
+            .iter()
+            .any(|spec| variable_spec_binds(spec, symbol))
+        {
+            return;
+        }
+    }
+
+    for spec in &binding_form.children {
+        if let Some(step_form) = do_variable_spec_step_form(spec) {
+            collect_unshadowed_symbol_references(step_form, symbol, input, output);
+        }
+    }
+
+    for body in &view.children[2..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn collect_prog_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+    sequential_scope: bool,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+
+    if sequential_scope {
+        for spec in &binding_form.children {
+            if let Some(init_form) = variable_spec_init_form(spec) {
+                collect_unshadowed_symbol_references(init_form, symbol, input, output);
+            }
+            if variable_spec_binds(spec, symbol) {
+                return;
+            }
+        }
+    } else {
+        for spec in &binding_form.children {
+            if let Some(init_form) = variable_spec_init_form(spec) {
+                collect_unshadowed_symbol_references(init_form, symbol, input, output);
+            }
+        }
+        if binding_form
+            .children
+            .iter()
+            .any(|spec| variable_spec_binds(spec, symbol))
+        {
+            return;
+        }
+    }
+
+    for body in &view.children[2..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
 fn collect_slot_binding_references(
     view: &ExpressionView,
     symbol: &SymbolName,
@@ -233,6 +327,24 @@ fn slot_spec_binds(slot_spec: &ExpressionView, symbol: &SymbolName) -> bool {
     atom_text(slot_spec)
         .or_else(|| slot_spec.children.first().and_then(atom_text))
         .is_some_and(|name| name == symbol.as_str())
+}
+
+fn variable_spec_binds(spec: &ExpressionView, symbol: &SymbolName) -> bool {
+    atom_text(spec)
+        .or_else(|| spec.children.first().and_then(atom_text))
+        .is_some_and(|name| name == symbol.as_str())
+}
+
+fn variable_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+    (spec.kind == ExpressionKind::List)
+        .then(|| spec.children.get(1))
+        .flatten()
+}
+
+fn do_variable_spec_step_form(spec: &ExpressionView) -> Option<&ExpressionView> {
+    (spec.kind == ExpressionKind::List)
+        .then(|| spec.children.get(2))
+        .flatten()
 }
 
 fn collect_sequential_let_references(
