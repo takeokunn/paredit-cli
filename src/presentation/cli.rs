@@ -105,7 +105,7 @@ enum Command {
     /// Compare callable definitions and call-site arity across explicit files.
     SignatureReport(signature_report::SignatureReportArgs),
     /// Report internal and optional external call graph edges across explicit files.
-    CallGraph(call_graph_report::CallGraphArgs),
+    CallGraph(call_graph_report::args::CallGraphArgs),
     /// Report refactoring impact risks for one symbol across explicit files.
     ImpactReport(impact_report::args::ImpactReportArgs),
     /// Produce an ordered, gated refactoring plan for AI coding agents.

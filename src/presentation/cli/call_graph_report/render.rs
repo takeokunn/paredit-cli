@@ -1,78 +1,13 @@
-use super::*;
+use std::collections::BTreeMap;
 
-use crate::application::call_graph_report::{
-    CallGraphFile, CallGraphNode, CallGraphPolicy, CallGraphReportSource, build_call_graph_report,
-    evaluate_call_graph_policy,
-};
+use anyhow::Result;
+use serde_json::json;
 
-#[derive(Debug, Args)]
-pub(super) struct CallGraphArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Exact callable symbol to focus on as caller or callee.
-    #[arg(long)]
-    symbol: Option<SymbolName>,
-    /// Include calls to symbols that have no definition in the scanned file set.
-    #[arg(long)]
-    include_external: bool,
-    /// Exit with failure when the focused symbol has inbound internal caller edges.
-    #[arg(long)]
-    fail_on_inbound_callers: bool,
-    /// Require at least this many reported call graph edges.
-    #[arg(long)]
-    require_edges: Option<usize>,
-    /// Require at least this many reported internal call graph edges.
-    #[arg(long)]
-    require_internal_edges: Option<usize>,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    output: OutputFormat,
-}
+use crate::application::call_graph_report::{CallGraphFile, CallGraphNode, CallGraphPolicy};
+use crate::domain::sexpr::SymbolName;
+use crate::presentation::cli::OutputFormat;
 
-pub(super) fn call_graph(args: CallGraphArgs) -> Result<()> {
-    let symbol = args.symbol.as_ref();
-    let mut sources = Vec::with_capacity(args.files.len());
-
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-
-        sources.push(CallGraphReportSource {
-            path: file.clone(),
-            dialect,
-            tree,
-        });
-    }
-
-    let report = build_call_graph_report(sources, args.include_external, symbol)?;
-    let policy = evaluate_call_graph_policy(
-        &report.files,
-        symbol,
-        args.fail_on_inbound_callers,
-        args.require_edges,
-        args.require_internal_edges,
-    );
-    print_call_graph_report(
-        &report.files,
-        &report.nodes_by_name,
-        symbol,
-        args.include_external,
-        &policy,
-        args.output,
-    )?;
-    if !policy.passed {
-        anyhow::bail!("call-graph policy failed");
-    }
-    Ok(())
-}
-
-fn print_call_graph_report(
+pub(super) fn print_call_graph_report(
     reports: &[CallGraphFile],
     nodes_by_name: &BTreeMap<String, CallGraphNode>,
     symbol: Option<&SymbolName>,
