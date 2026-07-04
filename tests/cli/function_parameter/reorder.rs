@@ -40,6 +40,41 @@ fn cli_plans_reorder_function_parameters_for_common_lisp() {
 }
 
 #[test]
+fn cli_plans_reorder_function_parameters_for_common_lisp_defmethod() {
+    let mut cmd = paredit();
+    cmd.args([
+        "reorder-function-parameters",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--parameter",
+        "style",
+        "--parameter",
+        "node",
+        "--parameter",
+        "stream",
+        "--call-path",
+        "1",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defmethod render :around ((node widget) stream style) (draw node stream style))\n(render thing out :fancy)",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"function_name\": \"render\""))
+    .stdout(predicate::str::contains(
+        "\"old_parameter_order\": [\n    \"node\",\n    \"stream\",\n    \"style\"\n  ]",
+    ))
+    .stdout(predicate::str::contains(
+        "(defmethod render :around (style (node widget) stream)",
+    ))
+    .stdout(predicate::str::contains("(render :fancy thing out)"));
+}
+
+#[test]
 fn cli_writes_reorder_function_parameters_with_all_calls() {
     let dir = fresh_temp_dir("reorder-function-parameters-all-calls");
     let common_lisp_file = dir.join("render.lisp");

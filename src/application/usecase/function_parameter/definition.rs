@@ -94,7 +94,12 @@ fn parse_function_parameter_definition(
         anyhow::bail!("{operation} does not support definition head: {head}");
     }
 
-    let (function_name, parameter_container, protected_prefix_count) = if head == "define" {
+    let (
+        function_name,
+        parameter_container,
+        protected_prefix_count,
+        allow_specialized_required_parameters,
+    ) = if head == "define" {
         let signature = view.children.get(1).context(
             "scheme define selection must include a signature list: (define (name args...) body)",
         )?;
@@ -105,7 +110,19 @@ fn parse_function_parameter_definition(
         }
         let name = atom_child(signature, 0)
             .context("scheme define signature must start with a function name")?;
-        (SymbolName::new(name.to_owned())?, signature.clone(), 1)
+        (
+            SymbolName::new(name.to_owned())?,
+            signature.clone(),
+            1,
+            false,
+        )
+    } else if common_lisp_method_head(head) {
+        let name =
+            atom_child(&view, 1).context("function definition must include a symbol name")?;
+        let params = common_lisp_method_lambda_list(&view).with_context(|| {
+            format!("{operation} defmethod definition must include a specialized lambda list")
+        })?;
+        (SymbolName::new(name.to_owned())?, params.clone(), 0, true)
     } else {
         let name =
             atom_child(&view, 1).context("function definition must include a symbol name")?;
@@ -113,12 +130,13 @@ fn parse_function_parameter_definition(
             .children
             .get(2)
             .context("function definition must include a parameter list")?;
-        (SymbolName::new(name.to_owned())?, params.clone(), 0)
+        (SymbolName::new(name.to_owned())?, params.clone(), 0, false)
     };
     let parameters = parameter_locations(
         dialect,
         &parameter_container,
         protected_prefix_count,
+        allow_specialized_required_parameters,
         operation,
     )?;
     let has_lambda_list_marker = parameter_container.children[protected_prefix_count..]
@@ -150,22 +168,43 @@ fn parse_function_parameter_definition(
 
 fn function_head_supported(dialect: Dialect, head: &str) -> bool {
     match dialect {
-        Dialect::CommonLisp | Dialect::EmacsLisp => matches!(head, "defun" | "defmacro"),
+        Dialect::CommonLisp | Dialect::EmacsLisp => {
+            matches!(head, "defun" | "defmacro") || common_lisp_method_head(head)
+        }
         Dialect::Scheme => matches!(head, "define"),
         Dialect::Clojure => matches!(head, "defn" | "defmacro"),
         Dialect::Janet => matches!(head, "defn" | "defmacro"),
         Dialect::Fennel => matches!(head, "fn" | "lambda"),
         Dialect::Unknown => matches!(
             head,
-            "defun" | "defmacro" | "define" | "defn" | "fn" | "lambda"
+            "defun"
+                | "defmacro"
+                | "define"
+                | "defn"
+                | "fn"
+                | "lambda"
+                | "defmethod"
+                | "cl-defmethod"
         ),
     }
+}
+
+fn common_lisp_method_head(head: &str) -> bool {
+    matches!(head, "defmethod" | "cl-defmethod")
+}
+
+fn common_lisp_method_lambda_list(view: &ExpressionView) -> Option<&ExpressionView> {
+    view.children
+        .iter()
+        .skip(2)
+        .find(|child| matches!(child.delimiter, Some(Delimiter::Paren | Delimiter::Bracket)))
 }
 
 fn parameter_locations(
     dialect: Dialect,
     parameter_form: &ExpressionView,
     protected_prefix_count: usize,
+    allow_specialized_required_parameters: bool,
     operation: &str,
 ) -> Result<Vec<ParameterLocation>> {
     match parameter_form.kind {
@@ -173,6 +212,7 @@ fn parameter_locations(
             dialect,
             &parameter_form.children,
             protected_prefix_count,
+            allow_specialized_required_parameters,
             operation,
         ),
         _ => anyhow::bail!("{operation} function parameter form must be a list or vector"),
@@ -183,6 +223,7 @@ fn parameter_locations_from_children(
     dialect: Dialect,
     children: &[ExpressionView],
     protected_prefix_count: usize,
+    allow_specialized_required_parameters: bool,
     operation: &str,
 ) -> Result<Vec<ParameterLocation>> {
     let mut locations = Vec::with_capacity(children.len().saturating_sub(protected_prefix_count));
@@ -243,8 +284,15 @@ fn parameter_locations_from_children(
                 "{operation} does not support parameters after &allow-other-keys before another lambda-list marker"
             );
         }
-        let binding = lambda_list_binding(child, allow_lambda_list_spec, keyword_parameters)
-            .with_context(|| format!("{operation} currently supports only simple parameters"))?;
+        let allow_specialized_required =
+            allow_specialized_required_parameters && positional && !allow_lambda_list_spec;
+        let binding = lambda_list_binding(
+            child,
+            allow_lambda_list_spec,
+            keyword_parameters,
+            allow_specialized_required,
+        )
+        .with_context(|| format!("{operation} currently supports only simple parameters"))?;
         SymbolName::new(binding.name.to_owned()).with_context(|| {
             format!(
                 "{operation} found invalid parameter symbol '{}'",
@@ -273,6 +321,7 @@ fn lambda_list_binding<'a>(
     child: &'a ExpressionView,
     allow_spec: bool,
     keyword_parameters: bool,
+    allow_specialized_required: bool,
 ) -> Option<LambdaListBinding<'a>> {
     if let Some(name) = atom_text(child) {
         if keyword_parameters && name.starts_with(':') {
@@ -281,6 +330,19 @@ fn lambda_list_binding<'a>(
         return Some(LambdaListBinding {
             name,
             keyword: keyword_parameters.then(|| default_keyword_for_parameter(name)),
+        });
+    }
+    if allow_specialized_required {
+        if child.kind != ExpressionKind::List || child.children.len() != 2 {
+            return None;
+        }
+        let name = atom_text(child.children.first()?)?;
+        if name.starts_with('&') || name.starts_with(':') {
+            return None;
+        }
+        return Some(LambdaListBinding {
+            name,
+            keyword: None,
         });
     }
     if !allow_spec {

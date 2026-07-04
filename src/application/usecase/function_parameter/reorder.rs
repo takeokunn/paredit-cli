@@ -2,13 +2,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{ExpressionView, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
 
 use super::calls::{reorder_function_parameter_call_edit, resolve_function_call_paths};
 use super::definition::parse_reorder_function_parameters_definition;
 use super::list_edit::{
-    SpanEdit, apply_byte_span_edits, atom_text, ensure_non_overlapping_spans,
-    reorder_list_items_edit, spans_overlap,
+    apply_byte_span_edits, atom_text, ensure_non_overlapping_spans, reorder_list_items_edit,
+    spans_overlap, SpanEdit,
 };
 use super::types::{ReorderFunctionParametersPlan, ReorderFunctionParametersRequest};
 
@@ -107,19 +107,44 @@ fn required_parameter_names(
     container.children[protected_prefix_count..]
         .iter()
         .map(|child| {
-            let name = atom_text(child).with_context(|| {
-                format!("{operation} currently supports only simple symbol parameters")
-            })?;
-            if name.starts_with('&') {
-                anyhow::bail!(
-                    "{operation} currently supports only required parameters; found marker {}",
-                    name
-                );
-            }
+            let name = required_parameter_name(child, operation)?;
             SymbolName::new(name.to_owned())
                 .with_context(|| format!("{operation} found invalid parameter symbol '{}'", name))
         })
         .collect()
+}
+
+fn required_parameter_name<'a>(child: &'a ExpressionView, operation: &str) -> Result<&'a str> {
+    if let Some(name) = atom_text(child) {
+        if name.starts_with('&') {
+            anyhow::bail!(
+                "{operation} currently supports only required parameters; found marker {}",
+                name
+            );
+        }
+        return Ok(name);
+    }
+
+    if child.kind == ExpressionKind::List
+        && matches!(child.delimiter, Some(Delimiter::Paren | Delimiter::Bracket))
+        && child.children.len() == 2
+    {
+        let name = atom_text(&child.children[0]).with_context(|| {
+            format!("{operation} currently supports only simple symbol parameters")
+        })?;
+        if name.starts_with('&') {
+            anyhow::bail!(
+                "{operation} currently supports only required parameters; found marker {}",
+                name
+            );
+        }
+        if name.starts_with(':') {
+            anyhow::bail!("{operation} currently supports only simple symbol parameters");
+        }
+        return Ok(name);
+    }
+
+    anyhow::bail!("{operation} currently supports only simple symbol parameters")
 }
 
 fn build_new_relative_order(

@@ -1,11 +1,10 @@
 use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::{
-    AddFunctionParameterRequest, FunctionParameterInsert, MoveFunctionParameterRequest,
-    RemoveFunctionParameterRequest, ReorderFunctionParametersRequest,
-    SwapFunctionParametersRequest, plan_add_function_parameter, plan_move_function_parameter,
-    plan_remove_function_parameter, plan_reorder_function_parameters,
-    plan_swap_function_parameters,
+    plan_add_function_parameter, plan_move_function_parameter, plan_remove_function_parameter,
+    plan_reorder_function_parameters, plan_swap_function_parameters, AddFunctionParameterRequest,
+    FunctionParameterInsert, MoveFunctionParameterRequest, RemoveFunctionParameterRequest,
+    ReorderFunctionParametersRequest, SwapFunctionParametersRequest,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
@@ -75,6 +74,50 @@ fn removes_parameter_and_call_argument() {
 
     assert_eq!(plan.rewritten, "(defun f (a) (+ a b))\n(print (f 1))");
     assert_eq!(plan.removed_arguments, vec![Some("2".to_owned())]);
+}
+
+#[test]
+fn adds_parameter_to_common_lisp_defmethod_and_call() {
+    let input =
+        "(defmethod render :around ((node widget) stream) (draw node stream))\n(render thing out)";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("style"),
+        argument: ":fancy".to_owned(),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defmethod render :around ((node widget) stream style) (draw node stream))\n(render thing out :fancy)"
+    );
+}
+
+#[test]
+fn removes_specialized_parameter_from_common_lisp_defmethod_and_call() {
+    let input = "(defmethod render :around ((node widget) stream style) (draw stream style))\n(render thing out :fancy)";
+    let plan = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("node"),
+        call_paths: vec![path("1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defmethod render :around (stream style) (draw stream style))\n(render out :fancy)"
+    );
+    assert_eq!(plan.parameter_index, 0);
+    assert_eq!(plan.removed_arguments, vec![Some("thing".to_owned())]);
 }
 
 #[test]
@@ -182,11 +225,9 @@ fn rejects_common_lisp_key_parameter_named_as_keyword() {
     })
     .expect_err("keyword-named parameter must fail");
 
-    assert!(
-        error
-            .to_string()
-            .contains("currently supports only simple parameters")
-    );
+    assert!(error
+        .to_string()
+        .contains("currently supports only simple parameters"));
 }
 
 #[test]
@@ -203,11 +244,9 @@ fn rejects_common_lisp_key_parameter_with_non_keyword_designator() {
     })
     .expect_err("non-keyword external designator must fail");
 
-    assert!(
-        error
-            .to_string()
-            .contains("currently supports only simple parameters")
-    );
+    assert!(error
+        .to_string()
+        .contains("currently supports only simple parameters"));
 }
 
 #[test]
@@ -259,11 +298,9 @@ fn rejects_add_parameter_to_common_lisp_lambda_list_marker() {
     })
     .expect_err("lambda-list marker must fail");
 
-    assert!(
-        error
-            .to_string()
-            .contains("currently supports only flat positional parameter lists")
-    );
+    assert!(error
+        .to_string()
+        .contains("currently supports only flat positional parameter lists"));
 }
 
 #[test]
@@ -280,11 +317,9 @@ fn rejects_move_parameter_across_common_lisp_lambda_list_marker() {
     })
     .expect_err("lambda-list marker must fail");
 
-    assert!(
-        error
-            .to_string()
-            .contains("currently supports only flat positional parameter lists")
-    );
+    assert!(error
+        .to_string()
+        .contains("currently supports only flat positional parameter lists"));
 }
 
 #[test]
@@ -301,11 +336,9 @@ fn rejects_swap_parameter_across_common_lisp_lambda_list_marker() {
     })
     .expect_err("lambda-list marker must fail");
 
-    assert!(
-        error
-            .to_string()
-            .contains("currently supports only flat positional parameter lists")
-    );
+    assert!(error
+        .to_string()
+        .contains("currently supports only flat positional parameter lists"));
 }
 
 #[test]
@@ -368,6 +401,40 @@ fn reorders_parameters_and_call_arguments() {
     assert_eq!(
         plan.reordered_arguments,
         vec![vec!["3".to_owned(), "1".to_owned(), "2".to_owned()]]
+    );
+}
+
+#[test]
+fn reorders_common_lisp_defmethod_specialized_parameters_and_call_arguments() {
+    let input = "(defmethod render :around ((node widget) stream style) (draw node stream style))\n(render thing out :fancy)";
+    let plan = plan_reorder_function_parameters(ReorderFunctionParametersRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        parameter_order: vec![symbol("style"), symbol("node"), symbol("stream")],
+        call_paths: vec![path("1")],
+        all_calls: false,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defmethod render :around (style (node widget) stream) (draw node stream style))\n(render :fancy thing out)"
+    );
+    assert_eq!(
+        plan.old_parameter_order
+            .iter()
+            .map(SymbolName::as_str)
+            .collect::<Vec<_>>(),
+        vec!["node", "stream", "style"]
+    );
+    assert_eq!(
+        plan.reordered_arguments,
+        vec![vec![
+            ":fancy".to_owned(),
+            "thing".to_owned(),
+            "out".to_owned()
+        ]]
     );
 }
 

@@ -30,6 +30,37 @@ fn cli_plans_add_function_parameter_for_common_lisp() {
 }
 
 #[test]
+fn cli_plans_add_function_parameter_for_common_lisp_defmethod() {
+    let mut cmd = paredit();
+    cmd.args([
+        "add-function-parameter",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--name",
+        "style",
+        "--argument",
+        ":fancy",
+        "--call-path",
+        "1",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defmethod render :around ((node widget) stream) (draw node stream))\n(render thing out)",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"function_name\": \"render\""))
+    .stdout(predicate::str::contains("\"parameter_name\": \"style\""))
+    .stdout(predicate::str::contains(
+        "(defmethod render :around ((node widget) stream style)",
+    ))
+    .stdout(predicate::str::contains("(render thing out :fancy)"));
+}
+
+#[test]
 fn cli_plans_add_function_parameter_with_all_calls() {
     let mut cmd = paredit();
     cmd.args([
