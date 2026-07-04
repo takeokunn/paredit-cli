@@ -69,7 +69,7 @@ fn cli_formats_handler_case_indentation() {
     let file = dir.join("handler-case.lisp");
     fs::write(
         &file,
-        "(handler-case (risky) (error (condition) (recover condition)) (:no-error (value) value))\n",
+        "(handler-case (risky) (error (condition) (recover condition) (log condition)) (:no-error (value) value))\n",
     )
     .expect("write source fixture");
 
@@ -80,7 +80,28 @@ fn cli_formats_handler_case_indentation() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "(handler-case (risky)\n  (error (condition) (recover condition))\n  (:no-error (value) value))\n",
+            "(handler-case (risky)\n  (error (condition)\n    (recover condition)\n    (log condition))\n  (:no-error (value)\n    value))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_restart_case_indentation() {
+    let dir = fresh_temp_dir("format-restart-case");
+    let file = dir.join("restart-case.lisp");
+    fs::write(
+        &file,
+        "(restart-case (risky) (retry () (prepare) (risky)) (skip () nil))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(restart-case (risky)\n  (retry ()\n    (prepare)\n    (risky))\n  (skip ()\n    nil))\n",
         ));
 }
 

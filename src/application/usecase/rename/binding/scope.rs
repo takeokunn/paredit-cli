@@ -65,6 +65,10 @@ fn collect_shadow_aware_special_form(
             }
             true
         }
+        "handler-case" | "restart-case" => {
+            collect_clause_form_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
         _ => false,
     }
 }
@@ -167,5 +171,56 @@ fn collect_sequential_let_references(
 
     for body in &view.children[2..] {
         collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn collect_clause_form_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    if let Some(protected_form) = view.children.get(1) {
+        collect_symbol_atom_spans_unshadowed(
+            protected_form,
+            symbol,
+            output,
+            shadowed_scope_count,
+            input,
+        );
+    }
+
+    for clause in &view.children[2..] {
+        if clause.kind != ExpressionKind::List || clause.delimiter != Some(Delimiter::Paren) {
+            collect_symbol_atom_spans_unshadowed(
+                clause,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+            continue;
+        }
+
+        let Some(parameter_form) = clause.children.get(1) else {
+            collect_symbol_atom_spans_unshadowed(
+                clause,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+            continue;
+        };
+
+        if parameter_form_binds(parameter_form, symbol, input) {
+            *shadowed_scope_count += 1;
+            continue;
+        }
+
+        for body in &clause.children[2..] {
+            collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+        }
     }
 }

@@ -7,7 +7,7 @@ mod types;
 use anyhow::{Context, Result};
 
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionView, SymbolName};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::selection::list_head;
 use forms::{binding_groups, parameter_name_spans};
@@ -35,6 +35,7 @@ pub(super) fn binding_rename_parts(
         "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => {
             parameter_binding_rename_parts(view, from, form, 2, 3, input)
         }
+        "handler-case" | "restart-case" => clause_binding_rename_parts(view, from, form, input),
         _ => anyhow::bail!("selected form is not a supported binding form"),
     }
 }
@@ -176,6 +177,67 @@ fn value_binding_rename_parts(
         form_span: view.span,
         binding_span: target.name_span,
         binding_edit: target.binding_edit.clone(),
+        reference_spans,
+        shadowed_scope_count,
+    })
+}
+
+fn clause_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> Result<BindingRenameParts> {
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for clause in &view.children[2..] {
+        if clause.kind != ExpressionKind::List || clause.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+
+        let Some(parameter_form) = clause.children.get(1) else {
+            continue;
+        };
+        let parameters = parameter_name_spans(parameter_form, input)?;
+        let Some(parameter) = parameters
+            .iter()
+            .find(|parameter| parameter.name == from.as_str())
+        else {
+            continue;
+        };
+
+        duplicate_count += 1;
+        target = Some((clause, parameter.clone()));
+    }
+
+    if duplicate_count > 1 {
+        anyhow::bail!(
+            "binding '{from}' was found in multiple selected {form} clauses; select an unambiguous binding form"
+        );
+    }
+
+    let (target_clause, target_parameter) = target
+        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &target_clause.children[2..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+    reference_spans.sort_by_key(|span| span.start());
+
+    Ok(BindingRenameParts {
+        form,
+        form_span: view.span,
+        binding_span: target_parameter.name_span,
+        binding_edit: target_parameter.binding_edit,
         reference_spans,
         shadowed_scope_count,
     })

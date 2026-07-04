@@ -93,22 +93,21 @@ fn formats_multiple_value_bind_with_two_prefix_forms() {
 
 #[test]
 fn formats_handler_case_clauses_after_protected_form() {
-    let input =
-        "(handler-case (risky) (error (condition) (recover condition)) (:no-error (value) value))";
+    let input = "(handler-case (risky) (error (condition) (recover condition) (log condition)) (:no-error (value) value))";
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(handler-case (risky)\n  (error (condition) (recover condition))\n  (:no-error (value) value))\n"
+        "(handler-case (risky)\n  (error (condition)\n    (recover condition)\n    (log condition))\n  (:no-error (value)\n    value))\n"
     );
 }
 
 #[test]
 fn formats_restart_case_clauses_after_protected_form() {
-    let input = "(restart-case (risky) (retry () (risky)) (skip () nil))";
+    let input = "(restart-case (risky) (retry () (prepare) (risky)) (skip () nil))";
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         Formatter::new(2).format(&tree),
-        "(restart-case (risky)\n  (retry () (risky))\n  (skip () nil))\n"
+        "(restart-case (risky)\n  (retry ()\n    (prepare)\n    (risky))\n  (skip ()\n    nil))\n"
     );
 }
 
