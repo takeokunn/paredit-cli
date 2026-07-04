@@ -7,7 +7,7 @@ use crate::application::usecase::split_file::{SplitFileRequest, plan_split_file}
 
 use super::super::shared::{detect_dialect, read_file_or_empty, read_input};
 use super::args::SplitFileArgs;
-use super::render::print_split_file_plan;
+use super::render::split_file::print_split_file_plan;
 use super::shared::same_file_path;
 
 pub(in crate::presentation::cli) fn split_file(args: SplitFileArgs) -> Result<()> {

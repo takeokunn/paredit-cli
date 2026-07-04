@@ -8,7 +8,7 @@ use crate::application::usecase::sort_definitions::{
 
 use super::super::shared::{detect_dialect, read_input};
 use super::args::SortDefinitionsArgs;
-use super::render::print_sort_definitions_plan;
+use super::render::sort_definitions::print_sort_definitions_plan;
 
 pub(in crate::presentation::cli) fn sort_definitions(args: SortDefinitionsArgs) -> Result<()> {
     let input = read_input(Some(args.file.clone()))?;

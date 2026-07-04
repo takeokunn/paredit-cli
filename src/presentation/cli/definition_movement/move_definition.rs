@@ -13,7 +13,7 @@ use super::super::shared::{
     detect_dialect, list_head, package_context_before_top_level, read_file_or_empty, read_input,
 };
 use super::args::MoveDefinitionArgs;
-use super::render::print_move_definition_plan;
+use super::render::move_definition::print_move_definition_plan;
 use super::shared::append_top_level_form;
 use super::types::MoveDefinitionPlan;
 
