@@ -62,6 +62,14 @@ pub(super) fn collect_inferred_extract_function_special_form(
             bound_params,
             params,
         ),
+        "handler-bind" | "restart-bind" => collect_inferred_extract_function_handler_bind(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+            head == "restart-bind",
+        ),
         "dolist" | "dotimes" => collect_inferred_extract_function_iteration_binding(
             dialect,
             view,
@@ -299,6 +307,79 @@ fn collect_inferred_extract_function_clause_form(
         }
     }
     true
+}
+
+fn collect_inferred_extract_function_handler_bind(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+    include_restart_options: bool,
+) -> bool {
+    let Some(binding_form) = view.children.get(1) else {
+        return false;
+    };
+
+    for spec in &binding_form.children {
+        if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+
+        if let Some(function_form) = spec.children.get(1) {
+            super::collect_inferred_extract_function_params(
+                dialect,
+                function_form,
+                false,
+                explicit_params,
+                bound_params,
+                params,
+            );
+        }
+
+        if include_restart_options {
+            collect_inferred_extract_function_restart_option_values(
+                dialect,
+                spec,
+                explicit_params,
+                bound_params,
+                params,
+            );
+        }
+    }
+
+    for body in &view.children[2..] {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            body,
+            false,
+            explicit_params,
+            bound_params,
+            params,
+        );
+    }
+    true
+}
+
+fn collect_inferred_extract_function_restart_option_values(
+    dialect: Dialect,
+    spec: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) {
+    let mut index = 2;
+    while index + 1 < spec.children.len() {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            &spec.children[index + 1],
+            false,
+            explicit_params,
+            bound_params,
+            params,
+        );
+        index += 2;
+    }
 }
 
 fn collect_inferred_extract_function_iteration_binding(

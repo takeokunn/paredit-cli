@@ -54,6 +54,10 @@ fn collect_shadow_aware_special_form(
             collect_clause_binding_references(view, symbol, input, output);
             true
         }
+        "handler-bind" | "restart-bind" => {
+            collect_handler_bind_references(view, symbol, input, output, head == "restart-bind");
+            true
+        }
         "dolist" | "dotimes" => {
             collect_iteration_binding_references(view, symbol, input, output);
             true
@@ -171,6 +175,49 @@ fn collect_clause_body_references(
 
     for body in &clause.children[2..] {
         collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn collect_handler_bind_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+    include_restart_options: bool,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+
+    for spec in &binding_form.children {
+        if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+
+        if let Some(function_form) = spec.children.get(1) {
+            collect_unshadowed_symbol_references(function_form, symbol, input, output);
+        }
+
+        if include_restart_options {
+            collect_restart_bind_option_value_references(spec, symbol, input, output);
+        }
+    }
+
+    for body in &view.children[2..] {
+        collect_unshadowed_symbol_references(body, symbol, input, output);
+    }
+}
+
+fn collect_restart_bind_option_value_references(
+    spec: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) {
+    let mut index = 2;
+    while index + 1 < spec.children.len() {
+        collect_unshadowed_symbol_references(&spec.children[index + 1], symbol, input, output);
+        index += 2;
     }
 }
 

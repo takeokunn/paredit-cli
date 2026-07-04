@@ -148,6 +148,60 @@ fn cli_plans_symbol_macrolet_binding_rename_without_touching_expansion_reference
 }
 
 #[test]
+fn cli_plans_outer_binding_rename_without_touching_handler_bind_lambda_shadow() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "condition",
+        "--to",
+        "state",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(let ((condition 1)) (handler-bind ((error (lambda (condition) condition))) condition))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"let\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains("\"shadowed_scope_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(let ((state 1)) (handler-bind ((error (lambda (condition) condition))) state))",
+    ));
+}
+
+#[test]
+fn cli_plans_outer_binding_rename_across_restart_bind_function_and_body_but_not_report_shadow() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "stream",
+        "--to",
+        "output",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(let ((stream *standard-output*)) (restart-bind ((retry (lambda () stream) :report (lambda (stream) stream))) stream))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"let\""))
+    .stdout(predicate::str::contains("\"reference_count\": 2"))
+    .stdout(predicate::str::contains("\"shadowed_scope_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(let ((output *standard-output*)) (restart-bind ((retry (lambda () output) :report (lambda (stream) stream))) output))",
+    ));
+}
+
+#[test]
 fn cli_plans_dolist_iteration_binding_rename_without_touching_source() {
     let mut cmd = paredit();
     cmd.args([

@@ -109,6 +109,26 @@ fn restart_case_clause_parameters_shadow_only_clause_body() {
 }
 
 #[test]
+fn handler_bind_function_lambda_parameters_shadow_only_handler_body() {
+    let input = "(list condition (handler-bind ((error (lambda (condition) condition))) condition) condition)";
+
+    assert_eq!(
+        reference_texts(input, "condition"),
+        vec!["condition", "condition", "condition"]
+    );
+}
+
+#[test]
+fn restart_bind_scans_restart_function_and_option_values_with_local_lambda_shadowing() {
+    let input = "(list stream (restart-bind ((retry (lambda () stream) :report (lambda (stream) stream))) stream) stream)";
+
+    assert_eq!(
+        reference_texts(input, "stream"),
+        vec!["stream", "stream", "stream", "stream"]
+    );
+}
+
+#[test]
 fn dolist_iteration_variable_shadows_body_and_result() {
     let input = "(list value (dolist (value values value) value) value)";
 

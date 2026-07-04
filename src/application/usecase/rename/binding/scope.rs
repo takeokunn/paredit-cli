@@ -75,6 +75,17 @@ fn collect_shadow_aware_special_form(
             collect_clause_form_references(view, symbol, output, shadowed_scope_count, input);
             true
         }
+        "handler-bind" | "restart-bind" => {
+            collect_handler_bind_references(
+                view,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+                head == "restart-bind",
+            );
+            true
+        }
         "dolist" | "dotimes" => {
             collect_iteration_binding_references(view, symbol, output, shadowed_scope_count, input);
             true
@@ -288,6 +299,69 @@ fn collect_iteration_binding_references(
 
     for body in &view.children[2..] {
         collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn collect_handler_bind_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+    include_restart_options: bool,
+) {
+    let Some(binding_form) = view.children.get(1) else {
+        return;
+    };
+
+    for spec in &binding_form.children {
+        if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+
+        if let Some(function_form) = spec.children.get(1) {
+            collect_symbol_atom_spans_unshadowed(
+                function_form,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+        }
+
+        if include_restart_options {
+            collect_restart_bind_option_value_references(
+                spec,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+        }
+    }
+
+    for body in &view.children[2..] {
+        collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn collect_restart_bind_option_value_references(
+    spec: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    let mut index = 2;
+    while index + 1 < spec.children.len() {
+        collect_symbol_atom_spans_unshadowed(
+            &spec.children[index + 1],
+            symbol,
+            output,
+            shadowed_scope_count,
+            input,
+        );
+        index += 2;
     }
 }
 

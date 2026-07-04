@@ -85,6 +85,28 @@ fn treats_restart_case_clause_lambda_lists_as_local() {
 }
 
 #[test]
+fn treats_handler_bind_handler_lambda_lists_as_local() {
+    let params = infer_at(
+        "(handler-bind ((error (lambda (condition) (recover condition outer)))) (use condition outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "condition"]);
+}
+
+#[test]
+fn treats_restart_bind_restart_option_lambda_lists_as_local() {
+    let params = infer_at(
+        "(restart-bind ((retry (lambda () stream) :report (lambda (stream) stream) :test test-fn)) (invoke stream outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["stream", "test-fn", "outer"]);
+}
+
+#[test]
 fn treats_dolist_iteration_variable_as_local_to_result_and_body() {
     let params = infer_at(
         "(dolist (item items (finish item done)) (render item outer))",
