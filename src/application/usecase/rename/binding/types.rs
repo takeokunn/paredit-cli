@@ -15,7 +15,7 @@ pub(in crate::application::usecase::rename) struct BindingRenameParts {
 #[derive(Debug, Clone)]
 pub(super) struct BindingGroup {
     pub(super) names: Vec<ParameterNameSpan>,
-    pub(super) value: ExpressionView,
+    pub(super) value: Option<ExpressionView>,
 }
 
 #[derive(Debug, Clone)]

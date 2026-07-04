@@ -3,7 +3,9 @@ use anyhow::Result;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
-use super::destructure::{binding_pattern_name_spans, lambda_list_name_spans};
+use super::destructure::{
+    binding_pattern_name_spans, lambda_list_name_spans, specialized_lambda_list_name_spans,
+};
 use super::types::{BindingGroup, ParameterNameSpan};
 
 pub(super) fn binding_groups(
@@ -54,6 +56,28 @@ pub(super) fn parameter_form_binds(
             .any(|name| name.name == symbol.as_str())
 }
 
+pub(super) fn specialized_parameter_name_spans(
+    parameter_form: &ExpressionView,
+    input: &str,
+) -> Result<Vec<ParameterNameSpan>> {
+    if parameter_form.kind != ExpressionKind::List {
+        anyhow::bail!("specialized parameter form must be a list");
+    }
+
+    Ok(specialized_lambda_list_name_spans(parameter_form, input))
+}
+
+pub(super) fn specialized_parameter_form_binds(
+    parameter_form: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+) -> bool {
+    parameter_form.kind == ExpressionKind::List
+        && specialized_lambda_list_name_spans(parameter_form, input)
+            .iter()
+            .any(|name| name.name == symbol.as_str())
+}
+
 pub(super) fn binding_binds(binding: &BindingGroup, symbol: &SymbolName) -> bool {
     binding
         .names
@@ -84,7 +108,7 @@ fn vector_let_binding_groups(
             }
             Ok(BindingGroup {
                 names,
-                value: pair[1].clone(),
+                value: Some(pair[1].clone()),
             })
         })
         .collect()
@@ -104,10 +128,17 @@ fn list_pair_let_binding_groups(
         .iter()
         .map(|pair| {
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("let binding must be a (name value) pair");
+                if pair.kind != ExpressionKind::Atom {
+                    anyhow::bail!("let binding must be a name, (name), or (name value)");
+                }
+                let names = binding_pattern_name_spans(pair, input);
+                if names.len() != 1 {
+                    anyhow::bail!("bare let binding must contain one binding name");
+                }
+                return Ok(BindingGroup { names, value: None });
             }
-            if pair.children.len() != 2 {
-                anyhow::bail!("let binding pair must contain a name and value");
+            if pair.children.is_empty() || pair.children.len() > 2 {
+                anyhow::bail!("let binding pair must be (name) or (name value)");
             }
             let names = binding_pattern_name_spans(&pair.children[0], input);
             if names.is_empty() {
@@ -115,7 +146,7 @@ fn list_pair_let_binding_groups(
             }
             Ok(BindingGroup {
                 names,
-                value: pair.children[1].clone(),
+                value: pair.children.get(1).cloned(),
             })
         })
         .collect()

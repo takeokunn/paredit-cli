@@ -10,7 +10,7 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::selection::{atom_text, list_head};
-use forms::{binding_groups, parameter_name_spans};
+use forms::{binding_groups, parameter_name_spans, specialized_parameter_name_spans};
 use scope::collect_symbol_atom_spans_unshadowed;
 pub(super) use types::BindingRenameParts;
 
@@ -32,11 +32,16 @@ pub(super) fn binding_rename_parts(
             value_binding_rename_parts(view, from, form, 1, 3, input)
         }
         "lambda" | "fn" => parameter_binding_rename_parts(view, from, form, 1, 2, input),
+        "defmethod" | "cl-defmethod" => defmethod_binding_rename_parts(view, from, form, input),
         "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => {
             parameter_binding_rename_parts(view, from, form, 2, 3, input)
         }
         "handler-case" | "restart-case" => clause_binding_rename_parts(view, from, form, input),
+        "handler-bind" | "restart-bind" => {
+            handler_bind_lambda_binding_rename_parts(view, from, form, input)
+        }
         "dolist" | "dotimes" => iteration_binding_rename_parts(view, from, form, input),
+        "loop" => loop_binding_rename_parts(view, from, form, input),
         "do" | "do*" | "prog" | "prog*" => {
             common_lisp_variable_binding_rename_parts(view, from, form, input)
         }
@@ -57,6 +62,9 @@ fn let_binding_rename_parts(
         .get(1)
         .context("selected let form must contain bindings")?;
     let bindings = binding_groups(dialect, binding_form, input)?;
+    if form == "symbol-macrolet" && bindings.iter().any(|binding| binding.value.is_none()) {
+        anyhow::bail!("symbol-macrolet binding must contain a symbol and expansion");
+    }
     let (target_index, target) = bindings
         .iter()
         .enumerate()
@@ -74,13 +82,15 @@ fn let_binding_rename_parts(
     let mut shadowed_scope_count = 0usize;
     if sequential_scope {
         for later in bindings.iter().skip(target_index + 1) {
-            collect_symbol_atom_spans_unshadowed(
-                &later.value,
-                from,
-                &mut reference_spans,
-                &mut shadowed_scope_count,
-                input,
-            );
+            if let Some(value) = &later.value {
+                collect_symbol_atom_spans_unshadowed(
+                    value,
+                    from,
+                    &mut reference_spans,
+                    &mut shadowed_scope_count,
+                    input,
+                );
+            }
         }
     }
 
@@ -144,6 +154,55 @@ fn parameter_binding_rename_parts(
         reference_spans,
         shadowed_scope_count,
     })
+}
+
+fn defmethod_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> Result<BindingRenameParts> {
+    let parameter_index = defmethod_specialized_lambda_list_index(view)
+        .with_context(|| format!("selected {form} form must contain a specialized lambda list"))?;
+    let parameter_form = &view.children[parameter_index];
+    let parameters = specialized_parameter_name_spans(parameter_form, input)?;
+    let target = parameters
+        .iter()
+        .find(|parameter| parameter.name == from.as_str())
+        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &view.children[parameter_index + 1..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+    reference_spans.sort_by_key(|span| span.start());
+
+    Ok(BindingRenameParts {
+        form,
+        form_span: view.span,
+        binding_span: target.name_span,
+        binding_edit: target.binding_edit.clone(),
+        reference_spans,
+        shadowed_scope_count,
+    })
+}
+
+fn defmethod_specialized_lambda_list_index(view: &ExpressionView) -> Option<usize> {
+    view.children
+        .iter()
+        .enumerate()
+        .skip(2)
+        .find_map(|(index, child)| {
+            (child.kind == ExpressionKind::List && child.delimiter == Some(Delimiter::Paren))
+                .then_some(index)
+        })
 }
 
 fn value_binding_rename_parts(
@@ -248,6 +307,57 @@ fn clause_binding_rename_parts(
     })
 }
 
+fn handler_bind_lambda_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> Result<BindingRenameParts> {
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for function_form in handler_bind_function_forms(view, form.as_str()) {
+        collect_lambda_binding_targets(
+            function_form,
+            from,
+            input,
+            &mut target,
+            &mut duplicate_count,
+        )?;
+    }
+
+    if duplicate_count > 1 {
+        anyhow::bail!(
+            "binding '{from}' was found in multiple selected {form} handler functions; select an unambiguous binding form"
+        );
+    }
+
+    let (target_lambda, target_parameter) = target
+        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &target_lambda.children[2..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+    reference_spans.sort_by_key(|span| span.start());
+
+    Ok(BindingRenameParts {
+        form,
+        form_span: view.span,
+        binding_span: target_parameter.name_span,
+        binding_edit: target_parameter.binding_edit,
+        reference_spans,
+        shadowed_scope_count,
+    })
+}
+
 fn iteration_binding_rename_parts(
     view: &ExpressionView,
     from: &SymbolName,
@@ -291,6 +401,55 @@ fn iteration_binding_rename_parts(
         form_span: view.span,
         binding_span: target.span,
         binding_edit: types::BindingEdit::rename_atom(target.span),
+        reference_spans,
+        shadowed_scope_count,
+    })
+}
+
+fn loop_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    input: &str,
+) -> Result<BindingRenameParts> {
+    let mut target = None;
+    let mut duplicate_count = 0usize;
+
+    for spec in loop_binding_specs(view) {
+        if spec.name != from.as_str() {
+            continue;
+        }
+        duplicate_count += 1;
+        target = Some(spec);
+    }
+
+    if duplicate_count > 1 {
+        anyhow::bail!(
+            "binding '{from}' was found in multiple selected {form} clauses; select an unambiguous binding form"
+        );
+    }
+
+    let target = target
+        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &view.children[target.reference_start_index..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+    reference_spans.sort_by_key(|span| span.start());
+
+    Ok(BindingRenameParts {
+        form,
+        form_span: view.span,
+        binding_span: target.name_span,
+        binding_edit: types::BindingEdit::rename_atom(target.name_span),
         reference_spans,
         shadowed_scope_count,
     })
@@ -436,6 +595,101 @@ fn slot_binding_rename_parts(
     })
 }
 
+#[derive(Clone, Copy)]
+struct LoopBindingSpec<'a> {
+    name: &'a str,
+    name_span: ByteSpan,
+    reference_start_index: usize,
+}
+
+fn loop_binding_specs(view: &ExpressionView) -> Vec<LoopBindingSpec<'_>> {
+    let mut specs = Vec::new();
+    let mut index = 1usize;
+
+    while index < view.children.len() {
+        let child = &view.children[index];
+        if loop_keyword_is(child, "for") || loop_keyword_is(child, "as") {
+            if let Some(name_form) = view.children.get(index + 1) {
+                if let Some(name) = atom_text(name_form) {
+                    specs.push(LoopBindingSpec {
+                        name,
+                        name_span: name_form.span,
+                        reference_start_index: loop_for_reference_start_index(
+                            &view.children,
+                            index + 2,
+                        ),
+                    });
+                }
+            }
+            index += 2;
+            continue;
+        }
+
+        if loop_keyword_is(child, "with") {
+            if let Some(name_form) = view.children.get(index + 1) {
+                if let Some(name) = atom_text(name_form) {
+                    specs.push(LoopBindingSpec {
+                        name,
+                        name_span: name_form.span,
+                        reference_start_index: loop_with_reference_start_index(
+                            &view.children,
+                            index + 2,
+                        ),
+                    });
+                }
+            }
+            index += 2;
+            continue;
+        }
+
+        index += 1;
+    }
+
+    specs
+}
+
+fn loop_for_reference_start_index(children: &[ExpressionView], mut index: usize) -> usize {
+    let Some(keyword) = children.get(index).and_then(atom_text) else {
+        return index;
+    };
+
+    if matches_loop_keyword(keyword, &["in", "on", "across"]) {
+        return (index + 2).min(children.len());
+    }
+
+    if matches_loop_keyword(keyword, &["=", "from", "downfrom", "upfrom"]) {
+        index = (index + 2).min(children.len());
+        while children.get(index).and_then(atom_text).is_some_and(|text| {
+            matches_loop_keyword(text, &["to", "upto", "downto", "below", "above", "by"])
+        }) {
+            index = (index + 2).min(children.len());
+        }
+    }
+
+    index
+}
+
+fn loop_with_reference_start_index(children: &[ExpressionView], index: usize) -> usize {
+    if children
+        .get(index)
+        .is_some_and(|child| loop_keyword_is(child, "="))
+    {
+        return (index + 2).min(children.len());
+    }
+
+    index
+}
+
+fn loop_keyword_is(view: &ExpressionView, keyword: &str) -> bool {
+    atom_text(view).is_some_and(|text| text.eq_ignore_ascii_case(keyword))
+}
+
+fn matches_loop_keyword(text: &str, keywords: &[&str]) -> bool {
+    keywords
+        .iter()
+        .any(|keyword| text.eq_ignore_ascii_case(keyword))
+}
+
 fn common_lisp_variable_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan)> {
     match &spec.kind {
         ExpressionKind::Atom => Some((atom_text(spec)?, spec.span)),
@@ -457,6 +711,66 @@ fn common_lisp_do_variable_spec_step_form(spec: &ExpressionView) -> Option<&Expr
     (spec.kind == ExpressionKind::List)
         .then(|| spec.children.get(2))
         .flatten()
+}
+
+fn handler_bind_function_forms<'a>(
+    view: &'a ExpressionView,
+    form: &str,
+) -> Vec<&'a ExpressionView> {
+    let Some(binding_form) = view.children.get(1) else {
+        return Vec::new();
+    };
+
+    let mut forms = Vec::new();
+    for spec in &binding_form.children {
+        if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+
+        if let Some(function_form) = spec.children.get(1) {
+            forms.push(function_form);
+        }
+
+        if form == "restart-bind" {
+            let mut index = 2usize;
+            while index + 1 < spec.children.len() {
+                forms.push(&spec.children[index + 1]);
+                index += 2;
+            }
+        }
+    }
+
+    forms
+}
+
+fn collect_lambda_binding_targets<'a>(
+    view: &'a ExpressionView,
+    from: &SymbolName,
+    input: &str,
+    target: &mut Option<(&'a ExpressionView, types::ParameterNameSpan)>,
+    duplicate_count: &mut usize,
+) -> Result<()> {
+    if view.kind == ExpressionKind::List
+        && view.delimiter == Some(Delimiter::Paren)
+        && atom_text(view.children.first().unwrap_or(view)) == Some("lambda")
+    {
+        if let Some(parameter_form) = view.children.get(1) {
+            let parameters = parameter_name_spans(parameter_form, input)?;
+            if let Some(parameter) = parameters
+                .iter()
+                .find(|parameter| parameter.name == from.as_str())
+            {
+                *duplicate_count += 1;
+                *target = Some((view, parameter.clone()));
+            }
+        }
+    }
+
+    for child in &view.children {
+        collect_lambda_binding_targets(child, from, input, target, duplicate_count)?;
+    }
+
+    Ok(())
 }
 
 fn slot_spec_binding_name(spec: &ExpressionView) -> Option<(&str, ByteSpan, types::BindingEdit)> {

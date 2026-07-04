@@ -22,6 +22,48 @@ fn cli_formats_common_lisp_indentation() {
 }
 
 #[test]
+fn cli_formats_defmethod_specialized_lambda_list() {
+    let dir = fresh_temp_dir("format-defmethod");
+    let file = dir.join("defmethod.lisp");
+    fs::write(
+        &file,
+        "(defmethod render ((node widget) stream) (draw node stream) (finish-output stream))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(defmethod render ((node widget) stream)\n  (draw node stream)\n  (finish-output stream))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_defmethod_qualifiers_with_specialized_lambda_list() {
+    let dir = fresh_temp_dir("format-defmethod-qualifier");
+    let file = dir.join("defmethod-qualifier.lisp");
+    fs::write(
+        &file,
+        "(defmethod render :around ((node widget) stream) (call-next-method) (finish-output stream))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(defmethod render :around ((node widget) stream)\n  (call-next-method)\n  (finish-output stream))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_handler_bind_indentation() {
     let dir = fresh_temp_dir("format-handler-bind");
     let file = dir.join("handler-bind.lisp");

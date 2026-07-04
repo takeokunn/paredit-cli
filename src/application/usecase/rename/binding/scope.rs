@@ -1,7 +1,9 @@
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::selection::atom_text;
-use super::forms::{binding_binds, generic_binding_groups, parameter_form_binds};
+use super::forms::{
+    binding_binds, generic_binding_groups, parameter_form_binds, specialized_parameter_form_binds,
+};
 
 pub(super) fn collect_symbol_atom_spans_unshadowed(
     view: &ExpressionView,
@@ -59,6 +61,10 @@ fn collect_shadow_aware_special_form(
             }
             false
         }
+        "defmethod" | "cl-defmethod" => {
+            collect_defmethod_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
         "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => {
             if view.children.len() > 2 && parameter_form_binds(&view.children[2], symbol, input) {
                 *shadowed_scope_count += 1;
@@ -71,6 +77,10 @@ fn collect_shadow_aware_special_form(
         }
         "dolist" | "dotimes" => {
             collect_iteration_binding_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
+        "loop" => {
+            collect_loop_references(view, symbol, output, shadowed_scope_count, input);
             true
         }
         "do" | "do*" => {
@@ -103,6 +113,38 @@ fn collect_shadow_aware_special_form(
     }
 }
 
+fn collect_defmethod_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    let Some(parameter_index) = defmethod_specialized_lambda_list_index(view) else {
+        return;
+    };
+
+    if specialized_parameter_form_binds(&view.children[parameter_index], symbol, input) {
+        *shadowed_scope_count += 1;
+        return;
+    }
+
+    for body in &view.children[parameter_index + 1..] {
+        collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn defmethod_specialized_lambda_list_index(view: &ExpressionView) -> Option<usize> {
+    view.children
+        .iter()
+        .enumerate()
+        .skip(2)
+        .find_map(|(index, child)| {
+            (child.kind == ExpressionKind::List && child.delimiter == Some(Delimiter::Paren))
+                .then_some(index)
+        })
+}
+
 fn collect_parallel_let_references(
     view: &ExpressionView,
     symbol: &SymbolName,
@@ -122,13 +164,15 @@ fn collect_parallel_let_references(
     };
 
     for binding in &bindings {
-        collect_symbol_atom_spans_unshadowed(
-            &binding.value,
-            symbol,
-            output,
-            shadowed_scope_count,
-            input,
-        );
+        if let Some(value) = &binding.value {
+            collect_symbol_atom_spans_unshadowed(
+                value,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+        }
     }
 
     if bindings
@@ -186,13 +230,15 @@ fn collect_sequential_let_references(
     };
 
     for binding in &bindings {
-        collect_symbol_atom_spans_unshadowed(
-            &binding.value,
-            symbol,
-            output,
-            shadowed_scope_count,
-            input,
-        );
+        if let Some(value) = &binding.value {
+            collect_symbol_atom_spans_unshadowed(
+                value,
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+        }
         if binding_binds(binding, symbol) {
             *shadowed_scope_count += 1;
             return;
@@ -243,6 +289,144 @@ fn collect_iteration_binding_references(
     for body in &view.children[2..] {
         collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
     }
+}
+
+fn collect_loop_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    let mut index = 1usize;
+
+    while index < view.children.len() {
+        let child = &view.children[index];
+
+        if loop_keyword_is(child, "for") || loop_keyword_is(child, "as") {
+            let binding_index = index + 1;
+            let source_start = index + 2;
+            let reference_start = loop_for_reference_start_index(&view.children, source_start);
+            collect_loop_outer_references(
+                &view.children[source_start..reference_start],
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+
+            if view
+                .children
+                .get(binding_index)
+                .and_then(atom_text)
+                .is_some_and(|name| name == symbol.as_str())
+            {
+                *shadowed_scope_count += 1;
+                return;
+            }
+
+            index = reference_start;
+            continue;
+        }
+
+        if loop_keyword_is(child, "with") {
+            let binding_index = index + 1;
+            let init_start = index + 2;
+            let reference_start = loop_with_reference_start_index(&view.children, init_start);
+            collect_loop_outer_references(
+                &view.children[init_start..reference_start],
+                symbol,
+                output,
+                shadowed_scope_count,
+                input,
+            );
+
+            if view
+                .children
+                .get(binding_index)
+                .and_then(atom_text)
+                .is_some_and(|name| name == symbol.as_str())
+            {
+                *shadowed_scope_count += 1;
+                return;
+            }
+
+            index = reference_start;
+            continue;
+        }
+
+        collect_symbol_atom_spans_unshadowed(child, symbol, output, shadowed_scope_count, input);
+        index += 1;
+    }
+}
+
+fn collect_loop_outer_references(
+    forms: &[ExpressionView],
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    for form in forms {
+        if loop_syntax_atom(form) {
+            continue;
+        }
+        collect_symbol_atom_spans_unshadowed(form, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn loop_for_reference_start_index(children: &[ExpressionView], mut index: usize) -> usize {
+    let Some(keyword) = children.get(index).and_then(atom_text) else {
+        return index;
+    };
+
+    if matches_loop_keyword(keyword, &["in", "on", "across"]) {
+        return (index + 2).min(children.len());
+    }
+
+    if matches_loop_keyword(keyword, &["=", "from", "downfrom", "upfrom"]) {
+        index = (index + 2).min(children.len());
+        while children.get(index).and_then(atom_text).is_some_and(|text| {
+            matches_loop_keyword(text, &["to", "upto", "downto", "below", "above", "by"])
+        }) {
+            index = (index + 2).min(children.len());
+        }
+    }
+
+    index
+}
+
+fn loop_with_reference_start_index(children: &[ExpressionView], index: usize) -> usize {
+    if children
+        .get(index)
+        .is_some_and(|child| loop_keyword_is(child, "="))
+    {
+        return (index + 2).min(children.len());
+    }
+
+    index
+}
+
+fn loop_syntax_atom(view: &ExpressionView) -> bool {
+    atom_text(view).is_some_and(|text| {
+        matches_loop_keyword(
+            text,
+            &[
+                "=", "in", "on", "across", "from", "downfrom", "upfrom", "to", "upto", "downto",
+                "below", "above", "by",
+            ],
+        )
+    })
+}
+
+fn loop_keyword_is(view: &ExpressionView, keyword: &str) -> bool {
+    atom_text(view).is_some_and(|text| text.eq_ignore_ascii_case(keyword))
+}
+
+fn matches_loop_keyword(text: &str, keywords: &[&str]) -> bool {
+    keywords
+        .iter()
+        .any(|keyword| text.eq_ignore_ascii_case(keyword))
 }
 
 fn collect_do_binding_references(

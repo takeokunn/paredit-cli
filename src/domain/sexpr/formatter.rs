@@ -50,6 +50,9 @@ impl Formatter {
                         ListStyle::Definition => {
                             self.format_definition(tree, node_id, depth, output);
                         }
+                        ListStyle::Defmethod => {
+                            self.format_defmethod(tree, node_id, depth, output);
+                        }
                         ListStyle::DefinitionNameBody => {
                             self.format_prefix_body(tree, node_id, depth, 1, output);
                         }
@@ -168,6 +171,41 @@ impl Formatter {
                     output.push_str(&self.indent(depth + 1));
                     self.format_node(tree, *child, depth + 1, output);
                 }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    fn format_defmethod(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        let lambda_list_position =
+            node.children
+                .iter()
+                .enumerate()
+                .skip(2)
+                .find_map(|(position, child)| {
+                    (tree.node(*child).kind == NodeKind::List).then_some(position)
+                });
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            if position == 0 {
+                self.format_node(tree, *child, depth + 1, output);
+            } else if lambda_list_position.is_some_and(|lambda| position <= lambda) {
+                output.push(' ');
+                self.format_inline_or_node(tree, *child, depth + 1, output);
+            } else {
+                output.push('\n');
+                output.push_str(&self.indent(depth + 1));
+                self.format_node(tree, *child, depth + 1, output);
             }
         }
 
@@ -631,7 +669,6 @@ impl Formatter {
         match head.to_ascii_lowercase().as_str() {
             "defun"
             | "defmacro"
-            | "defmethod"
             | "defgeneric"
             | "define-condition"
             | "define-compiler-macro"
@@ -643,6 +680,7 @@ impl Formatter {
             | "defparameter"
             | "defvar"
             | "defconstant" => ListStyle::Definition,
+            "defmethod" | "cl-defmethod" => ListStyle::Defmethod,
             "define-symbol-macro" => ListStyle::DefinitionNameBody,
             "lambda" => ListStyle::Lambda,
             "named-lambda" => ListStyle::NamedLambda,
@@ -679,6 +717,7 @@ impl Formatter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ListStyle {
     Definition,
+    Defmethod,
     DefinitionNameBody,
     Lambda,
     NamedLambda,

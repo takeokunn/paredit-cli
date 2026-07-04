@@ -23,6 +23,16 @@ pub(super) fn lambda_list_name_spans(
     names
 }
 
+pub(super) fn specialized_lambda_list_name_spans(
+    parameter_form: &ExpressionView,
+    input: &str,
+) -> Vec<ParameterNameSpan> {
+    let mut names = Vec::new();
+    let _ = input;
+    collect_specialized_lambda_list_name_spans(parameter_form, &mut names);
+    names
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum LambdaListMode {
     Required,
@@ -79,6 +89,75 @@ fn collect_lambda_list_name_spans(
         collect_lambda_list_parameter_spec_name_spans(child, mode, output);
         index += 1;
     }
+}
+
+fn collect_specialized_lambda_list_name_spans(
+    parameter_form: &ExpressionView,
+    output: &mut Vec<ParameterNameSpan>,
+) {
+    let mut mode = LambdaListMode::Required;
+    let mut index = 0usize;
+
+    while index < parameter_form.children.len() {
+        let child = &parameter_form.children[index];
+        if let Some(marker) = atom_text(child) {
+            match marker {
+                "&optional" => {
+                    mode = LambdaListMode::Optional;
+                    index += 1;
+                    continue;
+                }
+                "&key" => {
+                    mode = LambdaListMode::Key;
+                    index += 1;
+                    continue;
+                }
+                "&aux" => {
+                    mode = LambdaListMode::Aux;
+                    index += 1;
+                    continue;
+                }
+                "&rest" | "&body" | "&whole" | "&environment" => {
+                    if let Some(next) = parameter_form.children.get(index + 1) {
+                        collect_binding_pattern_name_spans(next, output);
+                    }
+                    index += 2;
+                    continue;
+                }
+                "&allow-other-keys" => {
+                    index += 1;
+                    continue;
+                }
+                _ if marker.starts_with('&') => {
+                    index += 1;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+
+        if mode == LambdaListMode::Required {
+            collect_specialized_required_parameter_name_span(child, output);
+        } else {
+            collect_lambda_list_parameter_spec_name_spans(child, mode, output);
+        }
+        index += 1;
+    }
+}
+
+fn collect_specialized_required_parameter_name_span(
+    spec: &ExpressionView,
+    output: &mut Vec<ParameterNameSpan>,
+) {
+    if spec.kind == ExpressionKind::List
+        && spec.delimiter == Some(Delimiter::Paren)
+        && let Some(parameter) = spec.children.first()
+    {
+        collect_binding_pattern_name_spans(parameter, output);
+        return;
+    }
+
+    collect_binding_pattern_name_spans(spec, output);
 }
 
 fn collect_lambda_list_parameter_spec_name_spans(
