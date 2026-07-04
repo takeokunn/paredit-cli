@@ -14,9 +14,13 @@ mod types;
 
 use candidates::{
     let_binding_removal_candidates, local_callable_binding_removal_candidates,
-    macrolet_binding_removal_candidates,
+    macrolet_binding_removal_candidates, with_accessors_binding_removal_candidates,
+    with_slots_binding_removal_candidates,
 };
-use references::{let_binding_reference_spans, local_callable_binding_reference_spans};
+use references::{
+    body_binding_reference_spans, let_binding_reference_spans,
+    local_callable_binding_reference_spans,
+};
 use rewrite::{apply_nested_span_edits, replace_span};
 use syntax::atom_text;
 use types::{RemoveUnusedBindingParts, RemovedBindingParts};
@@ -81,22 +85,35 @@ fn remove_unused_binding_parts(
 ) -> Result<RemoveUnusedBindingParts> {
     if target.kind != ExpressionKind::List || target.delimiter != Some(Delimiter::Paren) {
         anyhow::bail!(
-            "remove-unused-binding selection must be a let, let*, symbol-macrolet, flet, labels, macrolet, or compiler-macrolet list"
+            "remove-unused-binding selection must be a let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, or with-accessors list"
         );
     }
     if target.children.len() < 3 {
         anyhow::bail!(
-            "remove-unused-binding requires a let, let*, symbol-macrolet, flet, labels, macrolet, or compiler-macrolet form with bindings and a body"
+            "remove-unused-binding requires a supported binding form with bindings and a body"
         );
     }
     let head = atom_text(&target.children[0])
         .context("remove-unused-binding form must start with an atom")?;
     if !matches!(
         head,
-        "let" | "let*" | "symbol-macrolet" | "flet" | "labels" | "macrolet" | "compiler-macrolet"
+        "let"
+            | "let*"
+            | "symbol-macrolet"
+            | "flet"
+            | "labels"
+            | "macrolet"
+            | "compiler-macrolet"
+            | "with-slots"
+            | "with-accessors"
     ) {
         anyhow::bail!(
-            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, or compiler-macrolet"
+            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, or with-accessors"
+        );
+    }
+    if matches!(head, "with-slots" | "with-accessors") && target.children.len() < 4 {
+        anyhow::bail!(
+            "remove-unused-binding requires a with-slots or with-accessors form with bindings, an instance expression, and a body"
         );
     }
 
@@ -105,8 +122,17 @@ fn remove_unused_binding_parts(
         macrolet_binding_removal_candidates(dialect, binding_form)?
     } else if matches!(head, "flet" | "labels") {
         local_callable_binding_removal_candidates(dialect, binding_form)?
+    } else if head == "with-slots" {
+        with_slots_binding_removal_candidates(dialect, binding_form)?
+    } else if head == "with-accessors" {
+        with_accessors_binding_removal_candidates(dialect, binding_form)?
     } else {
         let_binding_removal_candidates(dialect, binding_form)?
+    };
+    let body_start_index = if matches!(head, "with-slots" | "with-accessors") {
+        3
+    } else {
+        2
     };
     let selected = if all_bindings {
         let mut unused = Vec::new();
@@ -114,6 +140,8 @@ fn remove_unused_binding_parts(
             let symbol = SymbolName::new(candidate.name.clone())?;
             let reference_spans = if matches!(head, "flet" | "labels") {
                 local_callable_binding_reference_spans(dialect, target, &symbol)?
+            } else if matches!(head, "with-slots" | "with-accessors") {
+                body_binding_reference_spans(input, target, &symbol, body_start_index)
             } else {
                 let_binding_reference_spans(
                     input,
@@ -150,6 +178,8 @@ fn remove_unused_binding_parts(
             })?;
         let reference_spans = if matches!(head, "flet" | "labels") {
             local_callable_binding_reference_spans(dialect, target, name)?
+        } else if matches!(head, "with-slots" | "with-accessors") {
+            body_binding_reference_spans(input, target, name, body_start_index)
         } else {
             let_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)?
         };
@@ -168,7 +198,7 @@ fn remove_unused_binding_parts(
     };
 
     let replacement = if selected.len() == candidates.len() {
-        let first_body = &target.children[2];
+        let first_body = &target.children[body_start_index];
         let last_body = target
             .children
             .last()

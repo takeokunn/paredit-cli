@@ -51,6 +51,30 @@ pub(super) fn local_callable_binding_removal_candidates(
     }
 }
 
+pub(super) fn with_slots_binding_removal_candidates(
+    dialect: Dialect,
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    match dialect {
+        Dialect::CommonLisp | Dialect::Unknown => {
+            list_pair_with_slots_binding_removal_candidates(binding_form)
+        }
+        _ => anyhow::bail!("remove-unused-binding only supports with-slots in Common Lisp"),
+    }
+}
+
+pub(super) fn with_accessors_binding_removal_candidates(
+    dialect: Dialect,
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    match dialect {
+        Dialect::CommonLisp | Dialect::Unknown => {
+            list_pair_with_accessors_binding_removal_candidates(binding_form)
+        }
+        _ => anyhow::bail!("remove-unused-binding only supports with-accessors in Common Lisp"),
+    }
+}
+
 fn vector_let_binding_removal_candidates(
     binding_form: &ExpressionView,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
@@ -76,6 +100,81 @@ fn vector_let_binding_removal_candidates(
                 name,
                 value_span: pair[1].span,
                 removal_span: ByteSpan::new(pair[0].span.start(), pair[1].span.end()),
+            })
+        })
+        .collect()
+}
+
+fn list_pair_with_slots_binding_removal_candidates(
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
+    {
+        anyhow::bail!("dialect expects with-slots bindings: (slot-or-pair ...)");
+    }
+
+    binding_form
+        .children
+        .iter()
+        .enumerate()
+        .map(|(index, spec)| {
+            if spec.kind == ExpressionKind::Atom {
+                let name = atom_text(spec)
+                    .context("with-slots bare binding name must be an atom")?
+                    .to_owned();
+                return Ok(LetBindingRemovalCandidate {
+                    index,
+                    name,
+                    value_span: spec.span,
+                    removal_span: spec.span,
+                });
+            }
+            if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+                anyhow::bail!("with-slots binding must be a slot name or (name slot-name) pair");
+            }
+            if spec.children.len() != 2 {
+                anyhow::bail!("with-slots binding pair must contain a name and slot name");
+            }
+            let name = atom_text(&spec.children[0])
+                .context("with-slots binding name must be an atom")?
+                .to_owned();
+            Ok(LetBindingRemovalCandidate {
+                index,
+                name,
+                value_span: spec.children[1].span,
+                removal_span: spec.span,
+            })
+        })
+        .collect()
+}
+
+fn list_pair_with_accessors_binding_removal_candidates(
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
+    {
+        anyhow::bail!("dialect expects with-accessors bindings: ((name accessor) ...)");
+    }
+
+    binding_form
+        .children
+        .iter()
+        .enumerate()
+        .map(|(index, spec)| {
+            if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+                anyhow::bail!("with-accessors binding must be a (name accessor) pair");
+            }
+            if spec.children.len() != 2 {
+                anyhow::bail!("with-accessors binding pair must contain a name and accessor");
+            }
+            let name = atom_text(&spec.children[0])
+                .context("with-accessors binding name must be an atom")?
+                .to_owned();
+            Ok(LetBindingRemovalCandidate {
+                index,
+                name,
+                value_span: spec.children[1].span,
+                removal_span: spec.span,
             })
         })
         .collect()

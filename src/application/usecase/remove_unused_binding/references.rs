@@ -39,6 +39,19 @@ pub(super) fn let_binding_reference_spans(
     Ok(reference_spans)
 }
 
+pub(super) fn body_binding_reference_spans(
+    input: &str,
+    target: &ExpressionView,
+    name: &SymbolName,
+    body_start_index: usize,
+) -> Vec<ByteSpan> {
+    let mut reference_spans = Vec::new();
+    for body in target.children.iter().skip(body_start_index) {
+        collect_unshadowed_symbol_references(body, name, input, &mut reference_spans);
+    }
+    reference_spans
+}
+
 pub(super) fn local_callable_binding_reference_spans(
     dialect: Dialect,
     target: &ExpressionView,
