@@ -12,8 +12,11 @@ mod syntax;
 mod tests;
 mod types;
 
-use candidates::let_binding_removal_candidates;
-use references::let_binding_reference_spans;
+use candidates::{
+    let_binding_removal_candidates, local_callable_binding_removal_candidates,
+    macrolet_binding_removal_candidates,
+};
+use references::{let_binding_reference_spans, local_callable_binding_reference_spans};
 use rewrite::{apply_nested_span_edits, replace_span};
 use syntax::atom_text;
 use types::{RemoveUnusedBindingParts, RemovedBindingParts};
@@ -77,31 +80,50 @@ fn remove_unused_binding_parts(
     all_bindings: bool,
 ) -> Result<RemoveUnusedBindingParts> {
     if target.kind != ExpressionKind::List || target.delimiter != Some(Delimiter::Paren) {
-        anyhow::bail!("remove-unused-binding selection must be a let list");
+        anyhow::bail!(
+            "remove-unused-binding selection must be a let, let*, symbol-macrolet, flet, labels, macrolet, or compiler-macrolet list"
+        );
     }
     if target.children.len() < 3 {
-        anyhow::bail!("remove-unused-binding requires a let form with bindings and a body");
+        anyhow::bail!(
+            "remove-unused-binding requires a let, let*, symbol-macrolet, flet, labels, macrolet, or compiler-macrolet form with bindings and a body"
+        );
     }
     let head = atom_text(&target.children[0])
         .context("remove-unused-binding form must start with an atom")?;
-    if !matches!(head, "let" | "let*") {
-        anyhow::bail!("remove-unused-binding selection must start with let or let*");
+    if !matches!(
+        head,
+        "let" | "let*" | "symbol-macrolet" | "flet" | "labels" | "macrolet" | "compiler-macrolet"
+    ) {
+        anyhow::bail!(
+            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, or compiler-macrolet"
+        );
     }
 
     let binding_form = &target.children[1];
-    let candidates = let_binding_removal_candidates(dialect, binding_form)?;
+    let candidates = if matches!(head, "macrolet" | "compiler-macrolet") {
+        macrolet_binding_removal_candidates(dialect, binding_form)?
+    } else if matches!(head, "flet" | "labels") {
+        local_callable_binding_removal_candidates(dialect, binding_form)?
+    } else {
+        let_binding_removal_candidates(dialect, binding_form)?
+    };
     let selected = if all_bindings {
         let mut unused = Vec::new();
         for candidate in &candidates {
             let symbol = SymbolName::new(candidate.name.clone())?;
-            let reference_spans = let_binding_reference_spans(
-                input,
-                target,
-                binding_form,
-                &candidates,
-                candidate,
-                &symbol,
-            )?;
+            let reference_spans = if matches!(head, "flet" | "labels") {
+                local_callable_binding_reference_spans(dialect, target, &symbol)?
+            } else {
+                let_binding_reference_spans(
+                    input,
+                    target,
+                    binding_form,
+                    &candidates,
+                    candidate,
+                    &symbol,
+                )?
+            };
             if reference_spans.is_empty() {
                 unused.push(RemovedBindingParts {
                     name: candidate.name.clone(),
@@ -122,12 +144,15 @@ fn remove_unused_binding_parts(
             .find(|candidate| candidate.name == name.as_str())
             .with_context(|| {
                 format!(
-                    "binding {} was not found in selected let form",
+                    "binding {} was not found in selected binding form",
                     name.as_str()
                 )
             })?;
-        let reference_spans =
-            let_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)?;
+        let reference_spans = if matches!(head, "flet" | "labels") {
+            local_callable_binding_reference_spans(dialect, target, name)?
+        } else {
+            let_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)?
+        };
         let reference_count = reference_spans.len();
         if reference_count != 0 {
             anyhow::bail!(

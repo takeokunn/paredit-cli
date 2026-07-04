@@ -60,6 +60,12 @@ fn cli_refactor_status_reports_ready_write_plan_without_writing() {
         ))
         .stdout(predicate::str::contains("\"name\": \"apply-write\""))
         .stdout(predicate::str::contains("\"status\": \"scheduled\""))
+        .stdout(predicate::str::contains("\"decision_summary\": {"))
+        .stdout(predicate::str::contains("\"passed_step_count\": 4"))
+        .stdout(predicate::str::contains("\"failed_step_count\": 0"))
+        .stdout(predicate::str::contains("\"skipped_step_count\": 0"))
+        .stdout(predicate::str::contains("\"scheduled_step_count\": 1"))
+        .stdout(predicate::str::contains("\"blocked_reason_count\": 0"))
         .stdout(predicate::str::contains("\"path\":"))
         .stdout(predicate::str::contains(
             manifest_file.display().to_string(),
@@ -133,6 +139,12 @@ fn cli_refactor_status_reports_blocked_stale_manifest_without_writing() {
             "\"next_action\": \"regenerate_refactor_preview\"",
         ))
         .stdout(predicate::str::contains("\"stale_files\""))
+        .stdout(predicate::str::contains("\"decision_summary\": {"))
+        .stdout(predicate::str::contains("\"passed_step_count\": 2"))
+        .stdout(predicate::str::contains("\"failed_step_count\": 2"))
+        .stdout(predicate::str::contains("\"skipped_step_count\": 1"))
+        .stdout(predicate::str::contains("\"scheduled_step_count\": 0"))
+        .stdout(predicate::str::contains("\"blocked_reason_count\": 4"))
         .stdout(predicate::str::contains("\"can_apply\": false"))
         .stdout(predicate::str::contains("\"stale_file_count\": 1"))
         .stdout(predicate::str::contains("\"write_plan\": []"))

@@ -1,7 +1,7 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::signature_report::{
-    build_signature_reports, evaluate_signature_report_policy, SignatureReportSource,
+    SignatureReportSource, build_signature_reports, evaluate_signature_report_policy,
 };
 use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::shared::{detect_dialect, read_input};

@@ -7,6 +7,7 @@ pub fn collect_replacement_plan_batches(
     grouped: DuplicateCandidateGroups,
     min_group_size: usize,
     replacement: String,
+    keep_first: bool,
 ) -> Vec<ReplacementPlanBatch> {
     let mut batches = Vec::new();
 
@@ -31,6 +32,7 @@ pub fn collect_replacement_plan_batches(
                 dialect: first_form.dialect,
                 shape: shape.clone(),
                 replacement: replacement.clone(),
+                keep_first,
                 forms: file_forms,
             });
         }

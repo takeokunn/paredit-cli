@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 
 use crate::domain::sexpr::{Edit, SyntaxTree};
 
-use super::super::shared::{detect_dialect, list_head, read_file_or_empty, read_input};
 use super::super::MoveInsert;
+use super::super::shared::{detect_dialect, list_head, read_file_or_empty, read_input};
 use super::args::MoveFormArgs;
 use super::render::move_form::print_move_form_plan;
 use super::shared::{insert_top_level_form, same_file_path, top_level_path_index};

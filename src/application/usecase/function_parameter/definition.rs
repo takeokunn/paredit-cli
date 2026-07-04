@@ -11,6 +11,27 @@ pub(super) struct FunctionParameterTarget {
     pub(super) parameter_container: ExpressionView,
     pub(super) protected_prefix_count: usize,
     pub(super) definition_span: ByteSpan,
+    pub(super) has_lambda_list_marker: bool,
+    parameters: Vec<ParameterLocation>,
+}
+
+#[derive(Debug)]
+pub(super) struct ParameterLocation {
+    pub(super) name: String,
+    pub(super) item_index: usize,
+    pub(super) call_index: Option<usize>,
+    pub(super) keyword_argument: Option<KeywordArgumentLocation>,
+}
+
+#[derive(Debug)]
+pub(super) struct KeywordArgumentLocation {
+    pub(super) keyword: String,
+    pub(super) positional_prefix_count: usize,
+}
+
+struct LambdaListBinding<'a> {
+    name: &'a str,
+    keyword: Option<String>,
 }
 
 pub(super) fn parse_remove_function_parameter_definition(
@@ -73,9 +94,7 @@ fn parse_function_parameter_definition(
         anyhow::bail!("{operation} does not support definition head: {head}");
     }
 
-    let (function_name, parameter_container, protected_prefix_count, existing_parameters) = if head
-        == "define"
-    {
+    let (function_name, parameter_container, protected_prefix_count) = if head == "define" {
         let signature = view.children.get(1).context(
             "scheme define selection must include a signature list: (define (name args...) body)",
         )?;
@@ -86,12 +105,7 @@ fn parse_function_parameter_definition(
         }
         let name = atom_child(signature, 0)
             .context("scheme define signature must start with a function name")?;
-        (
-            SymbolName::new(name.to_owned())?,
-            signature.clone(),
-            1,
-            parameter_names_from_children(&signature.children[1..])?,
-        )
+        (SymbolName::new(name.to_owned())?, signature.clone(), 1)
     } else {
         let name =
             atom_child(&view, 1).context("function definition must include a symbol name")?;
@@ -99,18 +113,22 @@ fn parse_function_parameter_definition(
             .children
             .get(2)
             .context("function definition must include a parameter list")?;
-        (
-            SymbolName::new(name.to_owned())?,
-            params.clone(),
-            0,
-            parameter_names(params)?,
-        )
+        (SymbolName::new(name.to_owned())?, params.clone(), 0)
     };
+    let parameters = parameter_locations(
+        dialect,
+        &parameter_container,
+        protected_prefix_count,
+        operation,
+    )?;
+    let has_lambda_list_marker = parameter_container.children[protected_prefix_count..]
+        .iter()
+        .any(|child| atom_text(child).is_some_and(|name| name.starts_with('&')));
 
     if let Some(new_parameter) = new_parameter {
-        if existing_parameters
+        if parameters
             .iter()
-            .any(|parameter| parameter == new_parameter.as_str())
+            .any(|parameter| parameter.name == new_parameter.as_str())
         {
             anyhow::bail!(
                 "add-function-parameter parameter '{}' already exists in {}",
@@ -125,6 +143,8 @@ fn parse_function_parameter_definition(
         parameter_container,
         protected_prefix_count,
         definition_span: view.span,
+        has_lambda_list_marker,
+        parameters,
     })
 }
 
@@ -142,46 +162,172 @@ fn function_head_supported(dialect: Dialect, head: &str) -> bool {
     }
 }
 
-fn parameter_names(parameter_form: &ExpressionView) -> Result<Vec<String>> {
-    match parameter_form.kind {
-        ExpressionKind::List => parameter_names_from_children(&parameter_form.children),
-        _ => anyhow::bail!("function parameter form must be a list or vector"),
-    }
-}
-
-fn parameter_names_from_children(children: &[ExpressionView]) -> Result<Vec<String>> {
-    let mut names = Vec::with_capacity(children.len());
-    for child in children {
-        let name = atom_text(child).context("function parameters must be atoms")?;
-        if name.starts_with('&') {
-            anyhow::bail!("function parameter modifiers are not supported yet: {name}");
-        }
-        names.push(name.to_owned());
-    }
-    Ok(names)
-}
-
-pub(super) fn find_unique_parameter_item_index(
-    parameter_container: &ExpressionView,
+fn parameter_locations(
+    dialect: Dialect,
+    parameter_form: &ExpressionView,
     protected_prefix_count: usize,
+    operation: &str,
+) -> Result<Vec<ParameterLocation>> {
+    match parameter_form.kind {
+        ExpressionKind::List => parameter_locations_from_children(
+            dialect,
+            &parameter_form.children,
+            protected_prefix_count,
+            operation,
+        ),
+        _ => anyhow::bail!("{operation} function parameter form must be a list or vector"),
+    }
+}
+
+fn parameter_locations_from_children(
+    dialect: Dialect,
+    children: &[ExpressionView],
+    protected_prefix_count: usize,
+    operation: &str,
+) -> Result<Vec<ParameterLocation>> {
+    let mut locations = Vec::with_capacity(children.len().saturating_sub(protected_prefix_count));
+    let mut call_index = 0usize;
+    let mut positional = true;
+    let mut allow_lambda_list_spec = false;
+    let mut keyword_parameters = false;
+    let mut accepts_parameters = true;
+    let supports_common_lisp_lambda_list = matches!(
+        dialect,
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Unknown
+    );
+
+    for (item_index, child) in children.iter().enumerate().skip(protected_prefix_count) {
+        if let Some(marker) = atom_text(child).filter(|name| name.starts_with('&')) {
+            if !supports_common_lisp_lambda_list {
+                anyhow::bail!(
+                    "{operation} function parameter modifiers are not supported: {marker}"
+                );
+            }
+            match marker {
+                "&optional" => {
+                    accepts_parameters = true;
+                    positional = true;
+                    allow_lambda_list_spec = true;
+                    keyword_parameters = false;
+                }
+                "&key" => {
+                    accepts_parameters = true;
+                    positional = false;
+                    allow_lambda_list_spec = true;
+                    keyword_parameters = true;
+                }
+                "&aux" | "&rest" | "&body" | "&whole" | "&environment" => {
+                    accepts_parameters = true;
+                    positional = false;
+                    allow_lambda_list_spec = marker == "&aux";
+                    keyword_parameters = false;
+                }
+                "&allow-other-keys" => {
+                    if !keyword_parameters {
+                        anyhow::bail!(
+                            "{operation} lambda-list marker &allow-other-keys is only supported after &key"
+                        );
+                    }
+                    accepts_parameters = false;
+                    positional = false;
+                    allow_lambda_list_spec = false;
+                    keyword_parameters = false;
+                }
+                _ => anyhow::bail!("{operation} unsupported lambda-list marker: {marker}"),
+            }
+            continue;
+        }
+
+        if !accepts_parameters {
+            anyhow::bail!(
+                "{operation} does not support parameters after &allow-other-keys before another lambda-list marker"
+            );
+        }
+        let binding = lambda_list_binding(child, allow_lambda_list_spec, keyword_parameters)
+            .with_context(|| format!("{operation} currently supports only simple parameters"))?;
+        SymbolName::new(binding.name.to_owned()).with_context(|| {
+            format!(
+                "{operation} found invalid parameter symbol '{}'",
+                binding.name
+            )
+        })?;
+        let call_index_for_parameter = positional.then_some(call_index);
+        let keyword_argument = binding.keyword.map(|keyword| KeywordArgumentLocation {
+            keyword,
+            positional_prefix_count: call_index,
+        });
+        if positional {
+            call_index += 1;
+        }
+        locations.push(ParameterLocation {
+            name: binding.name.to_owned(),
+            item_index,
+            call_index: call_index_for_parameter,
+            keyword_argument,
+        });
+    }
+    Ok(locations)
+}
+
+fn lambda_list_binding<'a>(
+    child: &'a ExpressionView,
+    allow_spec: bool,
+    keyword_parameters: bool,
+) -> Option<LambdaListBinding<'a>> {
+    if let Some(name) = atom_text(child) {
+        if keyword_parameters && name.starts_with(':') {
+            return None;
+        }
+        return Some(LambdaListBinding {
+            name,
+            keyword: keyword_parameters.then(|| default_keyword_for_parameter(name)),
+        });
+    }
+    if !allow_spec {
+        return None;
+    }
+
+    let binding = child.children.first()?;
+    if let Some(name) = atom_text(binding) {
+        if keyword_parameters && name.starts_with(':') {
+            return None;
+        }
+        return Some(LambdaListBinding {
+            name,
+            keyword: keyword_parameters.then(|| default_keyword_for_parameter(name)),
+        });
+    }
+
+    if keyword_parameters && binding.children.len() != 2 {
+        return None;
+    }
+    let keyword = atom_text(binding.children.first()?)?;
+    if keyword_parameters && !keyword.starts_with(':') {
+        return None;
+    }
+    let name = binding.children.get(1).and_then(atom_text)?;
+    Some(LambdaListBinding {
+        name,
+        keyword: keyword_parameters.then(|| keyword.to_owned()),
+    })
+}
+
+fn default_keyword_for_parameter(name: &str) -> String {
+    if name.starts_with(':') {
+        name.to_owned()
+    } else {
+        format!(":{name}")
+    }
+}
+
+pub(super) fn find_unique_parameter_location<'a>(
+    target: &'a FunctionParameterTarget,
     parameter_name: &SymbolName,
     operation: &str,
-) -> Result<usize> {
+) -> Result<&'a ParameterLocation> {
     let mut found = None;
-    for (index, child) in parameter_container
-        .children
-        .iter()
-        .enumerate()
-        .skip(protected_prefix_count)
-    {
-        let name = atom_text(child).with_context(|| {
-            format!("{operation} currently supports only simple symbol parameters")
-        })?;
-        if name.starts_with('&') {
-            anyhow::bail!("{operation} does not support lambda-list keyword parameter yet: {name}");
-        }
-        SymbolName::new(name.to_owned())?;
-        if name == parameter_name.as_str() && found.replace(index).is_some() {
+    for parameter in &target.parameters {
+        if parameter.name == parameter_name.as_str() && found.replace(parameter).is_some() {
             anyhow::bail!(
                 "{operation} parameter '{}' appears more than once",
                 parameter_name

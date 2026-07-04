@@ -31,6 +31,29 @@ pub struct RefactorPreviewPolicy {
     pub violations: Vec<String>,
 }
 
+impl RefactorPreviewPolicy {
+    pub fn summary(&self) -> RefactorPreviewPolicySummary {
+        let violation_count = self.violations.len();
+
+        RefactorPreviewPolicySummary {
+            violation_count,
+            write_blocked: violation_count > 0,
+            next_action: if violation_count == 0 {
+                "review-preview-or-rerun-with-write"
+            } else {
+                "review-policy-violations"
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefactorPreviewPolicySummary {
+    pub violation_count: usize,
+    pub write_blocked: bool,
+    pub next_action: &'static str,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct RefactorPreviewPolicyOptions {
     pub fail_on_no_change: bool,

@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::function_parameter::{
-    plan_reorder_function_parameters, ReorderFunctionParametersRequest,
+    ReorderFunctionParametersRequest, plan_reorder_function_parameters,
 };
 use crate::presentation::cli::{detect_dialect, read_input};
 

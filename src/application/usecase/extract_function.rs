@@ -20,7 +20,7 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
     let selected = request.selection.text(request.input).to_owned();
     let mut params = request.explicit_params;
     let inferred_params = if request.infer_params {
-        infer_extract_function_params(&request.selection.view(), &params)
+        infer_extract_function_params(request.dialect, &request.selection.view(), &params)
     } else {
         Vec::new()
     };
@@ -65,8 +65,9 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
 }
 
 pub fn infer_extract_function_params(
+    dialect: crate::domain::dialect::Dialect,
     selection: &ExpressionView,
     explicit_params: &[String],
 ) -> Vec<String> {
-    inference::infer_extract_function_params(selection, explicit_params)
+    inference::infer_extract_function_params(dialect, selection, explicit_params)
 }

@@ -68,6 +68,10 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
             println!("parse_error_count\t{}", preview.summary.parse_error_count);
             println!("all_outputs_parse\t{}", preview.summary.all_outputs_parse);
             println!("policy_passed\t{}", preview.policy.passed);
+            let policy_summary = preview.policy.summary();
+            println!("policy_violation_count\t{}", policy_summary.violation_count);
+            println!("policy_write_blocked\t{}", policy_summary.write_blocked);
+            println!("policy_next_action\t{}", policy_summary.next_action);
             for violation in &preview.policy.violations {
                 println!("policy_violation\t{violation}");
             }
@@ -146,6 +150,7 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
                         "require_definitions": preview.policy.require_definitions,
                         "require_edits": preview.policy.require_edits,
                         "passed": preview.policy.passed,
+                        "summary": refactor_preview_policy_summary_json(preview),
                         "violations": preview.policy.violations.as_slice(),
                     },
                     "files": preview
@@ -180,6 +185,16 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
     }
 
     Ok(())
+}
+
+fn refactor_preview_policy_summary_json(preview: &RefactorPreview) -> Value {
+    let summary = preview.policy.summary();
+
+    json!({
+        "violation_count": summary.violation_count,
+        "write_blocked": summary.write_blocked,
+        "next_action": summary.next_action,
+    })
 }
 
 fn print_refactor_preview_decision(decision: &RefactorPreviewDecision) {

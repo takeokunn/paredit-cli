@@ -25,9 +25,16 @@ pub(super) fn binding_rename_parts(
         .to_owned();
 
     match form.as_str() {
-        "let" | "let*" => let_binding_rename_parts(dialect, view, from, form, input),
+        "let" | "let*" | "symbol-macrolet" => {
+            let_binding_rename_parts(dialect, view, from, form, input)
+        }
+        "destructuring-bind" | "multiple-value-bind" => {
+            value_binding_rename_parts(view, from, form, 1, 3, input)
+        }
         "lambda" | "fn" => parameter_binding_rename_parts(view, from, form, 1, 2, input),
-        "defun" | "defmacro" => parameter_binding_rename_parts(view, from, form, 2, 3, input),
+        "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => {
+            parameter_binding_rename_parts(view, from, form, 2, 3, input)
+        }
         _ => anyhow::bail!("selected form is not a supported binding form"),
     }
 }
@@ -108,6 +115,47 @@ fn parameter_binding_rename_parts(
     let target = parameters
         .iter()
         .find(|parameter| parameter.name == from.as_str())
+        .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
+
+    let mut reference_spans = Vec::new();
+    let mut shadowed_scope_count = 0usize;
+    for body in &view.children[body_start_index..] {
+        collect_symbol_atom_spans_unshadowed(
+            body,
+            from,
+            &mut reference_spans,
+            &mut shadowed_scope_count,
+            input,
+        );
+    }
+    reference_spans.sort_by_key(|span| span.start());
+
+    Ok(BindingRenameParts {
+        form,
+        form_span: view.span,
+        binding_span: target.name_span,
+        binding_edit: target.binding_edit.clone(),
+        reference_spans,
+        shadowed_scope_count,
+    })
+}
+
+fn value_binding_rename_parts(
+    view: &ExpressionView,
+    from: &SymbolName,
+    form: String,
+    binding_index: usize,
+    body_start_index: usize,
+    input: &str,
+) -> Result<BindingRenameParts> {
+    let binding_form = view
+        .children
+        .get(binding_index)
+        .with_context(|| format!("selected {form} form must contain bindings"))?;
+    let bindings = parameter_name_spans(binding_form, input)?;
+    let target = bindings
+        .iter()
+        .find(|binding| binding.name == from.as_str())
         .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
 
     let mut reference_spans = Vec::new();

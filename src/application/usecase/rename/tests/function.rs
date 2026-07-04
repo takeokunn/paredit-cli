@@ -19,6 +19,46 @@ fn plans_function_rename_without_value_references() {
     assert!(plan.rewritten.contains("(list foo x)"));
 }
 
+#[test]
+fn skips_labels_local_function_calls_when_renaming_function() {
+    let input = "(defun helper (x) x)\n(defun main () (labels ((helper (x) (helper x))) (helper 1)))\n(defun caller () (helper 2))";
+    let plan = plan_rename_function(RenameFunctionRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        from: SymbolName::new("helper").unwrap(),
+        to: SymbolName::new("renamed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.definitions.len(), 1);
+    assert_eq!(plan.calls.len(), 1);
+    assert!(plan.rewritten.contains("(defun renamed (x)"));
+    assert!(
+        plan.rewritten
+            .contains("(labels ((helper (x) (helper x))) (helper 1))")
+    );
+    assert!(plan.rewritten.contains("(defun caller () (renamed 2))"));
+}
+
+#[test]
+fn renames_outer_function_calls_inside_flet_binding_bodies_only() {
+    let input = "(defun helper (x) x)\n(defun main () (flet ((helper (x) (helper x))) (helper 1)))";
+    let plan = plan_rename_function(RenameFunctionRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        from: SymbolName::new("helper").unwrap(),
+        to: SymbolName::new("renamed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.definitions.len(), 1);
+    assert_eq!(plan.calls.len(), 1);
+    assert!(
+        plan.rewritten
+            .contains("(flet ((helper (x) (renamed x))) (helper 1))")
+    );
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 

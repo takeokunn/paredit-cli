@@ -1,11 +1,11 @@
 use super::super::super::*;
 use super::super::args::*;
 use super::super::render::print_workspace_refactor_execute;
-use super::super::types::execute::WorkspaceRefactorExecute;
+use super::super::types::execute::{WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome};
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::preview::{
-    build_refactor_preview, finish_refactor_preview_failure, write_refactor_preview,
-    BuildRefactorPreviewRequest,
+    BuildRefactorPreviewRequest, build_refactor_preview, finish_refactor_preview_failure,
+    write_refactor_preview,
 };
 use super::verification::build_refactor_verification;
 
@@ -98,10 +98,17 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
     let post_passed = post_verification
         .as_ref()
         .is_none_or(|verification| verification.passed);
+    let outcome = WorkspaceRefactorExecuteOutcome::from_decision(
+        execute_decision,
+        post_verification
+            .as_ref()
+            .map(|verification| verification.passed),
+    );
     let execution = WorkspaceRefactorExecute {
         preview,
         preflight_decision,
         execute_decision,
+        outcome,
         pre_verification,
         post_verification,
     };

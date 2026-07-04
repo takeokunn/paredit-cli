@@ -68,11 +68,12 @@ fn replacement_batches_are_partitioned_per_file() {
         ],
     );
 
-    let batches = collect_replacement_plan_batches(grouped, 2, "(helper _ _)".to_owned());
+    let batches = collect_replacement_plan_batches(grouped, 2, "(helper _ _)".to_owned(), false);
 
     assert_eq!(batches.len(), 1);
     assert_eq!(batches[0].file, PathBuf::from("a.lisp"));
     assert_eq!(batches[0].shape, shape);
+    assert!(!batches[0].keep_first);
     assert_eq!(batches[0].forms[0].span.start().get(), 0);
     assert_eq!(batches[0].forms[1].span.start().get(), 8);
 }

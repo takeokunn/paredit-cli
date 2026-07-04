@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::application::usecase::function_parameter::list_edit::{
-    SpanEdit, removal_edit_for_list_item,
+    SpanEdit, atom_text, removal_edit_for_list_item,
 };
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
@@ -34,5 +34,83 @@ pub(in crate::application::usecase::function_parameter) fn remove_function_param
     };
     let removed_argument = argument.span.slice(input).to_owned();
     let edit = removal_edit_for_list_item(&view, argument_item_index)?;
+    Ok((view.span, Some(removed_argument), Some(edit)))
+}
+
+pub(in crate::application::usecase::function_parameter) fn remove_keyword_function_parameter_call_edit(
+    input: &str,
+    view: ExpressionView,
+    function_name: &SymbolName,
+    keyword: &str,
+    positional_prefix_count: usize,
+    allow_missing_argument: bool,
+) -> Result<RemoveArgumentEdit> {
+    ensure_matching_function_call(&view, function_name, "remove-function-parameter")?;
+
+    let first_keyword_item_index = positional_prefix_count + 1;
+    if first_keyword_item_index >= view.children.len() {
+        if allow_missing_argument {
+            return Ok((view.span, None, None));
+        }
+        anyhow::bail!(
+            "remove-function-parameter call to '{}' at {}..{} does not have keyword argument {}",
+            function_name,
+            view.span.start().get(),
+            view.span.end().get(),
+            keyword
+        );
+    }
+
+    let mut found_keyword_item_index = None;
+    let mut item_index = first_keyword_item_index;
+    while item_index < view.children.len() {
+        if atom_text(&view.children[item_index]).is_some_and(|text| text == keyword)
+            && found_keyword_item_index.replace(item_index).is_some()
+        {
+            anyhow::bail!(
+                "remove-function-parameter call to '{}' at {}..{} contains duplicate keyword argument {}",
+                function_name,
+                view.span.start().get(),
+                view.span.end().get(),
+                keyword
+            );
+        }
+        item_index += 2;
+    }
+
+    let Some(keyword_item_index) = found_keyword_item_index else {
+        if allow_missing_argument {
+            return Ok((view.span, None, None));
+        }
+        anyhow::bail!(
+            "remove-function-parameter call to '{}' at {}..{} does not have keyword argument {}",
+            function_name,
+            view.span.start().get(),
+            view.span.end().get(),
+            keyword
+        );
+    };
+    let value_item_index = keyword_item_index + 1;
+    let Some(value) = view.children.get(value_item_index) else {
+        anyhow::bail!(
+            "remove-function-parameter call to '{}' at {}..{} has keyword {} without a value",
+            function_name,
+            view.span.start().get(),
+            view.span.end().get(),
+            keyword
+        );
+    };
+
+    let keyword_item = &view.children[keyword_item_index];
+    let previous = &view.children[keyword_item_index - 1];
+    let removed_argument = format!(
+        "{} {}",
+        keyword_item.span.slice(input),
+        value.span.slice(input)
+    );
+    let edit = (
+        ByteSpan::new(previous.span.end(), value.span.end()),
+        String::new(),
+    );
     Ok((view.span, Some(removed_argument), Some(edit)))
 }

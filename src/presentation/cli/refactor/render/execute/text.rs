@@ -1,5 +1,7 @@
 use super::super::super::super::*;
-use super::super::super::types::execute::WorkspaceRefactorExecute;
+use super::super::super::types::execute::{
+    WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome,
+};
 use super::super::write_plan::print_refactor_write_plan;
 use crate::application::refactor::execute::RefactorExecuteDecision;
 
@@ -18,6 +20,7 @@ pub(super) fn print_workspace_refactor_execute_text(
     print_refactor_write_plan(&write_plan, &writable_files, &refused_files);
     print_decision("preflight_decision", &execution.preflight_decision);
     print_decision("execute_decision", &execution.execute_decision);
+    print_outcome("outcome", &execution.outcome);
     println!("changed_file_count\t{}", preview.summary.changed_file_count);
     for changed_file in &preview.summary.changed_files {
         println!("changed_file\t{changed_file}");
@@ -30,6 +33,10 @@ pub(super) fn print_workspace_refactor_execute_text(
     println!("edit_count\t{}", preview.summary.edit_count);
     println!("parse_error_count\t{}", preview.summary.parse_error_count);
     println!("policy_passed\t{}", preview.policy.passed);
+    let policy_summary = preview.policy.summary();
+    println!("policy_violation_count\t{}", policy_summary.violation_count);
+    println!("policy_write_blocked\t{}", policy_summary.write_blocked);
+    println!("policy_next_action\t{}", policy_summary.next_action);
     if let Some(verification) = &execution.pre_verification {
         println!("pre_verification_passed\t{}", verification.passed);
         for check in &verification.checks {
@@ -61,12 +68,30 @@ pub(super) fn print_workspace_refactor_execute_text(
 }
 
 fn print_decision(label: &str, decision: &RefactorExecuteDecision) {
+    let summary = decision.summary();
+
     println!("{}\tstatus\t{}", label, decision.status.label());
     println!("{}\treason\t{}", label, decision.status.reason());
     println!("{}\tnext_action\t{}", label, decision.status.next_action());
     for step in decision.steps() {
         println!("{}\tstep\t{}\t{}", label, step.name, step.status.label());
     }
+    println!(
+        "{}\tpassed_step_count\t{}",
+        label, summary.passed_step_count
+    );
+    println!(
+        "{}\tfailed_step_count\t{}",
+        label, summary.failed_step_count
+    );
+    println!(
+        "{}\tskipped_step_count\t{}",
+        label, summary.skipped_step_count
+    );
+    println!(
+        "{}\tscheduled_step_count\t{}",
+        label, summary.scheduled_step_count
+    );
     println!(
         "{}\twrite_parse_refused\t{}",
         label, decision.write_parse_refused
@@ -80,4 +105,36 @@ fn print_decision(label: &str, decision: &RefactorExecuteDecision) {
         "{}\trun_post_verification\t{}",
         label, decision.run_post_verification
     );
+}
+
+fn print_outcome(label: &str, outcome: &WorkspaceRefactorExecuteOutcome) {
+    let summary = outcome.summary();
+
+    println!("{}\tstatus\t{}", label, outcome.status.label());
+    println!("{}\treason\t{}", label, outcome.status.reason());
+    println!("{}\tnext_action\t{}", label, outcome.status.next_action());
+    for step in outcome.steps() {
+        println!("{}\tstep\t{}\t{}", label, step.name, step.status.label());
+    }
+    println!(
+        "{}\tpassed_step_count\t{}",
+        label, summary.passed_step_count
+    );
+    println!(
+        "{}\tfailed_step_count\t{}",
+        label, summary.failed_step_count
+    );
+    println!(
+        "{}\tskipped_step_count\t{}",
+        label, summary.skipped_step_count
+    );
+    println!(
+        "{}\tscheduled_step_count\t{}",
+        label, summary.scheduled_step_count
+    );
+    println!("{}\twrite_applied\t{}", label, outcome.write_applied);
+    match outcome.post_verification_passed {
+        Some(passed) => println!("{}\tpost_verification_passed\t{}", label, passed),
+        None => println!("{}\tpost_verification_passed\tnull", label),
+    }
 }

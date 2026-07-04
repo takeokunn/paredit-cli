@@ -98,3 +98,59 @@ fn cli_plans_defun_parameter_rename() {
         "(defun render (product other) (list product other))",
     ));
 }
+
+#[test]
+fn cli_plans_define_setf_expander_environment_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "env",
+        "--to",
+        "macro-env",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(define-setf-expander slot (&whole whole &environment env target) (list whole env target))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"form\": \"define-setf-expander\"",
+    ))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(define-setf-expander slot (&whole whole &environment macro-env target) (list whole macro-env target))",
+    ));
+}
+
+#[test]
+fn cli_plans_define_compiler_macro_environment_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "env",
+        "--to",
+        "macro-env",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(define-compiler-macro render (&whole whole &environment env target) (list whole env target))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"form\": \"define-compiler-macro\"",
+    ))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(define-compiler-macro render (&whole whole &environment macro-env target) (list whole macro-env target))",
+    ));
+}

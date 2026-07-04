@@ -6,12 +6,12 @@ use super::super::shared::{detect_dialect, read_input};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
 use crate::application::usecase::definition_report::{
-    collect_definition_forms, DefinitionReportItem,
+    DefinitionReportItem, collect_definition_forms,
 };
 use crate::application::usecase::package_report::build_package_report;
 use crate::application::usecase::remove_unused_definition::{
-    plan_remove_unused_definitions, RemoveUnusedDefinitionInputFile,
-    RemoveUnusedDefinitionsRequest, UnusedDefinitionDefinition,
+    RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsRequest, UnusedDefinitionDefinition,
+    plan_remove_unused_definitions,
 };
 use crate::domain::sexpr::SyntaxTree;
 

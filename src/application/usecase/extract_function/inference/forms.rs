@@ -1,3 +1,5 @@
+use crate::application::usecase::callable_scope::common_lisp_local_callable_form;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::syntax::list_head;
@@ -6,6 +8,7 @@ use super::patterns::parameter_names;
 use super::symbols::is_extract_function_param_candidate;
 
 pub(super) fn collect_inferred_extract_function_special_form(
+    dialect: Dialect,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -19,22 +22,54 @@ pub(super) fn collect_inferred_extract_function_special_form(
         return false;
     };
 
+    if common_lisp_local_callable_form(dialect, head).is_some() {
+        return collect_inferred_extract_function_local_callable_form(
+            view,
+            explicit_params,
+            bound_params,
+            params,
+        );
+    }
+
     match head {
-        "let" => collect_inferred_extract_function_let(view, explicit_params, bound_params, params),
-        "let*" => {
-            collect_inferred_extract_function_let_star(view, explicit_params, bound_params, params)
-        }
-        "lambda" | "fn" => {
-            collect_inferred_extract_function_lambda(view, 1, explicit_params, bound_params, params)
-        }
-        "defun" | "defmacro" => {
-            collect_inferred_extract_function_lambda(view, 2, explicit_params, bound_params, params)
+        "let" | "symbol-macrolet" => collect_inferred_extract_function_let(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        "let*" => collect_inferred_extract_function_let_star(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        "lambda" | "fn" => collect_inferred_extract_function_lambda(
+            dialect,
+            view,
+            1,
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => {
+            collect_inferred_extract_function_lambda(
+                dialect,
+                view,
+                2,
+                explicit_params,
+                bound_params,
+                params,
+            )
         }
         _ => false,
     }
 }
 
 fn collect_inferred_extract_function_let(
+    dialect: Dialect,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -45,6 +80,7 @@ fn collect_inferred_extract_function_let(
     };
     if binding_form.delimiter == Some(Delimiter::Bracket) {
         return collect_inferred_extract_function_let_star(
+            dialect,
             view,
             explicit_params,
             bound_params,
@@ -57,6 +93,7 @@ fn collect_inferred_extract_function_let(
 
     for binding in &bindings {
         super::collect_inferred_extract_function_params(
+            dialect,
             &binding.value,
             false,
             explicit_params,
@@ -73,6 +110,7 @@ fn collect_inferred_extract_function_let(
     );
     for body in &view.children[2..] {
         super::collect_inferred_extract_function_params(
+            dialect,
             body,
             false,
             explicit_params,
@@ -84,6 +122,7 @@ fn collect_inferred_extract_function_let(
 }
 
 fn collect_inferred_extract_function_let_star(
+    dialect: Dialect,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -99,6 +138,7 @@ fn collect_inferred_extract_function_let_star(
     let mut current_bound_params = bound_params.to_vec();
     for binding in &bindings {
         super::collect_inferred_extract_function_params(
+            dialect,
             &binding.value,
             false,
             explicit_params,
@@ -112,6 +152,7 @@ fn collect_inferred_extract_function_let_star(
 
     for body in &view.children[2..] {
         super::collect_inferred_extract_function_params(
+            dialect,
             body,
             false,
             explicit_params,
@@ -123,6 +164,7 @@ fn collect_inferred_extract_function_let_star(
 }
 
 fn collect_inferred_extract_function_lambda(
+    dialect: Dialect,
     view: &ExpressionView,
     parameter_index: usize,
     explicit_params: &[String],
@@ -137,10 +179,60 @@ fn collect_inferred_extract_function_lambda(
         extend_extract_function_bound_params(bound_params, names.iter().map(String::as_str));
     for body in &view.children[parameter_index + 1..] {
         super::collect_inferred_extract_function_params(
+            dialect,
             body,
             false,
             explicit_params,
             &body_bound_params,
+            params,
+        );
+    }
+    true
+}
+
+fn collect_inferred_extract_function_local_callable_form(
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) -> bool {
+    let Some(binding_form) = view.children.get(1) else {
+        return false;
+    };
+    if binding_form.delimiter != Some(Delimiter::Paren) {
+        return false;
+    }
+
+    for binding in &binding_form.children {
+        if binding.kind != ExpressionKind::List || binding.delimiter != Some(Delimiter::Paren) {
+            continue;
+        }
+        let Some(parameter_form) = binding.children.get(1) else {
+            continue;
+        };
+        let lambda_bound_params = extend_extract_function_bound_params(
+            bound_params,
+            parameter_names(parameter_form).iter().map(String::as_str),
+        );
+        for body in binding.children.iter().skip(2) {
+            super::collect_inferred_extract_function_params(
+                Dialect::CommonLisp,
+                body,
+                false,
+                explicit_params,
+                &lambda_bound_params,
+                params,
+            );
+        }
+    }
+
+    for body in &view.children[2..] {
+        super::collect_inferred_extract_function_params(
+            Dialect::CommonLisp,
+            body,
+            false,
+            explicit_params,
+            bound_params,
             params,
         );
     }

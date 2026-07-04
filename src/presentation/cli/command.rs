@@ -102,6 +102,8 @@ pub(super) enum Command {
     RenameSymbols(rename::args::RenameSymbolsArgs),
     /// Plan or apply a callable definition and call-site rename across explicit files.
     RenameFunction(rename::args::RenameFunctionArgs),
+    /// Plan or apply a macrolet/compiler-macrolet binding and call-site rename across explicit files.
+    RenameMacrolet(rename::args::RenameMacroletArgs),
     /// Plan or replace callable call-site heads across explicit files.
     ReplaceFunctionCalls(rename::args::ReplaceFunctionCallsArgs),
     /// Plan or wrap callable call sites in another function or macro call.

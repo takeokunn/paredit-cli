@@ -28,6 +28,7 @@ pub struct ReplacementPlanBatch {
     pub dialect: Dialect,
     pub shape: String,
     pub replacement: String,
+    pub keep_first: bool,
     pub forms: Vec<DuplicateFormReport>,
 }
 

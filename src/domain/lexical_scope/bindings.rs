@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
-use super::patterns::binding_pattern_names;
+use super::patterns::{binding_pattern_names, lambda_list_names};
 
 #[derive(Debug, Clone)]
 pub(super) struct BindingGroup {
@@ -74,10 +74,8 @@ fn list_pair_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bin
 
 pub(super) fn parameter_form_binds(parameter_form: &ExpressionView, symbol: &SymbolName) -> bool {
     parameter_form.kind == ExpressionKind::List
-        && parameter_form
-            .children
+        && lambda_list_names(parameter_form)
             .iter()
-            .flat_map(binding_pattern_names)
             .any(|name| name == symbol.as_str())
 }
 

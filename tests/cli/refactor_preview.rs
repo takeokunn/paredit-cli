@@ -55,6 +55,11 @@ fn cli_previews_function_refactor_without_writing_files() {
         .stdout(predicate::str::contains("\"end\":"))
         .stdout(predicate::str::contains("\"replacement\": \"new-name\""))
         .stdout(predicate::str::contains("\"passed\": true"))
+        .stdout(predicate::str::contains("\"violation_count\": 0"))
+        .stdout(predicate::str::contains("\"write_blocked\": false"))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-preview-or-rerun-with-write\"",
+        ))
         .stdout(predicate::str::contains("new-name"))
         .stdout(predicate::str::contains("old-name"));
 
@@ -164,6 +169,11 @@ fn cli_refuses_refactor_preview_write_when_policy_fails() {
         .stdout(predicate::str::contains("\"written_file_count\": 0"))
         .stdout(predicate::str::contains("\"written\": false"))
         .stdout(predicate::str::contains("\"passed\": false"))
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"write_blocked\": true"))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-policy-violations\"",
+        ))
         .stderr(predicate::str::contains("refactor-preview policy failed"));
 
     assert_eq!(

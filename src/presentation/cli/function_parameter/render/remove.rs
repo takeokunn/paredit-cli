@@ -27,6 +27,9 @@ pub(in crate::presentation::cli::function_parameter) fn print_remove_function_pa
             println!("function_name\t{}", plan.function_name);
             println!("parameter_name\t{}", plan.parameter_name);
             println!("parameter_index\t{}", plan.parameter_index);
+            if let Some(keyword) = plan.parameter_keyword.as_deref() {
+                println!("parameter_keyword\t{keyword}");
+            }
             for ((path, span), removed_argument) in plan
                 .call_paths
                 .iter()
@@ -68,6 +71,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_remove_function_pa
                 "function_name": plan.function_name.as_str(),
                 "parameter_name": plan.parameter_name.as_str(),
                 "parameter_index": plan.parameter_index,
+                "parameter_keyword": &plan.parameter_keyword,
                 "removed_arguments": &plan.removed_arguments,
                 "changed": plan.changed,
                 "written": written,

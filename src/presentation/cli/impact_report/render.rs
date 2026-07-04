@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::application::usecase::call_graph_report::CallGraphEdge;
 use crate::application::usecase::impact_report::{
-    impact_risks, impact_status_counts, ImpactReportFile, ImpactReportPolicy,
+    ImpactReportFile, ImpactReportPolicy, impact_risks, impact_status_counts,
 };
 
 pub(in crate::presentation::cli) fn print_impact_report(

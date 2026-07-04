@@ -54,6 +54,38 @@ fn policy_reports_every_failed_preview_gate() {
     assert!(policy.violations.iter().any(|violation| {
         violation == "--fail-on-target-conflict found 2 existing replacement symbol occurrence(s)"
     }));
+    assert_eq!(
+        policy.summary(),
+        RefactorPreviewPolicySummary {
+            violation_count: 6,
+            write_blocked: true,
+            next_action: "review-policy-violations",
+        }
+    );
+}
+
+#[test]
+fn policy_summary_marks_passing_policy_as_not_blocked() {
+    let policy = evaluate_refactor_preview_policy(
+        RefactorPreviewPolicyOptions {
+            fail_on_no_change: true,
+            fail_on_parse_error: true,
+            fail_on_target_conflict: true,
+            require_changed_files: Some(1),
+            require_definitions: Some(1),
+            require_edits: Some(3),
+        },
+        &summary(),
+    );
+
+    assert_eq!(
+        policy.summary(),
+        RefactorPreviewPolicySummary {
+            violation_count: 0,
+            write_blocked: false,
+            next_action: "review-preview-or-rerun-with-write",
+        }
+    );
 }
 
 proptest! {

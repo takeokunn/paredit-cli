@@ -66,6 +66,11 @@ fn cli_previews_workspace_refactor_from_directory_roots() {
         .stdout(predicate::str::contains("\"definition_count\": 1"))
         .stdout(predicate::str::contains("\"edit_count\": 2"))
         .stdout(predicate::str::contains("\"output_parse_ok\": true"))
+        .stdout(predicate::str::contains("\"violation_count\": 0"))
+        .stdout(predicate::str::contains("\"write_blocked\": false"))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"review-preview-or-rerun-with-write\"",
+        ))
         .stdout(predicate::str::contains("paint-pane"));
 }
 
@@ -110,6 +115,8 @@ fn cli_fails_workspace_refactor_preview_when_target_symbol_already_exists() {
         .stdout(predicate::str::contains("\"changed_file_count\": 1"))
         .stdout(predicate::str::contains("\"changed_files\": ["))
         .stdout(predicate::str::contains("core.lisp"))
+        .stdout(predicate::str::contains("\"violation_count\": 1"))
+        .stdout(predicate::str::contains("\"write_blocked\": true"))
         .stdout(predicate::str::contains(
             "--fail-on-target-conflict found 1 existing replacement symbol occurrence(s)",
         ))

@@ -1,7 +1,9 @@
 use serde_json::{Value, json};
 
 use super::super::super::super::*;
-use super::super::super::types::execute::WorkspaceRefactorExecute;
+use super::super::super::types::execute::{
+    WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome,
+};
 use super::super::super::types::verification::RefactorVerification;
 use super::super::write_plan::refactor_write_plan_json;
 use crate::application::refactor::execute::RefactorExecuteDecision;
@@ -55,6 +57,7 @@ pub(super) fn print_workspace_refactor_execute_json(
                     "require_definitions": execution.preview.policy.require_definitions,
                     "require_edits": execution.preview.policy.require_edits,
                     "passed": execution.preview.policy.passed,
+                    "summary": refactor_preview_policy_summary_json(execution),
                     "violations": execution.preview.policy.violations.as_slice(),
                 },
                 "files": execution
@@ -77,6 +80,7 @@ pub(super) fn print_workspace_refactor_execute_json(
             "write_plan": refactor_write_plan_json(&write_plan, &writable_files, &refused_files),
             "preflight_decision": refactor_execute_decision_json(&execution.preflight_decision),
             "execute_decision": refactor_execute_decision_json(&execution.execute_decision),
+            "outcome": refactor_execute_outcome_json(&execution.outcome),
             "pre_verification": execution
                 .pre_verification
                 .as_ref()
@@ -89,6 +93,16 @@ pub(super) fn print_workspace_refactor_execute_json(
     );
 
     Ok(())
+}
+
+fn refactor_preview_policy_summary_json(execution: &WorkspaceRefactorExecute) -> Value {
+    let summary = execution.preview.policy.summary();
+
+    json!({
+        "violation_count": summary.violation_count,
+        "write_blocked": summary.write_blocked,
+        "next_action": summary.next_action,
+    })
 }
 
 fn refactor_verification_json(verification: &RefactorVerification) -> Value {
@@ -119,6 +133,7 @@ fn refactor_execute_decision_json(decision: &RefactorExecuteDecision) -> Value {
         "status": decision.status.label(),
         "reason": decision.status.reason(),
         "next_action": decision.status.next_action(),
+        "summary": refactor_execute_decision_summary_json(*decision),
         "steps": decision
             .steps()
             .iter()
@@ -131,6 +146,53 @@ fn refactor_execute_decision_json(decision: &RefactorExecuteDecision) -> Value {
         "run_pre_verification": decision.run_pre_verification,
         "apply_preview": decision.apply_preview,
         "run_post_verification": decision.run_post_verification,
+    })
+}
+
+fn refactor_execute_decision_summary_json(decision: RefactorExecuteDecision) -> Value {
+    let summary = decision.summary();
+
+    json!({
+        "passed_step_count": summary.passed_step_count,
+        "failed_step_count": summary.failed_step_count,
+        "skipped_step_count": summary.skipped_step_count,
+        "scheduled_step_count": summary.scheduled_step_count,
+        "write_parse_refused": summary.write_parse_refused,
+        "run_pre_verification": summary.run_pre_verification,
+        "apply_preview": summary.apply_preview,
+        "run_post_verification": summary.run_post_verification,
+    })
+}
+
+fn refactor_execute_outcome_json(outcome: &WorkspaceRefactorExecuteOutcome) -> Value {
+    json!({
+        "status": outcome.status.label(),
+        "reason": outcome.status.reason(),
+        "next_action": outcome.status.next_action(),
+        "summary": refactor_execute_outcome_summary_json(outcome),
+        "steps": outcome
+            .steps()
+            .iter()
+            .map(|step| json!({
+                "name": step.name,
+                "status": step.status.label(),
+            }))
+            .collect::<Vec<_>>(),
+        "write_applied": outcome.write_applied,
+        "post_verification_passed": outcome.post_verification_passed,
+    })
+}
+
+fn refactor_execute_outcome_summary_json(outcome: &WorkspaceRefactorExecuteOutcome) -> Value {
+    let summary = outcome.summary();
+
+    json!({
+        "passed_step_count": summary.passed_step_count,
+        "failed_step_count": summary.failed_step_count,
+        "skipped_step_count": summary.skipped_step_count,
+        "scheduled_step_count": summary.scheduled_step_count,
+        "write_applied": summary.write_applied,
+        "post_verification_passed": summary.post_verification_passed,
     })
 }
 

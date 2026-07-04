@@ -38,7 +38,7 @@ fn collect_shadow_aware_special_form(
     };
 
     match head {
-        "let" => {
+        "let" | "symbol-macrolet" => {
             collect_parallel_let_references(view, symbol, input, output);
             true
         }
@@ -47,7 +47,7 @@ fn collect_shadow_aware_special_form(
             true
         }
         "lambda" | "fn" => parameter_form_binds(&view.children[1], symbol),
-        "defun" | "defmacro" => true,
+        "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => true,
         _ => false,
     }
 }

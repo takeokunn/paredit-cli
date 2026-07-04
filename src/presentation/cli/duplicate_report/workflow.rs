@@ -2,8 +2,8 @@ use super::super::*;
 use super::args::{DuplicateReportArgs, ReplacementPlanArgs};
 use super::render::{print_duplicate_report, print_replacement_plan};
 use crate::application::usecase::duplicate_report::{
-    build_duplicate_shape_reports, collect_duplicate_candidates, collect_replacement_plan_batches,
-    DuplicateCandidateGroups,
+    DuplicateCandidateGroups, build_duplicate_shape_reports, collect_duplicate_candidates,
+    collect_replacement_plan_batches,
 };
 
 pub(in crate::presentation::cli) fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
@@ -51,8 +51,12 @@ pub(in crate::presentation::cli) fn replacement_plan(args: ReplacementPlanArgs) 
         )?;
     }
 
-    let mut batches =
-        collect_replacement_plan_batches(grouped, args.min_group_size, args.replacement);
+    let mut batches = collect_replacement_plan_batches(
+        grouped,
+        args.min_group_size,
+        args.replacement,
+        args.keep_first,
+    );
     batches.sort_by(|left, right| {
         right
             .forms

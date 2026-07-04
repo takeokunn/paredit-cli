@@ -16,7 +16,7 @@ fn infer_at(input: &str, path: &[usize], explicit: &[&str]) -> Vec<String> {
         .map(|param| (*param).to_owned())
         .collect::<Vec<_>>();
 
-    infer_extract_function_params(&selection.view(), &explicit)
+    infer_extract_function_params(Dialect::CommonLisp, &selection.view(), &explicit)
 }
 
 fn plan_at(

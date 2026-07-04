@@ -23,7 +23,7 @@ pub(super) fn analyze_let_form(
     let Some(head) = atom_text(&view.children[0]) else {
         return Ok(None);
     };
-    if !matches!(head, "let" | "let*") {
+    if !matches!(head, "let" | "let*" | "symbol-macrolet") {
         return Ok(None);
     }
 
@@ -31,6 +31,8 @@ pub(super) fn analyze_let_form(
     let (binding_style, candidates) = let_binding_candidates(dialect, binding_form)?;
     let body_count = view.children.len().saturating_sub(2);
     let single_binding = candidates.len() == 1;
+    let inline_supported_by_inline_let =
+        matches!(head, "let" | "let*") && single_binding && body_count > 0;
     let mut bindings = Vec::with_capacity(candidates.len());
 
     for candidate in &candidates {
@@ -62,6 +64,9 @@ pub(super) fn analyze_let_form(
         if reference_count > 1 {
             risks.push("duplicate-evaluation");
         }
+        if !inline_supported_by_inline_let {
+            risks.push("unsupported-by-inline-let");
+        }
 
         bindings.push(LetBindingReport {
             name: candidate.name.clone(),
@@ -79,7 +84,7 @@ pub(super) fn analyze_let_form(
         span: view.span,
         binding_style,
         body_count,
-        inline_supported_by_inline_let: single_binding && body_count > 0,
+        inline_supported_by_inline_let,
         bindings,
     }))
 }

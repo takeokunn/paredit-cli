@@ -32,6 +32,7 @@ pub fn plan_reorder_function_parameters(
         build_new_relative_order(&old_parameter_order, &request.parameter_order)?;
     let call_paths = resolve_function_call_paths(
         &tree,
+        request.dialect,
         request.call_paths,
         request.all_calls,
         target.definition_span,

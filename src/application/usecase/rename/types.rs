@@ -27,6 +27,23 @@ pub struct RenameFunctionPlan {
 }
 
 #[derive(Debug, Clone)]
+pub struct RenameMacroletRequest<'a> {
+    pub input: &'a str,
+    pub dialect: Dialect,
+    pub from: SymbolName,
+    pub to: SymbolName,
+}
+
+#[derive(Debug, Clone)]
+pub struct RenameMacroletPlan {
+    pub dialect: Dialect,
+    pub definitions: Vec<RenameFunctionOccurrence>,
+    pub calls: Vec<RenameFunctionOccurrence>,
+    pub rewritten: String,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
 pub enum RenameTarget {
     Path(Path),
     Offset(usize),

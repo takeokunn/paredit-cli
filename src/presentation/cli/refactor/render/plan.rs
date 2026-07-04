@@ -73,6 +73,18 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
             for violation in &plan.policy.violations {
                 println!("policy_violation\t{violation}");
             }
+            println!(
+                "risk_highest_level\t{}",
+                plan.risk_summary
+                    .highest_level
+                    .map(|level| level.label())
+                    .unwrap_or("none")
+            );
+            println!("risk_info_count\t{}", plan.risk_summary.info_count);
+            println!("risk_warning_count\t{}", plan.risk_summary.warning_count);
+            println!("risk_error_count\t{}", plan.risk_summary.error_count);
+            println!("risk_blocking_count\t{}", plan.risk_summary.blocking_count);
+            println!("risk_advisory_count\t{}", plan.risk_summary.advisory_count);
             println!("files\t{}", summary.file_count);
             println!("definition_count\t{}", summary.definition_count);
             println!("reference_count\t{}", summary.reference_count);
@@ -153,6 +165,14 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
                     "outbound_edge_count": summary.outbound_edge_count,
                     "non_call_reference_count": summary.non_call_reference_count,
                     "signature_mismatch_count": summary.signature_mismatch_count,
+                },
+                "risk_summary": {
+                    "highest_level": plan.risk_summary.highest_level.map(|level| level.label()),
+                    "info_count": plan.risk_summary.info_count,
+                    "warning_count": plan.risk_summary.warning_count,
+                    "error_count": plan.risk_summary.error_count,
+                    "blocking_count": plan.risk_summary.blocking_count,
+                    "advisory_count": plan.risk_summary.advisory_count,
                 },
                 "policy": {
                     "fail_on_blocking_gate": plan.policy.fail_on_blocking_gate,

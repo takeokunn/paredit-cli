@@ -3,8 +3,8 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::definition_report::{
-    body_form_count, count_lambda_parameters, definition_name, lambda_list_index,
-    DefinitionReportItem,
+    DefinitionReportItem, body_form_count, count_lambda_parameters, definition_name,
+    lambda_list_index,
 };
 use crate::domain::definition::classify_definition_head;
 use crate::domain::sexpr::{Edit, SyntaxTree};

@@ -9,10 +9,7 @@ fn parses_balanced_document() {
 #[test]
 fn parses_reader_delimiters() {
     let tree = SyntaxTree::parse("(mapv inc [1 2 {:x 3}])").expect("valid");
-    assert_eq!(
-        Formatter::new(2).format(&tree),
-        "(mapv\n  inc\n  [1\n    2\n    {:x 3}])\n"
-    );
+    assert_eq!(Formatter::new(2).format(&tree), "(mapv inc [1 2 {:x 3}])\n");
 }
 
 #[test]

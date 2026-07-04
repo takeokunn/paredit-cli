@@ -56,6 +56,24 @@ fn reports_ambiguous_definition_when_multiple_signatures_exist() {
 }
 
 #[test]
+fn ignores_common_lisp_local_callable_calls_when_checking_global_signatures() {
+    let reports = build_signature_reports(
+        vec![source(
+            "(defun helper (x y) y)\n(defun main () (flet ((helper (x) x)) (helper 1)))",
+        )],
+        None,
+    )
+    .unwrap();
+
+    assert!(
+        !reports[0]
+            .calls
+            .iter()
+            .any(|item| item.call.head == "helper")
+    );
+}
+
+#[test]
 fn evaluates_policy_thresholds() {
     let reports = build_signature_reports(vec![source("(defun f (x) (f) (f x))")], None).unwrap();
     let policy = evaluate_signature_report_policy(&reports, true, Some(1), Some(2));

@@ -13,6 +13,124 @@ pub(super) fn binding_pattern_name_spans(
     names
 }
 
+pub(super) fn lambda_list_name_spans(
+    parameter_form: &ExpressionView,
+    input: &str,
+) -> Vec<ParameterNameSpan> {
+    let mut names = Vec::new();
+    let _ = input;
+    collect_lambda_list_name_spans(parameter_form, &mut names);
+    names
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum LambdaListMode {
+    Required,
+    Optional,
+    Key,
+    Aux,
+}
+
+fn collect_lambda_list_name_spans(
+    parameter_form: &ExpressionView,
+    output: &mut Vec<ParameterNameSpan>,
+) {
+    let mut mode = LambdaListMode::Required;
+    let mut index = 0usize;
+
+    while index < parameter_form.children.len() {
+        let child = &parameter_form.children[index];
+        if let Some(marker) = atom_text(child) {
+            match marker {
+                "&optional" => {
+                    mode = LambdaListMode::Optional;
+                    index += 1;
+                    continue;
+                }
+                "&key" => {
+                    mode = LambdaListMode::Key;
+                    index += 1;
+                    continue;
+                }
+                "&aux" => {
+                    mode = LambdaListMode::Aux;
+                    index += 1;
+                    continue;
+                }
+                "&rest" | "&body" | "&whole" | "&environment" => {
+                    if let Some(next) = parameter_form.children.get(index + 1) {
+                        collect_binding_pattern_name_spans(next, output);
+                    }
+                    index += 2;
+                    continue;
+                }
+                "&allow-other-keys" => {
+                    index += 1;
+                    continue;
+                }
+                _ if marker.starts_with('&') => {
+                    index += 1;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+
+        collect_lambda_list_parameter_spec_name_spans(child, mode, output);
+        index += 1;
+    }
+}
+
+fn collect_lambda_list_parameter_spec_name_spans(
+    spec: &ExpressionView,
+    mode: LambdaListMode,
+    output: &mut Vec<ParameterNameSpan>,
+) {
+    if atom_text(spec).is_some() || mode == LambdaListMode::Required {
+        collect_binding_pattern_name_spans(spec, output);
+        return;
+    }
+
+    if spec.kind != ExpressionKind::List || spec.children.is_empty() {
+        return;
+    }
+
+    match mode {
+        LambdaListMode::Required => collect_binding_pattern_name_spans(spec, output),
+        LambdaListMode::Optional => {
+            collect_binding_pattern_name_spans(&spec.children[0], output);
+            collect_supplied_p_name_span(spec, output);
+        }
+        LambdaListMode::Key => {
+            collect_key_parameter_name_spans(&spec.children[0], output);
+            collect_supplied_p_name_span(spec, output);
+        }
+        LambdaListMode::Aux => collect_binding_pattern_name_spans(&spec.children[0], output),
+    }
+}
+
+fn collect_key_parameter_name_spans(
+    spec_name: &ExpressionView,
+    output: &mut Vec<ParameterNameSpan>,
+) {
+    if spec_name.kind == ExpressionKind::List && spec_name.children.len() >= 2 {
+        if let Some(designator) = atom_text(&spec_name.children[0]) {
+            if designator.starts_with(':') {
+                collect_binding_pattern_name_spans(&spec_name.children[1], output);
+                return;
+            }
+        }
+    }
+
+    collect_binding_pattern_name_spans(spec_name, output);
+}
+
+fn collect_supplied_p_name_span(spec: &ExpressionView, output: &mut Vec<ParameterNameSpan>) {
+    if let Some(supplied_p) = spec.children.get(2) {
+        collect_binding_pattern_name_spans(supplied_p, output);
+    }
+}
+
 fn collect_binding_pattern_name_spans(
     pattern: &ExpressionView,
     output: &mut Vec<ParameterNameSpan>,

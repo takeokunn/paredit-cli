@@ -54,6 +54,15 @@ fn execute_decision_refuses_write_parse_failures_before_preflight() {
     assert_eq!(steps[1].name, "write-output-parse");
     assert_eq!(steps[1].status, RefactorExecuteStepStatus::Failed);
     assert_eq!(steps[2].status, RefactorExecuteStepStatus::Skipped);
+    let summary = decision.summary();
+    assert_eq!(summary.passed_step_count, 1);
+    assert_eq!(summary.failed_step_count, 1);
+    assert_eq!(summary.skipped_step_count, 3);
+    assert_eq!(summary.scheduled_step_count, 0);
+    assert!(summary.write_parse_refused);
+    assert!(!summary.run_pre_verification);
+    assert!(!summary.apply_preview);
+    assert!(!summary.run_post_verification);
     assert!(!decision.run_pre_verification);
     assert!(!decision.apply_preview);
     assert!(!decision.run_post_verification);
@@ -81,6 +90,15 @@ fn execute_decision_allows_dry_run_preflight_without_post_verification() {
     assert_eq!(steps[2].status, RefactorExecuteStepStatus::Passed);
     assert_eq!(steps[3].status, RefactorExecuteStepStatus::Scheduled);
     assert_eq!(steps[4].status, RefactorExecuteStepStatus::Skipped);
+    let summary = decision.summary();
+    assert_eq!(summary.passed_step_count, 3);
+    assert_eq!(summary.failed_step_count, 0);
+    assert_eq!(summary.skipped_step_count, 1);
+    assert_eq!(summary.scheduled_step_count, 1);
+    assert!(!summary.write_parse_refused);
+    assert!(summary.run_pre_verification);
+    assert!(summary.apply_preview);
+    assert!(!summary.run_post_verification);
     assert!(decision.run_pre_verification);
     assert!(decision.apply_preview);
     assert!(!decision.run_post_verification);
@@ -222,6 +240,40 @@ proptest! {
                 RefactorExecuteStepStatus::Skipped
             },
         );
+
+        let summary = decision.summary();
+        prop_assert_eq!(
+            summary.passed_step_count,
+            steps
+                .iter()
+                .filter(|step| step.status == RefactorExecuteStepStatus::Passed)
+                .count(),
+        );
+        prop_assert_eq!(
+            summary.failed_step_count,
+            steps
+                .iter()
+                .filter(|step| step.status == RefactorExecuteStepStatus::Failed)
+                .count(),
+        );
+        prop_assert_eq!(
+            summary.skipped_step_count,
+            steps
+                .iter()
+                .filter(|step| step.status == RefactorExecuteStepStatus::Skipped)
+                .count(),
+        );
+        prop_assert_eq!(
+            summary.scheduled_step_count,
+            steps
+                .iter()
+                .filter(|step| step.status == RefactorExecuteStepStatus::Scheduled)
+                .count(),
+        );
+        prop_assert_eq!(summary.write_parse_refused, decision.write_parse_refused);
+        prop_assert_eq!(summary.run_pre_verification, decision.run_pre_verification);
+        prop_assert_eq!(summary.apply_preview, decision.apply_preview);
+        prop_assert_eq!(summary.run_post_verification, decision.run_post_verification);
 
         prop_assert!(!decision.run_post_verification || decision.apply_preview);
         prop_assert!(!decision.apply_preview || decision.run_pre_verification);

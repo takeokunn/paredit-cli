@@ -78,6 +78,87 @@ fn cli_plans_introduce_let_skips_shadowed_all_occurrences() {
 }
 
 #[test]
+fn cli_plans_introduce_let_skips_symbol_macrolet_shadowed_all_occurrences() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--all-occurrences",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render () (+ (* width height) (symbol-macrolet ((product 1)) (* width height))))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"occurrence_count\": 1"))
+    .stdout(predicate::str::contains(
+        "\"skipped_shadowed_occurrence_count\": 1",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product (symbol-macrolet ((product 1)) (* width height)))))",
+    ));
+}
+
+#[test]
+fn cli_plans_introduce_let_skips_define_setf_expander_shadowed_all_occurrences() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--all-occurrences",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render () (+ (* width height) (define-setf-expander slot (&environment product place) (* width height))))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"occurrence_count\": 1"))
+    .stdout(predicate::str::contains(
+        "\"skipped_shadowed_occurrence_count\": 1",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product (define-setf-expander slot (&environment product place) (* width height)))))",
+    ));
+}
+
+#[test]
+fn cli_plans_introduce_let_skips_define_compiler_macro_shadowed_all_occurrences() {
+    let mut cmd = paredit();
+    cmd.args([
+        "introduce-let",
+        "--path",
+        "0.3.1",
+        "--name",
+        "product",
+        "--all-occurrences",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render () (+ (* width height) (define-compiler-macro slot (&environment product place) (* width height))))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"occurrence_count\": 1"))
+    .stdout(predicate::str::contains(
+        "\"skipped_shadowed_occurrence_count\": 1",
+    ))
+    .stdout(predicate::str::contains(
+        "(defun render () (let ((product (* width height))) (+ product (define-compiler-macro slot (&environment product place) (* width height)))))",
+    ));
+}
+
+#[test]
 fn cli_writes_introduce_let_for_emacs_lisp_file() {
     let dir = fresh_temp_dir("introduce-let");
     let elisp_file = dir.join("render.el");

@@ -73,6 +73,50 @@ pub struct RefactorPlanGate {
     pub blocks_automation: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefactorPlanRiskSummary {
+    pub highest_level: Option<RefactorRiskLevel>,
+    pub info_count: usize,
+    pub warning_count: usize,
+    pub error_count: usize,
+    pub blocking_count: usize,
+    pub advisory_count: usize,
+}
+
+impl RefactorPlanRiskSummary {
+    pub fn from_gates(gates: &[RefactorPlanGate]) -> Self {
+        let mut summary = Self {
+            highest_level: None,
+            info_count: 0,
+            warning_count: 0,
+            error_count: 0,
+            blocking_count: 0,
+            advisory_count: 0,
+        };
+
+        for gate in gates {
+            summary.highest_level = Some(match summary.highest_level {
+                Some(level) => level.max(gate.level),
+                None => gate.level,
+            });
+
+            match gate.level {
+                RefactorRiskLevel::Info => summary.info_count += gate.count,
+                RefactorRiskLevel::Warning => summary.warning_count += gate.count,
+                RefactorRiskLevel::Error => summary.error_count += gate.count,
+            }
+
+            if gate.blocks_automation {
+                summary.blocking_count += gate.count;
+            } else {
+                summary.advisory_count += gate.count;
+            }
+        }
+
+        summary
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RefactorPlanStep {
     pub order: usize,
@@ -229,6 +273,7 @@ pub struct RefactorPlanRequest<'a> {
 #[derive(Debug, Clone)]
 pub struct RefactorPlanDecision {
     pub gates: Vec<RefactorPlanGate>,
+    pub risk_summary: RefactorPlanRiskSummary,
     pub steps: Vec<RefactorPlanStep>,
     pub policy: RefactorPlanPolicy,
     pub automation: RefactorPlanAutomationDecision,

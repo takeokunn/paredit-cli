@@ -154,6 +154,7 @@ pub struct RemoveFunctionParameterPlan {
     pub function_name: SymbolName,
     pub parameter_name: SymbolName,
     pub parameter_index: usize,
+    pub parameter_keyword: Option<String>,
     pub removed_arguments: Vec<Option<String>>,
     pub rewritten: String,
     pub changed: bool,

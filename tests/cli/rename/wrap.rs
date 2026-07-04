@@ -67,6 +67,40 @@ fn cli_writes_wrap_function_calls_and_skips_already_wrapped() {
 }
 
 #[test]
+fn cli_wrap_function_calls_accepts_wrapper_template() {
+    let dir = fresh_temp_dir("wrap-function-calls-template");
+    let lisp_file = dir.join("service.lisp");
+    let source = "(defun render ()\n  (fetch-user id))\n";
+    fs::write(&lisp_file, source).expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("wrap-function-calls")
+        .arg(&lisp_file)
+        .arg("--function")
+        .arg("fetch-user")
+        .arg("--wrapper")
+        .arg("with-tracing")
+        .arg("--wrapper-template")
+        .arg("(with-tracing :label 'fetch-user _)")
+        .arg("--all-calls")
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"wrapperTemplate\": \"(with-tracing :label 'fetch-user _)\"",
+        ))
+        .stdout(predicate::str::contains(
+            "(with-tracing :label 'fetch-user (fetch-user id))",
+        ));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read unchanged lisp"),
+        source
+    );
+}
+
+#[test]
 fn cli_rejects_wrap_function_calls_without_explicit_scope() {
     let dir = fresh_temp_dir("wrap-function-calls-no-scope");
     let lisp_file = dir.join("service.lisp");

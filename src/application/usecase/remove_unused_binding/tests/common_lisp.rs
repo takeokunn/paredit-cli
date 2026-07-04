@@ -116,3 +116,181 @@ fn plans_all_unused_bindings_by_replacing_form_with_body() {
     assert_eq!(plan.replacement, "body");
     assert_eq!(plan.rewritten, "body");
 }
+
+#[test]
+fn plans_unused_symbol_macrolet_without_counting_expansion_reference() {
+    let input = "(symbol-macrolet ((value (compute value)) (used other)) (list used))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.form, "symbol-macrolet");
+    assert_eq!(plan.binding_name.as_deref(), Some("value"));
+    assert_eq!(plan.binding_value.as_deref(), Some("(compute value)"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(
+        plan.replacement,
+        "(symbol-macrolet ( (used other)) (list used))"
+    );
+}
+
+#[test]
+fn rejects_referenced_symbol_macrolet_binding() {
+    let input = "(symbol-macrolet ((value (compute))) (list value))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("referenced symbol macro");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}
+
+#[test]
+fn plans_unused_macrolet_without_counting_expander_body_reference() {
+    let input = "(macrolet ((value (x) (compute value x)) (used (y) (list y))) (list used))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.form, "macrolet");
+    assert_eq!(plan.binding_name.as_deref(), Some("value"));
+    assert_eq!(plan.binding_value.as_deref(), Some("(x) (compute value x)"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(
+        plan.replacement,
+        "(macrolet ( (used (y) (list y))) (list used))"
+    );
+}
+
+#[test]
+fn rejects_referenced_macrolet_binding() {
+    let input = "(macrolet ((value (x) (compute x))) (list (value 1)))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("referenced macro");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}
+
+#[test]
+fn plans_unused_compiler_macrolet_without_counting_expander_body_reference() {
+    let input =
+        "(compiler-macrolet ((value (x) (compute value x)) (used (y) (list y))) (list used))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.form, "compiler-macrolet");
+    assert_eq!(plan.binding_name.as_deref(), Some("value"));
+    assert_eq!(plan.binding_value.as_deref(), Some("(x) (compute value x)"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(
+        plan.replacement,
+        "(compiler-macrolet ( (used (y) (list y))) (list used))"
+    );
+}
+
+#[test]
+fn rejects_referenced_compiler_macrolet_binding() {
+    let input = "(compiler-macrolet ((value (x) (compute x))) (list (value 1)))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("value").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("referenced compiler macro");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}
+
+#[test]
+fn plans_unused_flet_binding_ignoring_definition_body_reference() {
+    let input = "(flet ((unused () (unused)) (used () (used))) (used))";
+    let plan = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("unused").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.form, "flet");
+    assert_eq!(plan.binding_name.as_deref(), Some("unused"));
+    assert_eq!(plan.reference_count, Some(0));
+    assert_eq!(plan.replacement, "(flet ( (used () (used))) (used))");
+}
+
+#[test]
+fn rejects_referenced_flet_binding() {
+    let input = "(flet ((unused () 1)) (unused))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("unused").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("referenced flet binding");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}
+
+#[test]
+fn rejects_recursive_labels_binding() {
+    let input = "(labels ((unused () (unused)) (used () (list used))) (used))";
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(input),
+        name: Some(&SymbolName::new("unused").expect("symbol")),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .expect_err("recursive labels binding");
+
+    assert!(error.to_string().contains("zero in-scope references"));
+}

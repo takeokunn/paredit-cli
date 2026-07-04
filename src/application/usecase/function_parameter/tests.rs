@@ -78,6 +78,237 @@ fn removes_parameter_and_call_argument() {
 }
 
 #[test]
+fn removes_common_lisp_optional_parameter_spec_and_call_argument() {
+    let input = "(defun f (a &optional (b 2 b-p) c) (list a b c))\n(print (f 1 3 4))";
+    let plan = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun f (a &optional c) (list a b c))\n(print (f 1 4))"
+    );
+    assert_eq!(plan.parameter_index, 1);
+    assert_eq!(plan.removed_arguments, vec![Some("3".to_owned())]);
+}
+
+#[test]
+fn removes_common_lisp_optional_parameter_when_call_argument_is_missing() {
+    let input = "(defun f (a &optional (b 2 b-p) c) (list a b c))\n(print (f 1))";
+    let plan = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: true,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun f (a &optional c) (list a b c))\n(print (f 1))"
+    );
+    assert_eq!(plan.parameter_index, 1);
+    assert_eq!(plan.removed_arguments, vec![None]);
+}
+
+#[test]
+fn removes_common_lisp_key_parameter_and_call_keyword_argument() {
+    let input = "(defun f (a &key (b 2) ((:external c) 3 c-p) d) (list a b c d))\n(print (f 1 :b 20 :external 30 :d 40))";
+    let plan = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("c"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun f (a &key (b 2) d) (list a b c d))\n(print (f 1 :b 20 :d 40))"
+    );
+    assert_eq!(plan.parameter_keyword.as_deref(), Some(":external"));
+    assert_eq!(
+        plan.removed_arguments,
+        vec![Some(":external 30".to_owned())]
+    );
+}
+
+#[test]
+fn removes_common_lisp_key_parameter_when_call_keyword_is_missing() {
+    let input = "(defun f (a &key b c) (list a b c))\n(print (f 1 :c 30))";
+    let plan = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: true,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun f (a &key c) (list a b c))\n(print (f 1 :c 30))"
+    );
+    assert_eq!(plan.parameter_keyword.as_deref(), Some(":b"));
+    assert_eq!(plan.removed_arguments, vec![None]);
+}
+
+#[test]
+fn rejects_common_lisp_key_parameter_named_as_keyword() {
+    let input = "(defun f (a &key :b) (list a))\n(print (f 1 :b 20))";
+    let error = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol(":b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect_err("keyword-named parameter must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only simple parameters")
+    );
+}
+
+#[test]
+fn rejects_common_lisp_key_parameter_with_non_keyword_designator() {
+    let input = "(defun f (a &key ((external b) 2)) (list a b))\n(print (f 1 :external 20))";
+    let error = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect_err("non-keyword external designator must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only simple parameters")
+    );
+}
+
+#[test]
+fn rejects_common_lisp_parameter_after_allow_other_keys_before_next_marker() {
+    let input = "(defun f (a &key b &allow-other-keys c) (list a b c))\n(print (f 1 :b 20 :c 30))";
+    let error = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("c"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect_err("parameter after &allow-other-keys must fail");
+
+    assert!(error.to_string().contains("after &allow-other-keys"));
+}
+
+#[test]
+fn rejects_duplicate_common_lisp_keyword_argument_removal() {
+    let input = "(defun f (a &key b) (list a b))\n(print (f 1 :b 20 :b 30))";
+    let error = plan_remove_function_parameter(RemoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        allow_missing_argument: false,
+    })
+    .expect_err("duplicate keyword must fail");
+
+    assert!(error.to_string().contains("duplicate keyword argument :b"));
+}
+
+#[test]
+fn rejects_add_parameter_to_common_lisp_lambda_list_marker() {
+    let input = "(defun f (a &optional b) (list a b))\n(print (f 1 2))";
+    let error = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("c"),
+        argument: "3".to_owned(),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect_err("lambda-list marker must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only flat positional parameter lists")
+    );
+}
+
+#[test]
+fn rejects_move_parameter_across_common_lisp_lambda_list_marker() {
+    let input = "(defun f (a &optional b) (list a b))\n(print (f 1 2))";
+    let error = plan_move_function_parameter(MoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        to_index: 0,
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+    })
+    .expect_err("lambda-list marker must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only flat positional parameter lists")
+    );
+}
+
+#[test]
+fn rejects_swap_parameter_across_common_lisp_lambda_list_marker() {
+    let input = "(defun f (a &optional b) (list a b))\n(print (f 1 2))";
+    let error = plan_swap_function_parameters(SwapFunctionParametersRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        left_name: symbol("a"),
+        right_name: symbol("b"),
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+    })
+    .expect_err("lambda-list marker must fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("currently supports only flat positional parameter lists")
+    );
+}
+
+#[test]
 fn swaps_parameters_and_call_arguments() {
     let input = "(defun f (a b c) (list a b c))\n(print (f 1 2 3))";
     let plan = plan_swap_function_parameters(SwapFunctionParametersRequest {
@@ -175,6 +406,74 @@ fn discovers_all_same_file_calls() {
     assert_eq!(
         plan.rewritten,
         "(defun f (a b) a)\n(print (f 1 0))\n(print (f 2 0))"
+    );
+}
+
+#[test]
+fn discovers_all_calls_respects_common_lisp_flet_callable_shadowing() {
+    let input = "\
+(defun f (a) a)
+(defun caller ()
+  (flet ((f (x) (f x)))
+    (f 1))
+  (f 2))";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        argument: "0".to_owned(),
+        call_paths: Vec::new(),
+        all_calls: true,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.call_paths, vec![path("1.3.1.0.2"), path("1.4")]);
+    assert_eq!(
+        plan.rewritten,
+        "\
+(defun f (a b) a)
+(defun caller ()
+  (flet ((f (x) (f x 0)))
+    (f 1))
+  (f 2 0))"
+    );
+}
+
+#[test]
+fn discovers_all_calls_respects_common_lisp_labels_callable_shadowing() {
+    let input = "\
+(defun f (a) a)
+(defun caller ()
+  (labels ((f (x) (f x))
+           (g (y) (f y)))
+    (f 1)
+    (cl:print (f 2)))
+  (f 3))";
+    let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("b"),
+        argument: "0".to_owned(),
+        call_paths: Vec::new(),
+        all_calls: true,
+        insert: FunctionParameterInsert::End,
+    })
+    .expect("plan");
+
+    assert_eq!(plan.call_paths, vec![path("1.4")]);
+    assert_eq!(
+        plan.rewritten,
+        "\
+(defun f (a b) a)
+(defun caller ()
+  (labels ((f (x) (f x))
+           (g (y) (f y)))
+    (f 1)
+    (cl:print (f 2)))
+  (f 3 0))"
     );
 }
 

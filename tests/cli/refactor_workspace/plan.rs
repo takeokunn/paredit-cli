@@ -35,6 +35,12 @@ fn cli_builds_gated_refactor_plan_for_agents() {
         .stdout(predicate::str::contains("\"safe_to_automate\": true"))
         .stdout(predicate::str::contains("\"policy_passed\": true"))
         .stdout(predicate::str::contains("\"blocking_gate_count\": 0"))
+        .stdout(predicate::str::contains("\"risk_summary\""))
+        .stdout(predicate::str::contains("\"highest_level\": \"warning\""))
+        .stdout(predicate::str::contains("\"warning_count\": 2"))
+        .stdout(predicate::str::contains("\"error_count\": 0"))
+        .stdout(predicate::str::contains("\"blocking_count\": 0"))
+        .stdout(predicate::str::contains("\"advisory_count\": 2"))
         .stdout(predicate::str::contains("\"name\": \"plan-policy\""))
         .stdout(predicate::str::contains(
             "\"name\": \"manual-review-gates\"",
@@ -229,9 +235,44 @@ fn cli_marks_refactor_plan_manual_review_when_blocking_gates_do_not_fail_policy(
         .stdout(predicate::str::contains(
             "\"next_action\": \"review-rename-scope\"",
         ))
+        .stdout(predicate::str::contains("\"risk_summary\""))
+        .stdout(predicate::str::contains("\"highest_level\": \"warning\""))
         .stdout(predicate::str::contains(
             "\"code\": \"ambiguous-definition\"",
         ))
         .stdout(predicate::str::contains("\"code\": \"signature-mismatch\""))
         .stdout(predicate::str::contains("\"command\": null"));
+}
+
+#[test]
+fn cli_prints_refactor_plan_risk_summary_in_text_output() {
+    let dir = fresh_temp_dir("refactor-plan-risk-text");
+    let file = dir.join("core.lisp");
+    fs::write(
+        &file,
+        r#"(defpackage #:demo.core (:use #:cl))
+(in-package #:demo.core)
+(defun render-pane (pane) (draw-pane pane))
+(defun caller () (render-pane window) render-pane)
+"#,
+    )
+    .expect("write text refactor plan fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("refactor-plan")
+        .arg("--symbol")
+        .arg("render-pane")
+        .arg("--operation")
+        .arg("rename")
+        .arg("--output")
+        .arg("text")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("risk_highest_level\twarning"))
+        .stdout(predicate::str::contains("risk_info_count\t0"))
+        .stdout(predicate::str::contains("risk_warning_count\t2"))
+        .stdout(predicate::str::contains("risk_error_count\t0"))
+        .stdout(predicate::str::contains("risk_blocking_count\t0"))
+        .stdout(predicate::str::contains("risk_advisory_count\t2"));
 }

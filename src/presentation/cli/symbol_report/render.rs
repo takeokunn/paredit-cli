@@ -3,8 +3,8 @@ use serde_json::json;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{SymbolName, SyntaxTree};
-use crate::presentation::cli::shared::matching_symbol_occurrences;
 use crate::presentation::cli::OutputFormat;
+use crate::presentation::cli::shared::matching_symbol_occurrences;
 
 use super::types::SymbolReportFile;
 

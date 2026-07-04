@@ -3,6 +3,7 @@ mod forms;
 mod patterns;
 mod symbols;
 
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::syntax::atom_text;
@@ -10,11 +11,13 @@ use forms::collect_inferred_extract_function_special_form;
 use symbols::is_extract_function_param_candidate;
 
 pub(super) fn infer_extract_function_params(
+    dialect: Dialect,
     selection: &ExpressionView,
     explicit_params: &[String],
 ) -> Vec<String> {
     let mut params = Vec::new();
     collect_inferred_extract_function_params(
+        dialect,
         selection,
         false,
         explicit_params,
@@ -25,6 +28,7 @@ pub(super) fn infer_extract_function_params(
 }
 
 fn collect_inferred_extract_function_params(
+    dialect: Dialect,
     view: &ExpressionView,
     is_call_head: bool,
     explicit_params: &[String],
@@ -43,12 +47,19 @@ fn collect_inferred_extract_function_params(
         return;
     }
 
-    if collect_inferred_extract_function_special_form(view, explicit_params, bound_params, params) {
+    if collect_inferred_extract_function_special_form(
+        dialect,
+        view,
+        explicit_params,
+        bound_params,
+        params,
+    ) {
         return;
     }
 
     for (index, child) in view.children.iter().enumerate() {
         collect_inferred_extract_function_params(
+            dialect,
             child,
             view.kind == ExpressionKind::List
                 && view.delimiter == Some(Delimiter::Paren)

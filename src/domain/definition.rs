@@ -82,7 +82,12 @@ pub fn classify_definition_head(dialect: Dialect, head: &str) -> Option<Definiti
         "defun" | "cl-defun" | "defsubst" | "definline" | "defn" | "defn-" => {
             DefinitionCategory::Function
         }
-        "defmacro" | "cl-defmacro" | "define-compiler-macro" => DefinitionCategory::Macro,
+        "defmacro"
+        | "cl-defmacro"
+        | "define-compiler-macro"
+        | "define-modify-macro"
+        | "define-setf-expander"
+        | "defsetf" => DefinitionCategory::Macro,
         "defgeneric" | "cl-defgeneric" => DefinitionCategory::GenericFunction,
         "defmethod" | "cl-defmethod" => DefinitionCategory::Method,
         "defclass" | "cl-defclass" => DefinitionCategory::Class,
@@ -158,6 +163,10 @@ mod tests {
         );
         assert_eq!(
             classify_definition_head(Dialect::CommonLisp, "cl:defmacro"),
+            Some(DefinitionCategory::Macro)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "define-setf-expander"),
             Some(DefinitionCategory::Macro)
         );
         assert_eq!(

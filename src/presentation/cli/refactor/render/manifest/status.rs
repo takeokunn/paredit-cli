@@ -1,5 +1,9 @@
 use super::super::super::super::*;
 use super::super::super::types::status::RefactorStatusResult;
+use super::{
+    blocked_reason_labels, blocked_reason_text, decision_steps_json, decision_summary_json,
+    print_decision_summary,
+};
 
 pub(in crate::presentation::cli) fn print_refactor_status_result(
     result: &RefactorStatusResult,
@@ -20,12 +24,7 @@ pub(in crate::presentation::cli) fn print_refactor_status_result(
             println!("next_action\t{}", result.next_action.label());
             println!(
                 "blocked_reasons\t{}",
-                result
-                    .blocked_reasons
-                    .iter()
-                    .map(|reason| reason.label())
-                    .collect::<Vec<_>>()
-                    .join(",")
+                blocked_reason_text(&result.blocked_reasons)
             );
             for step in result.steps() {
                 println!(
@@ -34,6 +33,7 @@ pub(in crate::presentation::cli) fn print_refactor_status_result(
                     step.status.label()
                 );
             }
+            print_decision_summary(result.decision_summary());
             println!("manifest_policy_passed\t{}", result.manifest_policy_passed);
             println!("manifest_outputs_parse\t{}", result.manifest_outputs_parse);
             println!("can_apply\t{}", result.summary.can_apply);
@@ -94,19 +94,9 @@ pub(in crate::presentation::cli) fn print_refactor_status_result(
                 },
                 "status": result.status.label(),
                 "next_action": result.next_action.label(),
-                "blocked_reasons": result
-                    .blocked_reasons
-                    .iter()
-                    .map(|reason| reason.label())
-                    .collect::<Vec<_>>(),
-                "steps": result
-                    .steps()
-                    .into_iter()
-                    .map(|step| json!({
-                        "name": step.name,
-                        "status": step.status.label(),
-                    }))
-                    .collect::<Vec<_>>(),
+                "blocked_reasons": blocked_reason_labels(&result.blocked_reasons),
+                "steps": decision_steps_json(result.steps()),
+                "decision_summary": decision_summary_json(result.decision_summary()),
                 "manifest_policy_passed": result.manifest_policy_passed,
                 "manifest_outputs_parse": result.manifest_outputs_parse,
                     "summary": {

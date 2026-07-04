@@ -2,9 +2,12 @@ use anyhow::{Context, Result};
 
 use crate::domain::sexpr::SyntaxTree;
 
-use super::calls::{remove_function_parameter_call_edit, resolve_function_call_paths};
+use super::calls::{
+    remove_function_parameter_call_edit, remove_keyword_function_parameter_call_edit,
+    resolve_function_call_paths,
+};
 use super::definition::{
-    find_unique_parameter_item_index, parse_remove_function_parameter_definition,
+    find_unique_parameter_location, parse_remove_function_parameter_definition,
 };
 use super::list_edit::{
     apply_byte_span_edits, ensure_non_overlapping_spans, removal_edit_for_list_item, spans_overlap,
@@ -18,15 +21,25 @@ pub fn plan_remove_function_parameter(
     let definition_selection = tree.select_path(&request.definition_path)?;
     let target =
         parse_remove_function_parameter_definition(request.dialect, definition_selection.view())?;
-    let parameter_item_index = find_unique_parameter_item_index(
-        &target.parameter_container,
-        target.protected_prefix_count,
-        &request.name,
-        "remove-function-parameter",
-    )?;
-    let parameter_index = parameter_item_index - target.protected_prefix_count;
+    let parameter =
+        find_unique_parameter_location(&target, &request.name, "remove-function-parameter")?;
+    let parameter_item_index = parameter.item_index;
+    let parameter_index = parameter
+        .call_index
+        .or_else(|| {
+            parameter
+                .keyword_argument
+                .as_ref()
+                .map(|keyword| keyword.positional_prefix_count)
+        })
+        .unwrap_or(parameter_item_index);
+    let parameter_keyword = parameter
+        .keyword_argument
+        .as_ref()
+        .map(|keyword| keyword.keyword.clone());
     let call_paths = resolve_function_call_paths(
         &tree,
+        request.dialect,
         request.call_paths,
         request.all_calls,
         target.definition_span,
@@ -50,13 +63,30 @@ pub fn plan_remove_function_parameter(
                 call_path
             );
         }
-        let (call_span, removed_argument, edit) = remove_function_parameter_call_edit(
-            request.input,
-            call_selection.view(),
-            &target.function_name,
-            parameter_index,
-            request.allow_missing_argument,
-        )?;
+        let (call_span, removed_argument, edit) =
+            if let Some(keyword_argument) = parameter.keyword_argument.as_ref() {
+                remove_keyword_function_parameter_call_edit(
+                    request.input,
+                    call_selection.view(),
+                    &target.function_name,
+                    &keyword_argument.keyword,
+                    keyword_argument.positional_prefix_count,
+                    request.allow_missing_argument,
+                )?
+            } else if let Some(call_index) = parameter.call_index {
+                remove_function_parameter_call_edit(
+                    request.input,
+                    call_selection.view(),
+                    &target.function_name,
+                    call_index,
+                    request.allow_missing_argument,
+                )?
+            } else {
+                anyhow::bail!(
+                    "remove-function-parameter parameter '{}' is not a call argument",
+                    request.name
+                );
+            };
         call_spans.push(call_span);
         removed_arguments.push(removed_argument);
         if let Some(edit) = edit {
@@ -83,6 +113,7 @@ pub fn plan_remove_function_parameter(
         function_name: target.function_name,
         parameter_name: request.name,
         parameter_index,
+        parameter_keyword,
         removed_arguments,
         rewritten,
         changed,

@@ -128,6 +128,28 @@ pub(in crate::presentation::cli) struct RenameFunctionArgs {
 }
 
 #[derive(Debug, Args)]
+pub(in crate::presentation::cli) struct RenameMacroletArgs {
+    /// Files to scan and optionally rewrite.
+    #[arg(required = true)]
+    pub(super) files: Vec<PathBuf>,
+    /// Override extension-based dialect detection for every file.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
+    /// Existing macrolet or compiler-macrolet binding name.
+    #[arg(long)]
+    pub(super) from: SymbolName,
+    /// Replacement macrolet or compiler-macrolet binding name.
+    #[arg(long)]
+    pub(super) to: SymbolName,
+    /// Rewrite changed files in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub(super) output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct WrapFunctionCallsArgs {
     /// Files to scan and optionally rewrite.
     #[arg(required = true)]
@@ -141,6 +163,9 @@ pub(in crate::presentation::cli) struct WrapFunctionCallsArgs {
     /// Wrapper callable or macro inserted around each selected call.
     #[arg(long)]
     pub(super) wrapper: SymbolName,
+    /// Wrapper form template containing exactly one "_" placeholder for the original call.
+    #[arg(long = "wrapper-template")]
+    pub(super) wrapper_template: Option<String>,
     /// Wrap all matching call sites.
     #[arg(long)]
     pub(super) all_calls: bool,

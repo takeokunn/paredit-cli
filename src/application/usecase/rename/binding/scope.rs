@@ -40,12 +40,16 @@ fn collect_shadow_aware_special_form(
     };
 
     match head {
-        "let" => {
+        "let" | "symbol-macrolet" => {
             collect_parallel_let_references(view, symbol, output, shadowed_scope_count, input);
             true
         }
         "let*" => {
             collect_sequential_let_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
+        "destructuring-bind" | "multiple-value-bind" => {
+            collect_value_binding_references(view, symbol, output, shadowed_scope_count, input);
             true
         }
         "lambda" | "fn" => {
@@ -55,7 +59,7 @@ fn collect_shadow_aware_special_form(
             }
             false
         }
-        "defun" | "defmacro" => {
+        "defun" | "defmacro" | "define-setf-expander" | "define-compiler-macro" => {
             if view.children.len() > 2 && parameter_form_binds(&view.children[2], symbol, input) {
                 *shadowed_scope_count += 1;
             }
@@ -102,6 +106,33 @@ fn collect_parallel_let_references(
     }
 
     for body in &view.children[2..] {
+        collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn collect_value_binding_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    if let Some(value_form) = view.children.get(2) {
+        collect_symbol_atom_spans_unshadowed(
+            value_form,
+            symbol,
+            output,
+            shadowed_scope_count,
+            input,
+        );
+    }
+
+    if parameter_form_binds(&view.children[1], symbol, input) {
+        *shadowed_scope_count += 1;
+        return;
+    }
+
+    for body in &view.children[3..] {
         collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
     }
 }

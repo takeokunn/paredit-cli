@@ -13,19 +13,21 @@ pub use types::{
     RawRefactorRisk, RefactorOperation, RefactorPlanAutomationDecision,
     RefactorPlanAutomationStatus, RefactorPlanAutomationStep, RefactorPlanAutomationStepStatus,
     RefactorPlanDecision, RefactorPlanGate, RefactorPlanPolicy, RefactorPlanPolicyRequest,
-    RefactorPlanRequest, RefactorPlanStep, RefactorPlanSummary, RefactorRiskLevel,
-    RefactorVerificationCheck, RefactorVerificationRequest, VerificationPhase,
+    RefactorPlanRequest, RefactorPlanRiskSummary, RefactorPlanStep, RefactorPlanSummary,
+    RefactorRiskLevel, RefactorVerificationCheck, RefactorVerificationRequest, VerificationPhase,
 };
 pub use verification::refactor_verification_checks;
 
 pub fn build_refactor_plan_decision(request: RefactorPlanRequest<'_>) -> RefactorPlanDecision {
     let gates = refactor_plan_gates(request.operation, &request.summary, request.risks);
+    let risk_summary = RefactorPlanRiskSummary::from_gates(&gates);
     let steps = refactor_plan_steps(request.operation, request.symbol, request.files, &gates);
     let policy = evaluate_refactor_plan_policy(request.policy, &request.summary, &gates);
     let automation = refactor_plan_automation_decision(&policy, &steps);
 
     RefactorPlanDecision {
         gates,
+        risk_summary,
         steps,
         policy,
         automation,

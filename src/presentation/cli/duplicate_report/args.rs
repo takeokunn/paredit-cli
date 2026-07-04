@@ -36,6 +36,9 @@ pub(in crate::presentation::cli) struct ReplacementPlanArgs {
     /// Placeholder replacement form for generated replace-forms commands.
     #[arg(long, default_value = "(TODO-refactor)")]
     pub(super) replacement: String,
+    /// Keep the first matching form as the canonical sample and replace only later duplicates.
+    #[arg(long)]
+    pub(super) keep_first: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,

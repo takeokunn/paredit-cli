@@ -111,6 +111,36 @@ fn cli_infers_extract_function_params_without_sequential_let_bindings() {
 }
 
 #[test]
+fn cli_infers_extract_function_params_without_symbol_macrolet_bindings() {
+    let mut cmd = paredit();
+    cmd.args([
+        "extract-function",
+        "--path",
+        "0.3",
+        "--name",
+        "build",
+        "--infer-params",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render (outer) (symbol-macrolet ((local (compute outer))) (list local outer)))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"params\": [\n    \"outer\"\n  ]",
+    ))
+    .stdout(predicate::str::contains(
+        "\"inferred_params\": [\n    \"outer\"\n  ]",
+    ))
+    .stdout(predicate::str::contains("\"call\": \"(build outer)\""))
+    .stdout(predicate::str::contains(
+        "\"definition\": \"(defun build (outer) (symbol-macrolet ((local (compute outer))) (list local outer)))\"",
+    ));
+}
+
+#[test]
 fn cli_infers_extract_function_params_without_clojure_destructuring_let_bindings() {
     let mut cmd = paredit();
     cmd.args([
@@ -167,5 +197,97 @@ fn cli_infers_extract_function_params_without_clojure_destructuring_lambda_bindi
     .stdout(predicate::str::contains("\"call\": \"(compute scale)\""))
     .stdout(predicate::str::contains(
         "\"definition\": \"(defn compute [scale] (fn [[x y]] (+ x y scale)))\"",
+    ));
+}
+
+#[test]
+fn cli_infers_extract_function_params_without_common_lisp_lambda_list_init_bindings() {
+    let mut cmd = paredit();
+    cmd.args([
+        "extract-function",
+        "--path",
+        "0.3",
+        "--name",
+        "build",
+        "--infer-params",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render (fallback) (lambda (&optional (value (fallback value) supplied)) (list value supplied fallback)))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"params\": [\n    \"fallback\"\n  ]",
+    ))
+    .stdout(predicate::str::contains(
+        "\"inferred_params\": [\n    \"fallback\"\n  ]",
+    ))
+    .stdout(predicate::str::contains("\"call\": \"(build fallback)\""))
+    .stdout(predicate::str::contains(
+        "\"definition\": \"(defun build (fallback) (lambda (&optional (value (fallback value) supplied)) (list value supplied fallback)))\"",
+    ));
+}
+
+#[test]
+fn cli_infers_extract_function_params_without_define_setf_expander_macro_lambda_list_bindings() {
+    let mut cmd = paredit();
+    cmd.args([
+        "extract-function",
+        "--path",
+        "0",
+        "--name",
+        "wrap-expander",
+        "--infer-params",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(define-setf-expander slot (&whole whole &environment env target) (list whole env target outer))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"params\": [\n    \"outer\"\n  ]",
+    ))
+    .stdout(predicate::str::contains(
+        "\"inferred_params\": [\n    \"outer\"\n  ]",
+    ))
+    .stdout(predicate::str::contains("\"call\": \"(wrap-expander outer)\""))
+    .stdout(predicate::str::contains(
+        "\"definition\": \"(defun wrap-expander (outer) (define-setf-expander slot (&whole whole &environment env target) (list whole env target outer)))\"",
+    ));
+}
+
+#[test]
+fn cli_infers_extract_function_params_without_define_compiler_macro_lambda_list_bindings() {
+    let mut cmd = paredit();
+    cmd.args([
+        "extract-function",
+        "--path",
+        "0",
+        "--name",
+        "wrap-compiler-macro",
+        "--infer-params",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(define-compiler-macro render (&whole whole &environment env target) (list whole env target outer))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"params\": [\n    \"outer\"\n  ]",
+    ))
+    .stdout(predicate::str::contains(
+        "\"inferred_params\": [\n    \"outer\"\n  ]",
+    ))
+    .stdout(predicate::str::contains(
+        "\"call\": \"(wrap-compiler-macro outer)\"",
+    ))
+    .stdout(predicate::str::contains(
+        "\"definition\": \"(defun wrap-compiler-macro (outer) (define-compiler-macro render (&whole whole &environment env target) (list whole env target outer)))\"",
     ));
 }

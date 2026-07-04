@@ -14,7 +14,9 @@ mod syntax;
 mod tests;
 mod types;
 
-use calls::{parse_inline_function_call, resolve_function_call_paths};
+use calls::{
+    bind_inline_function_arguments, parse_inline_function_call, resolve_function_call_paths,
+};
 use definition::parse_inline_function_definition;
 use rewrite::{apply_byte_span_edits, expand_definition_removal};
 use substitution::substitute_inline_function_body;
@@ -40,6 +42,7 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
         parse_inline_function_definition(request.dialect, definition_selection.view())?;
     let call_paths = resolve_function_call_paths(
         &tree,
+        request.dialect,
         request.call_paths,
         request.all_calls,
         definition_span,
@@ -120,21 +123,17 @@ fn inline_function_parts(
 ) -> Result<InlineFunctionParts> {
     let (function_name, params, body) =
         parse_inline_function_definition(dialect, definition_selection.clone())?;
-    let args = parse_inline_function_call(call_selection.clone(), &function_name, input)?;
-
-    if params.len() != args.len() {
-        anyhow::bail!(
-            "inline-function arity mismatch for {}: definition has {} parameter(s), call has {} argument(s)",
-            function_name,
-            params.len(),
-            args.len()
-        );
-    }
+    let raw_args = parse_inline_function_call(call_selection.clone(), &function_name, input)?;
+    let args = bind_inline_function_arguments(&params, raw_args, &function_name)?;
+    let param_names = params
+        .iter()
+        .map(|param| param.name.clone())
+        .collect::<Vec<_>>();
 
     let (replacement, parameters) = substitute_inline_function_body(
         input,
         &body,
-        &params,
+        &param_names,
         &args,
         allow_duplicate_evaluation,
         allow_drop_arguments,

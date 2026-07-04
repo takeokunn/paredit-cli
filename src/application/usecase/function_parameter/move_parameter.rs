@@ -3,9 +3,7 @@ use anyhow::{Context, Result};
 use crate::domain::sexpr::SyntaxTree;
 
 use super::calls::{move_function_parameter_call_edit, resolve_function_call_paths};
-use super::definition::{
-    find_unique_parameter_item_index, parse_move_function_parameter_definition,
-};
+use super::definition::{find_unique_parameter_location, parse_move_function_parameter_definition};
 use super::list_edit::{
     apply_byte_span_edits, ensure_non_overlapping_spans, move_list_item_edit, spans_overlap,
 };
@@ -18,13 +16,15 @@ pub fn plan_move_function_parameter(
     let definition_selection = tree.select_path(&request.definition_path)?;
     let target =
         parse_move_function_parameter_definition(request.dialect, definition_selection.view())?;
-    let parameter_item_index = find_unique_parameter_item_index(
-        &target.parameter_container,
-        target.protected_prefix_count,
-        &request.name,
-        "move-function-parameter",
-    )?;
-    let from_index = parameter_item_index - target.protected_prefix_count;
+    if target.has_lambda_list_marker {
+        anyhow::bail!(
+            "move-function-parameter currently supports only flat positional parameter lists"
+        );
+    }
+    let parameter =
+        find_unique_parameter_location(&target, &request.name, "move-function-parameter")?;
+    let parameter_item_index = parameter.item_index;
+    let from_index = parameter.call_index.expect("flat positional parameter");
     let parameter_count = target
         .parameter_container
         .children
@@ -39,6 +39,7 @@ pub fn plan_move_function_parameter(
     }
     let call_paths = resolve_function_call_paths(
         &tree,
+        request.dialect,
         request.call_paths,
         request.all_calls,
         target.definition_span,

@@ -180,6 +180,13 @@ mod tests {
     use crate::presentation::cli::refactor::types::root::RefactorRootReport;
     use crate::presentation::cli::refactor::types::status::RefactorManifestDecisionStepStatus;
 
+    fn count_step_status(
+        steps: &[crate::presentation::cli::refactor::types::status::RefactorManifestDecisionStep],
+        status: RefactorManifestDecisionStepStatus,
+    ) -> usize {
+        steps.iter().filter(|step| step.status == status).count()
+    }
+
     fn check_result(
         manifest_policy_passed: bool,
         manifest_outputs_parse: bool,
@@ -394,6 +401,28 @@ mod tests {
                     RefactorManifestDecisionStepStatus::Skipped
                 }
             );
+
+            let summary = decision.summary();
+            prop_assert_eq!(
+                summary.passed_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Passed)
+            );
+            prop_assert_eq!(
+                summary.failed_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Failed)
+            );
+            prop_assert_eq!(
+                summary.skipped_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Skipped)
+            );
+            prop_assert_eq!(
+                summary.scheduled_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Scheduled)
+            );
+            prop_assert_eq!(
+                summary.blocked_reason_count,
+                decision.blocked_reasons.len()
+            );
         }
 
         #[test]
@@ -454,8 +483,31 @@ mod tests {
                 }
             );
             prop_assert_eq!(
-                apply_decision.blocked_reasons,
-                manifest_decision.blocked_reasons
+                &apply_decision.blocked_reasons,
+                &manifest_decision.blocked_reasons
+            );
+
+            let steps = apply_decision.steps();
+            let summary = apply_decision.summary();
+            prop_assert_eq!(
+                summary.passed_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Passed)
+            );
+            prop_assert_eq!(
+                summary.failed_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Failed)
+            );
+            prop_assert_eq!(
+                summary.skipped_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Skipped)
+            );
+            prop_assert_eq!(
+                summary.scheduled_step_count,
+                count_step_status(&steps, RefactorManifestDecisionStepStatus::Scheduled)
+            );
+            prop_assert_eq!(
+                summary.blocked_reason_count,
+                apply_decision.blocked_reasons.len()
             );
         }
     }

@@ -80,6 +80,7 @@ proptest! {
             dialect: Dialect::CommonLisp,
             function: SymbolName::new(function.clone()).unwrap(),
             wrapper: SymbolName::new(wrapper.clone()).unwrap(),
+            wrapper_template: None,
             scope: WrapFunctionCallsScope::AllCalls,
         }).unwrap();
         let unwrapped = plan_unwrap_function_calls(UnwrapFunctionCallsRequest {

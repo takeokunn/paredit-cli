@@ -43,6 +43,14 @@ fn parallel_let_checks_binding_values_before_body_shadowing() {
 }
 
 #[test]
+fn symbol_macrolet_checks_expansions_before_body_shadowing() {
+    let input = "(symbol-macrolet ((x outer) (y x)) (list x y outer))";
+
+    assert_eq!(reference_texts(input, "x"), vec!["x"]);
+    assert_eq!(reference_texts(input, "outer"), vec!["outer", "outer"]);
+}
+
+#[test]
 fn clojure_vector_let_is_sequential_for_shadowing() {
     let input = "(let [y x x 2] (list x y))";
 
@@ -54,6 +62,30 @@ fn clojure_destructuring_shadows_keys_shorthand() {
     let input = "(list x (fn [{:keys [x] :as m}] x m))";
 
     assert_eq!(reference_texts(input, "x"), vec!["x"]);
+}
+
+#[test]
+fn lambda_list_default_forms_remain_outer_references() {
+    let input = "(list fallback (lambda (&optional (x (fallback y) supplied)) x))";
+
+    assert_eq!(
+        reference_texts(input, "fallback"),
+        vec!["fallback", "fallback"]
+    );
+}
+
+#[test]
+fn define_setf_expander_body_is_definition_scope_boundary() {
+    let input = "(list outer (define-setf-expander slot (place) (list outer place)) outer)";
+
+    assert_eq!(reference_texts(input, "outer"), vec!["outer", "outer"]);
+}
+
+#[test]
+fn define_compiler_macro_body_is_definition_scope_boundary() {
+    let input = "(list outer (define-compiler-macro render (place) (list outer place)) outer)";
+
+    assert_eq!(reference_texts(input, "outer"), vec!["outer", "outer"]);
 }
 
 proptest! {

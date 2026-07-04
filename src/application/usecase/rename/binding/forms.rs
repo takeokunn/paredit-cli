@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
-use super::destructure::binding_pattern_name_spans;
+use super::destructure::{binding_pattern_name_spans, lambda_list_name_spans};
 use super::types::{BindingGroup, ParameterNameSpan};
 
 pub(super) fn binding_groups(
@@ -40,11 +40,7 @@ pub(super) fn parameter_name_spans(
         anyhow::bail!("parameter form must be a list");
     }
 
-    Ok(parameter_form
-        .children
-        .iter()
-        .flat_map(|child| binding_pattern_name_spans(child, input))
-        .collect())
+    Ok(lambda_list_name_spans(parameter_form, input))
 }
 
 pub(super) fn parameter_form_binds(
@@ -53,10 +49,8 @@ pub(super) fn parameter_form_binds(
     input: &str,
 ) -> bool {
     parameter_form.kind == ExpressionKind::List
-        && parameter_form
-            .children
+        && lambda_list_name_spans(parameter_form, input)
             .iter()
-            .flat_map(|child| binding_pattern_name_spans(child, input))
             .any(|name| name.name == symbol.as_str())
 }
 

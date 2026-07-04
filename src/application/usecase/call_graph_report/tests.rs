@@ -63,6 +63,30 @@ fn can_include_external_edges_and_filter_by_symbol() {
 }
 
 #[test]
+fn skips_common_lisp_local_callable_edges_to_shadowed_global_definitions() {
+    let report = build_call_graph_report(
+        vec![source(
+            "(defun helper (x y) y)\n(defun main () (flet ((helper (x) (target x))) (helper 1)))\n(defun target (x) x)",
+        )],
+        false,
+        None,
+    )
+    .unwrap();
+    let edges = &report.files[0].edges;
+
+    assert!(
+        !edges
+            .iter()
+            .any(|edge| edge.caller.as_deref() == Some("main") && edge.callee == "helper")
+    );
+    assert!(
+        edges
+            .iter()
+            .any(|edge| edge.caller.as_deref() == Some("main") && edge.callee == "target")
+    );
+}
+
+#[test]
 fn policy_counts_inbound_edges_without_self_recursive_calls() {
     let symbol = SymbolName::new("target").unwrap();
     let report = build_call_graph_report(

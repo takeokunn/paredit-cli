@@ -56,6 +56,48 @@ fn explicit_path_must_select_matching_call() {
     assert!(error.to_string().contains("call-path 0 is not a call"));
 }
 
+#[test]
+fn all_calls_skip_labels_local_function_calls() {
+    let input = "(defun main () (labels ((fetch-user (id) (fetch-user id))) (fetch-user user)))\n(fetch-user root)";
+    let plan = plan_replace_function_calls(ReplaceFunctionCallsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        from: SymbolName::new("fetch-user").unwrap(),
+        to: SymbolName::new("load-user").unwrap(),
+        scope: ReplaceFunctionCallsScope::AllCalls,
+    })
+    .unwrap();
+
+    assert_eq!(plan.calls.len(), 1);
+    assert!(
+        plan.rewritten
+            .contains("(labels ((fetch-user (id) (fetch-user id))) (fetch-user user))")
+    );
+    assert!(plan.rewritten.contains("(load-user root)"));
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn all_calls_replaces_outer_calls_inside_flet_binding_bodies_only() {
+    let input = "(defun main () (flet ((fetch-user (id) (fetch-user id))) (fetch-user user)))\n(fetch-user root)";
+    let plan = plan_replace_function_calls(ReplaceFunctionCallsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        from: SymbolName::new("fetch-user").unwrap(),
+        to: SymbolName::new("load-user").unwrap(),
+        scope: ReplaceFunctionCallsScope::AllCalls,
+    })
+    .unwrap();
+
+    assert_eq!(plan.calls.len(), 2);
+    assert!(
+        plan.rewritten
+            .contains("(flet ((fetch-user (id) (load-user id))) (fetch-user user))")
+    );
+    assert!(plan.rewritten.contains("(load-user root)"));
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 

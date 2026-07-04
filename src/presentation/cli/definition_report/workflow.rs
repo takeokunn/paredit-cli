@@ -2,8 +2,8 @@ use super::super::*;
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
 use crate::application::usecase::definition_report::{
-    build_definition_report, build_parsed_definition_file, collect_unused_definition_candidates,
-    evaluate_unused_definition_policy, UnusedDefinitionPolicyOptions,
+    UnusedDefinitionPolicyOptions, build_definition_report, build_parsed_definition_file,
+    collect_unused_definition_candidates, evaluate_unused_definition_policy,
 };
 
 pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs) -> Result<()> {

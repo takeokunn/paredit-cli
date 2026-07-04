@@ -60,6 +60,45 @@ fn cli_plans_add_function_parameter_with_all_calls() {
 }
 
 #[test]
+fn cli_plans_add_function_parameter_all_calls_without_common_lisp_labels_shadowed_calls() {
+    let mut cmd = paredit();
+    cmd.args([
+        "add-function-parameter",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--name",
+        "b",
+        "--argument",
+        "0",
+        "--all-calls",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "\
+(defun f (a) a)
+(defun caller ()
+  (labels ((f (x) (f x))
+           (g (y) (f y)))
+    (f 1)
+    (cl:print (f 2)))
+  (f 3))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"all_calls\": true"))
+    .stdout(predicate::str::contains(
+        "\"call_paths\": [\n    \"1.4\"\n  ]",
+    ))
+    .stdout(predicate::str::contains("(defun f (a b) a)"))
+    .stdout(predicate::str::contains("(f x))"))
+    .stdout(predicate::str::contains("(f 1)"))
+    .stdout(predicate::str::contains("(f 3 0)"));
+}
+
+#[test]
 fn cli_writes_add_function_parameter_for_scheme_start() {
     let dir = fresh_temp_dir("add-function-parameter");
     let scheme_file = dir.join("render.scm");

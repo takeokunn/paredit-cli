@@ -21,6 +21,13 @@ impl RefactorStatusResult {
     pub(in crate::presentation::cli) fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
         RefactorManifestDecision::steps_from_blocked_reasons(&self.blocked_reasons)
     }
+
+    pub(in crate::presentation::cli) fn decision_summary(&self) -> RefactorManifestDecisionSummary {
+        RefactorManifestDecisionSummary::from_steps_and_blocked_reasons(
+            self.steps(),
+            self.blocked_reasons.len(),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +55,13 @@ pub(in crate::presentation::cli) struct RefactorManifestDecision {
 impl RefactorManifestDecision {
     pub(in crate::presentation::cli) fn steps(&self) -> [RefactorManifestDecisionStep; 5] {
         Self::steps_from_blocked_reasons(&self.blocked_reasons)
+    }
+
+    pub(in crate::presentation::cli) fn summary(&self) -> RefactorManifestDecisionSummary {
+        RefactorManifestDecisionSummary::from_steps_and_blocked_reasons(
+            self.steps(),
+            self.blocked_reasons.len(),
+        )
     }
 
     fn steps_from_blocked_reasons(
@@ -128,6 +142,13 @@ impl RefactorApplyDecision {
             RefactorApplyDecisionStatus::Blocked => RefactorManifestDecisionStepStatus::Skipped,
         };
         steps
+    }
+
+    pub(in crate::presentation::cli) fn summary(&self) -> RefactorManifestDecisionSummary {
+        RefactorManifestDecisionSummary::from_steps_and_blocked_reasons(
+            self.steps(),
+            self.blocked_reasons.len(),
+        )
     }
 }
 
@@ -213,6 +234,41 @@ impl RefactorManifestDecisionStepStatus {
 pub(in crate::presentation::cli) struct RefactorManifestDecisionStep {
     pub(in crate::presentation::cli) name: &'static str,
     pub(in crate::presentation::cli) status: RefactorManifestDecisionStepStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::presentation::cli) struct RefactorManifestDecisionSummary {
+    pub(in crate::presentation::cli) passed_step_count: usize,
+    pub(in crate::presentation::cli) failed_step_count: usize,
+    pub(in crate::presentation::cli) skipped_step_count: usize,
+    pub(in crate::presentation::cli) scheduled_step_count: usize,
+    pub(in crate::presentation::cli) blocked_reason_count: usize,
+}
+
+impl RefactorManifestDecisionSummary {
+    fn from_steps_and_blocked_reasons(
+        steps: [RefactorManifestDecisionStep; 5],
+        blocked_reason_count: usize,
+    ) -> Self {
+        let mut summary = Self {
+            passed_step_count: 0,
+            failed_step_count: 0,
+            skipped_step_count: 0,
+            scheduled_step_count: 0,
+            blocked_reason_count,
+        };
+
+        for step in steps {
+            match step.status {
+                RefactorManifestDecisionStepStatus::Passed => summary.passed_step_count += 1,
+                RefactorManifestDecisionStepStatus::Failed => summary.failed_step_count += 1,
+                RefactorManifestDecisionStepStatus::Skipped => summary.skipped_step_count += 1,
+                RefactorManifestDecisionStepStatus::Scheduled => summary.scheduled_step_count += 1,
+            }
+        }
+
+        summary
+    }
 }
 
 fn step_status_for_reason(

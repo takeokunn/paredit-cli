@@ -24,6 +24,37 @@ fn cli_plans_inline_function_with_parameters() {
 }
 
 #[test]
+fn cli_plans_inline_function_with_common_lisp_key_parameter() {
+    let mut cmd = paredit();
+    cmd.args([
+        "inline-function",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--call-path",
+        "1.3",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun render-one (x &key (style :plain)) (list x style))\n\
+         (defun render () (render-one 1 :style :bold))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains(
+        "\"function_name\": \"render-one\"",
+    ))
+    .stdout(predicate::str::contains(
+        "\"replacement\": \"(list 1 :bold)\"",
+    ))
+    .stdout(predicate::str::contains("\"name\": \"style\""))
+    .stdout(predicate::str::contains("\"argument\": \":bold\""))
+    .stdout(predicate::str::contains("(defun render () (list 1 :bold))"));
+}
+
+#[test]
 fn cli_writes_inline_function_and_removes_definition() {
     let dir = fresh_temp_dir("inline-function");
     let lisp_file = dir.join("render.lisp");
@@ -82,6 +113,35 @@ fn cli_plans_inline_function_with_all_calls() {
     .stdout(predicate::str::contains(
         "(defun summarize () (+ (* 3 4) 1))",
     ));
+}
+
+#[test]
+fn cli_plans_inline_function_all_calls_without_common_lisp_labels_shadowed_calls() {
+    let mut cmd = paredit();
+    cmd.args([
+        "inline-function",
+        "--dialect",
+        "common-lisp",
+        "--definition-path",
+        "0",
+        "--all-calls",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defun helper (x) (+ x 1))\n\
+         (defun render () (labels ((helper (x) (if x (helper nil) 0))) (helper t)) (helper 3))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"all_calls\": true"))
+    .stdout(predicate::str::contains("\"call_paths\": ["))
+    .stdout(predicate::str::contains("\"1.4\""))
+    .stdout(predicate::str::contains("\"replacement\": \"(+ 3 1)\""))
+    .stdout(predicate::str::contains(
+        "(labels ((helper (x) (if x (helper nil) 0))) (helper t)) (+ 3 1)",
+    ))
+    .stdout(predicate::str::contains("\"1.3.1.0.2.2\"").not());
 }
 
 #[test]

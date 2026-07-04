@@ -117,6 +117,18 @@ pub struct RefactorExecuteStep {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RefactorExecuteDecisionSummary {
+    pub passed_step_count: usize,
+    pub failed_step_count: usize,
+    pub skipped_step_count: usize,
+    pub scheduled_step_count: usize,
+    pub write_parse_refused: bool,
+    pub run_pre_verification: bool,
+    pub apply_preview: bool,
+    pub run_post_verification: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefactorExecuteDecision {
     pub status: RefactorExecuteDecisionStatus,
     pub write_parse_refused: bool,
@@ -126,6 +138,30 @@ pub struct RefactorExecuteDecision {
 }
 
 impl RefactorExecuteDecision {
+    pub fn summary(self) -> RefactorExecuteDecisionSummary {
+        let mut summary = RefactorExecuteDecisionSummary {
+            passed_step_count: 0,
+            failed_step_count: 0,
+            skipped_step_count: 0,
+            scheduled_step_count: 0,
+            write_parse_refused: self.write_parse_refused,
+            run_pre_verification: self.run_pre_verification,
+            apply_preview: self.apply_preview,
+            run_post_verification: self.run_post_verification,
+        };
+
+        for step in self.steps() {
+            match step.status {
+                RefactorExecuteStepStatus::Passed => summary.passed_step_count += 1,
+                RefactorExecuteStepStatus::Failed => summary.failed_step_count += 1,
+                RefactorExecuteStepStatus::Skipped => summary.skipped_step_count += 1,
+                RefactorExecuteStepStatus::Scheduled => summary.scheduled_step_count += 1,
+            }
+        }
+
+        summary
+    }
+
     pub fn steps(self) -> [RefactorExecuteStep; 5] {
         [
             RefactorExecuteStep {

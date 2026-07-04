@@ -4,7 +4,7 @@ use crate::domain::sexpr::SyntaxTree;
 
 use super::calls::{resolve_function_call_paths, swap_function_parameter_call_edit};
 use super::definition::{
-    find_unique_parameter_item_index, parse_swap_function_parameters_definition,
+    find_unique_parameter_location, parse_swap_function_parameters_definition,
 };
 use super::list_edit::{
     apply_byte_span_edits, ensure_non_overlapping_spans, spans_overlap, swap_list_item_edit,
@@ -22,22 +22,22 @@ pub fn plan_swap_function_parameters(
     let definition_selection = tree.select_path(&request.definition_path)?;
     let target =
         parse_swap_function_parameters_definition(request.dialect, definition_selection.view())?;
-    let left_item_index = find_unique_parameter_item_index(
-        &target.parameter_container,
-        target.protected_prefix_count,
-        &request.left_name,
-        "swap-function-parameters",
-    )?;
-    let right_item_index = find_unique_parameter_item_index(
-        &target.parameter_container,
-        target.protected_prefix_count,
-        &request.right_name,
-        "swap-function-parameters",
-    )?;
-    let left_index = left_item_index - target.protected_prefix_count;
-    let right_index = right_item_index - target.protected_prefix_count;
+    if target.has_lambda_list_marker {
+        anyhow::bail!(
+            "swap-function-parameters currently supports only flat positional parameter lists"
+        );
+    }
+    let left =
+        find_unique_parameter_location(&target, &request.left_name, "swap-function-parameters")?;
+    let right =
+        find_unique_parameter_location(&target, &request.right_name, "swap-function-parameters")?;
+    let left_item_index = left.item_index;
+    let right_item_index = right.item_index;
+    let left_index = left.call_index.expect("flat positional parameter");
+    let right_index = right.call_index.expect("flat positional parameter");
     let call_paths = resolve_function_call_paths(
         &tree,
+        request.dialect,
         request.call_paths,
         request.all_calls,
         target.definition_span,

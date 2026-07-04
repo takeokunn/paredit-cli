@@ -106,3 +106,58 @@ fn cli_plans_clojure_as_destructured_fn_parameter_rename_without_shadow_capture(
         "(fn [{:keys [value] :as record}] (list value record (fn [row] row)))",
     ));
 }
+
+#[test]
+fn cli_plans_common_lisp_destructuring_bind_rename_without_touching_value_form() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "slot",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(destructuring-bind (value other) (parse value) (list value other))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"destructuring-bind\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(destructuring-bind (slot other) (parse value) (list slot other))",
+    ));
+}
+
+#[test]
+fn cli_plans_common_lisp_multiple_value_bind_rename_without_shadow_capture() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "slot",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(multiple-value-bind (value other) (compute) (list value (destructuring-bind (value) row value) other value))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"multiple-value-bind\""))
+    .stdout(predicate::str::contains("\"reference_count\": 2"))
+    .stdout(predicate::str::contains("\"shadowed_scope_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(multiple-value-bind (slot other) (compute) (list slot (destructuring-bind (value) row value) other slot))",
+    ));
+}

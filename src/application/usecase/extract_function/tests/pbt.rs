@@ -39,7 +39,7 @@ proptest! {
             .select_path(&Path::from_indexes(vec![0]))
             .expect("select generated input");
 
-        let inferred = infer_extract_function_params(&selection.view(), &[]);
+        let inferred = infer_extract_function_params(Dialect::CommonLisp, &selection.view(), &[]);
 
         prop_assert_eq!(inferred, vec![outer_a, outer_b]);
     }
@@ -58,7 +58,7 @@ proptest! {
             .expect("select generated input");
         let explicit = vec![outer_a];
 
-        let inferred = infer_extract_function_params(&selection.view(), &explicit);
+        let inferred = infer_extract_function_params(Dialect::CommonLisp, &selection.view(), &explicit);
 
         prop_assert_eq!(inferred, vec![outer_b]);
     }

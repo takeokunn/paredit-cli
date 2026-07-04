@@ -30,8 +30,14 @@ pub fn plan_add_function_parameter(
         definition_selection.view(),
         &request.name,
     )?;
+    if target.has_lambda_list_marker {
+        anyhow::bail!(
+            "add-function-parameter currently supports only flat positional parameter lists"
+        );
+    }
     let call_paths = resolve_function_call_paths(
         &tree,
+        request.dialect,
         request.call_paths,
         request.all_calls,
         target.definition_span,

@@ -57,9 +57,85 @@ fn skips_all_occurrences_inside_shadowing_binding_forms() {
 }
 
 #[test]
+fn skips_all_occurrences_inside_symbol_macrolet_shadowing_binding_forms() {
+    let input =
+        "(defun render () (+ (* width height) (symbol-macrolet ((product 1)) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (symbol-macrolet ((product 1)) (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_all_occurrences_inside_define_setf_expander_shadowing_lambda_list() {
+    let input = "(defun render () (+ (* width height) (define-setf-expander slot (&environment product place) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (define-setf-expander slot (&environment product place) (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_all_occurrences_inside_define_compiler_macro_shadowing_lambda_list() {
+    let input = "(defun render () (+ (* width height) (define-compiler-macro slot (&environment product place) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (define-compiler-macro slot (&environment product place) (* width height)))))"
+    );
+}
+
+#[test]
 fn rejects_selected_expression_inside_shadowing_binding_form() {
     let input = "(defun render () (let ((product 1)) (* width height)))";
     let error = plan_introduce_let(request(input, "0.3.2", false)).expect_err("shadowed");
+
+    assert!(
+        error
+            .to_string()
+            .contains("inside an existing binding for 'product'")
+    );
+}
+
+#[test]
+fn rejects_selected_expression_inside_symbol_macrolet_shadowing_binding_form() {
+    let input = "(defun render () (symbol-macrolet ((product 1)) (* width height)))";
+    let error = plan_introduce_let(request(input, "0.3.2", false)).expect_err("shadowed");
+
+    assert!(
+        error
+            .to_string()
+            .contains("inside an existing binding for 'product'")
+    );
+}
+
+#[test]
+fn rejects_selected_expression_inside_define_setf_expander_shadowing_lambda_list() {
+    let input = "(defun render () (define-setf-expander slot (&environment product place) (* width height)))";
+    let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
+
+    assert!(
+        error
+            .to_string()
+            .contains("inside an existing binding for 'product'")
+    );
+}
+
+#[test]
+fn rejects_selected_expression_inside_define_compiler_macro_shadowing_lambda_list() {
+    let input = "(defun render () (define-compiler-macro slot (&environment product place) (* width height)))";
+    let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
 
     assert!(
         error

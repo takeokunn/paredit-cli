@@ -63,6 +63,14 @@ fn cli_e2e_applies_workspace_refactor_manifest_across_lisp_dialects() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"mode\": \"function\""))
+        .stdout(predicate::str::contains("\"status\": \"applied\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"run_verification_or_review_diff\"",
+        ))
+        .stdout(predicate::str::contains("\"blocked_reasons\": []"))
+        .stdout(predicate::str::contains("\"steps\": ["))
+        .stdout(predicate::str::contains("\"name\": \"apply-write\""))
+        .stdout(predicate::str::contains("\"status\": \"passed\""))
         .stdout(predicate::str::contains("\"file_count\": 2"))
         .stdout(predicate::str::contains("\"changed_file_count\": 2"))
         .stdout(predicate::str::contains("\"changed_files\": ["))

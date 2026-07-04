@@ -1,5 +1,9 @@
 use anyhow::Result;
 
+use crate::application::usecase::callable_scope::{
+    LocalCallableForm, common_lisp_local_callable_form, is_local_callable_bound,
+    local_callable_names,
+};
 use crate::domain::definition::{classify_definition_head, definition_name_child_index};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
@@ -62,6 +66,7 @@ pub fn collect_function_call_head_renames(
             path_indexes,
             from,
             to,
+            &[],
             &mut renames,
         );
     }
@@ -74,14 +79,32 @@ fn collect_function_call_head_renames_from_view(
     path_indexes: Vec<usize>,
     from: &SymbolName,
     to: &SymbolName,
+    local_callables: &[String],
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
     let mut first_callable_child_index = 0;
 
     if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
         if let Some(head) = list_head(view) {
+            if let Some(form) = common_lisp_local_callable_form(dialect, head) {
+                collect_local_callable_function_call_renames(
+                    view,
+                    dialect,
+                    path_indexes,
+                    from,
+                    to,
+                    local_callables,
+                    form,
+                    renames,
+                );
+                return;
+            }
+
             let category = classify_definition_head(dialect, head);
-            if head == from.as_str() && classify_definition_head(dialect, head).is_none() {
+            if head == from.as_str()
+                && classify_definition_head(dialect, head).is_none()
+                && !is_local_callable_bound(local_callables, head)
+            {
                 if let Some(head_view) = view.children.first() {
                     let mut head_path = path_indexes.clone();
                     head_path.push(0);
@@ -105,7 +128,69 @@ fn collect_function_call_head_renames_from_view(
         }
         let mut child_path = path_indexes.clone();
         child_path.push(index);
-        collect_function_call_head_renames_from_view(child, dialect, child_path, from, to, renames);
+        collect_function_call_head_renames_from_view(
+            child,
+            dialect,
+            child_path,
+            from,
+            to,
+            local_callables,
+            renames,
+        );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_local_callable_function_call_renames(
+    view: &ExpressionView,
+    dialect: Dialect,
+    path_indexes: Vec<usize>,
+    from: &SymbolName,
+    to: &SymbolName,
+    local_callables: &[String],
+    form: LocalCallableForm,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) {
+    let local_names = local_callable_names(view);
+    let mut body_scope = local_callables.to_vec();
+    body_scope.extend(local_names.iter().cloned());
+
+    if let Some(bindings) = view.children.get(1) {
+        let binding_body_scope = match form {
+            LocalCallableForm::Labels => body_scope.as_slice(),
+            LocalCallableForm::Flet
+            | LocalCallableForm::Macrolet
+            | LocalCallableForm::CompilerMacrolet => local_callables,
+        };
+        for (binding_index, binding) in bindings.children.iter().enumerate() {
+            for (child_index, child) in binding.children.iter().enumerate().skip(2) {
+                let mut child_path = path_indexes.clone();
+                child_path.extend([1, binding_index, child_index]);
+                collect_function_call_head_renames_from_view(
+                    child,
+                    dialect,
+                    child_path,
+                    from,
+                    to,
+                    binding_body_scope,
+                    renames,
+                );
+            }
+        }
+    }
+
+    for (index, child) in view.children.iter().enumerate().skip(2) {
+        let mut child_path = path_indexes.clone();
+        child_path.push(index);
+        collect_function_call_head_renames_from_view(
+            child,
+            dialect,
+            child_path,
+            from,
+            to,
+            &body_scope,
+            renames,
+        );
     }
 }
 

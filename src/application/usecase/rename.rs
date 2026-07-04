@@ -2,6 +2,7 @@
 
 mod binding;
 mod function;
+mod macrolet;
 mod replace_call;
 mod selection;
 #[cfg(test)]
@@ -18,13 +19,15 @@ use binding::binding_rename_parts;
 use selection::{apply_byte_span_edits, collect_symbol_atom_spans, select_rename_target};
 
 pub use function::{collect_callable_definition_renames, collect_function_call_head_renames};
+pub use macrolet::{collect_macrolet_binding_renames, collect_macrolet_call_head_renames};
 pub use replace_call::{
     ReplaceFunctionCallSite, ReplaceFunctionCallsPlan, ReplaceFunctionCallsRequest,
     ReplaceFunctionCallsScope, plan_replace_function_calls,
 };
 pub use types::{
     RenameBindingPlan, RenameBindingRequest, RenameFunctionOccurrence, RenameFunctionPlan,
-    RenameFunctionRequest, RenameInFormPlan, RenameInFormRequest, RenameTarget,
+    RenameFunctionRequest, RenameInFormPlan, RenameInFormRequest, RenameMacroletPlan,
+    RenameMacroletRequest, RenameTarget,
 };
 pub use unwrap::{
     UnwrapFunctionCallSite, UnwrapFunctionCallsPlan, UnwrapFunctionCallsRequest,
@@ -50,6 +53,29 @@ pub fn plan_rename_function(request: RenameFunctionRequest<'_>) -> Result<Rename
     SyntaxTree::parse(&rewritten).context("renamed output is not a valid S-expression document")?;
 
     Ok(RenameFunctionPlan {
+        dialect: request.dialect,
+        definitions,
+        calls,
+        changed: rewritten != request.input,
+        rewritten,
+    })
+}
+
+pub fn plan_rename_macrolet(request: RenameMacroletRequest<'_>) -> Result<RenameMacroletPlan> {
+    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    let definitions =
+        collect_macrolet_binding_renames(&tree, request.dialect, &request.from, &request.to)?;
+    let calls =
+        collect_macrolet_call_head_renames(&tree, request.dialect, &request.from, &request.to)?;
+    let edits = definitions
+        .iter()
+        .chain(calls.iter())
+        .map(|occurrence| (occurrence.span, occurrence.replacement.clone()))
+        .collect::<Vec<_>>();
+    let rewritten = apply_byte_span_edits(request.input, edits)?;
+    SyntaxTree::parse(&rewritten).context("renamed output is not a valid S-expression document")?;
+
+    Ok(RenameMacroletPlan {
         dialect: request.dialect,
         definitions,
         calls,

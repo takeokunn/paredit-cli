@@ -104,6 +104,7 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
         workspace,
         files,
         gates: decision.gates,
+        risk_summary: decision.risk_summary,
         steps: decision.steps,
         policy,
         automation,

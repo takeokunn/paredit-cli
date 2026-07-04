@@ -1,5 +1,5 @@
 use super::super::super::*;
-use crate::application::refactor::plan::RefactorPlanAutomationDecision;
+use crate::application::refactor::plan::{RefactorPlanAutomationDecision, RefactorPlanRiskSummary};
 
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct RefactorPlan {
@@ -8,6 +8,7 @@ pub(in crate::presentation::cli) struct RefactorPlan {
     pub(in crate::presentation::cli) workspace: Option<WorkspaceRefactorPlanDiscovery>,
     pub(in crate::presentation::cli) files: Vec<ImpactReportFile>,
     pub(in crate::presentation::cli) gates: Vec<RefactorPlanGate>,
+    pub(in crate::presentation::cli) risk_summary: RefactorPlanRiskSummary,
     pub(in crate::presentation::cli) steps: Vec<RefactorPlanStep>,
     pub(in crate::presentation::cli) policy: RefactorPlanPolicy,
     pub(in crate::presentation::cli) automation: RefactorPlanAutomationDecision,

@@ -2,6 +2,7 @@
 
 pub mod call_graph_report;
 pub mod call_report;
+pub(crate) mod callable_scope;
 pub mod definition_report;
 pub mod dependency_report;
 pub mod duplicate_report;

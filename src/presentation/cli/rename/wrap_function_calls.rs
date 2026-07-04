@@ -30,6 +30,7 @@ pub(in crate::presentation::cli) fn wrap_function_calls(args: WrapFunctionCallsA
                 dialect,
                 function: args.function.clone(),
                 wrapper: args.wrapper.clone(),
+                wrapper_template: args.wrapper_template.clone(),
                 scope,
             })
             .with_context(|| {

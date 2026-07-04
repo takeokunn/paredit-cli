@@ -1,5 +1,7 @@
 use super::super::*;
-use crate::application::usecase::duplicate_report::{DuplicateShapeReport, ReplacementPlanBatch};
+use crate::application::usecase::duplicate_report::{
+    DuplicateFormReport, DuplicateShapeReport, ReplacementPlanBatch,
+};
 
 pub(in crate::presentation::cli) fn print_duplicate_report(
     reports: &[DuplicateShapeReport],
@@ -69,23 +71,40 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
     batches: &[ReplacementPlanBatch],
     output: OutputFormat,
 ) -> Result<()> {
-    let form_count = batches.iter().map(|batch| batch.forms.len()).sum::<usize>();
+    let form_count = batches
+        .iter()
+        .map(|batch| replacement_forms(batch).len())
+        .sum::<usize>();
+    let candidate_form_count = batches.iter().map(|batch| batch.forms.len()).sum::<usize>();
 
     match output {
         OutputFormat::Text => {
             println!("batch_count\t{}", batches.len());
             println!("form_count\t{form_count}");
+            println!("candidate_form_count\t{candidate_form_count}");
             for batch in batches {
                 let command_args = replace_forms_command_args(batch);
+                let targets = replacement_forms(batch);
                 println!(
-                    "batch\t{}\t{}\tcount={}\tshape={}",
+                    "batch\t{}\t{}\tcount={}\tcandidate_count={}\tshape={}",
                     batch.file.display(),
                     batch.dialect.label(),
+                    targets.len(),
                     batch.forms.len(),
                     batch.shape
                 );
+                if let Some(form) = kept_form(batch) {
+                    println!(
+                        "kept\t{}\t{}..{}\tnodes={}\thead={}",
+                        form.form_path,
+                        form.span.start().get(),
+                        form.span.end().get(),
+                        form.node_count,
+                        form.head.as_deref().unwrap_or("")
+                    );
+                }
                 println!("command\t{}", format_command(&command_args));
-                for form in &batch.forms {
+                for form in targets {
                     println!(
                         "\t{}\t{}..{}\tnodes={}\thead={}",
                         form.form_path,
@@ -102,18 +121,32 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
             serde_json::to_string_pretty(&json!({
                 "batch_count": batches.len(),
                 "form_count": form_count,
+                "candidate_form_count": candidate_form_count,
                 "batches": batches
                     .iter()
                     .map(|batch| {
                         let command_args = replace_forms_command_args(batch);
+                        let targets = replacement_forms(batch);
                         json!({
                             "file": batch.file.display().to_string(),
                             "dialect": batch.dialect.label(),
                             "shape": batch.shape.as_str(),
-                            "count": batch.forms.len(),
+                            "count": targets.len(),
+                            "candidate_count": batch.forms.len(),
+                            "replacement_count": targets.len(),
+                            "keep_first": batch.keep_first,
+                            "kept_form": kept_form(batch).map(|form| json!({
+                                "form_path": form.form_path.as_str(),
+                                "span": {
+                                    "start": form.span.start().get(),
+                                    "end": form.span.end().get(),
+                                },
+                                "node_count": form.node_count,
+                                "head": form.head.as_deref(),
+                                "text": form.text.as_str(),
+                            })),
                             "replacement": batch.replacement.as_str(),
-                            "paths": batch
-                                .forms
+                            "paths": targets
                                 .iter()
                                 .map(|form| form.form_path.as_str())
                                 .collect::<Vec<_>>(),
@@ -151,7 +184,7 @@ fn replace_forms_command_args(batch: &ReplacementPlanBatch) -> Vec<String> {
         batch.file.display().to_string(),
     ];
 
-    for form in &batch.forms {
+    for form in replacement_forms(batch) {
         args.push("--path".to_owned());
         args.push(form.form_path.clone());
     }
@@ -165,6 +198,18 @@ fn replace_forms_command_args(batch: &ReplacementPlanBatch) -> Vec<String> {
     ]);
 
     args
+}
+
+fn replacement_forms(batch: &ReplacementPlanBatch) -> &[DuplicateFormReport] {
+    if batch.keep_first {
+        batch.forms.get(1..).unwrap_or(&[])
+    } else {
+        &batch.forms
+    }
+}
+
+fn kept_form(batch: &ReplacementPlanBatch) -> Option<&DuplicateFormReport> {
+    batch.keep_first.then(|| batch.forms.first()).flatten()
 }
 
 fn format_command(args: &[String]) -> String {

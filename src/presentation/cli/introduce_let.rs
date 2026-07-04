@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::introduce_let::{
-    plan_introduce_let, IntroduceLetPlan, IntroduceLetRequest,
+    IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let,
 };
 
 #[derive(Debug, Args)]

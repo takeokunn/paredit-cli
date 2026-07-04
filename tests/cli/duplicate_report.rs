@@ -80,6 +80,65 @@ fn cli_plans_replacement_batches_from_duplicate_forms() {
 }
 
 #[test]
+fn cli_plans_replacement_batches_can_keep_canonical_first_form() {
+    let dir = fresh_temp_dir("replacement-plan-keep-first");
+    let lisp_file = dir.join("suite.lisp");
+    fs::write(
+        &lisp_file,
+        "(deftest split-a () (is (= 1 (pane-count))))\n\
+         (deftest split-b () (is (= 2 (pane-count))))\n\
+         (deftest split-c () (is (= 3 (pane-count))))\n",
+    )
+    .expect("write duplicate fixture");
+
+    let mut cmd = paredit();
+    let output = cmd
+        .arg("replacement-plan")
+        .arg("--min-node-count")
+        .arg("8")
+        .arg("--keep-first")
+        .arg("--replacement")
+        .arg("(run-split-case)")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value = serde_json::from_slice(&output).expect("replacement-plan json");
+    let batch = &report["batches"][0];
+
+    assert_eq!(report["batch_count"], 1);
+    assert_eq!(report["candidate_form_count"], 3);
+    assert_eq!(report["form_count"], 2);
+    assert_eq!(batch["candidate_count"], 3);
+    assert_eq!(batch["replacement_count"], 2);
+    assert_eq!(batch["keep_first"], true);
+    assert_eq!(batch["kept_form"]["form_path"], "0");
+    assert_eq!(batch["paths"], serde_json::json!(["1", "2"]));
+    assert!(
+        batch["command"]
+            .as_str()
+            .expect("command")
+            .contains("--path 1")
+    );
+    assert!(
+        batch["command"]
+            .as_str()
+            .expect("command")
+            .contains("--path 2")
+    );
+    assert!(
+        !batch["command"]
+            .as_str()
+            .expect("command")
+            .contains("--path 0")
+    );
+}
+
+#[test]
 fn cli_filters_replacement_plan_by_per_file_group_size() {
     let dir = fresh_temp_dir("replacement-plan-min-size");
     let lisp_file = dir.join("suite.lisp");

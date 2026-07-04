@@ -1,6 +1,10 @@
 use super::super::super::super::*;
 use super::super::super::manifest::status::refactor_status_decision;
 use super::super::super::types::check::RefactorCheckResult;
+use super::{
+    blocked_reason_labels, blocked_reason_text, decision_steps_json, decision_summary_json,
+    print_decision_summary,
+};
 
 pub(in crate::presentation::cli) fn print_refactor_check_result(
     result: &RefactorCheckResult,
@@ -25,12 +29,7 @@ pub(in crate::presentation::cli) fn print_refactor_check_result(
             println!("next_action\t{}", decision.next_action.label());
             println!(
                 "blocked_reasons\t{}",
-                decision
-                    .blocked_reasons
-                    .iter()
-                    .map(|reason| reason.label())
-                    .collect::<Vec<_>>()
-                    .join(",")
+                blocked_reason_text(&decision.blocked_reasons)
             );
             for step in decision.steps() {
                 println!(
@@ -39,6 +38,7 @@ pub(in crate::presentation::cli) fn print_refactor_check_result(
                     step.status.label()
                 );
             }
+            print_decision_summary(decision.summary());
             println!("can_apply\t{}", result.summary.can_apply);
             println!("files\t{}", result.summary.file_count);
             println!("changed_file_count\t{}", result.summary.changed_file_count);
@@ -90,19 +90,9 @@ pub(in crate::presentation::cli) fn print_refactor_check_result(
                 "manifest_outputs_parse": result.manifest_outputs_parse,
                 "status": decision.status.label(),
                 "next_action": decision.next_action.label(),
-                "blocked_reasons": decision
-                    .blocked_reasons
-                    .iter()
-                    .map(|reason| reason.label())
-                    .collect::<Vec<_>>(),
-                "steps": decision
-                    .steps()
-                    .into_iter()
-                    .map(|step| json!({
-                        "name": step.name,
-                        "status": step.status.label(),
-                    }))
-                    .collect::<Vec<_>>(),
+                "blocked_reasons": blocked_reason_labels(&decision.blocked_reasons),
+                "steps": decision_steps_json(decision.steps()),
+                "decision_summary": decision_summary_json(decision.summary()),
                     "summary": {
                         "file_count": result.summary.file_count,
                         "changed_file_count": result.summary.changed_file_count,

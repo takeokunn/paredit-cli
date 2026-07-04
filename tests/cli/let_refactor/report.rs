@@ -62,6 +62,25 @@ fn cli_reports_let_star_references_from_later_bindings() {
 }
 
 #[test]
+fn cli_reports_symbol_macrolet_bindings_without_counting_expansion_reference() {
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .write_stdin("(symbol-macrolet ((value (compute value)) (used other)) (list used))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"form\": \"symbol-macrolet\""))
+        .stdout(predicate::str::contains(
+            "\"inline_supported_by_inline_let\": false",
+        ))
+        .stdout(predicate::str::contains("\"name\": \"value\""))
+        .stdout(predicate::str::contains("\"reference_count\": 0"))
+        .stdout(predicate::str::contains("\"name\": \"used\""))
+        .stdout(predicate::str::contains("\"reference_count\": 1"))
+        .stdout(predicate::str::contains("\"unused_binding_count\": 1"))
+        .stdout(predicate::str::contains("\"unsupported-by-inline-let\""));
+}
+
+#[test]
 fn cli_reports_clojure_vector_let_bindings() {
     let mut cmd = paredit();
     cmd.args(["let-report", "--dialect", "clojure", "--output", "json"])

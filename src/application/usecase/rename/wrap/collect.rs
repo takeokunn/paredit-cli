@@ -5,9 +5,9 @@ use crate::domain::definition::classify_definition_head;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
-use super::WrapFunctionCallSite;
 use super::call_site::wrap_call_site_from_view;
 use super::choose::select_outermost_wrap_call_sites;
+use super::{WrapFunctionCallSite, WrapFunctionCallTemplate};
 
 pub(super) fn collect_wrap_all_call_sites(
     tree: &SyntaxTree,
@@ -15,6 +15,7 @@ pub(super) fn collect_wrap_all_call_sites(
     input: &str,
     function: &SymbolName,
     wrapper: &SymbolName,
+    template: Option<&WrapFunctionCallTemplate>,
 ) -> Result<(
     Vec<WrapFunctionCallSite>,
     Vec<WrapFunctionCallSite>,
@@ -32,6 +33,7 @@ pub(super) fn collect_wrap_all_call_sites(
             input,
             function,
             wrapper,
+            template,
             candidates: &mut candidates,
             skipped_already_wrapped: &mut skipped_already_wrapped,
         };
@@ -49,6 +51,7 @@ pub(super) fn collect_wrap_explicit_call_sites(
     paths: &[Path],
     function: &SymbolName,
     wrapper: &SymbolName,
+    template: Option<&WrapFunctionCallTemplate>,
 ) -> Result<(
     Vec<WrapFunctionCallSite>,
     Vec<WrapFunctionCallSite>,
@@ -59,8 +62,9 @@ pub(super) fn collect_wrap_explicit_call_sites(
 
     for path in paths {
         let view = tree.select_path(path)?.view();
-        let site = wrap_call_site_from_view(&view, input, path.to_string(), function, wrapper)
-            .with_context(|| format!("call-path {path} is not a call to {function}"))?;
+        let site =
+            wrap_call_site_from_view(&view, input, path.to_string(), function, wrapper, template)
+                .with_context(|| format!("call-path {path} is not a call to {function}"))?;
         if call_site_is_already_wrapped(tree, dialect, path, wrapper)? {
             skipped_already_wrapped.push(site);
         } else {
@@ -76,6 +80,7 @@ struct WrapCallSiteCollection<'a> {
     input: &'a str,
     function: &'a SymbolName,
     wrapper: &'a SymbolName,
+    template: Option<&'a WrapFunctionCallTemplate>,
     candidates: &'a mut Vec<WrapFunctionCallSite>,
     skipped_already_wrapped: &'a mut Vec<WrapFunctionCallSite>,
 }
@@ -93,6 +98,7 @@ fn collect_wrap_call_sites_from_view(
         Path::from_indexes(path_indexes.clone()).to_string(),
         collection.function,
         collection.wrapper,
+        collection.template,
     ) {
         if parent_head == Some(collection.wrapper.as_str()) {
             collection.skipped_already_wrapped.push(site);

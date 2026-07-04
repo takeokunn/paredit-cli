@@ -36,31 +36,31 @@ use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 
 use crate::application::refactor::execute::{
-    build_refactor_execute_decision, RefactorExecuteGateInputs, RefactorWriteRefusal,
+    RefactorExecuteGateInputs, RefactorWriteRefusal, build_refactor_execute_decision,
 };
 use crate::application::refactor::plan::{
-    build_refactor_plan_decision, refactor_plan_gates as application_refactor_plan_gates,
-    refactor_verification_checks as application_refactor_verification_checks,
     RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
     RefactorPlanPolicyRequest, RefactorPlanRequest, RefactorPlanStep, RefactorPlanSummary,
     RefactorVerificationCheck, RefactorVerificationRequest,
-    VerificationPhase as ApplicationVerificationPhase,
+    VerificationPhase as ApplicationVerificationPhase, build_refactor_plan_decision,
+    refactor_plan_gates as application_refactor_plan_gates,
+    refactor_verification_checks as application_refactor_verification_checks,
 };
 use crate::application::refactor::preview::{
-    evaluate_refactor_preview_policy, refactor_preview_edits, RefactorPreviewEdit,
-    RefactorPreviewPolicy, RefactorPreviewPolicyOptions, RefactorPreviewSummary,
+    RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewPolicyOptions,
+    RefactorPreviewSummary, evaluate_refactor_preview_policy, refactor_preview_edits,
 };
 use crate::application::usecase::impact_report::{
-    raw_refactor_risks, summarize_impact_reports, ImpactReportFile,
-    ImpactRiskLevel as ApplicationImpactRiskLevel,
+    ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
+    summarize_impact_reports,
 };
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
-use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
+use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 use anyhow::{Context, Result};
 use clap::{Args, Parser, ValueEnum};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use args::*;
 use command::Command;

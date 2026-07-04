@@ -28,6 +28,9 @@ pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
         OutputFormat::Text => {
             println!("function\t{}", args.function);
             println!("wrapper\t{}", args.wrapper);
+            if let Some(template) = &args.wrapper_template {
+                println!("wrapperTemplate\t{template}");
+            }
             println!("callCount\t{call_count}");
             println!("skippedAlreadyWrappedCount\t{skipped_already_wrapped_count}");
             println!("skippedNestedCount\t{skipped_nested_count}");
@@ -48,6 +51,7 @@ pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
             serde_json::to_string_pretty(&json!({
                 "function": args.function.as_str(),
                 "wrapper": args.wrapper.as_str(),
+                "wrapperTemplate": args.wrapper_template.as_deref(),
                 "allCalls": args.all_calls,
                 "callPaths": args.call_paths.iter().map(ToString::to_string).collect::<Vec<_>>(),
                 "write": args.write,

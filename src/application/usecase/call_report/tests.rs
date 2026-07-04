@@ -49,6 +49,49 @@ fn filters_by_symbol() {
     assert_eq!(calls[1].argument_count, 2);
 }
 
+#[test]
+fn skips_common_lisp_flet_local_callable_calls() {
+    let tree = parse("(defun main () (flet ((helper (x) (target x))) (helper 1) (target 2)))");
+    let calls = build_call_report(&tree, Dialect::CommonLisp, None, false).unwrap();
+    let heads = calls
+        .iter()
+        .map(|call| call.head.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(heads, vec!["target", "target"]);
+}
+
+#[test]
+fn skips_common_lisp_labels_local_callable_calls_in_definition_bodies() {
+    let tree = parse("(defun main () (labels ((helper (x) (helper x) (target x))) (helper 1)))");
+    let calls = build_call_report(&tree, Dialect::CommonLisp, None, false).unwrap();
+    let heads = calls
+        .iter()
+        .map(|call| call.head.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(heads, vec!["target"]);
+}
+
+#[test]
+fn skips_common_lisp_macrolet_local_macro_calls() {
+    let tree = parse("(defun main () (macrolet ((helper (x) (list 'target x))) (helper 1)))");
+    let symbol = SymbolName::new("helper").unwrap();
+    let calls = build_call_report(&tree, Dialect::CommonLisp, Some(&symbol), false).unwrap();
+
+    assert!(calls.is_empty());
+}
+
+#[test]
+fn skips_common_lisp_compiler_macrolet_local_macro_calls() {
+    let tree =
+        parse("(defun main () (compiler-macrolet ((helper (x) (list 'target x))) (helper 1)))");
+    let symbol = SymbolName::new("helper").unwrap();
+    let calls = build_call_report(&tree, Dialect::CommonLisp, Some(&symbol), false).unwrap();
+
+    assert!(calls.is_empty());
+}
+
 fn symbol_strategy() -> impl Strategy<Value = String> {
     "[a-z][a-z0-9-]{0,8}".prop_filter("exclude definition heads", |symbol| {
         !matches!(

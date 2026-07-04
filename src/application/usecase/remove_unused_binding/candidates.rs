@@ -27,6 +27,30 @@ pub(super) fn let_binding_removal_candidates(
     }
 }
 
+pub(super) fn macrolet_binding_removal_candidates(
+    dialect: Dialect,
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    match dialect {
+        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
+            list_pair_macrolet_binding_removal_candidates(binding_form)
+        }
+        _ => anyhow::bail!("remove-unused-binding only supports macrolet in Common Lisp"),
+    }
+}
+
+pub(super) fn local_callable_binding_removal_candidates(
+    dialect: Dialect,
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    match dialect {
+        Dialect::CommonLisp | Dialect::Unknown => {
+            list_pair_local_callable_binding_removal_candidates(binding_form)
+        }
+        _ => anyhow::bail!("remove-unused-binding only supports flet and labels in Common Lisp"),
+    }
+}
+
 fn vector_let_binding_removal_candidates(
     binding_form: &ExpressionView,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
@@ -83,6 +107,88 @@ fn list_pair_let_binding_removal_candidates(
                 index,
                 name,
                 value_span: pair.children[1].span,
+                removal_span: pair.span,
+            })
+        })
+        .collect()
+}
+
+fn list_pair_macrolet_binding_removal_candidates(
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
+    {
+        anyhow::bail!(
+            "dialect expects list-pair macrolet bindings: ((name lambda-list form*) ...)"
+        );
+    }
+
+    binding_form
+        .children
+        .iter()
+        .enumerate()
+        .map(|(index, pair)| {
+            if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
+                anyhow::bail!("macrolet binding must be a (name lambda-list form*) list");
+            }
+            if pair.children.len() < 2 {
+                anyhow::bail!("macrolet binding must contain a name and macro expander body");
+            }
+            let name = atom_text(&pair.children[0])
+                .context("macrolet binding name must be an atom")?
+                .to_owned();
+            let value_start = pair.children[1].span.start();
+            let value_end = pair
+                .children
+                .last()
+                .expect("validated macrolet binding has at least two children")
+                .span
+                .end();
+            Ok(LetBindingRemovalCandidate {
+                index,
+                name,
+                value_span: ByteSpan::new(value_start, value_end),
+                removal_span: pair.span,
+            })
+        })
+        .collect()
+}
+
+fn list_pair_local_callable_binding_removal_candidates(
+    binding_form: &ExpressionView,
+) -> Result<Vec<LetBindingRemovalCandidate>> {
+    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
+    {
+        anyhow::bail!(
+            "dialect expects list-pair local callable bindings: ((name lambda-list form*) ...)"
+        );
+    }
+
+    binding_form
+        .children
+        .iter()
+        .enumerate()
+        .map(|(index, pair)| {
+            if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
+                anyhow::bail!("local callable binding must be a (name lambda-list form*) list");
+            }
+            if pair.children.len() < 2 {
+                anyhow::bail!("local callable binding must contain a name, lambda list, and body");
+            }
+            let name = atom_text(&pair.children[0])
+                .context("local callable binding name must be an atom")?
+                .to_owned();
+            let value_start = pair.children[1].span.start();
+            let value_end = pair
+                .children
+                .last()
+                .expect("validated local callable binding has at least two children")
+                .span
+                .end();
+            Ok(LetBindingRemovalCandidate {
+                index,
+                name,
+                value_span: ByteSpan::new(value_start, value_end),
                 removal_span: pair.span,
             })
         })
