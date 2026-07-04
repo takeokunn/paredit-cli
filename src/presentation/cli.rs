@@ -112,7 +112,7 @@ enum Command {
     /// Report internal and optional external call graph edges across explicit files.
     CallGraph(call_graph_report::CallGraphArgs),
     /// Report refactoring impact risks for one symbol across explicit files.
-    ImpactReport(impact_report::ImpactReportArgs),
+    ImpactReport(impact_report::args::ImpactReportArgs),
     /// Produce an ordered, gated refactoring plan for AI coding agents.
     RefactorPlan(refactor::args::RefactorPlanArgs),
     /// Verify pre/post refactoring invariants for AI coding agents and CI gates.

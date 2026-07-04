@@ -1,106 +1,10 @@
-use super::*;
+use super::super::*;
 use crate::application::call_graph_report::CallGraphEdge;
 use crate::application::impact_report::{
-    ImpactReportFile, ImpactReportPolicy, ImpactReportPolicyOptions, ImpactReportSource,
-    build_impact_reports, evaluate_impact_report_policy, impact_risks, impact_status_counts,
-    summarize_impact_reports,
+    ImpactReportFile, ImpactReportPolicy, impact_risks, impact_status_counts,
 };
 
-#[derive(Debug, Args)]
-pub(super) struct ImpactReportArgs {
-    /// Files to scan.
-    #[arg(required = true)]
-    files: Vec<PathBuf>,
-    /// Override extension-based dialect detection for every file.
-    #[arg(long)]
-    dialect: Option<DialectArg>,
-    /// Exact symbol to evaluate before rename, move, remove, or signature refactors.
-    #[arg(long)]
-    symbol: SymbolName,
-    /// Exit with failure when the report risk reaches this level or higher.
-    #[arg(long, value_enum)]
-    fail_on_risk_level: Option<ImpactRiskLevel>,
-    /// Require at least this many matching definitions.
-    #[arg(long)]
-    require_definitions: Option<usize>,
-    /// Require at least this many matching references.
-    #[arg(long)]
-    require_references: Option<usize>,
-    /// Require at least this many matching call sites.
-    #[arg(long)]
-    require_calls: Option<usize>,
-    /// Output format for agent consumption.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
-    output: OutputFormat,
-}
-
-pub(super) fn impact_report(args: ImpactReportArgs) -> Result<()> {
-    let reports = collect_impact_reports(&args.files, args.dialect, &args.symbol)?;
-    let summary = summarize_impact_reports(&reports);
-    let by_status = impact_status_counts(&reports);
-    let risks = impact_risks(
-        summary.definition_count,
-        summary.inbound_edge_count,
-        summary.non_call_reference_count,
-        &by_status,
-    );
-    let risk_level = risks
-        .iter()
-        .map(|risk| risk.level)
-        .max()
-        .unwrap_or(ApplicationImpactRiskLevel::Info);
-    let policy = evaluate_impact_report_policy(
-        ImpactReportPolicyOptions {
-            fail_on_risk_level: args.fail_on_risk_level.map(Into::into),
-            require_definitions: args.require_definitions,
-            require_references: args.require_references,
-            require_calls: args.require_calls,
-        },
-        &summary,
-        risk_level,
-    );
-
-    print_impact_report(&reports, &args.symbol, &policy, args.output)?;
-    if !policy.passed {
-        let policy_message = policy.violations.join("; ");
-        anyhow::bail!("impact-report policy failed: {policy_message}");
-    }
-    Ok(())
-}
-
-impl From<ImpactRiskLevel> for ApplicationImpactRiskLevel {
-    fn from(level: ImpactRiskLevel) -> Self {
-        match level {
-            ImpactRiskLevel::Info => Self::Info,
-            ImpactRiskLevel::Warning => Self::Warning,
-            ImpactRiskLevel::Error => Self::Error,
-        }
-    }
-}
-
-pub(super) fn collect_impact_reports(
-    files: &[PathBuf],
-    dialect_override: Option<DialectArg>,
-    symbol: &SymbolName,
-) -> Result<Vec<ImpactReportFile>> {
-    let mut sources = Vec::with_capacity(files.len());
-
-    for file in files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, dialect_override);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        sources.push(ImpactReportSource {
-            path: file.clone(),
-            dialect,
-            tree,
-        });
-    }
-
-    build_impact_reports(sources, symbol)
-}
-
-fn print_impact_report(
+pub(in crate::presentation::cli) fn print_impact_report(
     reports: &[ImpactReportFile],
     symbol: &SymbolName,
     policy: &ImpactReportPolicy,

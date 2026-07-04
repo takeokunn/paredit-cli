@@ -67,7 +67,7 @@ fn emit_refactor_plan(
     output: OutputFormat,
     failure_label: &'static str,
 ) -> Result<()> {
-    let files = impact_report::collect_impact_reports(paths, dialect, symbol)?;
+    let files = impact_report::workflow::collect_impact_reports(paths, dialect, symbol)?;
     let summary = summarize_impact_reports(&files);
     let operation = ApplicationRefactorOperation::from(operation);
     let decision = build_refactor_plan_decision(RefactorPlanRequest {

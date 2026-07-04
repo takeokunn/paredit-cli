@@ -26,7 +26,7 @@ pub(super) fn build_refactor_verification(
 ) -> Result<RefactorVerification> {
     let application_operation = ApplicationRefactorOperation::from(operation);
     let application_phase = ApplicationVerificationPhase::from(phase);
-    let before_files = impact_report::collect_impact_reports(paths, dialect, symbol)?;
+    let before_files = impact_report::workflow::collect_impact_reports(paths, dialect, symbol)?;
     let mut before = summarize_impact_reports(&before_files);
     let gates = application_refactor_plan_gates(
         application_operation,
@@ -37,7 +37,8 @@ pub(super) fn build_refactor_verification(
 
     let after = match (new_symbol, phase) {
         (Some(new_symbol), VerificationPhase::Post) => {
-            let after_files = impact_report::collect_impact_reports(paths, dialect, new_symbol)?;
+            let after_files =
+                impact_report::workflow::collect_impact_reports(paths, dialect, new_symbol)?;
             let mut after = summarize_impact_reports(&after_files);
             let after_gates = application_refactor_plan_gates(
                 application_operation,
