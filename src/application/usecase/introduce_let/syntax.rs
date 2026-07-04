@@ -27,6 +27,14 @@ pub(super) fn binding_form_binds_name(view: &ExpressionView, name: &str) -> bool
             .children
             .get(1)
             .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
+        "dolist" | "dotimes" => view
+            .children
+            .get(1)
+            .is_some_and(|binding_form| iteration_binding_binds_name(binding_form, name)),
+        "with-slots" | "with-accessors" => view
+            .children
+            .get(1)
+            .is_some_and(|slot_specs| slot_specs_bind_name(slot_specs, name)),
         _ => false,
     }
 }
@@ -56,6 +64,8 @@ pub(super) fn child_shadowed_by_binding(
             .children
             .get(child_index)
             .is_some_and(|clause| child_index >= 2 && clause_binds_name(clause, name)),
+        "dolist" | "dotimes" => child_index >= 2 && binding_form_binds_name(view, name),
+        "with-slots" | "with-accessors" => child_index >= 3 && binding_form_binds_name(view, name),
         _ => false,
     }
 }
@@ -69,11 +79,23 @@ pub(super) fn let_star_bindings_child_index(view: &ExpressionView) -> Option<usi
     matches!(list_head(view)?, "let*").then_some(1)
 }
 
+pub(super) fn iteration_bindings_child_index(view: &ExpressionView) -> Option<usize> {
+    matches!(list_head(view)?, "dolist" | "dotimes").then_some(1)
+}
+
 pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> bool {
     binding
         .children
         .first()
         .is_some_and(|pattern| pattern_contains_name(pattern, name))
+}
+
+pub(super) fn iteration_binding_child_shadowed(
+    binding_form: &ExpressionView,
+    name: &str,
+    child_index: usize,
+) -> bool {
+    child_index >= 2 && iteration_binding_binds_name(binding_form, name)
 }
 
 pub(super) fn local_callable_binding_child_shadowed(
@@ -110,6 +132,22 @@ fn clause_binds_name(clause: &ExpressionView, name: &str) -> bool {
         .children
         .get(1)
         .is_some_and(|parameters| lambda_list_contains_name(parameters, name))
+}
+
+fn iteration_binding_binds_name(binding_form: &ExpressionView, name: &str) -> bool {
+    binding_form
+        .children
+        .first()
+        .and_then(atom_text)
+        .is_some_and(|binding_name| binding_name == name)
+}
+
+fn slot_specs_bind_name(slot_specs: &ExpressionView, name: &str) -> bool {
+    slot_specs.children.iter().any(|slot_spec| {
+        atom_text(slot_spec)
+            .or_else(|| slot_spec.children.first().and_then(atom_text))
+            .is_some_and(|binding_name| binding_name == name)
+    })
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]

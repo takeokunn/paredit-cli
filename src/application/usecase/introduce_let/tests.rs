@@ -149,6 +149,59 @@ fn skips_all_occurrences_inside_handler_case_shadowing_clause_only() {
 }
 
 #[test]
+fn skips_all_occurrences_inside_dolist_shadowing_result_and_body() {
+    let input = "(defun render () (+ (* width height) (dolist (product items (* width height)) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (dolist (product items (* width height)) (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_all_occurrences_inside_dotimes_shadowing_result_and_body() {
+    let input = "(defun render () (+ (* width height) (dotimes (product count (* width height)) (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (dotimes (product count (* width height)) (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_all_occurrences_inside_with_slots_shadowing_body_only() {
+    let input =
+        "(defun render () (+ (* width height) (with-slots (product) panel (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (with-slots (product) panel (* width height)))))"
+    );
+}
+
+#[test]
+fn skips_all_occurrences_inside_with_accessors_shadowing_body_only() {
+    let input = "(defun render () (+ (* width height) (with-accessors ((product panel-product)) panel (* width height))))";
+    let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
+
+    assert_eq!(plan.occurrence_spans.len(), 1);
+    assert_eq!(plan.skipped_shadowed_occurrence_spans.len(), 1);
+    assert_eq!(
+        plan.rewritten,
+        "(defun render () (let ((product (* width height))) (+ product (with-accessors ((product panel-product)) panel (* width height)))))"
+    );
+}
+
+#[test]
 fn skips_all_occurrences_inside_macrolet_lambda_body_only() {
     let input = "(defun render () (+ (* width height) (macrolet ((with-product (product) (* width height))) (* width height))))";
     let plan = plan_introduce_let(request(input, "0.3.1", true)).expect("plan");
@@ -225,6 +278,30 @@ fn rejects_selected_expression_inside_destructuring_bind_shadowing_body() {
 fn rejects_selected_expression_inside_handler_case_shadowing_clause() {
     let input = "(defun render () (handler-case (risky) (error (product) (* width height))))";
     let error = plan_introduce_let(request(input, "0.3.2.2", false)).expect_err("shadowed");
+
+    assert!(
+        error
+            .to_string()
+            .contains("inside an existing binding for 'product'")
+    );
+}
+
+#[test]
+fn rejects_selected_expression_inside_dolist_shadowing_result() {
+    let input = "(defun render () (dolist (product items (* width height)) (done)))";
+    let error = plan_introduce_let(request(input, "0.3.1.2", false)).expect_err("shadowed");
+
+    assert!(
+        error
+            .to_string()
+            .contains("inside an existing binding for 'product'")
+    );
+}
+
+#[test]
+fn rejects_selected_expression_inside_with_slots_shadowing_body() {
+    let input = "(defun render () (with-slots (product) panel (* width height)))";
+    let error = plan_introduce_let(request(input, "0.3.3", false)).expect_err("shadowed");
 
     assert!(
         error

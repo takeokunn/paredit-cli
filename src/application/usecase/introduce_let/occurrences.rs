@@ -1,7 +1,8 @@
 use crate::domain::sexpr::{ByteOffset, ByteSpan, ChildIndex, ExpressionView};
 
 use super::syntax::{
-    binding_pair_binds_name, child_shadowed_by_binding, let_star_bindings_child_index,
+    binding_pair_binds_name, child_shadowed_by_binding, iteration_binding_child_shadowed,
+    iteration_bindings_child_index, let_star_bindings_child_index,
     local_callable_binding_child_shadowed, local_callable_bindings_child_index,
 };
 
@@ -30,6 +31,17 @@ pub(super) fn collect_equivalent_expression_spans(
     for (index, child) in view.children.iter().enumerate() {
         if let_star_bindings_child_index(view) == Some(index) {
             collect_let_star_binding_spans(
+                child,
+                target,
+                binding_name,
+                shadowed_by_binding,
+                output,
+            );
+            continue;
+        }
+
+        if iteration_bindings_child_index(view) == Some(index) {
+            collect_iteration_binding_spans(
                 child,
                 target,
                 binding_name,
@@ -76,6 +88,15 @@ pub(super) fn is_span_shadowed_by_binding(
             );
         }
 
+        if iteration_bindings_child_index(view) == Some(index) {
+            return is_span_shadowed_by_iteration_bindings(
+                child,
+                target_span,
+                binding_name,
+                shadowed_by_binding,
+            );
+        }
+
         if local_callable_bindings_child_index(view) == Some(index) {
             return is_span_shadowed_by_local_callable_binding(
                 child,
@@ -107,6 +128,15 @@ pub(super) fn is_path_shadowed_by_binding(
 
     if let_star_bindings_child_index(view) == Some(index) {
         return is_path_shadowed_by_let_star_bindings(
+            child,
+            rest,
+            binding_name,
+            shadowed_by_binding,
+        );
+    }
+
+    if iteration_bindings_child_index(view) == Some(index) {
+        return is_path_shadowed_by_iteration_bindings(
             child,
             rest,
             binding_name,
@@ -249,6 +279,73 @@ fn is_path_shadowed_by_let_star_bindings(
     }
 
     false
+}
+
+fn collect_iteration_binding_spans(
+    binding_form: &ExpressionView,
+    target: &ExpressionView,
+    binding_name: &str,
+    shadowed_by_binding: bool,
+    output: &mut EquivalentExpressionSpans,
+) {
+    if expressions_equivalent(binding_form, target) {
+        if shadowed_by_binding {
+            output.skipped_shadowed_spans.push(binding_form.span);
+        } else {
+            output.replacement_spans.push(binding_form.span);
+        }
+        return;
+    }
+
+    for (index, child) in binding_form.children.iter().enumerate() {
+        let child_shadowed = shadowed_by_binding
+            || iteration_binding_child_shadowed(binding_form, binding_name, index);
+        collect_equivalent_expression_spans(child, target, binding_name, child_shadowed, output);
+    }
+}
+
+fn is_span_shadowed_by_iteration_bindings(
+    binding_form: &ExpressionView,
+    target_span: ByteSpan,
+    binding_name: &str,
+    shadowed_by_binding: bool,
+) -> bool {
+    if binding_form.span == target_span {
+        return shadowed_by_binding;
+    }
+
+    binding_form
+        .children
+        .iter()
+        .enumerate()
+        .any(|(index, child)| {
+            let child_shadowed = shadowed_by_binding
+                || iteration_binding_child_shadowed(binding_form, binding_name, index);
+            is_span_shadowed_by_binding(child, target_span, binding_name, child_shadowed)
+        })
+}
+
+fn is_path_shadowed_by_iteration_bindings(
+    binding_form: &ExpressionView,
+    target_path: &[ChildIndex],
+    binding_name: &str,
+    shadowed_by_binding: bool,
+) -> bool {
+    let Some((index, rest)) = target_path.split_first() else {
+        return shadowed_by_binding;
+    };
+    let index = index.get();
+    let Some(child) = binding_form.children.get(index) else {
+        return false;
+    };
+
+    let child_shadowed =
+        shadowed_by_binding || iteration_binding_child_shadowed(binding_form, binding_name, index);
+    if rest.is_empty() {
+        child_shadowed
+    } else {
+        is_path_shadowed_by_binding(child, rest, binding_name, child_shadowed)
+    }
 }
 
 fn collect_local_callable_binding_spans(

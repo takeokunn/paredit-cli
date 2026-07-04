@@ -85,6 +85,50 @@ fn treats_restart_case_clause_lambda_lists_as_local() {
 }
 
 #[test]
+fn treats_dolist_iteration_variable_as_local_to_result_and_body() {
+    let params = infer_at(
+        "(dolist (item items (finish item done)) (render item outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["items", "done", "outer"]);
+}
+
+#[test]
+fn treats_dotimes_iteration_variable_as_local_to_result_and_body() {
+    let params = infer_at(
+        "(dotimes (index count (finish index done)) (render index outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["count", "done", "outer"]);
+}
+
+#[test]
+fn treats_with_slots_names_as_local_to_body() {
+    let params = infer_at(
+        "(with-slots (width (height slot-height)) panel (list width height outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["panel", "outer"]);
+}
+
+#[test]
+fn treats_with_accessors_names_as_local_to_body() {
+    let params = infer_at(
+        "(with-accessors ((width panel-width) height) panel (list width height outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["panel", "outer"]);
+}
+
+#[test]
 fn treats_flet_lambda_list_as_local_to_function_body() {
     let params = infer_at(
         "(flet ((helper (local) (+ local outer))) (helper input))",

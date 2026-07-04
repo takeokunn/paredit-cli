@@ -2,7 +2,7 @@ use crate::application::usecase::callable_scope::common_lisp_local_callable_form
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-use super::super::syntax::list_head;
+use super::super::syntax::{atom_text, list_head};
 use super::bindings::extract_function_binding_entries;
 use super::patterns::parameter_names;
 use super::symbols::is_extract_function_param_candidate;
@@ -56,6 +56,20 @@ pub(super) fn collect_inferred_extract_function_special_form(
             )
         }
         "handler-case" | "restart-case" => collect_inferred_extract_function_clause_form(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        "dolist" | "dotimes" => collect_inferred_extract_function_iteration_binding(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+        ),
+        "with-slots" | "with-accessors" => collect_inferred_extract_function_slot_binding(
             dialect,
             view,
             explicit_params,
@@ -269,6 +283,105 @@ fn collect_inferred_extract_function_clause_form(
         }
     }
     true
+}
+
+fn collect_inferred_extract_function_iteration_binding(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) -> bool {
+    let Some(binding_form) = view.children.get(1) else {
+        return false;
+    };
+
+    if let Some(source_form) = binding_form.children.get(1) {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            source_form,
+            false,
+            explicit_params,
+            bound_params,
+            params,
+        );
+    }
+
+    let body_bound_params = extend_extract_function_bound_params(
+        bound_params,
+        binding_form
+            .children
+            .first()
+            .and_then(atom_text)
+            .into_iter(),
+    );
+
+    if let Some(result_form) = binding_form.children.get(2) {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            result_form,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+
+    for body in &view.children[2..] {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            body,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+    true
+}
+
+fn collect_inferred_extract_function_slot_binding(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) -> bool {
+    let Some(slot_specs) = view.children.get(1) else {
+        return false;
+    };
+    let Some(instance_form) = view.children.get(2) else {
+        return false;
+    };
+
+    super::collect_inferred_extract_function_params(
+        dialect,
+        instance_form,
+        false,
+        explicit_params,
+        bound_params,
+        params,
+    );
+
+    let body_bound_params = extend_extract_function_bound_params(
+        bound_params,
+        slot_specs.children.iter().filter_map(slot_spec_bound_name),
+    );
+    for body in &view.children[3..] {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            body,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+    true
+}
+
+fn slot_spec_bound_name(slot_spec: &ExpressionView) -> Option<&str> {
+    atom_text(slot_spec).or_else(|| slot_spec.children.first().and_then(atom_text))
 }
 
 fn collect_inferred_extract_function_lambda(
