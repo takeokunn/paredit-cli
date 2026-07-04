@@ -124,6 +124,32 @@ fn cli_plans_defun_parameter_rename() {
 }
 
 #[test]
+fn cli_plans_defmacro_optional_parameter_rename_without_touching_default_form() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "form",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(defmacro wrap (&optional (value (default value) supplied)) (list value supplied))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"defmacro\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(defmacro wrap (&optional (form (default value) supplied)) (list form supplied))",
+    ));
+}
+
+#[test]
 fn cli_plans_define_setf_expander_environment_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
