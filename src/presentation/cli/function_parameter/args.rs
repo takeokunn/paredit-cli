@@ -74,6 +74,26 @@ pub(in crate::presentation::cli) struct SwapFunctionParametersArgs {
 }
 
 #[derive(Debug, Args)]
+pub(in crate::presentation::cli) struct ReorderFunctionParametersArgs {
+    #[arg(short, long)]
+    pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,
+    #[arg(long)]
+    pub(in crate::presentation::cli::function_parameter) dialect: Option<DialectArg>,
+    #[arg(long)]
+    pub(in crate::presentation::cli::function_parameter) definition_path: Path,
+    #[arg(long = "parameter", required = true)]
+    pub(in crate::presentation::cli::function_parameter) parameter_order: Vec<SymbolName>,
+    #[arg(long = "call-path")]
+    pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
+    #[arg(long)]
+    pub(in crate::presentation::cli::function_parameter) all_calls: bool,
+    #[arg(long)]
+    pub(in crate::presentation::cli::function_parameter) write: bool,
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub(in crate::presentation::cli::function_parameter) output: OutputFormat,
+}
+
+#[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct RemoveFunctionParameterArgs {
     #[arg(short, long)]
     pub(in crate::presentation::cli::function_parameter) file: Option<PathBuf>,

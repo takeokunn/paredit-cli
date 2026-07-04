@@ -175,6 +175,66 @@ pub(super) fn swap_list_item_edit(
     Ok((container.span, replacement))
 }
 
+pub(super) fn reorder_list_items_edit(
+    input: &str,
+    container: &ExpressionView,
+    protected_prefix_count: usize,
+    new_relative_order: &[usize],
+    operation: &str,
+) -> Result<SpanEdit> {
+    if container.kind != ExpressionKind::List || container.delimiter.is_none() {
+        anyhow::bail!("{operation} reorder target must be a list");
+    }
+    if protected_prefix_count > container.children.len() {
+        anyhow::bail!("{operation} protected prefix is out of bounds");
+    }
+
+    let item_count = container.children.len() - protected_prefix_count;
+    if new_relative_order.len() != item_count {
+        anyhow::bail!(
+            "{operation} new order has {} items but target has {} reorderable items",
+            new_relative_order.len(),
+            item_count
+        );
+    }
+
+    let mut seen = vec![false; item_count];
+    for &index in new_relative_order {
+        if index >= item_count {
+            anyhow::bail!("{operation} new order index {index} is out of bounds");
+        }
+        if seen[index] {
+            anyhow::bail!("{operation} new order contains duplicate index {index}");
+        }
+        seen[index] = true;
+    }
+
+    let start = container.span.start().get();
+    let end = container.span.end().get();
+    let open = &input[start..start + 1];
+    let close = &input[end - 1..end];
+    let mut items = container.children[..protected_prefix_count]
+        .iter()
+        .map(|child| child.span.slice(input).to_owned())
+        .collect::<Vec<_>>();
+    let reorderable_items = container.children[protected_prefix_count..]
+        .iter()
+        .map(|child| child.span.slice(input).to_owned())
+        .collect::<Vec<_>>();
+    items.extend(
+        new_relative_order
+            .iter()
+            .map(|&index| reorderable_items[index].clone()),
+    );
+
+    let replacement = if items.is_empty() {
+        format!("{open}{close}")
+    } else {
+        format!("{open}{}{close}", items.join(" "))
+    };
+    Ok((container.span, replacement))
+}
+
 pub(super) fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;

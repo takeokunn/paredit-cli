@@ -41,8 +41,20 @@
 
             === paredit-cli Development Shell ===
 
+            Development loop:
+              cargo fmt --all
+              cargo clippy --all-targets -- -D warnings
+              cargo test
+
             Quick verification:
               nix flake check  # fmt check + clippy -D warnings + package build/tests
+
+            Build and run:
+              nix build .#              # result/bin/paredit
+              nix run .# -- check --file source.lisp
+
+            Format everything (Rust + Nix):
+              nix fmt
 
             USAGE_EOF
           '';

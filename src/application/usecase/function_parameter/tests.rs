@@ -2,8 +2,10 @@ use proptest::{prelude::*, test_runner::TestCaseError};
 
 use super::{
     AddFunctionParameterRequest, FunctionParameterInsert, MoveFunctionParameterRequest,
-    RemoveFunctionParameterRequest, SwapFunctionParametersRequest, plan_add_function_parameter,
-    plan_move_function_parameter, plan_remove_function_parameter, plan_swap_function_parameters,
+    RemoveFunctionParameterRequest, ReorderFunctionParametersRequest,
+    SwapFunctionParametersRequest, plan_add_function_parameter, plan_move_function_parameter,
+    plan_remove_function_parameter, plan_reorder_function_parameters,
+    plan_swap_function_parameters,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
@@ -99,6 +101,59 @@ fn swaps_parameters_and_call_arguments() {
         plan.swapped_arguments,
         vec![("1".to_owned(), "3".to_owned())]
     );
+}
+
+#[test]
+fn reorders_parameters_and_call_arguments() {
+    let input = "(defun f (a b c) (list a b c))\n(print (f 1 2 3))";
+    let plan = plan_reorder_function_parameters(ReorderFunctionParametersRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        parameter_order: vec![symbol("c"), symbol("a"), symbol("b")],
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+    })
+    .expect("plan");
+
+    assert_eq!(
+        plan.rewritten,
+        "(defun f (c a b) (list a b c))\n(print (f 3 1 2))"
+    );
+    assert_eq!(
+        plan.old_parameter_order
+            .iter()
+            .map(SymbolName::as_str)
+            .collect::<Vec<_>>(),
+        vec!["a", "b", "c"]
+    );
+    assert_eq!(
+        plan.new_parameter_order
+            .iter()
+            .map(SymbolName::as_str)
+            .collect::<Vec<_>>(),
+        vec!["c", "a", "b"]
+    );
+    assert_eq!(
+        plan.reordered_arguments,
+        vec![vec!["3".to_owned(), "1".to_owned(), "2".to_owned()]]
+    );
+}
+
+#[test]
+fn rejects_reorder_with_missing_parameter() {
+    let input = "(defun f (a b c) (list a b c))";
+    let error = plan_reorder_function_parameters(ReorderFunctionParametersRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        parameter_order: vec![symbol("c"), symbol("a")],
+        call_paths: Vec::new(),
+        all_calls: false,
+    })
+    .expect_err("missing parameter must fail");
+
+    assert!(error.to_string().contains("definition has 3"));
 }
 
 #[test]
@@ -249,6 +304,41 @@ proptest! {
         prop_assert_eq!(
             &plan.rewritten,
             &format!("(defun {name} ({c} {b} {a}) (list {a} {b} {c}))\n(print ({name} {third} {second} {first}))")
+        );
+        SyntaxTree::parse(&plan.rewritten)
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
+    }
+
+    #[test]
+    fn pbt_reorder_parameters_output_remains_parseable(
+        name in "[a-z][a-z0-9]{0,8}",
+        a in "[a-z][a-z0-9]{0,8}",
+        b in "[a-z][a-z0-9]{0,8}",
+        c in "[a-z][a-z0-9]{0,8}",
+        first in "[-]?[0-9]{1,4}",
+        second in "[-]?[0-9]{1,4}",
+        third in "[-]?[0-9]{1,4}",
+    ) {
+        prop_assume!(name != a);
+        prop_assume!(name != b);
+        prop_assume!(name != c);
+        prop_assume!(a != b);
+        prop_assume!(a != c);
+        prop_assume!(b != c);
+        let input = format!("(defun {name} ({a} {b} {c}) (list {a} {b} {c}))\n(print ({name} {first} {second} {third}))");
+        let plan = plan_reorder_function_parameters(ReorderFunctionParametersRequest {
+            input: &input,
+            dialect: Dialect::CommonLisp,
+            definition_path: path("0"),
+            parameter_order: vec![symbol(&c), symbol(&a), symbol(&b)],
+            call_paths: vec![path("1.1")],
+            all_calls: false,
+        })
+        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+
+        prop_assert_eq!(
+            &plan.rewritten,
+            &format!("(defun {name} ({c} {a} {b}) (list {a} {b} {c}))\n(print ({name} {third} {first} {second}))")
         );
         SyntaxTree::parse(&plan.rewritten)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;

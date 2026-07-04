@@ -4,4 +4,5 @@ mod add;
 mod move_parameter;
 mod policy;
 mod remove;
+mod reorder;
 mod swap;

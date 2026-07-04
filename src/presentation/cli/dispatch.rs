@@ -77,6 +77,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::SwapFunctionParameters(args) => {
             function_parameter::swap::swap_function_parameters(args)?
         }
+        Command::ReorderFunctionParameters(args) => {
+            function_parameter::reorder::reorder_function_parameters(args)?
+        }
         Command::RemoveFunctionParameter(args) => {
             function_parameter::remove::remove_function_parameter(args)?
         }

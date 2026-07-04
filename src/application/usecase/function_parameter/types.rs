@@ -36,6 +36,16 @@ pub struct SwapFunctionParametersRequest<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub struct ReorderFunctionParametersRequest<'a> {
+    pub input: &'a str,
+    pub dialect: Dialect,
+    pub definition_path: Path,
+    pub parameter_order: Vec<SymbolName>,
+    pub call_paths: Vec<Path>,
+    pub all_calls: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct RemoveFunctionParameterRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
@@ -111,6 +121,23 @@ pub struct SwapFunctionParametersPlan {
     pub left_index: usize,
     pub right_index: usize,
     pub swapped_arguments: Vec<(String, String)>,
+    pub rewritten: String,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReorderFunctionParametersPlan {
+    pub dialect: Dialect,
+    pub definition_path: Path,
+    pub call_paths: Vec<Path>,
+    pub all_calls: bool,
+    pub definition_span: ByteSpan,
+    pub parameter_list_span: ByteSpan,
+    pub call_spans: Vec<ByteSpan>,
+    pub function_name: SymbolName,
+    pub old_parameter_order: Vec<SymbolName>,
+    pub new_parameter_order: Vec<SymbolName>,
+    pub reordered_arguments: Vec<Vec<String>>,
     pub rewritten: String,
     pub changed: bool,
 }

@@ -34,6 +34,13 @@ pub(super) fn parse_swap_function_parameters_definition(
     parse_function_parameter_definition(dialect, view, None, "swap-function-parameters")
 }
 
+pub(super) fn parse_reorder_function_parameters_definition(
+    dialect: Dialect,
+    view: ExpressionView,
+) -> Result<FunctionParameterTarget> {
+    parse_function_parameter_definition(dialect, view, None, "reorder-function-parameters")
+}
+
 pub(super) fn parse_add_function_parameter_definition(
     dialect: Dialect,
     view: ExpressionView,
