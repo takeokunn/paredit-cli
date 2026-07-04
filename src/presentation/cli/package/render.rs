@@ -9,7 +9,7 @@ pub(super) fn print_merge_package_options_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_merge_package_options_plan(plan),
-        OutputFormat::Json => json::print_merge_package_options_plan(plan),
+        OutputFormat::Json => json::refactor::print_merge_package_options_plan(plan),
     }
 }
 
@@ -19,7 +19,7 @@ pub(super) fn print_sort_package_options_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_sort_package_options_plan(plan),
-        OutputFormat::Json => json::print_sort_package_options_plan(plan),
+        OutputFormat::Json => json::refactor::print_sort_package_options_plan(plan),
     }
 }
 
@@ -29,7 +29,7 @@ pub(super) fn print_sort_package_exports_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_sort_package_exports_plan(plan),
-        OutputFormat::Json => json::print_sort_package_exports_plan(plan),
+        OutputFormat::Json => json::refactor::print_sort_package_exports_plan(plan),
     }
 }
 
@@ -39,7 +39,7 @@ pub(super) fn print_package_report(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_package_report(reports),
-        OutputFormat::Json => json::print_package_report(reports),
+        OutputFormat::Json => json::report::print_package_report(reports),
     }
 }
 
@@ -52,13 +52,13 @@ pub(super) fn print_rename_package_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_rename_package_plan(plans, from, to, write),
-        OutputFormat::Json => json::print_rename_package_plan(plans, from, to, write),
+        OutputFormat::Json => json::refactor::print_rename_package_plan(plans, from, to, write),
     }
 }
 
 pub(super) fn print_add_export_plan(plan: &AddExportPlan, output: OutputFormat) -> Result<()> {
     match output {
         OutputFormat::Text => text::print_add_export_plan(plan),
-        OutputFormat::Json => json::print_add_export_plan(plan),
+        OutputFormat::Json => json::refactor::print_add_export_plan(plan),
     }
 }
