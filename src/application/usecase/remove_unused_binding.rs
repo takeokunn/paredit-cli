@@ -2,7 +2,9 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{
+    Delimiter, ExpressionKind, ExpressionView, Formatter, SymbolName, SyntaxTree,
+};
 
 mod candidates;
 mod references;
@@ -207,14 +209,15 @@ fn remove_unused_binding_parts(
             .slice(input)
             .to_owned()
     } else {
-        apply_nested_span_edits(
+        let replacement = apply_nested_span_edits(
             target.span.slice(input),
             target.span,
             selected
                 .iter()
                 .map(|binding| (binding.binding_span, String::new()))
                 .collect(),
-        )?
+        )?;
+        format_single_replacement_form(&replacement)?
     };
 
     Ok(RemoveUnusedBindingParts {
@@ -223,4 +226,18 @@ fn remove_unused_binding_parts(
         bindings: selected,
         replacement,
     })
+}
+
+fn format_single_replacement_form(input: &str) -> Result<String> {
+    let tree = SyntaxTree::parse(input)
+        .context("remove-unused-binding replacement is not a valid S-expression form")?;
+    if tree.root_children().len() != 1 {
+        anyhow::bail!("remove-unused-binding replacement must contain exactly one form");
+    }
+
+    let mut formatted = Formatter::new(2).format(&tree);
+    if formatted.ends_with('\n') {
+        formatted.pop();
+    }
+    Ok(formatted)
 }

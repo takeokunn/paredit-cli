@@ -1,5 +1,5 @@
 use super::tree::{NodeKind, SyntaxTree};
-use super::types::NodeId;
+use super::types::{Delimiter, NodeId};
 
 const MAX_INLINE_WIDTH: usize = 80;
 
@@ -70,6 +70,18 @@ impl Formatter {
                         }
                         ListStyle::ClauseForm => {
                             self.format_clause_form(tree, node_id, depth, output);
+                        }
+                        ListStyle::CondClauses => {
+                            self.format_cond_clauses(tree, node_id, depth, output);
+                        }
+                        ListStyle::CaseClauses => {
+                            self.format_case_clauses(tree, node_id, depth, output);
+                        }
+                        ListStyle::Do => {
+                            self.format_do_form(tree, node_id, depth, head, output);
+                        }
+                        ListStyle::Prog => {
+                            self.format_prog_form(tree, node_id, depth, head, output);
                         }
                         ListStyle::Declaration => {
                             self.format_declaration_form(tree, node_id, depth, head, output);
@@ -316,6 +328,164 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
+    fn format_cond_clauses(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            if position == 0 {
+                self.format_node(tree, *child, depth + 1, output);
+            } else {
+                output.push('\n');
+                output.push_str(&self.indent(depth + 1));
+                self.format_body_clause(tree, *child, depth + 1, output);
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    fn format_case_clauses(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_inline_or_node(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    output.push('\n');
+                    output.push_str(&self.indent(depth + 1));
+                    self.format_body_clause(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    fn format_body_clause(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        if node.kind != NodeKind::List || node.children.len() <= 2 {
+            self.format_inline_or_node(tree, node_id, depth, output);
+            return;
+        }
+
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_inline_or_node(tree, *child, depth + 1, output),
+                _ => {
+                    output.push('\n');
+                    output.push_str(&self.indent(depth + 1));
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+        output.push(delimiter.close());
+    }
+
+    fn format_do_form(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        head: &str,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_sequence_list(
+                        tree,
+                        *child,
+                        depth + 1,
+                        depth * self.indent + head.len() + 3,
+                        output,
+                    );
+                }
+                2 => {
+                    output.push('\n');
+                    output.push_str(&self.indent(depth + 1));
+                    self.format_body_clause(tree, *child, depth + 1, output);
+                }
+                _ => {
+                    output.push('\n');
+                    output.push_str(&self.indent(depth + 1));
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    fn format_prog_form(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        head: &str,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        output.push(delimiter.open());
+
+        for (position, child) in node.children.iter().enumerate() {
+            match position {
+                0 => self.format_node(tree, *child, depth + 1, output),
+                1 => {
+                    output.push(' ');
+                    self.format_sequence_list(
+                        tree,
+                        *child,
+                        depth + 1,
+                        depth * self.indent + head.len() + 3,
+                        output,
+                    );
+                }
+                _ => {
+                    output.push('\n');
+                    output.push_str(&self.indent(depth + 1));
+                    self.format_node(tree, *child, depth + 1, output);
+                }
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
     fn format_head_body(
         &self,
         tree: &SyntaxTree,
@@ -409,6 +579,20 @@ impl Formatter {
 
         let delimiter = node.delimiter.expect("list has delimiter");
         output.push(delimiter.open());
+        if delimiter == Delimiter::Bracket && node.children.len() % 2 == 0 {
+            for (position, pair) in node.children.chunks_exact(2).enumerate() {
+                if position > 0 {
+                    output.push('\n');
+                    output.push_str(&" ".repeat(continuation_column));
+                }
+                self.format_inline_or_node(tree, pair[0], depth + 1, output);
+                output.push(' ');
+                self.format_inline_or_node(tree, pair[1], depth + 1, output);
+            }
+            output.push(delimiter.close());
+            return;
+        }
+
         for (position, child) in node.children.iter().enumerate() {
             if position > 0 {
                 output.push('\n');
@@ -464,12 +648,20 @@ impl Formatter {
             "flet" | "labels" | "macrolet" | "compiler-macrolet" => ListStyle::LocalFunctions,
             "if" => ListStyle::If,
             "when" | "unless" | "dolist" | "dotimes" | "with-open-file" | "with-slots"
-            | "with-accessors" => ListStyle::OneArgumentBody,
+            | "with-accessors" | "block" | "catch" | "unwind-protect" | "eval-when" => {
+                ListStyle::OneArgumentBody
+            }
             "destructuring-bind" | "multiple-value-bind" => ListStyle::TwoArgumentBody,
             "handler-case" | "restart-case" => ListStyle::ClauseForm,
-            "progn" | "prog1" | "prog2" | "cond" | "case" | "ccase" | "ecase" | "typecase"
-            | "ctypecase" | "etypecase" | "unwind-protect" | "block" | "catch" | "tagbody"
-            | "loop" | "defpackage" | "locally" | "eval-when" => ListStyle::HeadBody,
+            "cond" => ListStyle::CondClauses,
+            "case" | "ccase" | "ecase" | "typecase" | "ctypecase" | "etypecase" => {
+                ListStyle::CaseClauses
+            }
+            "do" | "do*" => ListStyle::Do,
+            "prog" | "prog*" => ListStyle::Prog,
+            "progn" | "prog1" | "prog2" | "tagbody" | "loop" | "defpackage" | "locally" => {
+                ListStyle::HeadBody
+            }
             "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
             _ => ListStyle::General,
         }
@@ -490,6 +682,10 @@ enum ListStyle {
     OneArgumentBody,
     TwoArgumentBody,
     ClauseForm,
+    CondClauses,
+    CaseClauses,
+    Do,
+    Prog,
     Declaration,
     HeadBody,
     If,

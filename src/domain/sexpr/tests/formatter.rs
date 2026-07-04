@@ -21,6 +21,16 @@ fn formats_binding_forms_with_aligned_bindings() {
 }
 
 #[test]
+fn formats_bracket_binding_forms_as_name_value_pairs() {
+    let input = "(let [x 1 y (+ x 2)] (list x y))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(let [x 1\n      y (+ x 2)]\n  (list x y))\n"
+    );
+}
+
+#[test]
 fn formats_handler_bind_like_a_binding_form() {
     let input =
         "(handler-bind ((error #'handle-error) (warning #'muffle-warning)) (risky) (recover))";
@@ -48,6 +58,87 @@ fn formats_macro_and_cond_body_forms() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         "(defmacro when-let ((name value))\n  (list 'when value (list 'let (list (list name value)) name)))\n\n(cond\n  ((null x) nil)\n  (t (car x)))\n"
+    );
+}
+
+#[test]
+fn formats_multi_body_cond_clauses_on_separate_lines() {
+    let input = "(cond ((ready-p value) (prepare value) (run value)) (t (fallback)))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(cond\n  ((ready-p value)\n    (prepare value)\n    (run value))\n  (t (fallback)))\n"
+    );
+}
+
+#[test]
+fn formats_case_keyform_and_multi_body_clauses() {
+    let input = "(case kind (:ready (prepare value) (run value)) ((:skip :noop) value) (otherwise (fallback)))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(case kind\n  (:ready\n    (prepare value)\n    (run value))\n  ((:skip :noop) value)\n  (otherwise (fallback)))\n"
+    );
+}
+
+#[test]
+fn formats_do_iteration_specs_and_end_clause() {
+    let input = "(do ((i 0 (1+ i)) (sum 0 (+ sum i))) ((>= i limit) sum total) (incf total sum) (collect i))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(do ((i 0 (1+ i))\n     (sum 0 (+ sum i)))\n  ((>= i limit)\n    sum\n    total)\n  (incf total sum)\n  (collect i))\n"
+    );
+}
+
+#[test]
+fn formats_do_star_like_do() {
+    let input = "(do* ((x 0 (1+ x)) (y x (+ x y))) ((> y 10) y) (print y))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(do* ((x 0 (1+ x))\n      (y x (+ x y)))\n  ((> y 10) y)\n  (print y))\n"
+    );
+}
+
+#[test]
+fn formats_prog_bindings_and_tagbody_forms() {
+    let input = "(prog ((i 0) (sum 0)) start (incf sum i) (when (> sum limit) (return sum)) (incf i) (go start))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(prog ((i 0)\n       (sum 0))\n  start\n  (incf sum i)\n  (when (> sum limit)\n    (return sum))\n  (incf i)\n  (go start))\n"
+    );
+}
+
+#[test]
+fn formats_prog_star_like_prog() {
+    let input = "(prog* ((x 1) (y x)) done (return y))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(prog* ((x 1)\n        (y x))\n  done\n  (return y))\n"
+    );
+}
+
+#[test]
+fn formats_common_lisp_prefix_body_forms() {
+    let input =
+        "(block done (catch 'retry (unwind-protect (run job) (cleanup job) (release job))))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(block done\n  (catch 'retry\n    (unwind-protect (run job)\n      (cleanup job)\n      (release job))))\n"
+    );
+}
+
+#[test]
+fn formats_eval_when_body_after_situation_list() {
+    let input = "(eval-when (:compile-toplevel :load-toplevel :execute) (declaim (optimize speed)) (defun boot () (start)))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(eval-when (:compile-toplevel :load-toplevel :execute)\n  (declaim (optimize speed))\n  (defun boot ()\n    (start)))\n"
     );
 }
 

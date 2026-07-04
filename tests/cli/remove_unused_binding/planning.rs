@@ -22,7 +22,7 @@ fn cli_plans_remove_unused_binding_without_writing() {
         "\"dropped_value_requires_review\": true",
     ))
     .stdout(predicate::str::contains("\"written\": false"))
-    .stdout(predicate::str::contains("(let ( (kept 1)) kept)"));
+    .stdout(predicate::str::contains("(let ((kept 1))\\n  kept)"));
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn cli_plans_remove_all_unused_bindings_without_writing() {
     .stdout(predicate::str::contains("\"binding_name\": \"unused\""))
     .stdout(predicate::str::contains("\"binding_name\": \"also\""))
     .stdout(predicate::str::contains(
-        "\"replacement\": \"(let (  (kept 3)) kept)\"",
+        "\"replacement\": \"(let ((kept 3))\\n  kept)\"",
     ))
     .stdout(predicate::str::contains("\"written\": false"));
 }
@@ -94,5 +94,5 @@ fn cli_plans_remove_unused_binding_for_clojure_vector_binding() {
     .stdout(predicate::str::contains("\"dialect\": \"clojure\""))
     .stdout(predicate::str::contains("\"binding_name\": \"unused\""))
     .stdout(predicate::str::contains("\"binding_value\": \"1\""))
-    .stdout(predicate::str::contains("(let [ kept 2] kept)"));
+    .stdout(predicate::str::contains("(let [kept 2]\\n  kept)"));
 }

@@ -106,6 +106,69 @@ fn cli_formats_restart_case_indentation() {
 }
 
 #[test]
+fn cli_formats_do_iteration_indentation() {
+    let dir = fresh_temp_dir("format-do");
+    let file = dir.join("do.lisp");
+    fs::write(
+        &file,
+        "(do ((i 0 (1+ i)) (sum 0 (+ sum i))) ((>= i limit) sum total) (incf total sum))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(do ((i 0 (1+ i))\n     (sum 0 (+ sum i)))\n  ((>= i limit)\n    sum\n    total)\n  (incf total sum))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_prog_iteration_indentation() {
+    let dir = fresh_temp_dir("format-prog");
+    let file = dir.join("prog.lisp");
+    fs::write(
+        &file,
+        "(prog ((i 0) (sum 0)) start (incf sum i) (when (> sum limit) (return sum)) (incf i) (go start))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(prog ((i 0)\n       (sum 0))\n  start\n  (incf sum i)\n  (when (> sum limit)\n    (return sum))\n  (incf i)\n  (go start))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_common_lisp_prefix_body_indentation() {
+    let dir = fresh_temp_dir("format-prefix-body");
+    let file = dir.join("prefix-body.lisp");
+    fs::write(
+        &file,
+        "(block done (catch 'retry (unwind-protect (run job) (cleanup job) (release job))))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(block done\n  (catch 'retry\n    (unwind-protect (run job)\n      (cleanup job)\n      (release job))))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_macrolet_indentation() {
     let dir = fresh_temp_dir("format-macrolet");
     let file = dir.join("macrolet.lisp");

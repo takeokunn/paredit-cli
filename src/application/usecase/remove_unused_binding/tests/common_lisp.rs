@@ -17,8 +17,8 @@ fn plans_common_lisp_single_unused_binding() {
     assert_eq!(plan.binding_name.as_deref(), Some("unused"));
     assert_eq!(plan.binding_value.as_deref(), Some("1"));
     assert_eq!(plan.reference_count, Some(0));
-    assert_eq!(plan.replacement, "(let ( (used 2)) used)");
-    assert_eq!(plan.rewritten, "(let ( (used 2)) used)");
+    assert_eq!(plan.replacement, "(let ((used 2))\n  used)");
+    assert_eq!(plan.rewritten, "(let ((used 2))\n  used)");
     assert!(plan.dropped_value_requires_review);
     assert!(plan.changed);
 }
@@ -58,7 +58,7 @@ fn plans_unused_binding_ignoring_shadowed_lambda_parameter() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(let ( (used 2)) (list used (lambda (x) x)))"
+        "(let ((used 2))\n  (list\n    used\n    (lambda (x)\n      x)))"
     );
 }
 
@@ -95,7 +95,10 @@ fn plans_unused_binding_ignoring_shadowed_inner_let() {
 
     assert_eq!(plan.binding_name.as_deref(), Some("x"));
     assert_eq!(plan.reference_count, Some(0));
-    assert_eq!(plan.replacement, "(let ( (used 2)) (let ((x 3)) x) used)");
+    assert_eq!(
+        plan.replacement,
+        "(let ((used 2))\n  (let ((x 3))\n    x)\n  used)"
+    );
 }
 
 #[test]
@@ -116,7 +119,7 @@ fn plans_unused_binding_ignoring_shadowed_dolist_variable() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(let ( (used 2)) (list used (dolist (value items value) value)))"
+        "(let ((used 2))\n  (list\n    used\n    (dolist (value items value)\n      value)))"
     );
 }
 
@@ -138,7 +141,7 @@ fn plans_unused_binding_ignoring_shadowed_with_slots_variable() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(let ( (used 2)) (list used (with-slots (value) object value)))"
+        "(let ((used 2))\n  (list\n    used\n    (with-slots (value)\n      object\n      value)))"
     );
 }
 
@@ -181,7 +184,7 @@ fn plans_unused_symbol_macrolet_without_counting_expansion_reference() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(symbol-macrolet ( (used other)) (list used))"
+        "(symbol-macrolet ((used other))\n  (list used))"
     );
 }
 
@@ -220,7 +223,10 @@ fn plans_unused_with_slots_bare_binding_without_counting_instance_expression() {
     assert_eq!(plan.binding_name.as_deref(), Some("value"));
     assert_eq!(plan.binding_value.as_deref(), Some("value"));
     assert_eq!(plan.reference_count, Some(0));
-    assert_eq!(plan.replacement, "(with-slots ( used) value (list used))");
+    assert_eq!(
+        plan.replacement,
+        "(with-slots (used)\n  value\n  (list used))"
+    );
 }
 
 #[test]
@@ -241,7 +247,10 @@ fn plans_unused_with_slots_pair_binding() {
     assert_eq!(plan.binding_name.as_deref(), Some("local"));
     assert_eq!(plan.binding_value.as_deref(), Some("slot-name"));
     assert_eq!(plan.reference_count, Some(0));
-    assert_eq!(plan.replacement, "(with-slots ( used) object (list used))");
+    assert_eq!(
+        plan.replacement,
+        "(with-slots (used)\n  object\n  (list used))"
+    );
 }
 
 #[test]
@@ -281,7 +290,7 @@ fn plans_unused_with_accessors_binding_without_counting_instance_expression() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(with-accessors ( (used used-slot)) value (list used))"
+        "(with-accessors ((used used-slot))\n  value\n  (list used))"
     );
 }
 
@@ -322,7 +331,7 @@ fn plans_unused_macrolet_without_counting_expander_body_reference() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(macrolet ( (used (y) (list y))) (list used))"
+        "(macrolet ((used (y) (list y)))\n  (list used))"
     );
 }
 
@@ -364,7 +373,7 @@ fn plans_unused_compiler_macrolet_without_counting_expander_body_reference() {
     assert_eq!(plan.reference_count, Some(0));
     assert_eq!(
         plan.replacement,
-        "(compiler-macrolet ( (used (y) (list y))) (list used))"
+        "(compiler-macrolet ((used (y) (list y)))\n  (list used))"
     );
 }
 
@@ -402,7 +411,7 @@ fn plans_unused_flet_binding_ignoring_definition_body_reference() {
     assert_eq!(plan.form, "flet");
     assert_eq!(plan.binding_name.as_deref(), Some("unused"));
     assert_eq!(plan.reference_count, Some(0));
-    assert_eq!(plan.replacement, "(flet ( (used () (used))) (used))");
+    assert_eq!(plan.replacement, "(flet ((used () (used)))\n  (used))");
 }
 
 #[test]

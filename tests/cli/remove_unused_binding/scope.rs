@@ -18,7 +18,7 @@ fn cli_plans_remove_unused_binding_ignoring_shadowed_lambda_parameter() {
     .stdout(predicate::str::contains("\"binding_name\": \"x\""))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(let ( (used 2)) (list used (lambda (x) x)))",
+        "(let ((used 2))\\n  (list\\n    used\\n    (lambda (x)\\n      x)))",
     ));
 }
 
@@ -51,7 +51,7 @@ fn cli_keeps_let_star_binding_used_by_later_binding_in_all_bindings() {
     .stdout(predicate::str::contains("\"binding_count\": 1"))
     .stdout(predicate::str::contains("\"binding_name\": \"unused\""))
     .stdout(predicate::str::contains(
-        "\"replacement\": \"(let* ((x 1)  (y (+ x 3))) y)\"",
+        "\"replacement\": \"(let* ((x 1)\\n       (y (+ x 3)))\\n  y)\"",
     ));
 }
 
@@ -77,7 +77,7 @@ fn cli_plans_remove_unused_symbol_macrolet_without_counting_expansion_reference(
     ))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(symbol-macrolet ( (used other)) (list used))",
+        "(symbol-macrolet ((used other))\\n  (list used))",
     ));
 }
 
@@ -103,7 +103,7 @@ fn cli_plans_remove_unused_macrolet_without_counting_expander_body_reference() {
     ))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(macrolet ( (used (y) (list y))) (list used))",
+        "(macrolet ((used (y) (list y)))\\n  (list used))",
     ));
 }
 
@@ -151,7 +151,7 @@ fn cli_plans_remove_unused_with_slots_without_counting_instance_expression() {
     .stdout(predicate::str::contains("\"binding_value\": \"value\""))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(with-slots ( used) value (list used))",
+        "(with-slots (used)\\n  value\\n  (list used))",
     ));
 }
 
@@ -175,7 +175,7 @@ fn cli_plans_remove_unused_with_accessors_without_counting_instance_expression()
     .stdout(predicate::str::contains("\"binding_value\": \"slot-name\""))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(with-accessors ( (used used-slot)) value (list used))",
+        "(with-accessors ((used used-slot))\\n  value\\n  (list used))",
     ));
 }
 
@@ -203,7 +203,7 @@ fn cli_plans_remove_unused_compiler_macrolet_without_counting_expander_body_refe
     ))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(compiler-macrolet ( (used (y) (list y))) (list used))",
+        "(compiler-macrolet ((used (y) (list y)))\\n  (list used))",
     ));
 }
 
@@ -238,7 +238,7 @@ fn cli_plans_remove_unused_flet_binding_ignoring_definition_body_reference() {
     .stdout(predicate::str::contains("\"binding_name\": \"unused\""))
     .stdout(predicate::str::contains("\"reference_count\": 0"))
     .stdout(predicate::str::contains(
-        "(flet ( (used () (used))) (used))",
+        "(flet ((used () (used)))\\n  (used))",
     ));
 }
 

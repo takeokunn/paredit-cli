@@ -63,7 +63,7 @@ fn cli_writes_remove_all_unused_bindings_when_drop_value_allowed() {
 
     assert_eq!(
         fs::read_to_string(lisp_file).expect("read rewritten lisp"),
-        "(defun render () (let (  (kept 3)) kept))\n"
+        "(defun render () (let ((kept 3))\n  kept))\n"
     );
 }
 
