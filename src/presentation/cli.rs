@@ -1,5 +1,6 @@
 mod analysis_report;
 mod args;
+mod basic_edit;
 mod call_graph_report;
 mod call_report;
 mod command;
@@ -56,7 +57,7 @@ use crate::application::refactor::preview::{
 };
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Edit, Formatter, Path, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
 use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 use anyhow::{Context, Result};
 use clap::{Args, Parser, ValueEnum};

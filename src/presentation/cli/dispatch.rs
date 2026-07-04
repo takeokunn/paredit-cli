@@ -81,34 +81,17 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::InlineLet(args) => inline_let::inline_let(args)?,
         Command::RemoveUnusedBinding(args) => remove_unused_binding::remove_unused_binding(args)?,
         Command::LetReport(args) => let_report::let_report(args)?,
-        Command::Format(args) => {
-            let input = read_input(args.file)?;
-            let _dialect = detect_dialect(&input, args.dialect);
-            let tree = SyntaxTree::parse(&input.text)?;
-            print!("{}", Formatter::new(args.indent).format(&tree));
-        }
-        Command::Select(args) => {
-            let input = read_input(args.file)?;
-            let tree = SyntaxTree::parse(&input.text)?;
-            let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-            print!("{}", selection.text(&input.text));
-        }
-        Command::Replace(args) => {
-            let input = read_input(args.file)?;
-            SyntaxTree::parse(&args.with)
-                .context("replacement is not a valid S-expression document")?;
-            let tree = SyntaxTree::parse(&input.text)?;
-            let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-            print!("{}", Edit::replace(&input.text, selection, &args.with));
-        }
-        Command::Kill(args) => edit_target(args, Edit::kill)?,
-        Command::Wrap(args) => edit_target(args, Edit::wrap)?,
-        Command::Splice(args) => edit_target(args, Edit::splice)?,
-        Command::Raise(args) => edit_target(args, Edit::raise)?,
-        Command::SlurpForward(args) => edit_target(args, Edit::slurp_forward)?,
-        Command::SlurpBackward(args) => edit_target(args, Edit::slurp_backward)?,
-        Command::BarfForward(args) => edit_target(args, Edit::barf_forward)?,
-        Command::BarfBackward(args) => edit_target(args, Edit::barf_backward)?,
+        Command::Format(args) => basic_edit::workflow::format(args)?,
+        Command::Select(args) => basic_edit::workflow::select(args)?,
+        Command::Replace(args) => basic_edit::workflow::replace(args)?,
+        Command::Kill(args) => basic_edit::workflow::kill(args)?,
+        Command::Wrap(args) => basic_edit::workflow::wrap(args)?,
+        Command::Splice(args) => basic_edit::workflow::splice(args)?,
+        Command::Raise(args) => basic_edit::workflow::raise(args)?,
+        Command::SlurpForward(args) => basic_edit::workflow::slurp_forward(args)?,
+        Command::SlurpBackward(args) => basic_edit::workflow::slurp_backward(args)?,
+        Command::BarfForward(args) => basic_edit::workflow::barf_forward(args)?,
+        Command::BarfBackward(args) => basic_edit::workflow::barf_backward(args)?,
     }
     Ok(())
 }
