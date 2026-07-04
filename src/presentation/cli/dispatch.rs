@@ -6,7 +6,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::Dialect(args) => analysis_report::dialect(args)?,
         Command::Stats(args) => analysis_report::stats(args)?,
         Command::AgentReport(args) => analysis_report::agent_report(args)?,
-        Command::WorkspaceReport(args) => workspace_report::workspace_report(args)?,
+        Command::WorkspaceReport(args) => workspace_report::workflow::workspace_report(args)?,
         Command::WorkspaceRefactorPlan(args) => refactor::workflow::workspace_refactor_plan(args)?,
         Command::WorkspaceRefactorPreview(args) => {
             refactor::workflow::workspace_refactor_preview(args)?

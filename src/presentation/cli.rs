@@ -85,7 +85,7 @@ enum Command {
     /// Print a complete JSON report for AI coding agent refactor planning.
     AgentReport(AnalyzeArgs),
     /// Discover Lisp sources under roots and report parse/refactor inventory.
-    WorkspaceReport(workspace_report::WorkspaceReportArgs),
+    WorkspaceReport(workspace_report::args::WorkspaceReportArgs),
     /// Discover Lisp sources under roots and build a gated refactor plan.
     WorkspaceRefactorPlan(refactor::args::WorkspaceRefactorPlanArgs),
     /// Discover Lisp sources under roots and preview exact refactoring rewrites.
