@@ -92,6 +92,9 @@ impl Formatter {
                         ListStyle::Declaration => {
                             self.format_declaration_form(tree, node_id, depth, head, output);
                         }
+                        ListStyle::PairAssignment => {
+                            self.format_pair_assignment_form(tree, node_id, depth, head, output);
+                        }
                         ListStyle::HeadBody => {
                             self.format_head_body(tree, node_id, depth, output);
                         }
@@ -582,6 +585,38 @@ impl Formatter {
         output.push(delimiter.close());
     }
 
+    fn format_pair_assignment_form(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        head: &str,
+        output: &mut String,
+    ) {
+        let node = tree.node(node_id);
+        let delimiter = node.delimiter.expect("list has delimiter");
+        let continuation_column = depth * self.indent + head.len() + 2;
+        output.push(delimiter.open());
+        self.format_node(tree, node.children[0], depth + 1, output);
+
+        for (position, pair) in node.children[1..].chunks(2).enumerate() {
+            if position == 0 {
+                output.push(' ');
+            } else {
+                output.push('\n');
+                output.push_str(&" ".repeat(continuation_column));
+            }
+
+            self.format_inline_or_node(tree, pair[0], depth + 1, output);
+            if let Some(value) = pair.get(1) {
+                output.push(' ');
+                self.format_inline_or_node(tree, *value, depth + 1, output);
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
     fn format_general_list(
         &self,
         tree: &SyntaxTree,
@@ -705,6 +740,7 @@ impl Formatter {
                 ListStyle::HeadBody
             }
             "declare" | "declaim" | "proclaim" => ListStyle::Declaration,
+            "setq" | "psetq" | "setf" | "psetf" => ListStyle::PairAssignment,
             _ => ListStyle::General,
         }
     }
@@ -731,6 +767,7 @@ enum ListStyle {
     Do,
     Prog,
     Declaration,
+    PairAssignment,
     HeadBody,
     If,
     General,

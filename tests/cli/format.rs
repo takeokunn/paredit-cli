@@ -337,6 +337,27 @@ fn cli_formats_define_setf_expander_indentation() {
 }
 
 #[test]
+fn cli_formats_common_lisp_assignment_pairs() {
+    let dir = fresh_temp_dir("format-assignment-pairs");
+    let file = dir.join("assignment-pairs.lisp");
+    fs::write(
+        &file,
+        "(setf (slot-value user 'name) (compute-name user) (slot-value user 'age) (compute-age user))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(setf (slot-value user 'name) (compute-name user)\n      (slot-value user 'age) (compute-age user))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_declarations_indentation() {
     let dir = fresh_temp_dir("format-declarations");
     let file = dir.join("declarations.lisp");

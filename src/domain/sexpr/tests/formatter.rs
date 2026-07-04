@@ -223,6 +223,33 @@ fn formats_setf_definition_forms_like_definitions() {
 }
 
 #[test]
+fn formats_common_lisp_assignment_pairs() {
+    let input = "(setq x 1 y (+ x 2) total (compute-total x y))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(setq x 1\n      y (+ x 2)\n      total (compute-total x y))\n"
+    );
+}
+
+#[test]
+fn formats_setf_place_value_pairs() {
+    let input = "(setf (slot-value user 'name) (compute-name user) (slot-value user 'age) (compute-age user))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(setf (slot-value user 'name) (compute-name user)\n      (slot-value user 'age) (compute-age user))\n"
+    );
+}
+
+#[test]
+fn formats_incomplete_assignment_pair_without_dropping_operands() {
+    let input = "(psetq ready-p)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), "(psetq ready-p)\n");
+}
+
+#[test]
 fn formats_define_symbol_macro_like_a_definition() {
     let input = "(define-symbol-macro current-user (slot-value *session* 'user))";
     let tree = SyntaxTree::parse(input).expect("valid");
