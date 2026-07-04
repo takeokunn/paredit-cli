@@ -42,6 +42,9 @@ use crate::application::impact_report::{
     ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
     summarize_impact_reports,
 };
+use crate::application::refactor::execute::{
+    RefactorWriteCandidate, RefactorWriteRefusal, build_refactor_write_plan,
+};
 use crate::application::refactor::plan::{
     RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
     RefactorPlanPolicyRequest, RefactorPlanRequest, RefactorPlanStep, RefactorPlanSummary,
