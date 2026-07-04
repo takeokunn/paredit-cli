@@ -1,7 +1,9 @@
 use crate::domain::sexpr::{ExpressionView, Path};
 
-use crate::application::dependency_report::syntax::{dependency_designator_text, list_head};
-use crate::application::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::application::usecase::dependency_report::syntax::{
+    dependency_designator_text, list_head,
+};
+use crate::application::usecase::dependency_report::types::{DependencyKind, DependencyReportItem};
 
 pub(super) fn collect_list_dependency_items(
     view: &ExpressionView,

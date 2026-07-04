@@ -6,7 +6,7 @@ use crate::domain::sexpr::ExpressionView;
 use super::super::types::LetFormReport;
 use super::report::analyze_let_form;
 
-pub(in crate::application::let_report) fn collect_let_reports_from_view(
+pub(in crate::application::usecase::let_report) fn collect_let_reports_from_view(
     dialect: Dialect,
     input: &str,
     view: &ExpressionView,

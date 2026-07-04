@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::application::call_graph_report::CallGraphEdge;
 use crate::application::refactor::plan::RefactorRiskLevel;
-use crate::application::signature_report::SignatureCallItem;
+use crate::application::usecase::signature_report::SignatureCallItem;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, SyntaxTree};

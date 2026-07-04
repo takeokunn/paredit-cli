@@ -1,9 +1,9 @@
 use crate::domain::sexpr::{ExpressionView, Path};
 
-use crate::application::dependency_report::syntax::{
+use crate::application::usecase::dependency_report::syntax::{
     atom_text, package_qualified_dependency_target,
 };
-use crate::application::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::application::usecase::dependency_report::types::{DependencyKind, DependencyReportItem};
 
 pub(super) fn collect_qualified_symbol_dependency(
     view: &ExpressionView,

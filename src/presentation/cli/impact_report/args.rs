@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::application::impact_report::ImpactRiskLevel as ApplicationImpactRiskLevel;
+use crate::application::usecase::impact_report::ImpactRiskLevel as ApplicationImpactRiskLevel;
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct ImpactReportArgs {

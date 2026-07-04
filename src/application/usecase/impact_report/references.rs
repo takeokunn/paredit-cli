@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::Path as FsPath;
 
-use crate::application::signature_report::SignatureCallItem;
+use crate::application::usecase::signature_report::SignatureCallItem;
 use crate::domain::sexpr::{AtomOccurrence, ByteSpan, SymbolName, SyntaxTree};
 
 use super::types::{ImpactDefinitionItem, ImpactSymbolOccurrence};

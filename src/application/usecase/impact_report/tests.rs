@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 
 use crate::application::refactor::plan::RefactorPlanSummary;
-use crate::application::signature_report::SignatureCallStatus;
+use crate::application::usecase::signature_report::SignatureCallStatus;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{SymbolName, SyntaxTree};
 

@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::application::definition_report::{
+use crate::application::usecase::definition_report::{
     DefinitionReportFile, UnusedDefinitionFile, UnusedDefinitionPolicy,
 };
 

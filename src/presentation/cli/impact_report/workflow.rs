@@ -1,7 +1,7 @@
 use super::super::*;
 use super::args::ImpactReportArgs;
 use super::render::print_impact_report;
-use crate::application::impact_report::{
+use crate::application::usecase::impact_report::{
     ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource, build_impact_reports,
     evaluate_impact_report_policy, impact_risks, impact_status_counts, summarize_impact_reports,
 };

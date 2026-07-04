@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::dependency_report::DependencyKind;
+use crate::application::usecase::dependency_report::DependencyKind;
 use crate::presentation::cli::args::OutputFormat;
 use crate::presentation::cli::dependency_report::types::DependencyReportFile;
 

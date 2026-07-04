@@ -5,7 +5,9 @@ use anyhow::{Context, Result};
 use super::super::shared::{detect_dialect, read_input};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
-use crate::application::definition_report::{DefinitionReportItem, collect_definition_forms};
+use crate::application::usecase::definition_report::{
+    DefinitionReportItem, collect_definition_forms,
+};
 use crate::application::usecase::package_report::build_package_report;
 use crate::application::usecase::remove_unused_definition::{
     RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsRequest, UnusedDefinitionDefinition,

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 
-use crate::application::signature_report::{
+use crate::application::usecase::signature_report::{
     SignatureReportSource, build_signature_reports, evaluate_signature_report_policy,
 };
 use crate::domain::sexpr::SyntaxTree;

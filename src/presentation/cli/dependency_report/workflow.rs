@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::application::definition_report::collect_definition_forms;
-use crate::application::dependency_report::build_dependency_report;
+use crate::application::usecase::definition_report::collect_definition_forms;
+use crate::application::usecase::dependency_report::build_dependency_report;
 use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::dependency_report::{
     args::DependencyReportArgs, render::print_dependency_report, types::DependencyReportFile,

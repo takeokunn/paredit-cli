@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::application::refactor::plan::{RawRefactorRisk, RefactorPlanSummary, RefactorRiskLevel};
-use crate::application::signature_report::SignatureCallStatus;
+use crate::application::usecase::signature_report::SignatureCallStatus;
 
 use super::types::{ImpactReportFile, ImpactRisk, ImpactRiskLevel};
 

@@ -1,4 +1,4 @@
-use crate::application::signature_report::types::{
+use crate::application::usecase::signature_report::types::{
     SignatureCallStatus, SignatureReportFile, SignatureReportPolicy,
 };
 

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::application::definition_report::DefinitionReportItem;
+use crate::application::usecase::definition_report::DefinitionReportItem;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Path};
 

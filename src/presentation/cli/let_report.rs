@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::let_report::{
+use crate::application::usecase::let_report::{
     LetFormReport, LetReportPolicy, LetReportPolicyOptions, build_let_report,
     evaluate_let_report_policy,
 };

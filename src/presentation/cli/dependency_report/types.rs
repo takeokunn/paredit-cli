@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::application::dependency_report::DependencyReportItem;
+use crate::application::usecase::dependency_report::DependencyReportItem;
 use crate::domain::dialect::Dialect;
 
 #[derive(Debug)]

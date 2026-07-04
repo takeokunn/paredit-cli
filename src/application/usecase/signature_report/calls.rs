@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::application::signature_report::types::SignatureCallStatus;
 use crate::application::usecase::call_report::CallReportItem;
+use crate::application::usecase::signature_report::types::SignatureCallStatus;
 
 pub fn classify_signature_call(
     definitions_by_name: &BTreeMap<String, Vec<usize>>,

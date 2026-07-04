@@ -1,7 +1,7 @@
 use super::super::*;
 use super::args::{DuplicateReportArgs, ReplacementPlanArgs};
 use super::render::{print_duplicate_report, print_replacement_plan};
-use crate::application::duplicate_report::{
+use crate::application::usecase::duplicate_report::{
     DuplicateCandidateGroups, build_duplicate_shape_reports, collect_duplicate_candidates,
     collect_replacement_plan_batches,
 };

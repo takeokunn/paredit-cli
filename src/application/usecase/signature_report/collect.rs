@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 
-use crate::application::signature_report::calls::classify_signature_call;
-use crate::application::signature_report::syntax::{
+use crate::application::usecase::call_report::build_call_report;
+use crate::application::usecase::signature_report::calls::classify_signature_call;
+use crate::application::usecase::signature_report::syntax::{
     count_lambda_parameters, definition_name, lambda_list_index, list_head,
 };
-use crate::application::signature_report::types::{
+use crate::application::usecase::signature_report::types::{
     SignatureCallItem, SignatureDefinitionItem, SignatureReportFile, SignatureReportSource,
 };
-use crate::application::usecase::call_report::build_call_report;
 use crate::domain::definition::classify_definition_head;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};

@@ -35,10 +35,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path as FsPath, PathBuf};
 
-use crate::application::impact_report::{
-    ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
-    summarize_impact_reports,
-};
 use crate::application::refactor::execute::{
     RefactorExecuteGateInputs, RefactorWriteCandidate, RefactorWriteRefusal,
     build_refactor_execute_decision, build_refactor_write_plan,
@@ -54,6 +50,10 @@ use crate::application::refactor::plan::{
 use crate::application::refactor::preview::{
     RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewPolicyOptions,
     RefactorPreviewSummary, evaluate_refactor_preview_policy, refactor_preview_edits,
+};
+use crate::application::usecase::impact_report::{
+    ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,
+    summarize_impact_reports,
 };
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;

@@ -1,5 +1,5 @@
 use super::super::*;
-use crate::application::duplicate_report::{DuplicateShapeReport, ReplacementPlanBatch};
+use crate::application::usecase::duplicate_report::{DuplicateShapeReport, ReplacementPlanBatch};
 
 pub(in crate::presentation::cli) fn print_duplicate_report(
     reports: &[DuplicateShapeReport],
