@@ -52,6 +52,67 @@ fn formats_macro_and_cond_body_forms() {
 }
 
 #[test]
+fn formats_lambda_body_after_lambda_list() {
+    let input = "(lambda (value) (validate value) (render value))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(lambda (value)\n  (validate value)\n  (render value))\n"
+    );
+}
+
+#[test]
+fn formats_when_body_after_condition() {
+    let input = "(when ready-p (prepare) (run))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(when ready-p\n  (prepare)\n  (run))\n"
+    );
+}
+
+#[test]
+fn formats_destructuring_bind_with_two_prefix_forms() {
+    let input = "(destructuring-bind (value other) (parse value) (list value other) (finish))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(destructuring-bind (value other) (parse value)\n  (list value other)\n  (finish))\n"
+    );
+}
+
+#[test]
+fn formats_multiple_value_bind_with_two_prefix_forms() {
+    let input = "(multiple-value-bind (value foundp) (gethash key table) (list value foundp))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(multiple-value-bind (value foundp) (gethash key table)\n  (list value foundp))\n"
+    );
+}
+
+#[test]
+fn formats_handler_case_clauses_after_protected_form() {
+    let input =
+        "(handler-case (risky) (error (condition) (recover condition)) (:no-error (value) value))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(handler-case (risky)\n  (error (condition) (recover condition))\n  (:no-error (value) value))\n"
+    );
+}
+
+#[test]
+fn formats_restart_case_clauses_after_protected_form() {
+    let input = "(restart-case (risky) (retry () (risky)) (skip () nil))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(restart-case (risky)\n  (retry () (risky))\n  (skip () nil))\n"
+    );
+}
+
+#[test]
 fn formats_define_compiler_macro_like_a_definition() {
     let input = "(define-compiler-macro fast-add (x y) (list '+ x y))";
     let tree = SyntaxTree::parse(input).expect("valid");

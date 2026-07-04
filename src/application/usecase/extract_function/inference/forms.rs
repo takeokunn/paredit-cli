@@ -46,6 +46,22 @@ pub(super) fn collect_inferred_extract_function_special_form(
             bound_params,
             params,
         ),
+        "destructuring-bind" | "multiple-value-bind" => {
+            collect_inferred_extract_function_value_binding(
+                dialect,
+                view,
+                explicit_params,
+                bound_params,
+                params,
+            )
+        }
+        "handler-case" | "restart-case" => collect_inferred_extract_function_clause_form(
+            dialect,
+            view,
+            explicit_params,
+            bound_params,
+            params,
+        ),
         "lambda" | "fn" => collect_inferred_extract_function_lambda(
             dialect,
             view,
@@ -159,6 +175,98 @@ fn collect_inferred_extract_function_let_star(
             &current_bound_params,
             params,
         );
+    }
+    true
+}
+
+fn collect_inferred_extract_function_value_binding(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) -> bool {
+    let Some(binding_form) = view.children.get(1) else {
+        return false;
+    };
+    let Some(value_form) = view.children.get(2) else {
+        return false;
+    };
+
+    super::collect_inferred_extract_function_params(
+        dialect,
+        value_form,
+        false,
+        explicit_params,
+        bound_params,
+        params,
+    );
+
+    let names = parameter_names(binding_form);
+    let body_bound_params =
+        extend_extract_function_bound_params(bound_params, names.iter().map(String::as_str));
+    for body in &view.children[3..] {
+        super::collect_inferred_extract_function_params(
+            dialect,
+            body,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+    true
+}
+
+fn collect_inferred_extract_function_clause_form(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+) -> bool {
+    let Some(protected_form) = view.children.get(1) else {
+        return false;
+    };
+
+    super::collect_inferred_extract_function_params(
+        dialect,
+        protected_form,
+        false,
+        explicit_params,
+        bound_params,
+        params,
+    );
+
+    for clause in &view.children[2..] {
+        if clause.kind != ExpressionKind::List || clause.delimiter != Some(Delimiter::Paren) {
+            super::collect_inferred_extract_function_params(
+                dialect,
+                clause,
+                false,
+                explicit_params,
+                bound_params,
+                params,
+            );
+            continue;
+        }
+
+        let Some(parameter_form) = clause.children.get(1) else {
+            continue;
+        };
+        let names = parameter_names(parameter_form);
+        let clause_bound_params =
+            extend_extract_function_bound_params(bound_params, names.iter().map(String::as_str));
+        for body in clause.children.iter().skip(2) {
+            super::collect_inferred_extract_function_params(
+                dialect,
+                body,
+                false,
+                explicit_params,
+                &clause_bound_params,
+                params,
+            );
+        }
     }
     true
 }

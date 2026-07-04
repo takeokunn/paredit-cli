@@ -41,6 +41,50 @@ fn treats_symbol_macrolet_body_names_as_local() {
 }
 
 #[test]
+fn treats_destructuring_bind_names_as_local_to_body() {
+    let params = infer_at(
+        "(destructuring-bind (local other) row (list local other outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["row", "outer"]);
+}
+
+#[test]
+fn treats_multiple_value_bind_names_as_local_to_body() {
+    let params = infer_at(
+        "(multiple-value-bind (value foundp) (lookup key table) (list value foundp outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["key", "table", "outer"]);
+}
+
+#[test]
+fn treats_handler_case_clause_lambda_lists_as_local() {
+    let params = infer_at(
+        "(handler-case (risky input) (error (condition) (recover condition outer)) (:no-error (value) (finish value done)))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["input", "outer", "done"]);
+}
+
+#[test]
+fn treats_restart_case_clause_lambda_lists_as_local() {
+    let params = infer_at(
+        "(restart-case (risky input) (retry (condition) (recover condition outer)) (skip () fallback))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["input", "outer", "fallback"]);
+}
+
+#[test]
 fn treats_flet_lambda_list_as_local_to_function_body() {
     let params = infer_at(
         "(flet ((helper (local) (+ local outer))) (helper input))",

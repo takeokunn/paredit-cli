@@ -51,6 +51,9 @@ impl Formatter {
                             self.format_definition(tree, node_id, depth, output);
                         }
                         ListStyle::Lambda => {
+                            self.format_prefix_body(tree, node_id, depth, 1, output);
+                        }
+                        ListStyle::NamedLambda => {
                             self.format_prefix_body(tree, node_id, depth, 2, output);
                         }
                         ListStyle::Binding => {
@@ -60,6 +63,9 @@ impl Formatter {
                             self.format_local_callable_form(tree, node_id, depth, head, output);
                         }
                         ListStyle::OneArgumentBody => {
+                            self.format_prefix_body(tree, node_id, depth, 1, output);
+                        }
+                        ListStyle::TwoArgumentBody => {
                             self.format_prefix_body(tree, node_id, depth, 2, output);
                         }
                         ListStyle::HeadBody => {
@@ -358,25 +364,21 @@ impl Formatter {
             | "defparameter"
             | "defvar"
             | "defconstant" => ListStyle::Definition,
-            "lambda" | "named-lambda" => ListStyle::Lambda,
+            "lambda" => ListStyle::Lambda,
+            "named-lambda" => ListStyle::NamedLambda,
             "let" | "let*" | "symbol-macrolet" | "handler-bind" | "restart-bind" => {
                 ListStyle::Binding
             }
             "flet" | "labels" | "macrolet" | "compiler-macrolet" => ListStyle::LocalFunctions,
             "if" => ListStyle::If,
-            "when"
-            | "unless"
-            | "dolist"
-            | "dotimes"
-            | "destructuring-bind"
-            | "multiple-value-bind"
-            | "with-open-file"
-            | "with-slots"
+            "when" | "unless" | "dolist" | "dotimes" | "with-open-file" | "with-slots"
             | "with-accessors" => ListStyle::OneArgumentBody,
+            "destructuring-bind" | "multiple-value-bind" => ListStyle::TwoArgumentBody,
+            "handler-case" | "restart-case" => ListStyle::OneArgumentBody,
             "progn" | "prog1" | "prog2" | "cond" | "case" | "ccase" | "ecase" | "typecase"
-            | "ctypecase" | "etypecase" | "handler-case" | "restart-case" | "unwind-protect"
-            | "block" | "catch" | "tagbody" | "loop" | "defpackage" | "declaim" | "declare"
-            | "locally" | "proclaim" | "eval-when" => ListStyle::HeadBody,
+            | "ctypecase" | "etypecase" | "unwind-protect" | "block" | "catch" | "tagbody"
+            | "loop" | "defpackage" | "declaim" | "declare" | "locally" | "proclaim"
+            | "eval-when" => ListStyle::HeadBody,
             _ => ListStyle::General,
         }
     }
@@ -390,9 +392,11 @@ impl Formatter {
 enum ListStyle {
     Definition,
     Lambda,
+    NamedLambda,
     Binding,
     LocalFunctions,
     OneArgumentBody,
+    TwoArgumentBody,
     HeadBody,
     If,
     General,

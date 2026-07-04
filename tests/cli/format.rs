@@ -43,6 +43,48 @@ fn cli_formats_handler_bind_indentation() {
 }
 
 #[test]
+fn cli_formats_multiple_value_bind_indentation() {
+    let dir = fresh_temp_dir("format-multiple-value-bind");
+    let file = dir.join("multiple-value-bind.lisp");
+    fs::write(
+        &file,
+        "(multiple-value-bind (value foundp) (gethash key table) (list value foundp))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(multiple-value-bind (value foundp) (gethash key table)\n  (list value foundp))\n",
+        ));
+}
+
+#[test]
+fn cli_formats_handler_case_indentation() {
+    let dir = fresh_temp_dir("format-handler-case");
+    let file = dir.join("handler-case.lisp");
+    fs::write(
+        &file,
+        "(handler-case (risky) (error (condition) (recover condition)) (:no-error (value) value))\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("format")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "(handler-case (risky)\n  (error (condition) (recover condition))\n  (:no-error (value) value))\n",
+        ));
+}
+
+#[test]
 fn cli_formats_macrolet_indentation() {
     let dir = fresh_temp_dir("format-macrolet");
     let file = dir.join("macrolet.lisp");
