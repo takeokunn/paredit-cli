@@ -148,6 +148,135 @@ fn cli_plans_symbol_macrolet_binding_rename_without_touching_expansion_reference
 }
 
 #[test]
+fn cli_plans_flet_lambda_list_parameter_rename_without_touching_call_args() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "item",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(flet ((helper (value) (list value))) (helper value))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"flet\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(flet ((helper (item) (list item))) (helper value))",
+    ));
+}
+
+#[test]
+fn cli_plans_macrolet_lambda_list_parameter_rename_without_touching_expansion_site() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "form",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(macrolet ((wrap (value) (list value))) (wrap value) value)")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"macrolet\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(macrolet ((wrap (form) (list form))) (wrap value) value)",
+    ));
+}
+
+#[test]
+fn cli_plans_compiler_macrolet_lambda_list_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "form",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(compiler-macrolet ((expand (value) (list value))) (expand value) value)")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"compiler-macrolet\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(compiler-macrolet ((expand (form) (list form))) (expand value) value)",
+    ));
+}
+
+#[test]
+fn cli_plans_outer_binding_rename_without_touching_local_callable_lambda_shadow() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "item",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(let ((value 1)) (flet ((helper (value) value)) (helper value) value))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"let\""))
+    .stdout(predicate::str::contains("\"reference_count\": 2"))
+    .stdout(predicate::str::contains("\"shadowed_scope_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(let ((item 1)) (flet ((helper (value) value)) (helper item) item))",
+    ));
+}
+
+#[test]
+fn cli_rejects_ambiguous_local_callable_lambda_list_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "item",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(flet ((left (value) value) (right (value) value)) (left 1))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "multiple selected flet local callable lambda lists",
+    ));
+}
+
+#[test]
 fn cli_plans_outer_binding_rename_without_touching_handler_bind_lambda_shadow() {
     let mut cmd = paredit();
     cmd.args([

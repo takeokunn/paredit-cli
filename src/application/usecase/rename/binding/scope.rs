@@ -87,6 +87,10 @@ fn collect_shadow_aware_special_form(
             );
             true
         }
+        "flet" | "labels" | "macrolet" | "compiler-macrolet" => {
+            collect_local_callable_references(view, symbol, output, shadowed_scope_count, input);
+            true
+        }
         "dolist" | "dotimes" => {
             collect_iteration_binding_references(view, symbol, output, shadowed_scope_count, input);
             true
@@ -338,6 +342,45 @@ fn collect_handler_bind_references(
                 shadowed_scope_count,
                 input,
             );
+        }
+    }
+
+    for body in &view.children[2..] {
+        collect_symbol_atom_spans_unshadowed(body, symbol, output, shadowed_scope_count, input);
+    }
+}
+
+fn collect_local_callable_references(
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+    shadowed_scope_count: &mut usize,
+    input: &str,
+) {
+    if let Some(binding_form) = view.children.get(1) {
+        for binding in &binding_form.children {
+            if binding.kind != ExpressionKind::List || binding.delimiter != Some(Delimiter::Paren) {
+                continue;
+            }
+
+            let Some(parameter_form) = binding.children.get(1) else {
+                continue;
+            };
+
+            if parameter_form_binds(parameter_form, symbol, input) {
+                *shadowed_scope_count += 1;
+                continue;
+            }
+
+            for body in &binding.children[2..] {
+                collect_symbol_atom_spans_unshadowed(
+                    body,
+                    symbol,
+                    output,
+                    shadowed_scope_count,
+                    input,
+                );
+            }
         }
     }
 
