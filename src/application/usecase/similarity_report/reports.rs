@@ -12,10 +12,12 @@ pub fn build_similarity_pairs(
     options: &SimilarityReportOptions,
 ) -> SimilarityReport {
     candidates.sort_by(|left, right| form_key(left).cmp(&form_key(right)));
+    let possible_pairs = scoped_pair_count(&candidates, options.comparison_scope);
+    let mut comparison_limit_reached = false;
     let mut evaluated_pairs = 0;
     let mut pruned_by_size = 0;
     let mut pairs = Vec::new();
-    for left_index in 0..candidates.len() {
+    'pairs: for left_index in 0..candidates.len() {
         for right_index in left_index + 1..candidates.len() {
             let left = &candidates[left_index];
             let right = &candidates[right_index];
@@ -29,6 +31,13 @@ pub fn build_similarity_pairs(
             ) {
                 pruned_by_size += 1;
                 continue;
+            }
+            if options
+                .max_comparisons
+                .is_some_and(|limit| evaluated_pairs == limit)
+            {
+                comparison_limit_reached = true;
+                break 'pairs;
             }
             evaluated_pairs += 1;
             let similarity = tree_similarity(&left.tree, &right.tree);
@@ -45,7 +54,7 @@ pub fn build_similarity_pairs(
         }
     }
     pairs.sort_by(compare_pairs);
-    let possible_pairs = evaluated_pairs + pruned_by_size;
+    let unprocessed_pairs = possible_pairs - evaluated_pairs - pruned_by_size;
     let matched_pairs = pairs.len();
     let suppressed_pairs = match options.overlap_policy {
         SimilarityOverlapPolicy::All => 0,
@@ -62,6 +71,8 @@ pub fn build_similarity_pairs(
             possible_pairs,
             evaluated_pairs,
             pruned_by_size,
+            comparison_limit_reached,
+            unprocessed_pairs,
             matched_pairs,
             suppressed_pairs,
             reported_pairs,
@@ -69,6 +80,30 @@ pub fn build_similarity_pairs(
         },
         pairs,
     }
+}
+
+fn scoped_pair_count(
+    candidates: &[SimilarityCandidate],
+    scope: SimilarityComparisonScope,
+) -> usize {
+    let total = pair_count(candidates.len());
+    if scope == SimilarityComparisonScope::All {
+        return total;
+    }
+
+    let same_file = candidates
+        .chunk_by(|left, right| left.form.path == right.form.path)
+        .map(|group| pair_count(group.len()))
+        .sum::<usize>();
+    match scope {
+        SimilarityComparisonScope::All => total,
+        SimilarityComparisonScope::SameFile => same_file,
+        SimilarityComparisonScope::CrossFile => total - same_file,
+    }
+}
+
+fn pair_count(count: usize) -> usize {
+    count.saturating_sub(1) * count / 2
 }
 
 fn comparison_is_in_scope(

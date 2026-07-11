@@ -15,6 +15,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         args.threshold,
         args.min_node_count,
         args.min_line_span,
+        args.max_comparisons,
         args.max_results,
     )?;
 
@@ -34,6 +35,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         comparison_scope: args.comparison_scope,
         form_scope: args.form_scope,
         overlap_policy: args.overlap_policy,
+        max_comparisons: args.max_comparisons,
         max_results: args.max_results,
     };
     for file in &discovery.files {
@@ -69,6 +71,7 @@ fn ensure_options(
     threshold: f64,
     min_node_count: usize,
     min_line_span: usize,
+    max_comparisons: Option<usize>,
     max_results: Option<usize>,
 ) -> Result<()> {
     if !(0.0..=1.0).contains(&threshold) {
@@ -82,6 +85,9 @@ fn ensure_options(
     }
     if max_results == Some(0) {
         bail!("--max-results must be at least 1");
+    }
+    if max_comparisons == Some(0) {
+        bail!("--max-comparisons must be at least 1");
     }
     Ok(())
 }

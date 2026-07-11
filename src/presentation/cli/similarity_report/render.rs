@@ -36,6 +36,7 @@ fn print_text(
     println!("comparison_scope\t{}", args.comparison_scope.label());
     println!("form_scope\t{}", args.form_scope.label());
     println!("overlap_policy\t{}", args.overlap_policy.label());
+    println!("max_comparisons\t{}", optional_usize(args.max_comparisons));
     println!("max_results\t{}", optional_usize(args.max_results));
     println!("scanned_files\t{}", discovery.files.len());
     println!("skipped_unknown\t{}", discovery.skipped_unknown_count);
@@ -45,6 +46,11 @@ fn print_text(
     println!("possible_pairs\t{}", summary.possible_pairs);
     println!("evaluated_pairs\t{}", summary.evaluated_pairs);
     println!("pruned_by_size\t{}", summary.pruned_by_size);
+    println!(
+        "comparison_limit_reached\t{}",
+        summary.comparison_limit_reached
+    );
+    println!("unprocessed_pairs\t{}", summary.unprocessed_pairs);
     println!("matched_pairs\t{}", summary.matched_pairs);
     println!("suppressed_pairs\t{}", summary.suppressed_pairs);
     println!("reported_pairs\t{}", summary.reported_pairs);
@@ -78,6 +84,7 @@ fn json_report(
             "comparison_scope": args.comparison_scope.label(),
             "form_scope": args.form_scope.label(),
             "overlap_policy": args.overlap_policy.label(),
+            "max_comparisons": args.max_comparisons,
             "max_results": args.max_results,
             "include_unknown": args.include_unknown,
             "include_hidden": args.include_hidden,
@@ -94,6 +101,8 @@ fn json_report(
             "possible_pairs": report.summary.possible_pairs,
             "evaluated_pairs": report.summary.evaluated_pairs,
             "pruned_by_size": report.summary.pruned_by_size,
+            "comparison_limit_reached": report.summary.comparison_limit_reached,
+            "unprocessed_pairs": report.summary.unprocessed_pairs,
             "matched_pairs": report.summary.matched_pairs,
             "suppressed_pairs": report.summary.suppressed_pairs,
             "reported_pairs": report.summary.reported_pairs,

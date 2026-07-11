@@ -101,6 +101,7 @@ pub struct SimilarityReportOptions {
     pub comparison_scope: SimilarityComparisonScope,
     pub form_scope: SimilarityFormScope,
     pub overlap_policy: SimilarityOverlapPolicy,
+    pub max_comparisons: Option<usize>,
     pub max_results: Option<usize>,
 }
 
@@ -113,6 +114,7 @@ impl Default for SimilarityReportOptions {
             comparison_scope: SimilarityComparisonScope::All,
             form_scope: SimilarityFormScope::All,
             overlap_policy: SimilarityOverlapPolicy::Maximal,
+            max_comparisons: None,
             max_results: None,
         }
     }
@@ -144,6 +146,8 @@ pub struct SimilarityReportSummary {
     pub possible_pairs: usize,
     pub evaluated_pairs: usize,
     pub pruned_by_size: usize,
+    pub comparison_limit_reached: bool,
+    pub unprocessed_pairs: usize,
     pub matched_pairs: usize,
     pub suppressed_pairs: usize,
     pub reported_pairs: usize,

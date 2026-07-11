@@ -46,6 +46,9 @@ pub(in crate::presentation::cli) struct SimilarityReportArgs {
     /// Control whether nested matches contained by higher-ranked matches are reported.
     #[arg(long, default_value = "maximal")]
     pub(super) overlap_policy: SimilarityOverlapPolicy,
+    /// Maximum number of tree-edit-distance comparisons to evaluate.
+    #[arg(long)]
+    pub(super) max_comparisons: Option<usize>,
     /// Maximum number of ranked pairs to include in the report.
     #[arg(long)]
     pub(super) max_results: Option<usize>,
