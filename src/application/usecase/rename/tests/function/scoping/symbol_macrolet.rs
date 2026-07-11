@@ -107,3 +107,21 @@ fn renames_outer_function_references_inside_reader_quoted_lambda_bodies_only() {
         ]
     };
 }
+
+#[test]
+fn renames_package_qualified_function_references_inside_symbol_macrolet_bodies() {
+    assert_function_rename! {
+        input: "(defun helper (x) x)\n(defun caller () (symbol-macrolet ((helper other)) helper #'cl-user:helper (function cl-user:helper) (cl-user:helper 1)) #'cl-user:helper (function cl-user:helper) (cl-user:helper 2))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 6,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (x) x)",
+            "(symbol-macrolet ((helper other)) helper #'renamed (function renamed) (renamed 1))",
+            "#'renamed (function renamed) (renamed 2)"
+        ]
+    };
+}
