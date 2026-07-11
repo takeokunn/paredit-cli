@@ -351,6 +351,26 @@ fn renames_common_lisp_user_qualified_define_setf_expander_definition_place_uses
 }
 
 #[test]
+fn renames_common_lisp_qualified_define_setf_expander_definition_place_uses_and_designators() {
+    assert_function_rename! {
+        input: "(cl:define-setf-expander accessor (place) (values nil nil '(store) '(writer store) '(reader place)))\n(setf (accessor item) 1)\n(list #'accessor (function accessor) accessor)",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(cl:define-setf-expander slot-accessor (place)",
+            "(setf (slot-accessor item) 1)",
+            "#'slot-accessor",
+            "(function slot-accessor)",
+            " accessor)"
+        ]
+    };
+}
+
+#[test]
 fn renames_defsetf_definition_place_uses_and_designators() {
     assert_function_rename! {
         input: "(defsetf accessor set-accessor)\n(setf (accessor item) 1)\n(list #'accessor (function accessor) accessor)",

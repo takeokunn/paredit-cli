@@ -65,6 +65,38 @@ fn cli_writes_common_lisp_user_qualified_setf_callable_rename() {
 }
 
 #[test]
+fn cli_writes_common_lisp_qualified_setf_callable_rename() {
+    assert_write_case(WriteCase {
+        fixture_name: "rename-function-common-lisp-qualified-setf",
+        dialect: None,
+        from: "old-name",
+        to: "new-name",
+        input_files: &[
+            FixtureFile {
+                path: "accessor.lisp",
+                contents: "(cl:define-setf-expander old-name (place) (values nil nil '(store) '(writer store) '(reader place)))\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (setf (old-name place) 1) #'old-name (function old-name) old-name)\n",
+            },
+        ],
+        expected_files: &[
+            FixtureFile {
+                path: "accessor.lisp",
+                contents: "(cl:define-setf-expander new-name (place) (values nil nil '(store) '(writer store) '(reader place)))\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (setf (new-name place) 1) #'new-name (function new-name) old-name)\n",
+            },
+        ],
+        expected_definition_count: 1,
+        expected_call_count: 3,
+    });
+}
+
+#[test]
 fn cli_writes_common_lisp_setf_callable_rename_inside_quasiquote() {
     assert_write_case(WriteCase {
         fixture_name: "rename-function-common-lisp-setf-quasiquote",
