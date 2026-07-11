@@ -153,3 +153,69 @@ fn keeps_definitions_referenced_from_package_qualified_symbol_macrolet_expansion
     assert_eq!(plan.files[0].rewritten, text);
     SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
 }
+
+#[test]
+fn ignores_callable_designators_shadowed_by_local_flet_bindings() {
+    let text = "(in-package #:app)\n(defun shadowed-helper () 1)\n(defun caller ()\n  (flet ((shadowed-helper (value) value))\n    #'shadowed-helper))\n";
+    let form = "(defun shadowed-helper () 1)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            form,
+            "shadowed-helper",
+            DefinitionCategory::Function,
+        )],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert_eq!(plan.skipped_count, 0);
+    assert!(!plan.files[0].rewritten.contains(form));
+    SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
+}
+
+#[test]
+fn ignores_callable_designators_shadowed_by_local_labels_bindings() {
+    let text = "(in-package #:app)\n(defun shadowed-helper () 1)\n(defun caller ()\n  (labels ((shadowed-helper () #'shadowed-helper))\n    (shadowed-helper)))\n";
+    let form = "(defun shadowed-helper () 1)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            form,
+            "shadowed-helper",
+            DefinitionCategory::Function,
+        )],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert_eq!(plan.skipped_count, 0);
+    assert!(!plan.files[0].rewritten.contains(form));
+    SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
+}
+
+#[test]
+fn ignores_macro_callable_accessors_shadowed_by_local_macrolet_bindings() {
+    let text = "(in-package #:app)\n(defmacro shadowed-helper (&rest body) `(progn ,@body))\n(defun caller ()\n  (macrolet ((shadowed-helper (&rest body) `(progn ,@body)))\n    (macro-function 'shadowed-helper)))\n";
+    let form = "(defmacro shadowed-helper (&rest body) `(progn ,@body))";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            form,
+            "shadowed-helper",
+            DefinitionCategory::Macro,
+        )],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert_eq!(plan.skipped_count, 0);
+    assert!(!plan.files[0].rewritten.contains(form));
+    SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
+}

@@ -1,8 +1,13 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::callable_scope::{
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope,
+};
 use crate::application::usecase::remove_unused_definition::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
+use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
@@ -69,21 +74,12 @@ pub(super) fn collect_unused_definition_candidates(
                                 &other.text,
                                 &mut spans,
                             );
-                            // Scope-aware reference collection above treats
-                            // `#'name`/`(function name)` as invisible, since
-                            // it also serves callers that check the *value*
-                            // namespace (where a same-named local variable
-                            // must not be confused with an unrelated
-                            // function-namespace reference). That makes it
-                            // blind to callback tables and higher-order call
-                            // sites that only ever reach a definition through
-                            // a function-namespace reference. Supplement it
-                            // with a dedicated, conservative scan: matching
-                            // here proves the definition is used, so a rare
-                            // false positive (an unrelated same-named local
-                            // function shadow) only keeps a definition that
-                            // could otherwise be removed, never removes one
-                            // still in use.
+                            // Scope-aware value-namespace collection above
+                            // intentionally treats function-namespace
+                            // designators such as `#'name` and `(function
+                            // name)` as invisible. Supplement it with a
+                            // callable-namespace traversal that understands
+                            // local callable shadowing.
                             collect_function_quote_references(
                                 other.dialect,
                                 other_view,
@@ -122,28 +118,87 @@ fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
-/// Collects every `#'name` (CLHS `function` reader macro) and explicit
-/// `(function name)` occurrence matching `symbol`, appending their spans to
-/// `output`. Unlike scope-aware value-namespace reference collection, this
-/// does not track `flet`/`labels`/`macrolet` shadowing of the function
-/// namespace: it is intentionally coarse so that it never misses a genuine
-/// function-namespace reference, at the cost of occasionally counting an
-/// unrelated same-named local function shadow too.
+/// Collects every function-namespace designator matching `symbol`,
+/// appending their spans to `output` while respecting local callable
+/// shadowing from `flet`, `labels`, `macrolet`, and `compiler-macrolet`.
 fn collect_function_quote_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
 ) {
+    collect_function_quote_references_from_view(dialect, view, symbol, &[], output);
+}
+
+fn collect_function_quote_references_from_view(
+    dialect: Dialect,
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    local_callables: &[String],
+    output: &mut Vec<ByteSpan>,
+) {
+    if let Some(head) = list_head(view) {
+        if let Some(form) = common_lisp_local_callable_form(dialect, head) {
+            collect_local_callable_function_quote_references(
+                dialect,
+                view,
+                symbol,
+                local_callables,
+                form,
+                output,
+            );
+            return;
+        }
+    }
+
     if let Some(target) = callable_reference_target(view) {
-        if callable_reference_matches(dialect, target, symbol) {
+        if callable_reference_matches(dialect, target, symbol)
+            && !is_local_callable_bound(local_callables, symbol.as_str())
+        {
             output.push(target.span);
             return;
         }
     }
 
     for child in &view.children {
-        collect_function_quote_references(dialect, child, symbol, output);
+        collect_function_quote_references_from_view(
+            dialect,
+            child,
+            symbol,
+            local_callables,
+            output,
+        );
+    }
+}
+
+fn collect_local_callable_function_quote_references(
+    dialect: Dialect,
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    local_callables: &[String],
+    form: CommonLispLocalCallableForm,
+    output: &mut Vec<ByteSpan>,
+) {
+    let body_scope = local_callable_body_scope(local_callables, view);
+
+    if let Some(bindings) = view.children.get(1) {
+        let binding_body_scope =
+            local_callable_binding_body_scope(form, local_callables, &body_scope);
+        for binding in &bindings.children {
+            for child in binding.children.iter().skip(2) {
+                collect_function_quote_references_from_view(
+                    dialect,
+                    child,
+                    symbol,
+                    binding_body_scope,
+                    output,
+                );
+            }
+        }
+    }
+
+    for child in view.children.iter().skip(2) {
+        collect_function_quote_references_from_view(dialect, child, symbol, &body_scope, output);
     }
 }
 
@@ -215,6 +270,13 @@ enum CallableAccessorKind {
     QuotedFunction,
 }
 
+fn list_head(view: &ExpressionView) -> Option<&str> {
+    (view.kind == ExpressionKind::List)
+        .then_some(view.children.first())
+        .flatten()
+        .and_then(atom_text)
+}
+
 fn function_quote_symbol_matches(dialect: Dialect, candidate: &str, symbol: &str) -> bool {
     match dialect {
         Dialect::CommonLisp => common_lisp_symbol_name_eq(candidate, symbol),
@@ -242,6 +304,16 @@ fn collect_quoted_data_references(
 ) {
     if view.reader_prefixes.contains(&ReaderPrefix::Quote) {
         collect_atoms_in_quoted_region(dialect, view, symbol, output);
+        return;
+    }
+
+    if callable_accessor_target(view).is_some() {
+        for (index, child) in view.children.iter().enumerate() {
+            if index == 1 {
+                continue;
+            }
+            collect_quoted_data_references(dialect, child, symbol, output);
+        }
         return;
     }
 

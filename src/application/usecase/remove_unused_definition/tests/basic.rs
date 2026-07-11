@@ -25,3 +25,87 @@ fn plans_private_unused_definition_removal() {
     assert!(!plan.files[0].rewritten.contains(stale_form));
     SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
 }
+
+#[test]
+fn does_not_flag_a_function_only_referenced_through_a_function_quote() {
+    // A callback/dispatch table capturing a function via `#'name` is a real
+    // reference, even though nothing ever calls `(handler ...)` directly.
+    let text = "(in-package #:app)\n\
+                (defun handler () 1)\n\
+                (defparameter *routes* (list (cons :get #'handler)))\n";
+    let handler_form = "(defun handler () 1)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            handler_form,
+            "handler",
+            DefinitionCategory::Function,
+        )],
+    ))
+    .expect("plan should build");
+
+    // `handler` has a reference (the `#'handler` capture below), so it is not
+    // even a removal candidate.
+    assert_eq!(plan.candidate_count, 0);
+    assert_eq!(plan.removal_count, 0);
+    assert!(plan.files[0].rewritten.contains(handler_form));
+}
+
+#[test]
+fn keeps_functions_referenced_through_callable_accessors() {
+    let text = "(in-package #:app)\n\
+                (defun handler () 1)\n\
+                (defparameter *routes*\n\
+                  (list (symbol-function 'handler)\n\
+                        (fdefinition 'handler)\n\
+                        #'(setf handler)\n\
+                        (function (setf handler))\n\
+                        (fdefinition '(setf handler))))\n";
+    let handler_form = "(defun handler () 1)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            handler_form,
+            "handler",
+            DefinitionCategory::Function,
+        )],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 0);
+    assert_eq!(plan.removal_count, 0);
+    assert_eq!(plan.skipped_count, 0);
+    assert_eq!(plan.files[0].rewritten, text);
+}
+
+#[test]
+fn keeps_macros_referenced_through_callable_accessors() {
+    let text = "(in-package #:app)\n\
+                (defmacro helper (&rest body) `(progn ,@body))\n\
+                (define-compiler-macro helper (&whole form &rest body) form)\n\
+                (defparameter *routes*\n\
+                  (list (macro-function 'helper)\n\
+                        (compiler-macro-function 'helper)))\n";
+    let macro_form = "(defmacro helper (&rest body) `(progn ,@body))";
+    let compiler_macro_form = "(define-compiler-macro helper (&whole form &rest body) form)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![
+            definition(text, macro_form, "helper", DefinitionCategory::Macro),
+            definition(
+                text,
+                compiler_macro_form,
+                "helper",
+                DefinitionCategory::Macro,
+            ),
+        ],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 0);
+    assert_eq!(plan.removal_count, 0);
+    assert_eq!(plan.skipped_count, 0);
+    assert_eq!(plan.files[0].rewritten, text);
+}
