@@ -3,21 +3,15 @@ use std::cmp::Ordering;
 use crate::application::form_similarity::tree_similarity;
 
 use super::types::{
-    SimilarityCandidate, SimilarityFormReport, SimilarityOverlapPolicy, SimilarityPairReport,
-    SimilarityReport, SimilarityReportSummary,
+    SimilarityCandidate, SimilarityComparisonScope, SimilarityFormReport, SimilarityOverlapPolicy,
+    SimilarityPairReport, SimilarityReport, SimilarityReportOptions, SimilarityReportSummary,
 };
 
 pub fn build_similarity_pairs(
     mut candidates: Vec<SimilarityCandidate>,
-    threshold: f64,
-    overlap_policy: SimilarityOverlapPolicy,
-    max_results: Option<usize>,
+    options: &SimilarityReportOptions,
 ) -> SimilarityReport {
     candidates.sort_by(|left, right| form_key(left).cmp(&form_key(right)));
-    let possible_pairs = candidates
-        .len()
-        .saturating_mul(candidates.len().saturating_sub(1))
-        / 2;
     let mut evaluated_pairs = 0;
     let mut pruned_by_size = 0;
     let mut pairs = Vec::new();
@@ -25,13 +19,20 @@ pub fn build_similarity_pairs(
         for right_index in left_index + 1..candidates.len() {
             let left = &candidates[left_index];
             let right = &candidates[right_index];
-            if size_bound_excludes(left.form.node_count, right.form.node_count, threshold) {
+            if !comparison_is_in_scope(left, right, options.comparison_scope) {
+                continue;
+            }
+            if size_bound_excludes(
+                left.form.node_count,
+                right.form.node_count,
+                options.threshold,
+            ) {
                 pruned_by_size += 1;
                 continue;
             }
             evaluated_pairs += 1;
             let similarity = tree_similarity(&left.tree, &right.tree);
-            if similarity >= threshold {
+            if similarity >= options.threshold {
                 let average_node_count =
                     (left.form.node_count + right.form.node_count) as f64 / 2.0;
                 pairs.push(SimilarityPairReport {
@@ -44,13 +45,14 @@ pub fn build_similarity_pairs(
         }
     }
     pairs.sort_by(compare_pairs);
+    let possible_pairs = evaluated_pairs + pruned_by_size;
     let matched_pairs = pairs.len();
-    let suppressed_pairs = match overlap_policy {
+    let suppressed_pairs = match options.overlap_policy {
         SimilarityOverlapPolicy::All => 0,
         SimilarityOverlapPolicy::Maximal => suppress_contained_pairs(&mut pairs),
     };
-    let truncated = max_results.is_some_and(|limit| pairs.len() > limit);
-    if let Some(limit) = max_results {
+    let truncated = options.max_results.is_some_and(|limit| pairs.len() > limit);
+    if let Some(limit) = options.max_results {
         pairs.truncate(limit);
     }
     let reported_pairs = pairs.len();
@@ -66,6 +68,18 @@ pub fn build_similarity_pairs(
             truncated,
         },
         pairs,
+    }
+}
+
+fn comparison_is_in_scope(
+    left: &SimilarityCandidate,
+    right: &SimilarityCandidate,
+    scope: SimilarityComparisonScope,
+) -> bool {
+    match scope {
+        SimilarityComparisonScope::All => true,
+        SimilarityComparisonScope::SameFile => left.form.path == right.form.path,
+        SimilarityComparisonScope::CrossFile => left.form.path != right.form.path,
     }
 }
 

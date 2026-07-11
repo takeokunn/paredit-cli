@@ -36,6 +36,88 @@ pub enum SimilarityOverlapPolicy {
     All,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimilarityComparisonScope {
+    All,
+    SameFile,
+    CrossFile,
+}
+
+impl SimilarityComparisonScope {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::SameFile => "same-file",
+            Self::CrossFile => "cross-file",
+        }
+    }
+}
+
+impl FromStr for SimilarityComparisonScope {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "all" => Ok(Self::All),
+            "same-file" => Ok(Self::SameFile),
+            "cross-file" => Ok(Self::CrossFile),
+            _ => Err(format!("unknown comparison scope: {value}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimilarityFormScope {
+    All,
+    TopLevel,
+}
+
+impl SimilarityFormScope {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::TopLevel => "top-level",
+        }
+    }
+}
+
+impl FromStr for SimilarityFormScope {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "all" => Ok(Self::All),
+            "top-level" => Ok(Self::TopLevel),
+            _ => Err(format!("unknown form scope: {value}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SimilarityReportOptions {
+    pub threshold: f64,
+    pub min_node_count: usize,
+    pub min_line_span: usize,
+    pub comparison_scope: SimilarityComparisonScope,
+    pub form_scope: SimilarityFormScope,
+    pub overlap_policy: SimilarityOverlapPolicy,
+    pub max_results: Option<usize>,
+}
+
+impl Default for SimilarityReportOptions {
+    fn default() -> Self {
+        Self {
+            threshold: 0.87,
+            min_node_count: 4,
+            min_line_span: 1,
+            comparison_scope: SimilarityComparisonScope::All,
+            form_scope: SimilarityFormScope::All,
+            overlap_policy: SimilarityOverlapPolicy::Maximal,
+            max_results: None,
+        }
+    }
+}
+
 impl SimilarityOverlapPolicy {
     pub const fn label(self) -> &'static str {
         match self {

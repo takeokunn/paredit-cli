@@ -9,16 +9,37 @@ use super::*;
 fn candidates(file: &str, input: &str, min_node_count: usize) -> Vec<SimilarityCandidate> {
     let tree = SyntaxTree::parse(input).unwrap();
     let mut result = Vec::new();
+    let options = SimilarityReportOptions {
+        min_node_count,
+        ..SimilarityReportOptions::default()
+    };
     collect_similarity_candidates(
         &tree,
         input,
         Path::new(file),
         Dialect::CommonLisp,
-        min_node_count,
+        &options,
         &mut result,
     )
     .unwrap();
     result
+}
+
+fn build_similarity_pairs(
+    candidates: Vec<SimilarityCandidate>,
+    threshold: f64,
+    overlap_policy: SimilarityOverlapPolicy,
+    max_results: Option<usize>,
+) -> SimilarityReport {
+    super::reports::build_similarity_pairs(
+        candidates,
+        &SimilarityReportOptions {
+            threshold,
+            overlap_policy,
+            max_results,
+            ..SimilarityReportOptions::default()
+        },
+    )
 }
 
 fn report_form(path: &str, start: usize, end: usize) -> SimilarityFormReport {
@@ -31,6 +52,77 @@ fn report_form(path: &str, start: usize, end: usize) -> SimilarityFormReport {
         head: None,
         text: String::new(),
     }
+}
+
+#[test]
+fn form_scope_top_level_excludes_nested_forms() {
+    let tree = SyntaxTree::parse("(outer (inner value))").unwrap();
+    let mut values = Vec::new();
+    collect_similarity_candidates(
+        &tree,
+        "(outer (inner value))",
+        Path::new("a.lisp"),
+        Dialect::CommonLisp,
+        &SimilarityReportOptions {
+            min_node_count: 2,
+            form_scope: SimilarityFormScope::TopLevel,
+            ..SimilarityReportOptions::default()
+        },
+        &mut values,
+    )
+    .unwrap();
+
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].form.text, "(outer (inner value))");
+}
+
+#[test]
+fn minimum_line_span_uses_inclusive_one_based_length() {
+    let input = "(multi\n value)\n(single value)";
+    let tree = SyntaxTree::parse(input).unwrap();
+    let mut values = Vec::new();
+    collect_similarity_candidates(
+        &tree,
+        input,
+        Path::new("a.lisp"),
+        Dialect::CommonLisp,
+        &SimilarityReportOptions {
+            min_node_count: 2,
+            min_line_span: 2,
+            ..SimilarityReportOptions::default()
+        },
+        &mut values,
+    )
+    .unwrap();
+
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].form.text, "(multi\n value)");
+}
+
+#[test]
+fn comparison_scope_filters_pair_population() {
+    let mut values = candidates("a.lisp", "(foo a) (foo b)", 2);
+    values.extend(candidates("b.lisp", "(foo c)", 2));
+    let report = |comparison_scope| {
+        super::reports::build_similarity_pairs(
+            values.clone(),
+            &SimilarityReportOptions {
+                threshold: 0.0,
+                comparison_scope,
+                overlap_policy: SimilarityOverlapPolicy::All,
+                ..SimilarityReportOptions::default()
+            },
+        )
+    };
+
+    let all = report(SimilarityComparisonScope::All);
+    let same_file = report(SimilarityComparisonScope::SameFile);
+    let cross_file = report(SimilarityComparisonScope::CrossFile);
+    assert_eq!(all.summary.possible_pairs, 3);
+    assert_eq!(same_file.summary.possible_pairs, 1);
+    assert_eq!(cross_file.summary.possible_pairs, 2);
+    assert_eq!(same_file.summary.evaluated_pairs, 1);
+    assert_eq!(cross_file.summary.evaluated_pairs, 2);
 }
 
 #[test]

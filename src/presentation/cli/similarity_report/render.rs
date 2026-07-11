@@ -32,6 +32,9 @@ fn print_text(
     println!("schema_version\t1");
     println!("threshold\t{:.6}", args.threshold);
     println!("min_node_count\t{}", args.min_node_count);
+    println!("min_line_span\t{}", args.min_line_span);
+    println!("comparison_scope\t{}", args.comparison_scope.label());
+    println!("form_scope\t{}", args.form_scope.label());
     println!("overlap_policy\t{}", args.overlap_policy.label());
     println!("max_results\t{}", optional_usize(args.max_results));
     println!("scanned_files\t{}", discovery.files.len());
@@ -71,6 +74,9 @@ fn json_report(
             "dialect": args.dialect.map(|dialect| Dialect::from(dialect).label()),
             "threshold": args.threshold,
             "min_node_count": args.min_node_count,
+            "min_line_span": args.min_line_span,
+            "comparison_scope": args.comparison_scope.label(),
+            "form_scope": args.form_scope.label(),
             "overlap_policy": args.overlap_policy.label(),
             "max_results": args.max_results,
             "include_unknown": args.include_unknown,

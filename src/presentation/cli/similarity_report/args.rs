@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::application::usecase::similarity_report::SimilarityOverlapPolicy;
+use crate::application::usecase::similarity_report::{
+    SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
+};
 
 use super::super::{DialectArg, OutputFormat};
 
@@ -32,6 +34,15 @@ pub(in crate::presentation::cli) struct SimilarityReportArgs {
     /// Minimum expression node count for a candidate form.
     #[arg(long, default_value_t = 4)]
     pub(super) min_node_count: usize,
+    /// Minimum number of source lines spanned by a candidate form.
+    #[arg(long, default_value_t = 1)]
+    pub(super) min_line_span: usize,
+    /// Restrict comparisons based on whether forms belong to the same file.
+    #[arg(long, default_value = "all")]
+    pub(super) comparison_scope: SimilarityComparisonScope,
+    /// Restrict candidates to all forms or only top-level forms.
+    #[arg(long, default_value = "all")]
+    pub(super) form_scope: SimilarityFormScope,
     /// Control whether nested matches contained by higher-ranked matches are reported.
     #[arg(long, default_value = "maximal")]
     pub(super) overlap_policy: SimilarityOverlapPolicy,
