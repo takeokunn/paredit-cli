@@ -50,3 +50,37 @@ fn renames_setf_function_designators_inside_reader_quoted_lambda_bodies() {
         ]
     };
 }
+
+#[test]
+fn renames_common_lisp_qualified_defsetf_designators_inside_reader_quoted_lambda_bodies() {
+    assert_function_rename! {
+        input: "(cl:defsetf accessor set-accessor)\n(defun caller () #'(lambda () #'accessor (function accessor) (setf (accessor thing) 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(cl:defsetf slot-accessor set-accessor)",
+            "#'(lambda () #'slot-accessor (function slot-accessor) (setf (slot-accessor thing) 1))"
+        ]
+    };
+}
+
+#[test]
+fn renames_common_lisp_user_qualified_defsetf_designators_inside_reader_quoted_lambda_bodies() {
+    assert_function_rename! {
+        input: "(cl-user:defsetf accessor set-accessor)\n(defun caller () #'(lambda () #'accessor (function accessor) (setf (accessor thing) 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(cl-user:defsetf slot-accessor set-accessor)",
+            "#'(lambda () #'slot-accessor (function slot-accessor) (setf (slot-accessor thing) 1))"
+        ]
+    };
+}
