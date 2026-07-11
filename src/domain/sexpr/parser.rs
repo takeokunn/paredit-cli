@@ -215,12 +215,28 @@ impl<'a> Parser<'a> {
         let start = self.pos;
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
+            if byte == b'\\' {
+                self.consume_single_escape();
+                continue;
+            }
             if is_symbol_boundary(byte) {
                 break;
             }
             self.advance();
         }
         self.push_atom(prefixes, start, self.pos);
+    }
+
+    /// Consumes a Lisp single-escape (`\`) and the following character literally.
+    ///
+    /// This keeps character literals such as `#\[`, `#\)`, and `#\Space`, as well
+    /// as escaped symbol constituents like `\(`, from being split at what would
+    /// otherwise be a delimiter or whitespace boundary.
+    fn consume_single_escape(&mut self) {
+        self.advance();
+        if self.pos.get() < self.bytes.len() {
+            self.advance();
+        }
     }
 
     fn push_atom(&mut self, prefixes: Vec<PrefixToken>, start: ByteOffset, end: ByteOffset) {
@@ -392,6 +408,10 @@ impl<'a> Parser<'a> {
     fn skip_atom(&mut self) {
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
+            if byte == b'\\' {
+                self.consume_single_escape();
+                continue;
+            }
             if is_symbol_boundary(byte) {
                 break;
             }
