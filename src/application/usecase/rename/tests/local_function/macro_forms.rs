@@ -49,6 +49,40 @@ fn plans_outer_flet_rename_inside_compiler_macrolet_expander_but_not_shadowed_bo
 }
 
 #[test]
+fn plans_outer_setf_flet_rename_inside_macrolet_expander_but_not_shadowed_body() {
+    assert_local_function_rename!(
+        input: "(flet (((setf foo) (value object) value)) (macrolet ((foo () #'(setf foo) (function (setf foo)) ((setf foo) 1 thing))) (foo) #'(setf foo) (function (setf foo)) ((setf foo) 2 thing)))\n",
+        dialect: Dialect::CommonLisp,
+        from: "foo",
+        to: "bar",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(flet (((setf bar) (value object) value))",
+            "(macrolet ((foo () #'(setf bar) (function (setf bar)) ((setf bar) 1 thing))) (foo) #'(setf foo) (function (setf foo)) ((setf foo) 2 thing)))"
+        ]
+    );
+}
+
+#[test]
+fn plans_outer_setf_flet_rename_inside_compiler_macrolet_expander_but_not_shadowed_body() {
+    assert_local_function_rename!(
+        input: "(flet (((setf foo) (value object) value)) (compiler-macrolet ((foo () #'(setf foo) (function (setf foo)) ((setf foo) 1 thing))) (foo) #'(setf foo) (function (setf foo)) ((setf foo) 2 thing)))\n",
+        dialect: Dialect::CommonLisp,
+        from: "foo",
+        to: "bar",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(flet (((setf bar) (value object) value))",
+            "(compiler-macrolet ((foo () #'(setf bar) (function (setf bar)) ((setf bar) 1 thing))) (foo) #'(setf foo) (function (setf foo)) ((setf foo) 2 thing)))"
+        ]
+    );
+}
+
+#[test]
 fn plans_package_qualified_outer_flet_rename_inside_compiler_macrolet_expander_but_not_shadowed_body()
  {
     assert_local_function_rename!(

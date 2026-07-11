@@ -183,10 +183,22 @@ impl Dialect {
         }
 
         match self {
-            Self::Clojure if head == "let" => Some(CommonLispBindingRefactorForm::Let(
-                CommonLispLetBindingForm::Parallel,
-            )),
-            Self::Clojure if head == "fn" => Some(CommonLispBindingRefactorForm::LambdaLike),
+            Self::Scheme => match head {
+                "let" => Some(CommonLispBindingRefactorForm::Let(
+                    CommonLispLetBindingForm::Parallel,
+                )),
+                "let*" => Some(CommonLispBindingRefactorForm::Let(
+                    CommonLispLetBindingForm::Sequential,
+                )),
+                "lambda" => Some(CommonLispBindingRefactorForm::LambdaLike),
+                _ => None,
+            },
+            Self::Clojure | Self::Janet | Self::Fennel if head == "let" => Some(
+                CommonLispBindingRefactorForm::Let(CommonLispLetBindingForm::Parallel),
+            ),
+            Self::Clojure | Self::Fennel if head == "fn" => {
+                Some(CommonLispBindingRefactorForm::LambdaLike)
+            }
             _ => None,
         }
     }

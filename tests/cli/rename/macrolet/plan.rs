@@ -126,3 +126,63 @@ fn cli_plans_cl_user_qualified_compiler_macrolet_rename_inside_reader_quoted_lam
         2,
     );
 }
+
+#[test]
+fn cli_plans_macrolet_rename_inside_quasiquote_with_unquote_prefixes() {
+    assert_plan_case_with_counts(
+        "rename-macrolet-quasiquote-plan",
+        "core.lisp",
+        "(macrolet ((old-name (x) x)) `(list ,(old-name 1) ,@(old-name 2) (old-name 3)))\n",
+        "(macrolet ((new-name (x) x)) `(list ,(new-name 1) ,@(new-name 2) (old-name 3)))",
+        1,
+        2,
+    );
+}
+
+#[test]
+fn cli_skips_macrolet_definitions_and_calls_inside_quoted_data_during_plan() {
+    assert_plan_case_with_counts(
+        "rename-macrolet-quoted-data-plan",
+        "core.lisp",
+        "(macrolet ((old-name (x) x)) '(macrolet ((old-name (y) y)) (old-name 1)) `(progn (macrolet ((old-name (z) z)) (old-name 2)) ,(old-name 3)))\n",
+        "(macrolet ((new-name (x) x)) '(macrolet ((old-name (y) y)) (old-name 1)) `(progn (macrolet ((old-name (z) z)) (old-name 2)) ,(new-name 3)))",
+        1,
+        1,
+    );
+}
+
+#[test]
+fn cli_plans_macrolet_rename_without_touching_global_macro_cell_accessors() {
+    assert_plan_case_with_counts(
+        "rename-macrolet-global-accessors-plan",
+        "core.lisp",
+        "(macrolet ((old-name (x) x)) (macro-function 'old-name) (compiler-macro-function 'old-name) (old-name 1) old-name)\n",
+        "(macrolet ((new-name (x) x)) (macro-function 'old-name) (compiler-macro-function 'old-name) (new-name 1) old-name)",
+        1,
+        1,
+    );
+}
+
+#[test]
+fn cli_plans_compiler_macrolet_rename_without_touching_global_macro_cell_accessors() {
+    assert_plan_case_with_counts(
+        "rename-compiler-macrolet-global-accessors-plan",
+        "core.lisp",
+        "(compiler-macrolet ((old-name (x) x)) (macro-function 'old-name) (compiler-macro-function 'old-name) (old-name 1) old-name)\n",
+        "(compiler-macrolet ((new-name (x) x)) (macro-function 'old-name) (compiler-macro-function 'old-name) (new-name 1) old-name)",
+        1,
+        1,
+    );
+}
+
+#[test]
+fn cli_plans_macrolet_rename_without_touching_setf_function_call_heads() {
+    assert_plan_case_with_counts(
+        "rename-macrolet-setf-function-call-heads-plan",
+        "core.lisp",
+        "(macrolet ((old-name (x) x)) ((setf old-name) 1 thing) (old-name 1) old-name)\n",
+        "(macrolet ((new-name (x) x)) ((setf old-name) 1 thing) (new-name 1) old-name)",
+        1,
+        1,
+    );
+}

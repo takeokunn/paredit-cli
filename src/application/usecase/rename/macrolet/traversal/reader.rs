@@ -6,10 +6,8 @@ use crate::domain::sexpr::{ExpressionView, Path};
 
 use super::super::RenameFunctionOccurrence;
 use super::super::scope::reader_lambda_body_scope as activate_reader_lambda_body_scope;
-use super::core::{
-    RenameTraversalMode, TraversalContext, TraversalState, recurse_child,
-    recurse_explicit_reader_children,
-};
+use super::core::{RenameTraversalMode, recurse_child, recurse_explicit_reader_children};
+use super::state::{TraversalContext, TraversalState};
 
 pub(in crate::application::usecase::rename::macrolet) fn collect_explicit_reader_form_renames<
     M: RenameTraversalMode,
@@ -33,25 +31,19 @@ pub(in crate::application::usecase::rename::macrolet) fn collect_explicit_reader
                     activate_reader_lambda_body_scope(state.reader_lambda_body_scope);
                 for (child_index, child) in children {
                     let child_path = path.child(1).child(child_index);
+                    let lambda_state = state
+                        .with_scopes(lambda_scope, lambda_scope)
+                        .with_quasiquote_depth(state.quasiquote_depth);
                     if M::collect_explicit_function_lambda_atom_renames(
                         child,
                         &child_path,
                         context,
-                        lambda_scope,
-                        state.quasiquote_depth,
+                        lambda_state,
                         renames,
                     ) {
                         continue;
                     }
-                    recurse_child::<M>(
-                        child,
-                        child_path,
-                        context,
-                        state
-                            .with_scopes(lambda_scope, lambda_scope)
-                            .with_quasiquote_depth(state.quasiquote_depth),
-                        renames,
-                    );
+                    recurse_child::<M>(child, child_path, context, lambda_state, renames);
                 }
             }
             true
@@ -98,25 +90,19 @@ pub(in crate::application::usecase::rename::macrolet) fn collect_reader_lambda_r
     let lambda_scope = activate_reader_lambda_body_scope(state.reader_lambda_body_scope);
     for (child_index, child) in children {
         let child_path = path.child(child_index);
+        let lambda_state = state
+            .with_scopes(lambda_scope, lambda_scope)
+            .with_quasiquote_depth(state.quasiquote_depth);
         if M::collect_reader_quoted_lambda_atom_renames(
             child,
             &child_path,
             context,
-            lambda_scope,
-            state.quasiquote_depth,
+            lambda_state,
             renames,
         ) {
             continue;
         }
-        recurse_child::<M>(
-            child,
-            child_path,
-            context,
-            state
-                .with_scopes(lambda_scope, lambda_scope)
-                .with_quasiquote_depth(state.quasiquote_depth),
-            renames,
-        );
+        recurse_child::<M>(child, child_path, context, lambda_state, renames);
     }
     true
 }

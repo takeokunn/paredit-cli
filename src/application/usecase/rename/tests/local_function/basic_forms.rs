@@ -157,3 +157,35 @@ fn plans_labels_setf_local_callable_rename_updates_definition_and_body_calls() {
         rewritten_contains: ["(labels (((setf bar) (value object) value)) ((setf bar) 1 thing) foo)"]
     );
 }
+
+#[test]
+fn plans_flet_setf_local_callable_reader_designators() {
+    assert_local_function_rename!(
+        input: "(flet (((setf foo) (value object) value)) #'(setf foo) (function (setf foo)) ((setf foo) 1 thing) foo)\n",
+        dialect: Dialect::CommonLisp,
+        from: "foo",
+        to: "bar",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(flet (((setf bar) (value object) value)) #'(setf bar) (function (setf bar)) ((setf bar) 1 thing) foo)"
+        ]
+    );
+}
+
+#[test]
+fn plans_labels_setf_local_callable_reader_designators_and_recursion() {
+    assert_local_function_rename!(
+        input: "(labels (((setf foo) (value object) #'(setf foo) (function (setf foo)) ((setf foo) value object))) #'(setf foo) (function (setf foo)) foo)\n",
+        dialect: Dialect::CommonLisp,
+        from: "foo",
+        to: "bar",
+        definitions: 1,
+        calls: 5,
+        changed: true,
+        rewritten_contains: [
+            "(labels (((setf bar) (value object) #'(setf bar) (function (setf bar)) ((setf bar) value object))) #'(setf bar) (function (setf bar)) foo)"
+        ]
+    );
+}

@@ -33,6 +33,7 @@ macro_rules! assert_local_function_rename {
     }};
 }
 
+mod accessors;
 mod basic_forms;
 mod macro_forms;
 mod property;

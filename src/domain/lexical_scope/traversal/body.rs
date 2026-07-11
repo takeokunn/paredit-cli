@@ -1,9 +1,11 @@
 use crate::domain::common_lisp::is_common_lisp_declaration_form;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::collect_unshadowed_symbol_references_in_context;
 
 pub(super) fn collect_body_forms(
+    dialect: Dialect,
     body_forms: &[ExpressionView],
     symbol: &SymbolName,
     input: &str,
@@ -23,6 +25,6 @@ pub(super) fn collect_body_forms(
         }
 
         body_started = true;
-        collect_unshadowed_symbol_references_in_context(body, symbol, input, output, 0);
+        collect_unshadowed_symbol_references_in_context(dialect, body, symbol, input, output, 0);
     }
 }

@@ -1,6 +1,7 @@
 use crate::domain::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_name_eq, normalize_common_lisp_operator_head,
 };
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
 
@@ -11,15 +12,17 @@ mod lambda_lists;
 use binding_forms::collect_shadow_aware_special_form;
 
 pub fn collect_unshadowed_symbol_references(
+    dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
     output: &mut Vec<ByteSpan>,
 ) {
-    collect_unshadowed_symbol_references_in_context(view, symbol, input, output, 0);
+    collect_unshadowed_symbol_references_in_context(dialect, view, symbol, input, output, 0);
 }
 
 pub(super) fn collect_unshadowed_symbol_references_in_context(
+    dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
@@ -31,29 +34,42 @@ pub(super) fn collect_unshadowed_symbol_references_in_context(
     };
 
     if view.kind == ExpressionKind::Atom {
-        collect_atom_reference(view, symbol, output, quasiquote_depth);
+        collect_atom_reference(dialect, view, symbol, output, quasiquote_depth);
         return;
     }
 
-    if collect_explicit_reader_form(view, symbol, input, output, quasiquote_depth) {
+    if collect_explicit_reader_form(dialect, view, symbol, input, output, quasiquote_depth) {
         return;
     }
 
     if quasiquote_depth > 0 {
-        collect_quasiquoted_children(view, symbol, input, output, quasiquote_depth);
+        collect_quasiquoted_children(dialect, view, symbol, input, output, quasiquote_depth);
         return;
     }
 
-    if collect_shadow_aware_special_form(view, symbol, input, output) {
+    if collect_shadow_aware_special_form(dialect, view, symbol, input, output) {
         return;
     }
 
     for child in &view.children {
-        collect_unshadowed_symbol_references_in_context(child, symbol, input, output, 0);
+        collect_unshadowed_symbol_references_in_context(dialect, child, symbol, input, output, 0);
+    }
+}
+
+/// Common Lisp is the only case-insensitive dialect per the CLHS reader, and it
+/// is the only one where a `cl:`-style package prefix may be stripped. Every
+/// other dialect (Clojure, Scheme, Fennel, Janet, Emacs Lisp) is case-sensitive,
+/// so matching must be exact to avoid rewriting an unrelated `myFn` when editing
+/// `myfn`, or matching a package-qualified `cl:foo` against a local `foo`.
+pub(super) fn symbol_name_matches(dialect: Dialect, candidate: &str, symbol: &str) -> bool {
+    match dialect {
+        Dialect::CommonLisp => common_lisp_symbol_name_eq(candidate, symbol),
+        _ => candidate == symbol,
     }
 }
 
 fn collect_atom_reference(
+    dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
@@ -65,7 +81,7 @@ fn collect_atom_reference(
 
     if quasiquote_depth == 0
         && super::syntax::atom_symbol_text(view)
-            .is_some_and(|text| common_lisp_symbol_name_eq(text, symbol.as_str()))
+            .is_some_and(|text| symbol_name_matches(dialect, text, symbol.as_str()))
     {
         if let Some(span) = super::syntax::atom_symbol_span(view) {
             output.push(span);
@@ -74,6 +90,7 @@ fn collect_atom_reference(
 }
 
 fn collect_quasiquoted_children(
+    dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
@@ -82,6 +99,7 @@ fn collect_quasiquoted_children(
 ) {
     for child in &view.children {
         collect_unshadowed_symbol_references_in_context(
+            dialect,
             child,
             symbol,
             input,
@@ -92,6 +110,7 @@ fn collect_quasiquoted_children(
 }
 
 fn collect_explicit_reader_form(
+    dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
@@ -118,6 +137,7 @@ fn collect_explicit_reader_form(
         "quasiquote" => {
             for child in &view.children[1..] {
                 collect_unshadowed_symbol_references_in_context(
+                    dialect,
                     child,
                     symbol,
                     input,
@@ -130,6 +150,7 @@ fn collect_explicit_reader_form(
         "unquote" | "unquote-splicing" if quasiquote_depth > 0 => {
             for child in &view.children[1..] {
                 collect_unshadowed_symbol_references_in_context(
+                    dialect,
                     child,
                     symbol,
                     input,

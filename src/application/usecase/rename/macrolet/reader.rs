@@ -1,3 +1,6 @@
+use crate::application::usecase::rename::function::target::{
+    CallableNameTarget, callable_name_target,
+};
 use crate::domain::sexpr::ExpressionView;
 
 use super::RenameFunctionOccurrence;
@@ -28,13 +31,32 @@ pub(super) fn collect_local_function_designator_renames(
         return false;
     }
 
-    if view.reader_prefixes.contains(&ReaderPrefix::Function)
-        && push_atom_rename_if_match(view, path, from, to, renames)
-    {
-        return true;
+    if view.reader_prefixes.contains(&ReaderPrefix::Function) {
+        if let Some(target) = callable_name_target(view, path) {
+            return push_callable_target_rename_if_match(target, from, to, renames);
+        }
     }
 
     false
+}
+
+pub(super) fn push_callable_target_rename_if_match(
+    target: CallableNameTarget<'_>,
+    from: &SymbolName,
+    to: &SymbolName,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) -> bool {
+    if !common_lisp_symbol_name_eq(target.text, from.as_str()) {
+        return false;
+    }
+
+    renames.push(RenameFunctionOccurrence {
+        path: target.path.to_string(),
+        span: target.span,
+        text: target.text.to_owned(),
+        replacement: to.as_str().to_owned(),
+    });
+    true
 }
 
 pub(super) fn push_atom_rename_if_match(

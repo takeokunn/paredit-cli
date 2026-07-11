@@ -1,4 +1,5 @@
 use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::body::collect_body_forms;
@@ -14,6 +15,7 @@ enum LambdaListMode {
 }
 
 pub(super) fn collect_lambda_list_references(
+    dialect: Dialect,
     parameter_form: &ExpressionView,
     body_forms: &[ExpressionView],
     symbol: &SymbolName,
@@ -40,7 +42,7 @@ pub(super) fn collect_lambda_list_references(
             continue;
         }
 
-        collect_lambda_list_spec_references(child, mode, symbol, input, output);
+        collect_lambda_list_spec_references(dialect, child, mode, symbol, input, output);
 
         if lambda_list_binding_names(child, mode)
             .iter()
@@ -52,7 +54,7 @@ pub(super) fn collect_lambda_list_references(
         index += 1;
     }
 
-    collect_body_forms(body_forms, symbol, input, output);
+    collect_body_forms(dialect, body_forms, symbol, input, output);
     true
 }
 
@@ -94,6 +96,7 @@ fn collect_lambda_list_marker(
 }
 
 fn collect_lambda_list_spec_references(
+    dialect: Dialect,
     spec: &ExpressionView,
     mode: LambdaListMode,
     symbol: &SymbolName,
@@ -105,6 +108,7 @@ fn collect_lambda_list_spec_references(
         LambdaListMode::Optional | LambdaListMode::Key | LambdaListMode::Aux => {
             if let Some(default_form) = spec.children.get(1) {
                 collect_unshadowed_symbol_references_in_context(
+                    dialect,
                     default_form,
                     symbol,
                     input,
