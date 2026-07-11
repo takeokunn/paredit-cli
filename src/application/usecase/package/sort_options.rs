@@ -33,10 +33,17 @@ pub(super) struct OptionReplacement {
     pub(super) replacement: String,
 }
 
+/// `full_span`/`full_text` span from the newline that ends the previous
+/// option's line up to this option's own end, so a leading `;;` comment (or
+/// blank run) travels with the option below it when options are reordered.
+/// The first option in a `defpackage` has no previous option to inherit
+/// trivia from, so its slot starts right after the package name and
+/// `has_leading_trivia` is `false`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::application::usecase::package) struct OptionSlot {
-    pub(in crate::application::usecase::package) span: ByteSpan,
-    pub(in crate::application::usecase::package) text: String,
+    pub(in crate::application::usecase::package) full_span: ByteSpan,
+    pub(in crate::application::usecase::package) full_text: String,
+    pub(in crate::application::usecase::package) has_leading_trivia: bool,
     pub(in crate::application::usecase::package) label: String,
     pub(in crate::application::usecase::package) sort_key: ordering::OptionSortKey,
 }
