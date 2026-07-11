@@ -26,6 +26,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
+        exclude: args.exclude.clone(),
     })?;
 
     let mut candidates = Vec::new();

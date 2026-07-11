@@ -26,6 +26,9 @@ pub(in crate::presentation::cli) struct SimilarityReportArgs {
     /// Maximum directory recursion depth from each root directory.
     #[arg(long)]
     pub(super) max_depth: Option<usize>,
+    /// Exclude an exact file or directory subtree from discovery. May be repeated.
+    #[arg(long)]
+    pub(super) exclude: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
     pub(super) dialect: Option<DialectArg>,

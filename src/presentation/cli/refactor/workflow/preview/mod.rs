@@ -9,7 +9,7 @@ use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::workspace::discover_workspace_refactor_scope;
 
 pub(in crate::presentation::cli::refactor::workflow) use build::{
-    BuildRefactorPreviewRequest, build_refactor_preview,
+    build_refactor_preview, BuildRefactorPreviewRequest,
 };
 pub(in crate::presentation::cli::refactor::workflow) use failure::finish_refactor_preview_failure;
 pub(in crate::presentation::cli::refactor::workflow) use write::write_refactor_preview;
@@ -46,6 +46,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_preview(
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
+        exclude: Vec::new(),
     })?;
 
     emit_refactor_preview(RefactorPreviewEmission {

@@ -7,6 +7,7 @@ pub struct WorkspaceDiscoveryOptions {
     pub include_hidden: bool,
     pub include_generated: bool,
     pub max_depth: Option<usize>,
+    pub exclude: Vec<PathBuf>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -16,4 +17,5 @@ pub struct WorkspaceDiscovery {
     pub skipped_hidden_count: usize,
     pub skipped_generated_count: usize,
     pub skipped_symlink_count: usize,
+    pub skipped_excluded_count: usize,
 }

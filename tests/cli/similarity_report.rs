@@ -167,6 +167,62 @@ fn cli_recursively_discovers_sources_and_skips_hidden_and_generated_directories(
 }
 
 #[test]
+fn cli_excludes_repeated_file_and_subtree_paths_without_prefix_false_positives() {
+    let dir = fresh_temp_dir("similarity-exclude-json");
+    let excluded_dir = dir.join("vendor");
+    let prefix_sibling = dir.join("vendor-copy");
+    let excluded_file = dir.join("excluded.lisp");
+    fs::create_dir_all(&excluded_dir).unwrap();
+    fs::create_dir_all(&prefix_sibling).unwrap();
+    fs::write(dir.join("keep.lisp"), "(foo a b)\n").unwrap();
+    fs::write(&excluded_file, "(foo excluded file)\n").unwrap();
+    fs::write(excluded_dir.join("nested.lisp"), "(foo excluded dir)\n").unwrap();
+    fs::write(prefix_sibling.join("keep.lisp"), "(foo x y)\n").unwrap();
+
+    let output = paredit()
+        .arg("similarity-report")
+        .arg("--threshold=0")
+        .arg("--exclude")
+        .arg(&excluded_dir)
+        .arg("--exclude")
+        .arg(&excluded_file)
+        .arg(&dir)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        report["options"]["exclude"],
+        serde_json::json!([
+            excluded_dir.display().to_string(),
+            excluded_file.display().to_string()
+        ])
+    );
+    assert_eq!(report["summary"]["scanned_files"], 2);
+    assert_eq!(report["summary"]["skipped_excluded"], 2);
+    assert_eq!(report["pair_count"], 1);
+}
+
+#[test]
+fn cli_resolves_relative_excludes_from_cwd_and_reports_text_summary() {
+    let dir = fresh_temp_dir("similarity-exclude-text");
+    fs::write(dir.join("keep.lisp"), "(foo a b)\n").unwrap();
+    fs::write(dir.join("excluded.lisp"), "(foo x y)\n").unwrap();
+
+    paredit()
+        .current_dir(&dir)
+        .arg("similarity-report")
+        .arg("--output=text")
+        .arg("--exclude=excluded.lisp")
+        .arg(".")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("scanned_files\t1"))
+        .stdout(predicate::str::contains("skipped_excluded\t1"));
+}
+
+#[test]
 fn cli_dialect_override_includes_unknown_extensions() {
     let dir = fresh_temp_dir("similarity-dialect-override");
     let left = dir.join("left.txt");

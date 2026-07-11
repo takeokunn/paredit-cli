@@ -7,7 +7,7 @@ use crate::application::usecase::definition_report::collect_definition_forms;
 use crate::application::usecase::workspace_report::types::WorkspaceFileStatus;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
 
 use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;
@@ -20,6 +20,7 @@ pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) 
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
+        exclude: Vec::new(),
     })?;
     let mut reports = Vec::with_capacity(discovery.files.len());
 

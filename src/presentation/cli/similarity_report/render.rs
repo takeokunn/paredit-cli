@@ -49,6 +49,7 @@ fn print_text(
     println!("skipped_hidden\t{}", discovery.skipped_hidden_count);
     println!("skipped_generated\t{}", discovery.skipped_generated_count);
     println!("skipped_symlink\t{}", discovery.skipped_symlink_count);
+    println!("skipped_excluded\t{}", discovery.skipped_excluded_count);
     println!("possible_pairs\t{}", summary.possible_pairs);
     println!("evaluated_pairs\t{}", summary.evaluated_pairs);
     println!("pruned_by_size\t{}", summary.pruned_by_size);
@@ -107,6 +108,7 @@ fn json_report(
             "include_hidden": args.include_hidden,
             "include_generated": args.include_generated,
             "max_depth": args.max_depth,
+            "exclude": args.exclude.iter().map(|path| path.display().to_string()).collect::<Vec<_>>(),
             "fail_on_duplicates": args.fail_on_duplicates,
         },
         "summary": {
@@ -117,6 +119,7 @@ fn json_report(
             "skipped_hidden": discovery.skipped_hidden_count,
             "skipped_generated": discovery.skipped_generated_count,
             "skipped_symlink": discovery.skipped_symlink_count,
+            "skipped_excluded": discovery.skipped_excluded_count,
             "possible_pairs": report.summary.possible_pairs,
             "evaluated_pairs": report.summary.evaluated_pairs,
             "pruned_by_size": report.summary.pruned_by_size,

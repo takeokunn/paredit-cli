@@ -3,8 +3,8 @@ use super::super::args::*;
 use super::super::render::print_workspace_refactor_execute;
 use super::super::types::execute::{WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome};
 use super::preview::{
-    BuildRefactorPreviewRequest, build_refactor_preview, finish_refactor_preview_failure,
-    write_refactor_preview,
+    build_refactor_preview, finish_refactor_preview_failure, write_refactor_preview,
+    BuildRefactorPreviewRequest,
 };
 use super::verification::build_refactor_verification;
 use super::workspace::discover_workspace_refactor_scope;
@@ -18,6 +18,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
+        exclude: Vec::new(),
     })?;
     let paths = workspace.paths;
 
