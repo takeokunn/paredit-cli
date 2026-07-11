@@ -55,7 +55,6 @@
           meta = {
             description = cargoToml.package.description;
             homepage = cargoToml.package.homepage;
-            changelog = "${cargoToml.package.repository}/blob/main/CHANGELOG.md";
             license = lib.licenses.mit;
             mainProgram = "paredit";
           };
@@ -394,8 +393,8 @@
           # It resolves the crates-io registry index over the network, which
           # the Nix build sandbox blocks on Linux CI (sandbox = true), making
           # `nix flake check` fail there even though the crate is fine. The
-          # publish dry-run remains a documented local pre-release step in
-          # RELEASE.md, where network access is available.
+          # publish dry-run remains a manual local pre-release step, run where
+          # network access is available.
         }
       );
 

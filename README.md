@@ -34,15 +34,6 @@ Start with the [documentation source](docs/src/README.md) for command selection,
 safe workflows, and integration examples. The published site is available at
 <https://takeokunn.github.io/paredit-cli/>.
 
-## Project Policy
-
-Security-sensitive reports and the currently supported release line are defined
-in [SECURITY.md](SECURITY.md). `main` is the active development line. See
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for collaboration and community
-expectations. Contributions and releases follow
-[CONTRIBUTING.md](CONTRIBUTING.md), [RELEASE.md](RELEASE.md), and
-[COMPATIBILITY.md](COMPATIBILITY.md).
-
 ## Install
 
 ```sh

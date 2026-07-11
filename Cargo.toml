@@ -12,21 +12,10 @@ readme = "README.md"
 keywords = ["lisp", "paredit", "refactoring", "cli", "sexp"]
 categories = ["command-line-utilities", "development-tools"]
 include = [
-    "/CHANGELOG.md",
-    "/CODE_OF_CONDUCT.md",
-    "/COMPATIBILITY.md",
     "/Cargo.lock",
     "/Cargo.toml",
-    "/CONTRIBUTING.md",
-    "/GOVERNANCE.md",
     "/LICENSE",
-    "/MAINTAINERS.md",
     "/README.md",
-    "/RELEASE.md",
-    "/ROADMAP.md",
-    "/SECURITY.md",
-    "/SKILLS.md",
-    "/SUPPORT.md",
     "/src/**/*.rs",
     "/tests/**/*.rs",
     "/tests/fixtures/*",

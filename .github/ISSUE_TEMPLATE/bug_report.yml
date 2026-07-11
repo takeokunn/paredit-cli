@@ -72,9 +72,9 @@ body:
     id: contract_surface
     attributes:
       label: Contract Surface
-      description: Indicate whether this report is about a stable contract covered by `COMPATIBILITY.md` or preview/unstable behavior.
+      description: Indicate whether this report is about the stable CLI/JSON contract or preview/unstable behavior.
       options:
-        - Stable contract covered by `COMPATIBILITY.md`
+        - Stable CLI or JSON contract
         - Preview or unstable behavior
     validations:
       required: true

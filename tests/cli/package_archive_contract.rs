@@ -22,21 +22,7 @@ fn cargo_package_includes_public_oss_docs() {
         .filter(|line| !line.is_empty())
         .collect();
 
-    for required in [
-        "CHANGELOG.md",
-        "CODE_OF_CONDUCT.md",
-        "COMPATIBILITY.md",
-        "CONTRIBUTING.md",
-        "GOVERNANCE.md",
-        "LICENSE",
-        "MAINTAINERS.md",
-        "README.md",
-        "RELEASE.md",
-        "ROADMAP.md",
-        "SECURITY.md",
-        "SKILLS.md",
-        "SUPPORT.md",
-    ] {
+    for required in ["LICENSE", "README.md"] {
         assert!(
             packaged_files.contains(required),
             "cargo package archive is missing required public document: {required}"

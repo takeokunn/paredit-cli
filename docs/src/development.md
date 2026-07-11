@@ -75,7 +75,6 @@ cargo +1.85 test --locked
 
 ## Releases
 
-The release checklist, versioning policy, and publish steps live in
-[RELEASE.md](https://github.com/takeokunn/paredit-cli/blob/main/RELEASE.md).
-Command evolution follows the no-backward-compatibility policy in
-[COMPATIBILITY.md](https://github.com/takeokunn/paredit-cli/blob/main/COMPATIBILITY.md).
+`paredit-cli` does not provide backward compatibility for command paths,
+flags, text output, or JSON schemas between releases. Automation must use the
+command reference in the current documentation release.

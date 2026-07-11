@@ -1,5 +1,5 @@
 name: Feature Request
-description: Propose a new capability that fits the project's roadmap and compatibility constraints.
+description: Propose a new capability that fits structural S-expression editing.
 title: "[feature] "
 labels:
   - enhancement
@@ -7,7 +7,6 @@ body:
   - type: markdown
     attributes:
       value: |
-        Before filing, check `ROADMAP.md`, `GOVERNANCE.md`, and `COMPATIBILITY.md`.
         Requests that expand surface area without clear structural-editing value are unlikely to be accepted.
   - type: textarea
     id: problem
@@ -38,14 +37,3 @@ body:
       description: Describe current workarounds or why existing commands are insufficient.
     validations:
       required: true
-  - type: checkboxes
-    id: policies
-    attributes:
-      label: Policy Check
-      options:
-        - label: I reviewed `ROADMAP.md` and believe this request matches current priorities.
-          required: true
-        - label: I reviewed `COMPATIBILITY.md` and understand this may require a public contract decision.
-          required: true
-        - label: I reviewed `GOVERNANCE.md` if this request also changes project policy or maintainer process.
-          required: false

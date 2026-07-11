@@ -58,11 +58,9 @@ paredit inspect check --file source.lisp
 
 ## AI coding agents
 
-[SKILLS.md](https://github.com/takeokunn/paredit-cli/blob/main/SKILLS.md)
-documents the agent-facing skill contract: when to reach for `paredit` instead
-of hand-editing delimiters, and which plan/preview/verify sequences are safe
-to automate. The `skills/paredit-cli/` directory packages the same contract
-for Claude Code.
+The `skills/paredit-cli/` directory packages the agent-facing skill contract:
+when to reach for `paredit` instead of hand-editing delimiters, and which
+plan/preview/verify sequences are safe to automate.
 
 ## GitHub Pages
 
