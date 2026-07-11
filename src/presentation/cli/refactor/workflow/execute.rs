@@ -18,6 +18,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
+        exclude: Vec::new(),
     })?;
     let paths = workspace.paths;
 

@@ -113,6 +113,8 @@ mod roadmap_contract;
 mod security_docs_contract;
 #[path = "cli/signature_report.rs"]
 mod signature_report;
+#[path = "cli/similarity_report.rs"]
+mod similarity_report;
 #[path = "cli/sort_definitions.rs"]
 mod sort_definitions;
 #[path = "cli/split_file.rs"]

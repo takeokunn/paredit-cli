@@ -58,6 +58,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         }
         Command::MoveForm(args) => definition_movement::move_form::move_form(args)?,
         Command::DuplicateReport(args) => duplicate_report::workflow::duplicate_report(args)?,
+        Command::SimilarityReport(args) => similarity_report::workflow::similarity_report(args)?,
         Command::ReplacementPlan(args) => duplicate_report::workflow::replacement_plan(args)?,
         Command::ReplaceForms(args) => replace_forms::replace_forms(args)?,
         Command::AddExport(args) => package::add_export::add_export(args)?,

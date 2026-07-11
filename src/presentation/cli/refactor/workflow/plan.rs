@@ -33,6 +33,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_plan(
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
+        exclude: Vec::new(),
     })?;
 
     emit_refactor_plan(RefactorPlanEmission {

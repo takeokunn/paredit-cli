@@ -360,6 +360,7 @@ paredit split-file --from-file src/core.lisp --to-file src/ui/render.lisp --name
 paredit move-form --from-file src/core.lisp --to-file src/system.lisp --path 2 --output json
 paredit move-form --from-file src/core.lisp --to-file src/system.lisp --path 2 --insert before --anchor-path 1 --write
 paredit duplicate-report --output json src/*.lisp test/*.lisp lisp/*.el
+paredit similarity-report --threshold 0.8 --min-node-count 4 --output json src/*.lisp test/*.lisp lisp/*.el
 paredit replacement-plan --replacement "(run-case)" --output json src/*.lisp test/*.lisp lisp/*.el
 paredit replace-forms --file test/suite.lisp --path 0 --path 1 --with "(run-case)" --require-same-shape --output json
 paredit replace-forms --file test/suite.lisp --path 0 --path 1 --with "(run-case)" --require-same-shape --write

@@ -26,6 +26,7 @@ mod rename;
 mod replace_forms;
 mod shared;
 mod signature_report;
+mod similarity_report;
 mod symbol_report;
 mod thread_expression;
 mod unthread_expression;

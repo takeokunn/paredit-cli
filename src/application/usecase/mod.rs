@@ -27,6 +27,7 @@ pub mod remove_unused_definition;
 pub mod rename;
 pub mod replace_forms;
 pub mod signature_report;
+pub mod similarity_report;
 pub mod sort_definitions;
 pub mod split_file;
 pub mod thread_expression;
