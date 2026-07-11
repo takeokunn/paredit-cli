@@ -5,7 +5,7 @@ use super::patterns::extract_function_pattern_names;
 #[derive(Debug)]
 pub(super) struct ExtractFunctionBindingEntry {
     pub(super) names: Vec<String>,
-    pub(super) value: ExpressionView,
+    pub(super) value: Option<ExpressionView>,
 }
 
 pub(super) fn extract_function_binding_entries(
@@ -22,7 +22,7 @@ pub(super) fn extract_function_binding_entries(
                     .chunks_exact(2)
                     .map(|pair| ExtractFunctionBindingEntry {
                         names: extract_function_pattern_names(&pair[0]),
-                        value: pair[1].clone(),
+                        value: Some(pair[1].clone()),
                     })
                     .collect(),
             )
@@ -32,15 +32,22 @@ pub(super) fn extract_function_binding_entries(
                 .children
                 .iter()
                 .map(|pair| {
-                    if pair.kind != ExpressionKind::List
-                        || pair.delimiter != Some(Delimiter::Paren)
-                        || pair.children.len() != 2
+                    if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren)
                     {
+                        if pair.kind != ExpressionKind::Atom {
+                            return None;
+                        }
+                        return Some(ExtractFunctionBindingEntry {
+                            names: extract_function_pattern_names(pair),
+                            value: None,
+                        });
+                    }
+                    if pair.children.is_empty() || pair.children.len() > 2 {
                         return None;
                     }
                     Some(ExtractFunctionBindingEntry {
                         names: extract_function_pattern_names(&pair.children[0]),
-                        value: pair.children[1].clone(),
+                        value: pair.children.get(1).cloned(),
                     })
                 })
                 .collect::<Option<Vec<_>>>()?,

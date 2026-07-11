@@ -29,14 +29,16 @@ pub(super) fn collect_inferred_extract_function_let(
     };
 
     for binding in &bindings {
-        super::super::collect_inferred_extract_function_params(
-            dialect,
-            &binding.value,
-            false,
-            explicit_params,
-            bound_params,
-            params,
-        );
+        if let Some(value) = &binding.value {
+            super::super::collect_inferred_extract_function_params(
+                dialect,
+                value,
+                false,
+                explicit_params,
+                bound_params,
+                params,
+            );
+        }
     }
 
     let body_bound_params = extend_extract_function_bound_params(
@@ -72,14 +74,16 @@ pub(super) fn collect_inferred_extract_function_let_star(
 
     let mut current_bound_params = bound_params.to_vec();
     for binding in &bindings {
-        super::super::collect_inferred_extract_function_params(
-            dialect,
-            &binding.value,
-            false,
-            explicit_params,
-            &current_bound_params,
-            params,
-        );
+        if let Some(value) = &binding.value {
+            super::super::collect_inferred_extract_function_params(
+                dialect,
+                value,
+                false,
+                explicit_params,
+                &current_bound_params,
+                params,
+            );
+        }
         for name in &binding.names {
             super::push_extract_function_bound_param(dialect, &mut current_bound_params, name);
         }
