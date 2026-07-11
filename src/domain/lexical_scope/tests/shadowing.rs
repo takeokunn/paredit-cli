@@ -22,6 +22,24 @@ fn parallel_let_checks_binding_values_before_body_shadowing() {
 }
 
 #[test]
+fn bare_uninitialized_let_binding_still_scans_the_body() {
+    // `(let (rows) ...)` is CLHS-legal shorthand for `(let ((rows nil)) ...)`.
+    // A bare binding name (no value form) must not stop the body scan for an
+    // unrelated symbol referenced later — this previously made a live call
+    // invisible, so `remove-unused-definitions` would delete the callee.
+    let input = "(let (rows) (helper rows))";
+
+    assert_eq!(reference_texts(input, "helper"), vec!["helper"]);
+}
+
+#[test]
+fn bare_uninitialized_sequential_let_binding_still_scans_the_body() {
+    let input = "(let* (rows) (helper rows))";
+
+    assert_eq!(reference_texts(input, "helper"), vec!["helper"]);
+}
+
+#[test]
 fn symbol_macrolet_checks_expansions_before_body_shadowing() {
     let input = "(symbol-macrolet ((x outer) (y x)) (list x y outer))";
 
@@ -73,6 +91,28 @@ fn lambda_list_default_forms_remain_outer_references() {
 #[test]
 fn lambda_list_default_forms_count_same_name_outer_references_before_shadowing() {
     let input = "(list x (lambda (&optional (x x)) x))";
+
+    assert_eq!(reference_texts(input, "x"), vec!["x", "x"]);
+}
+
+#[test]
+fn defun_lambda_list_default_forms_remain_outer_references() {
+    // DEFUN's own branch used to scan only its body, skipping the parameter
+    // list entirely: a global referenced solely as an &optional/&key/&aux
+    // default value (`(defun f (&optional (y *default*)) ...)`) had zero
+    // recorded references, so unused-definition-report/remove-unused-
+    // definitions would report and delete a still-live defparameter.
+    let input = "(list fallback (defun f (&optional (x (fallback y) supplied)) x))";
+
+    assert_eq!(
+        reference_texts(input, "fallback"),
+        vec!["fallback", "fallback"]
+    );
+}
+
+#[test]
+fn defun_parameter_shadows_same_named_global_in_body() {
+    let input = "(list x (defun f (x) (list x)) x)";
 
     assert_eq!(reference_texts(input, "x"), vec!["x", "x"]);
 }
