@@ -10,6 +10,33 @@ use super::super::RenameFunctionOccurrence;
 use super::super::target::callable_name_target;
 use super::core::{TraversalContext, TraversalState, collect_function_call_head_renames_from_view};
 
+fn collect_callable_target_rename(
+    target_view: &ExpressionView,
+    target_path: crate::domain::sexpr::Path,
+    state: &TraversalState<'_>,
+    context: &TraversalContext<'_>,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) -> bool {
+    let Some(target) = callable_name_target(target_view, &target_path) else {
+        return false;
+    };
+
+    if !common_lisp_symbol_name_eq(target.text, context.from.as_str())
+        || is_local_callable_bound(state.local_callables, target.text)
+        || state.shadowed_depth != 0
+    {
+        return false;
+    }
+
+    renames.push(RenameFunctionOccurrence {
+        path: target.path.to_string(),
+        span: target.span,
+        text: target.text.to_owned(),
+        replacement: context.to.as_str().to_owned(),
+    });
+    true
+}
+
 pub(in crate::application::usecase::rename::function) fn collect_function_designator_renames(
     view: &ExpressionView,
     state: &TraversalState<'_>,
@@ -17,20 +44,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_design
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
     if state.quasiquote_depth == 0 && view.reader_prefixes.contains(&ReaderPrefix::Function) {
-        if let Some(target) = callable_name_target(view, &state.path) {
-            if common_lisp_symbol_name_eq(target.text, context.from.as_str())
-                && !is_local_callable_bound(state.local_callables, target.text)
-                && state.shadowed_depth == 0
-            {
-                renames.push(RenameFunctionOccurrence {
-                    path: target.path.to_string(),
-                    span: target.span,
-                    text: target.text.to_owned(),
-                    replacement: context.to.as_str().to_owned(),
-                });
-                return true;
-            }
-        }
+        return collect_callable_target_rename(view, state.path.clone(), state, context, renames);
     }
 
     false
@@ -80,37 +94,25 @@ pub(in crate::application::usecase::rename::function) fn collect_explicit_reader
             if state.quasiquote_depth == 0 =>
         {
             if let Some(target) = view.children.get(1) {
-                if let Some(target) = callable_name_target(target, &state.path.child(1)) {
-                    if common_lisp_symbol_name_eq(target.text, context.from.as_str())
-                        && !is_local_callable_bound(state.local_callables, target.text)
-                        && state.shadowed_depth == 0
-                    {
-                        renames.push(RenameFunctionOccurrence {
-                            path: target.path.to_string(),
-                            span: target.span,
-                            text: target.text.to_owned(),
-                            replacement: context.to.as_str().to_owned(),
-                        });
-                    }
-                }
+                collect_callable_target_rename(
+                    target,
+                    state.path.child(1),
+                    &state,
+                    context,
+                    renames,
+                );
             }
             true
         }
         "function" if state.quasiquote_depth == 0 => {
             if let Some(target) = view.children.get(1) {
-                if let Some(target) = callable_name_target(target, &state.path.child(1)) {
-                    if common_lisp_symbol_name_eq(target.text, context.from.as_str())
-                        && !is_local_callable_bound(state.local_callables, target.text)
-                        && state.shadowed_depth == 0
-                    {
-                        renames.push(RenameFunctionOccurrence {
-                            path: target.path.to_string(),
-                            span: target.span,
-                            text: target.text.to_owned(),
-                            replacement: context.to.as_str().to_owned(),
-                        });
-                    }
-                }
+                collect_callable_target_rename(
+                    target,
+                    state.path.child(1),
+                    &state,
+                    context,
+                    renames,
+                );
             }
             if let Some(children) = explicit_reader_function_lambda_body_children(view) {
                 for (child_index, child) in children {
