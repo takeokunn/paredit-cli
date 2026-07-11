@@ -163,6 +163,7 @@ pub(super) fn parse_replace_call_report(
 
 pub(super) fn assert_cli_check_succeeds(path: &std::path::Path) -> Result<(), TestCaseError> {
     let check_output = paredit()
+        .arg("inspect")
         .arg("check")
         .arg("--file")
         .arg(path)

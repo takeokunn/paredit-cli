@@ -14,7 +14,8 @@ fn cli_plans_package_rename_without_writing() {
     fs::write(&file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-package")
+    cmd.arg("refactor")
+        .arg("rename-package")
         .arg("--from")
         .arg("old.pkg")
         .arg("--to")
@@ -57,7 +58,8 @@ fn cli_writes_package_rename() {
     .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-package")
+    cmd.arg("refactor")
+        .arg("rename-package")
         .arg("--from")
         .arg(":old.pkg")
         .arg("--to")

@@ -6,7 +6,7 @@ use crate::presentation::cli::OutputFormat;
 
 #[derive(Debug, Args)]
 #[command(
-    after_help = "Examples:\n  paredit workspace report .\n  paredit workspace report --include-hidden --max-depth 2 ."
+    after_help = "Examples:\n  paredit inspect workspace .\n  paredit inspect workspace --include-hidden --max-depth 2 ."
 )]
 pub(in crate::presentation::cli) struct WorkspaceReportArgs {
     /// Files or directories to scan recursively.

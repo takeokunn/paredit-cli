@@ -11,7 +11,8 @@ fn cli_rejects_unwrap_function_calls_without_explicit_scope() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -35,7 +36,8 @@ fn cli_rejects_unwrap_function_calls_with_conflicting_scope_flags() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -62,7 +64,8 @@ fn cli_unwrap_function_calls_fails_when_selected_calls_do_not_change() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

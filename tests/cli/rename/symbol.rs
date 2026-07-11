@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn cli_finds_symbol_atoms_without_string_or_comment_matches() {
     let mut cmd = paredit();
-    cmd.args(["find-symbol", "--symbol", "foo"])
+    cmd.args(["inspect", "find-symbol", "--symbol", "foo"])
         .write_stdin("(defun foo (foo) \"foo\" ; foo\n  foo)")
         .assert()
         .success()
@@ -15,7 +15,7 @@ fn cli_finds_symbol_atoms_without_string_or_comment_matches() {
 #[test]
 fn cli_renames_symbol_atoms_without_string_or_comment_matches() {
     let mut cmd = paredit();
-    cmd.args(["rename-symbol", "--from", "foo", "--to", "bar"])
+    cmd.args(["refactor", "rename-symbol", "--from", "foo", "--to", "bar"])
         .write_stdin("(defun foo (foo) \"foo\" ; foo\n  foo)")
         .assert()
         .success()
@@ -35,7 +35,8 @@ fn cli_plans_multi_file_symbol_rename() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-symbols")
+    cmd.arg("refactor")
+        .arg("rename-symbols")
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -63,7 +64,8 @@ fn cli_writes_multi_file_symbol_rename_without_string_or_comment_matches() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-symbols")
+    cmd.arg("refactor")
+        .arg("rename-symbols")
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -92,7 +94,7 @@ fn cli_renames_bare_quoted_symbol_designator_references() {
     // `make-instance`, etc). A rename that skipped it would silently leave
     // a dangling reference to a definition that no longer exists.
     let mut cmd = paredit();
-    cmd.args(["rename-symbol", "--from", "foo", "--to", "bar"])
+    cmd.args(["refactor", "rename-symbol", "--from", "foo", "--to", "bar"])
         .write_stdin("(define-condition foo (error) ())\n(error 'foo)")
         .assert()
         .success()
@@ -141,7 +143,7 @@ fn cli_refactor_preview_renames_bare_quoted_symbol_designator_in_symbol_and_func
         // to force the CLI to reparse it end-to-end.
         let mut find_cmd = paredit();
         find_cmd
-            .args(["find-symbol", "--symbol", "bar", "--file"])
+            .args(["inspect", "find-symbol", "--symbol", "bar", "--file"])
             .arg(&lisp_file)
             .assert()
             .success();
@@ -159,7 +161,8 @@ fn cli_renames_unqualified_occurrences_of_package_qualified_common_lisp_symbol()
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-symbols")
+    cmd.arg("refactor")
+        .arg("rename-symbols")
         .arg("--from")
         .arg("cl-user:old-name")
         .arg("--to")

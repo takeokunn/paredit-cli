@@ -9,7 +9,8 @@ fn cli_gates_call_graph_policy_for_ci() {
     );
 
     let mut cmd = paredit();
-    cmd.arg("call-graph")
+    cmd.arg("inspect")
+        .arg("call-graph")
         .arg("--symbol")
         .arg("leaf")
         .arg("--fail-on-inbound-callers")
@@ -51,7 +52,8 @@ fn cli_accepts_call_graph_policy_without_inbound_callers() {
     );
 
     let mut cmd = paredit();
-    cmd.arg("call-graph")
+    cmd.arg("inspect")
+        .arg("call-graph")
         .arg("--symbol")
         .arg("render")
         .arg("--fail-on-inbound-callers")

@@ -13,7 +13,8 @@ fn cli_reports_multi_file_call_sites_for_agent_refactor_planning() {
     fs::write(&elisp_file, "(defun demo-mode () (area 5 6))\n").expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--symbol")
         .arg("area")
         .arg(&lisp_file)
@@ -38,7 +39,8 @@ fn cli_reports_multi_file_call_sites_for_agent_refactor_planning() {
         ));
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg(&lisp_file)
         .assert()
         .success()
@@ -57,7 +59,8 @@ fn cli_can_include_definition_forms_for_inventory_reports() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--include-definitions")
         .arg("--output")
         .arg("json")
@@ -82,7 +85,8 @@ fn cli_skips_emacs_lisp_cl_flet_local_callable_calls() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--symbol")
         .arg("target")
         .arg("--output")
@@ -110,7 +114,8 @@ fn cli_skips_emacs_lisp_cl_labels_local_callable_calls_in_definition_bodies() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--symbol")
         .arg("target")
         .arg("--output")
@@ -138,7 +143,8 @@ fn cli_skips_emacs_lisp_cl_macrolet_local_macro_calls() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--symbol")
         .arg("helper")
         .arg("--output")
@@ -163,7 +169,8 @@ fn cli_reports_common_lisp_symbol_macrolet_expansion_calls_without_binding_name_
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--symbol")
         .arg("target")
         .arg("--output")
@@ -191,7 +198,8 @@ fn cli_skips_reader_eval_bodies_when_reporting_calls() {
     .expect("write reader-eval fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-report")
+    cmd.arg("inspect")
+        .arg("calls")
         .arg("--symbol")
         .arg("helper")
         .arg("--output")

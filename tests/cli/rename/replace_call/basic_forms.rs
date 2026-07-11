@@ -8,7 +8,8 @@ fn cli_plans_replace_function_calls_without_writing() {
     fs::write(&lisp_file, source).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -45,6 +46,7 @@ fn cli_writes_replace_function_calls_at_call_path() {
     .expect("write lisp fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
@@ -81,7 +83,8 @@ fn cli_rejects_replace_function_calls_without_explicit_scope() {
     fs::write(&lisp_file, "(defun render () (fetch-user id))\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -101,7 +104,8 @@ fn cli_rejects_replace_function_calls_with_conflicting_scope_flags() {
     fs::write(&lisp_file, "(defun render () (fetch-user id))\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -124,7 +128,8 @@ fn cli_replace_function_calls_enforces_required_call_count() {
     fs::write(&lisp_file, "(defun render () (fetch-user id))\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -147,7 +152,8 @@ fn cli_replace_function_calls_fails_when_selected_calls_do_not_change() {
     fs::write(&lisp_file, "(defun fetch-user (id) id)\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -169,6 +175,7 @@ fn cli_replace_function_calls_aggregates_counts_across_multiple_files() {
     fs::write(&unchanged_file, "(defun keep () :ok)\n").expect("write unchanged fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("replace-function-calls")
         .arg(&changed_file)
         .arg(&unchanged_file)

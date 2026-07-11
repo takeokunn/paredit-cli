@@ -17,6 +17,7 @@ fn assert_cli_replace_function_calls_property(
         .map_err(|err| TestCaseError::fail(format!("write lisp fixture: {err}")))?;
 
     let output = paredit()
+        .arg("refactor")
         .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")

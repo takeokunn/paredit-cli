@@ -6,7 +6,12 @@ mod write;
 
 fn assert_plan_output(args: &[&str], input: &str, checks: &[&str]) {
     let mut cmd = paredit();
-    let mut assert = cmd.args(args).write_stdin(input).assert().success();
+    let mut assert = cmd
+        .arg("refactor")
+        .args(args)
+        .write_stdin(input)
+        .assert()
+        .success();
     for check in checks {
         assert = assert.stdout(predicate::str::contains(*check));
     }
@@ -25,7 +30,7 @@ fn assert_written_file(
     fs::write(&file_path, initial_source).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("introduce-let");
+    cmd.arg("refactor").arg("introduce-let");
     for arg in args {
         cmd.arg(arg);
     }

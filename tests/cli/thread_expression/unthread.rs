@@ -3,17 +3,24 @@ use super::*;
 #[test]
 fn cli_plans_unthread_first_expression_without_writing() {
     let mut cmd = paredit();
-    cmd.args(["unthread-expression", "--path", "0", "--output", "json"])
-        .write_stdin("(-> id fetch-user normalize-user (format-name :short))")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("\"style\": \"first\""))
-        .stdout(predicate::str::contains("\"operator\": \"->\""))
-        .stdout(predicate::str::contains("\"base\": \"id\""))
-        .stdout(predicate::str::contains(
-            "\"replacement\": \"(format-name (normalize-user (fetch-user id)) :short)\"",
-        ))
-        .stdout(predicate::str::contains("\"written\": false"));
+    cmd.args([
+        "refactor",
+        "unthread-expression",
+        "--path",
+        "0",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(-> id fetch-user normalize-user (format-name :short))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"style\": \"first\""))
+    .stdout(predicate::str::contains("\"operator\": \"->\""))
+    .stdout(predicate::str::contains("\"base\": \"id\""))
+    .stdout(predicate::str::contains(
+        "\"replacement\": \"(format-name (normalize-user (fetch-user id)) :short)\"",
+    ))
+    .stdout(predicate::str::contains("\"written\": false"));
 }
 
 #[test]
@@ -27,7 +34,8 @@ fn cli_writes_unthread_last_expression_for_clojure_file() {
     .expect("write clojure fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unthread-expression")
+    cmd.arg("refactor")
+        .arg("unthread-expression")
         .arg("--file")
         .arg(&clj_file)
         .arg("--path")
@@ -50,7 +58,7 @@ fn cli_writes_unthread_last_expression_for_clojure_file() {
 #[test]
 fn cli_rejects_unthread_unrecognized_operator_without_explicit_confirmation() {
     let mut cmd = paredit();
-    cmd.args(["unthread-expression", "--path", "0"])
+    cmd.args(["refactor", "unthread-expression", "--path", "0"])
         .write_stdin("(my-> value step)")
         .assert()
         .failure()
@@ -63,9 +71,16 @@ fn cli_rejects_unthread_unrecognized_operator_without_explicit_confirmation() {
 #[test]
 fn cli_rejects_unthread_custom_operator_without_style() {
     let mut cmd = paredit();
-    cmd.args(["unthread-expression", "--path", "0", "--operator", "my->"])
-        .write_stdin("(my-> value step)")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("requires --style"));
+    cmd.args([
+        "refactor",
+        "unthread-expression",
+        "--path",
+        "0",
+        "--operator",
+        "my->",
+    ])
+    .write_stdin("(my-> value step)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("requires --style"));
 }

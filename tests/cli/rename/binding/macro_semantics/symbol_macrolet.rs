@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_symbol_macrolet_binding_rename_without_touching_expansion_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -28,6 +29,7 @@ fn cli_plans_symbol_macrolet_binding_rename_without_touching_expansion_reference
 fn cli_plans_emacs_lisp_cl_symbol_macrolet_binding_rename_without_touching_expansion_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "emacs-lisp",
@@ -54,6 +56,7 @@ fn cli_plans_emacs_lisp_cl_symbol_macrolet_binding_rename_without_touching_expan
 fn cli_plans_outer_binding_rename_through_symbol_macrolet_expansion_only() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -81,6 +84,7 @@ fn cli_plans_outer_binding_rename_through_symbol_macrolet_expansion_only() {
 fn cli_plans_emacs_lisp_outer_binding_rename_through_cl_symbol_macrolet_expansion_only() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "emacs-lisp",

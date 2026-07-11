@@ -9,7 +9,8 @@ fn cli_rejects_local_function_rename_without_matching_definition() {
     );
 
     let mut cmd = paredit();
-    cmd.arg("rename-local-function")
+    cmd.arg("refactor")
+        .arg("rename-local-function")
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -31,7 +32,7 @@ fn cli_rejects_local_function_rename_without_matching_definition() {
 #[test]
 fn cli_help_describes_rename_local_function_contract() {
     let mut cmd = paredit();
-    cmd.arg("rename-local-function")
+    cmd.arg("refactor").arg("rename-local-function")
         .arg("--help")
         .assert()
         .success()

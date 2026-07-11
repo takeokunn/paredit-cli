@@ -135,7 +135,7 @@ proptest! {
                 apply
                     .command
                     .as_deref()
-                    .is_some_and(|command| command.contains("paredit remove-unused-definitions --output json"))
+                    .is_some_and(|command| command.contains("paredit refactor remove-unused-definitions --output json"))
             );
         } else {
             prop_assert_eq!(apply.action, "review-remove-scope");

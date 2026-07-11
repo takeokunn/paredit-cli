@@ -4,6 +4,7 @@ use super::*;
 fn plans_common_lisp_dry_run_and_replaces_only_the_selection() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "extract-constant",
         "--dialect",
         "common-lisp",
@@ -27,6 +28,7 @@ fn plans_emacs_lisp_from_byte_offset() {
     let offset = input.find("40").unwrap();
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "extract-constant",
         "--dialect",
         "emacs-lisp",
@@ -48,6 +50,7 @@ fn plans_emacs_lisp_from_byte_offset() {
 fn inserts_before_a_top_level_anchor() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "extract-constant",
         "--dialect",
         "common-lisp",
@@ -76,6 +79,7 @@ fn writes_emacs_lisp_file() {
 
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "extract-constant",
         "--file",
         file.to_str().unwrap(),
@@ -104,6 +108,7 @@ fn rejects_quote_and_quasiquote_contexts() {
     ] {
         let mut cmd = paredit();
         cmd.args([
+            "refactor",
             "extract-constant",
             "--dialect",
             "common-lisp",
@@ -124,6 +129,7 @@ fn rejects_structurally_invalid_targets() {
     for (path, message) in [("0", "entire top-level form"), ("0.0", "definition head")] {
         let mut cmd = paredit();
         cmd.args([
+            "refactor",
             "extract-constant",
             "--dialect",
             "common-lisp",
@@ -144,6 +150,7 @@ fn rejects_invalid_cli_combinations_and_dialect() {
     let mut missing_anchor = paredit();
     missing_anchor
         .args([
+            "refactor",
             "extract-constant",
             "--dialect",
             "common-lisp",
@@ -162,6 +169,7 @@ fn rejects_invalid_cli_combinations_and_dialect() {
     let mut unsupported = paredit();
     unsupported
         .args([
+            "refactor",
             "extract-constant",
             "--dialect",
             "clojure",

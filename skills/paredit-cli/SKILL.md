@@ -21,78 +21,78 @@ version: 1.0.0
 
   Grouped entrypoints:
   - `paredit refactor ...` — plan, preview, verify, apply/diff flows for a rename or move.
-  - `paredit workspace ...` — directory-root discovery and inventory across many files.
+  - `paredit inspect workspace ...` — directory-root discovery and inventory across many files.
 </overview>
 
 <command_groups>
   <group name="inspect">
     <description>Read-only structural inspection; always safe, never writes.</description>
-    <command>paredit check --file f.lisp</command>
-    <command>paredit dialect --file f.lisp</command>
-    <command>paredit stats --file f.lisp</command>
-    <command>paredit agent-report --file f.lisp --output json</command>
-    <command>paredit outline --file f.lisp --output json</command>
-    <command>paredit form-report --file f.lisp --path 0 --include-source --output json</command>
-    <command>paredit select --file f.lisp --path 0.3</command>
-    <command>paredit workspace report --output json .</command>
+    <command>paredit inspect check --file f.lisp</command>
+    <command>paredit inspect dialect --file f.lisp</command>
+    <command>paredit inspect stats --file f.lisp</command>
+    <command>paredit inspect agent-report --file f.lisp --output json</command>
+    <command>paredit inspect outline --file f.lisp --output json</command>
+    <command>paredit inspect form --file f.lisp --path 0 --include-source --output json</command>
+    <command>paredit edit select --file f.lisp --path 0.3</command>
+    <command>paredit inspect workspace --output json .</command>
   </group>
 
   <group name="search_across_files">
     <description>Exact atom/call/definition inventories across explicit file lists; ignores comments and strings.</description>
-    <command>paredit find-symbol --file f.lisp --symbol old-name --output json</command>
-    <command>paredit symbol-report --symbol old-name --output json src/*.lisp elisp/*.el</command>
-    <command>paredit call-report --symbol old-name --output json src/*.lisp</command>
-    <command>paredit signature-report --symbol old-name --require-definitions 1 --require-calls 1 --output json src/*.lisp</command>
-    <command>paredit call-graph --symbol old-name --require-edges 1 --output json src/*.lisp</command>
-    <command>paredit impact-report --symbol old-name --fail-on-risk-level warning --output json src/*.lisp</command>
-    <command>paredit definition-report --output json src/*.lisp</command>
-    <command>paredit unused-definition-report --fail-on-unused --output json src/*.lisp</command>
-    <command>paredit dependency-report --output json system.asd src/*.lisp</command>
-    <command>paredit package-report --output json system.asd src/*.lisp</command>
-    <command>paredit duplicate-report --output json src/*.lisp</command>
+    <command>paredit inspect find-symbol --file f.lisp --symbol old-name --output json</command>
+    <command>paredit inspect symbols --symbol old-name --output json src/*.lisp elisp/*.el</command>
+    <command>paredit inspect calls --symbol old-name --output json src/*.lisp</command>
+    <command>paredit inspect signature --symbol old-name --require-definitions 1 --require-calls 1 --output json src/*.lisp</command>
+    <command>paredit inspect call-graph --symbol old-name --require-edges 1 --output json src/*.lisp</command>
+    <command>paredit inspect impact --symbol old-name --fail-on-risk-level warning --output json src/*.lisp</command>
+    <command>paredit inspect definitions --output json src/*.lisp</command>
+    <command>paredit inspect unused-definitions --fail-on-unused --output json src/*.lisp</command>
+    <command>paredit inspect dependencies --output json system.asd src/*.lisp</command>
+    <command>paredit inspect packages --output json system.asd src/*.lisp</command>
+    <command>paredit inspect duplicates --output json src/*.lisp</command>
   </group>
 
   <group name="rename">
     <description>Rename operations, narrowest scope first. Prefer the scope-aware command over the generic atom rename when the binding kind is known.</description>
-    <command>paredit rename-symbol --file f.lisp --from old --to new --plan --output json</command>
-    <command>paredit rename-in-form --file f.lisp --path 0.3 --from old --to new --output json</command>
-    <command>paredit rename-binding --file f.lisp --path 0.3 --from old --to new --output json</command>
-    <command>paredit rename-function --from old --to new --output json src/*.lisp elisp/*.el</command>
-    <command>paredit rename-local-function --from old --to new --output json src/*.lisp</command>
-    <command>paredit rename-macrolet --from old --to new --output json src/*.lisp</command>
-    <command>paredit rename-symbol-macro --from old --to new --output json src/*.lisp</command>
-    <command>paredit rename-package --from old.pkg --to new.pkg --output json system.asd src/*.lisp</command>
+    <command>paredit refactor rename-symbol --file f.lisp --from old --to new --plan --output json</command>
+    <command>paredit refactor rename-in-form --file f.lisp --path 0.3 --from old --to new --output json</command>
+    <command>paredit refactor rename-binding --file f.lisp --path 0.3 --from old --to new --output json</command>
+    <command>paredit refactor rename-function --from old --to new --output json src/*.lisp elisp/*.el</command>
+    <command>paredit refactor rename-local-function --from old --to new --output json src/*.lisp</command>
+    <command>paredit refactor rename-macrolet --from old --to new --output json src/*.lisp</command>
+    <command>paredit refactor rename-symbol-macro --from old --to new --output json src/*.lisp</command>
+    <command>paredit refactor rename-package --from old.pkg --to new.pkg --output json system.asd src/*.lisp</command>
     <command>paredit refactor plan --symbol old --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp</command>
     <command>paredit refactor workspace-plan --symbol old --output json .</command>
   </group>
 
   <group name="move_and_organize">
     <description>Relocate or reshape top-level structure across files.</description>
-    <command>paredit move-definition --from-file a.lisp --to-file b.lisp --path 2 --output json</command>
-    <command>paredit move-form --from-file a.lisp --to-file b.lisp --path 2 --insert before --anchor-path 1 --output json</command>
-    <command>paredit split-file --from-file a.lisp --to-file b.lisp --path 2 --path 5 --output json</command>
-    <command>paredit sort-definitions --file a.lisp --output json</command>
-    <command>paredit remove-definition --file a.lisp --path 2 --output json</command>
-    <command>paredit remove-unused-definitions --output json system.asd src/*.lisp</command>
-    <command>paredit replacement-plan --replacement '(run-case)' --output json src/*.lisp</command>
-    <command>paredit replace-forms --file a.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json</command>
+    <command>paredit refactor move-definition --from-file a.lisp --to-file b.lisp --path 2 --output json</command>
+    <command>paredit refactor move-form --from-file a.lisp --to-file b.lisp --path 2 --insert before --anchor-path 1 --output json</command>
+    <command>paredit refactor split-file --from-file a.lisp --to-file b.lisp --path 2 --path 5 --output json</command>
+    <command>paredit refactor sort-definitions --file a.lisp --output json</command>
+    <command>paredit refactor remove-definition --file a.lisp --path 2 --output json</command>
+    <command>paredit refactor remove-unused-definitions --output json system.asd src/*.lisp</command>
+    <command>paredit refactor replacement-plan --replacement '(run-case)' --output json src/*.lisp</command>
+    <command>paredit edit replace-forms --file a.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json</command>
   </group>
 
   <group name="function_shape">
     <description>Function-level refactors: signature changes propagate to explicit call sites.</description>
-    <command>paredit extract-function --file f.lisp --path 0.3 --name helper --param value --output json</command>
-    <command>paredit inline-function --file f.lisp --definition-path 0 --call-path 1.3 --output json</command>
-    <command>paredit add-function-parameter --file f.lisp --definition-path 0 --name ctx --argument '*ctx*' --all-calls --output json</command>
-    <command>paredit move-function-parameter --file f.lisp --definition-path 0 --name ctx --to-index 0 --all-calls --output json</command>
-    <command>paredit swap-function-parameters --file f.lisp --definition-path 0 --left-name a --right-name b --all-calls --output json</command>
-    <command>paredit reorder-function-parameters --file f.lisp --definition-path 0 --parameter b --parameter a --all-calls --output json</command>
-    <command>paredit remove-function-parameter --file f.lisp --definition-path 0 --name ctx --all-calls --output json</command>
-    <command>paredit thread-expression --file f.clj --path 0 --style last --output json</command>
-    <command>paredit unthread-expression --file f.clj --path 0 --output json</command>
-    <command>paredit introduce-let --file f.lisp --path 0.3.1 --name value --output json</command>
-    <command>paredit inline-let --file f.lisp --path 0.3.1 --output json</command>
-    <command>paredit let-report --output json f.lisp</command>
-    <command>paredit let-report --output json src/*.lisp</command>
+    <command>paredit refactor extract-function --file f.lisp --path 0.3 --name helper --param value --output json</command>
+    <command>paredit refactor inline-function --file f.lisp --definition-path 0 --call-path 1.3 --output json</command>
+    <command>paredit refactor add-function-parameter --file f.lisp --definition-path 0 --name ctx --argument '*ctx*' --all-calls --output json</command>
+    <command>paredit refactor move-function-parameter --file f.lisp --definition-path 0 --name ctx --to-index 0 --all-calls --output json</command>
+    <command>paredit refactor swap-function-parameters --file f.lisp --definition-path 0 --left-name a --right-name b --all-calls --output json</command>
+    <command>paredit refactor reorder-function-parameters --file f.lisp --definition-path 0 --parameter b --parameter a --all-calls --output json</command>
+    <command>paredit refactor remove-function-parameter --file f.lisp --definition-path 0 --name ctx --all-calls --output json</command>
+    <command>paredit refactor thread-expression --file f.clj --path 0 --style last --output json</command>
+    <command>paredit refactor unthread-expression --file f.clj --path 0 --output json</command>
+    <command>paredit refactor introduce-let --file f.lisp --path 0.3.1 --name value --output json</command>
+    <command>paredit refactor inline-let --file f.lisp --path 0.3.1 --output json</command>
+    <command>paredit inspect lets --output json f.lisp</command>
+    <command>paredit inspect lets --output json src/*.lisp</command>
   </group>
 
   <group name="structural_primitives">
@@ -100,18 +100,18 @@ version: 1.0.0
       Low-level paredit-style structural edits on one selected form (--path or --at).
       None of these accept --write: each prints the whole rewritten document to stdout.
       Review the output, then redirect into the file, for example
-      `paredit wrap --file f.lisp --path 0.3 > /tmp/out && mv /tmp/out f.lisp`.
+      `paredit edit wrap --file f.lisp --path 0.3 > /tmp/out && mv /tmp/out f.lisp`.
     </description>
-    <command>paredit format --file f.lisp</command>
-    <command>paredit replace --file f.lisp --path 0.3 --with '(new-form)'</command>
-    <command>paredit kill --file f.lisp --path 0.3</command>
-    <command>paredit wrap --file f.lisp --path 0.3</command>
-    <command>paredit splice --file f.lisp --path 0.3</command>
-    <command>paredit raise --file f.lisp --path 0.3</command>
-    <command>paredit slurp-forward --file f.lisp --path 0.3</command>
-    <command>paredit slurp-backward --file f.lisp --path 0.3</command>
-    <command>paredit barf-forward --file f.lisp --path 0.3</command>
-    <command>paredit barf-backward --file f.lisp --path 0.3</command>
+    <command>paredit edit format --file f.lisp</command>
+    <command>paredit edit replace --file f.lisp --path 0.3 --with '(new-form)'</command>
+    <command>paredit edit kill --file f.lisp --path 0.3</command>
+    <command>paredit edit wrap --file f.lisp --path 0.3</command>
+    <command>paredit edit splice --file f.lisp --path 0.3</command>
+    <command>paredit edit raise --file f.lisp --path 0.3</command>
+    <command>paredit edit slurp-forward --file f.lisp --path 0.3</command>
+    <command>paredit edit slurp-backward --file f.lisp --path 0.3</command>
+    <command>paredit edit barf-forward --file f.lisp --path 0.3</command>
+    <command>paredit edit barf-backward --file f.lisp --path 0.3</command>
   </group>
 </command_groups>
 
@@ -141,7 +141,7 @@ paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$H
   <pattern name="whole_directory_rename">
     <description>Discover sources under one or more roots instead of enumerating files explicitly.</description>
     <example>
-paredit workspace report --output json .
+paredit inspect workspace --output json .
 paredit refactor workspace-plan --symbol old-name --fail-on-blocking-gate --output json .
 paredit refactor workspace-preview --from old-name --to new-name --fail-on-no-change --output json .
 paredit refactor workspace-execute --from old-name --to new-name --write --output json .
@@ -151,9 +151,9 @@ paredit refactor workspace-execute --from old-name --to new-name --write --outpu
   <pattern name="safe_removal">
     <description>Only remove definitions after confirming they have no external references.</description>
     <example>
-paredit unused-definition-report --fail-on-unused --output json system.asd src/*.lisp
-paredit remove-unused-definitions --output json system.asd src/*.lisp
-paredit remove-unused-definitions --write system.asd src/*.lisp
+paredit inspect unused-definitions --fail-on-unused --output json system.asd src/*.lisp
+paredit refactor remove-unused-definitions --output json system.asd src/*.lisp
+paredit refactor remove-unused-definitions --write system.asd src/*.lisp
     </example>
   </pattern>
 </patterns>
@@ -199,7 +199,7 @@ paredit remove-unused-definitions --write system.asd src/*.lisp
 
 <rules priority="critical">
   <rule>Never hand-edit balanced delimiters; every structural change goes through a paredit subcommand</rule>
-  <rule>Always validate with `paredit check` before and after a batch of edits</rule>
+  <rule>Always validate with `paredit inspect check` before and after a batch of edits</rule>
   <rule>Never pass --write until a no-write preview/plan has been reviewed</rule>
 </rules>
 
@@ -212,7 +212,7 @@ paredit remove-unused-definitions --write system.asd src/*.lisp
 <workflow>
   <phase name="inspect">
     <objective>Establish ground truth about the current file or workspace before changing anything</objective>
-    <step order="1">Run `paredit check` on every target file</step>
+    <step order="1">Run `paredit inspect check` on every target file</step>
     <step order="2">Run outline/form-report or workspace report to get paths and spans</step>
     <step order="3">Run the relevant *-report command (symbol, call, signature, impact, unused-definition) to see the full blast radius</step>
   </phase>
@@ -225,7 +225,7 @@ paredit remove-unused-definitions --write system.asd src/*.lisp
   <phase name="apply_and_verify">
     <objective>Write the change and confirm nothing else broke</objective>
     <step order="1">Re-run the same command with --write (or refactor apply with the previewed manifest hash)</step>
-    <step order="2">Run `paredit check` again on every touched file</step>
+    <step order="2">Run `paredit inspect check` again on every touched file</step>
     <step order="3">Run `paredit refactor verify --phase post` (or the equivalent report command) to confirm the rename/move is complete and consistent</step>
   </phase>
 </workflow>
@@ -235,12 +235,12 @@ paredit remove-unused-definitions --write system.asd src/*.lisp
     <example severity="low">A report command returns zero matches for a symbol expected to exist — check the dialect/extension and file list first</example>
     <example severity="medium">Preview shows more or fewer edits than expected — narrow the command (specific rename-* variant) or the file list before writing</example>
     <example severity="high">--fail-on-blocking-gate or --fail-on-target-conflict trips — stop and inspect the JSON gate reason instead of forcing --write</example>
-    <example severity="critical">`paredit check` fails after a --write — the file is unbalanced; do not run further paredit commands against it until a human confirms recovery</example>
+    <example severity="critical">`paredit inspect check` fails after a --write — the file is unbalanced; do not run further paredit commands against it until a human confirms recovery</example>
   </examples>
 </error_escalation>
 
 <constraints>
-  <must>Run `paredit check --file &lt;f&gt;` before and after any batch of structural edits to that file</must>
+  <must>Run `paredit inspect check --file &lt;f&gt;` before and after any batch of structural edits to that file</must>
   <must>Preview (no --write) before ever passing --write</must>
   <must>Use the scope-aware rename-* command when the binding kind (function, local function, macrolet, symbol-macro, package) is known</must>
   <avoid>Hand-editing parentheses, brackets, or quoting to "fix" a refactor</avoid>

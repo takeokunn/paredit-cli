@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_scoped_rename_inside_selected_form() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-in-form",
         "--path",
         "0.3",
@@ -37,7 +38,8 @@ fn cli_writes_scoped_rename_without_touching_other_forms() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-in-form")
+    cmd.arg("refactor")
+        .arg("rename-in-form")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -61,6 +63,7 @@ fn cli_writes_scoped_rename_without_touching_other_forms() {
 fn cli_rejects_rename_in_form_write_without_file() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-in-form",
         "--path",
         "0.3",

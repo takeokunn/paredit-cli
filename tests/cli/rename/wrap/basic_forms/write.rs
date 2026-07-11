@@ -11,6 +11,7 @@ fn cli_writes_wrap_function_calls_and_skips_already_wrapped() {
     .expect("write lisp fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
@@ -48,6 +49,7 @@ fn cli_wrap_function_calls_accepts_wrapper_template() {
     fs::write(&lisp_file, source).expect("write lisp fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
@@ -93,7 +95,8 @@ fn cli_wrap_function_calls_can_target_call_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -126,6 +129,7 @@ fn cli_wrap_function_calls_skips_nested_all_call_rewrites() {
     .expect("write lisp fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")

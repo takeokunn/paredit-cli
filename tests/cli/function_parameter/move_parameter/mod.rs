@@ -2,7 +2,7 @@ pub(super) use super::*;
 
 fn move_command() -> Command {
     let mut cmd = paredit();
-    cmd.arg("move-function-parameter");
+    cmd.arg("refactor").arg("move-function-parameter");
     cmd
 }
 

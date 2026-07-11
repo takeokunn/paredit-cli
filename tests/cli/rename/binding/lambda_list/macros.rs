@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_defmacro_environment_parameter_rename_without_touching_body() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -29,8 +30,7 @@ fn cli_plans_defmacro_environment_parameter_rename_without_touching_body() {
 #[test]
 fn cli_plans_defmacro_whole_and_environment_parameter_rename_without_touching_body() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -57,8 +57,7 @@ fn cli_plans_defmacro_whole_and_environment_parameter_rename_without_touching_bo
 #[test]
 fn cli_plans_defmacro_aux_parameter_rename_without_touching_aux_initializer() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -84,6 +83,7 @@ fn cli_plans_defmacro_aux_parameter_rename_without_touching_aux_initializer() {
 fn cli_plans_defmacro_optional_parameter_rename_without_touching_default_form() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -109,8 +109,7 @@ fn cli_plans_defmacro_optional_parameter_rename_without_touching_default_form() 
 #[test]
 fn cli_plans_define_setf_expander_environment_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",
@@ -137,8 +136,7 @@ fn cli_plans_define_setf_expander_environment_parameter_rename() {
 #[test]
 fn cli_plans_define_compiler_macro_environment_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",

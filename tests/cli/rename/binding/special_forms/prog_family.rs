@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_prog_star_binding_rename_across_later_inits_and_body() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -28,6 +29,7 @@ fn cli_plans_prog_star_binding_rename_across_later_inits_and_body() {
 fn cli_plans_outer_binding_rename_without_touching_prog_scope() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",

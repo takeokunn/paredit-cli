@@ -4,6 +4,7 @@ use super::*;
 fn cli_requires_file_for_remove_unused_binding_writes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -27,7 +28,8 @@ fn cli_requires_drop_value_permission_for_remove_unused_binding_writes() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-binding")
+    cmd.arg("refactor")
+        .arg("remove-unused-binding")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -43,19 +45,27 @@ fn cli_requires_drop_value_permission_for_remove_unused_binding_writes() {
 #[test]
 fn cli_rejects_remove_unused_binding_with_references() {
     let mut cmd = paredit();
-    cmd.args(["remove-unused-binding", "--path", "0", "--name", "x"])
-        .write_stdin("(let ((x 1)) (+ x 2))")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "remove-unused-binding requires zero in-scope references",
-        ));
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "x",
+    ])
+    .write_stdin("(let ((x 1)) (+ x 2))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding requires zero in-scope references",
+    ));
 }
 
 #[test]
 fn cli_rejects_remove_unused_binding_name_with_all_bindings() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -74,11 +84,17 @@ fn cli_rejects_remove_unused_binding_name_with_all_bindings() {
 #[test]
 fn cli_rejects_remove_all_unused_bindings_when_none_unused() {
     let mut cmd = paredit();
-    cmd.args(["remove-unused-binding", "--path", "0", "--all-bindings"])
-        .write_stdin("(let ((x 1)) x)")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "remove-unused-binding --all-bindings found no unused bindings",
-        ));
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--all-bindings",
+    ])
+    .write_stdin("(let ((x 1)) x)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding --all-bindings found no unused bindings",
+    ));
 }

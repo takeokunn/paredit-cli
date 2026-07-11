@@ -13,7 +13,8 @@ fn cli_reports_call_graph_across_dialects() {
     fs::write(&elisp_file, "(defun draw () (area 5 6))\n").expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("call-graph")
+    cmd.arg("inspect")
+        .arg("call-graph")
         .arg(&lisp_file)
         .arg(&elisp_file)
         .assert()
@@ -32,6 +33,7 @@ fn cli_reports_call_graph_across_dialects() {
 
     let mut filtered = paredit();
     filtered
+        .arg("inspect")
         .arg("call-graph")
         .arg("--symbol")
         .arg("render")
@@ -55,7 +57,8 @@ fn cli_skips_common_lisp_defmethod_specialized_lambda_list_edges() {
     );
 
     let mut cmd = paredit();
-    cmd.arg("call-graph")
+    cmd.arg("inspect")
+        .arg("call-graph")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)
@@ -75,7 +78,8 @@ fn cli_reports_common_lisp_symbol_macrolet_expansion_and_body_edges_without_bind
     );
 
     let mut cmd = paredit();
-    cmd.arg("call-graph")
+    cmd.arg("inspect")
+        .arg("call-graph")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)
@@ -96,7 +100,8 @@ fn cli_reports_common_lisp_setf_callable_edges() {
     );
 
     let mut cmd = paredit();
-    cmd.arg("call-graph")
+    cmd.arg("inspect")
+        .arg("call-graph")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)

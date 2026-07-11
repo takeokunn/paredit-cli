@@ -19,6 +19,7 @@ fn assert_cli_rename_binding_property(
 
     let output = paredit()
         .args([
+            "refactor",
             "rename-binding",
             "--file",
             lisp_file.to_str().expect("utf-8 fixture path"),
@@ -81,7 +82,8 @@ fn cli_writes_binding_rename_without_touching_shadowed_scope() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("rename-binding")
+    cmd.arg("refactor")
+        .arg("rename-binding")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -105,6 +107,7 @@ fn cli_writes_binding_rename_without_touching_shadowed_scope() {
 fn cli_rejects_rename_binding_write_without_file() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0.3",
@@ -124,6 +127,7 @@ fn cli_rejects_rename_binding_write_without_file() {
 fn cli_rejects_missing_binding_rename_target() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",

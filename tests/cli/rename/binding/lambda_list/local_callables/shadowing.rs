@@ -4,6 +4,7 @@ use super::super::*;
 fn cli_plans_outer_binding_rename_without_touching_local_callable_lambda_shadow() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",

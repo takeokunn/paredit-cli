@@ -9,6 +9,78 @@ use super::{
 };
 use clap::Subcommand;
 
+/// Read-only inventory and analysis commands.
+#[derive(Debug, Subcommand)]
+pub(super) enum InspectCommand {
+    /// Validate that input is a balanced S-expression document.
+    Check(InputArgs),
+    /// Detect Lisp dialect from --file extension or explicit --dialect.
+    Dialect(AnalyzeArgs),
+    /// Print parse, dialect, and structural metrics for agent planning.
+    Stats(AnalyzeArgs),
+    /// Print a complete JSON report for AI coding agent refactor planning.
+    AgentReport(AnalyzeArgs),
+    /// Print top-level forms with paths, spans, and definition hints.
+    Outline(AnalyzeArgs),
+    /// Report one selected form with local structure for agent refactor planning.
+    Form(form_report::args::FormReportArgs),
+    /// Find exact atom occurrences without touching strings or comments.
+    FindSymbol(symbol_report::args::SymbolQueryArgs),
+    /// Report exact atom occurrences across explicit files for rename planning.
+    Symbols(symbol_report::args::SymbolReportArgs),
+    /// Report list-head call sites across explicit files for arity refactor planning.
+    Calls(call_report::args::CallReportArgs),
+    /// Compare callable definitions and call-site arity across explicit files.
+    Signature(signature_report::args::SignatureReportArgs),
+    /// Report internal and optional external call graph edges across explicit files.
+    CallGraph(call_graph_report::args::CallGraphArgs),
+    /// Report refactoring impact risks for one symbol across explicit files.
+    Impact(impact_report::args::ImpactReportArgs),
+    /// Discover Lisp sources under roots and report parse/refactor inventory.
+    Workspace(workspace_report::args::WorkspaceReportArgs),
+    /// Report package, system, load, and qualified-symbol dependencies across explicit files.
+    Dependencies(dependency_report::args::DependencyReportArgs),
+    /// Report Common Lisp package declarations across explicit files.
+    Packages(package::types::PackageReportArgs),
+    /// Report definition-like top-level forms across explicit files.
+    Definitions(definition_report::args::DefinitionReportArgs),
+    /// Report definition-like top-level forms with no external exact atom references.
+    UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
+    /// Report repeated structural S-expression shapes across explicit files.
+    Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Report structurally similar S-expression forms across explicit files.
+    Similarity(similarity_report::args::SimilarityReportArgs),
+    /// Report local let bindings and inline safety for agent refactor planning.
+    Lets(let_report::LetReportArgs),
+}
+
+/// Single-document structural editing commands. These print rewritten source to stdout.
+#[derive(Debug, Subcommand)]
+pub(super) enum EditCommand {
+    /// Print a canonical, indentation-based rendering.
+    Format(FormatArgs),
+    /// Print the S-expression selected by --path or --at.
+    Select(TargetArgs),
+    /// Replace the selected S-expression with replacement text.
+    Replace(ReplaceArgs),
+    /// Remove the selected S-expression.
+    Kill(TargetArgs),
+    /// Wrap the selected S-expression in a new list.
+    Wrap(TargetArgs),
+    /// Remove one list pair while keeping its children.
+    Splice(TargetArgs),
+    /// Replace the selected expression's parent list with the selected expression.
+    Raise(TargetArgs),
+    /// Pull the next sibling into the selected list.
+    SlurpForward(TargetArgs),
+    /// Pull the previous sibling into the selected list.
+    SlurpBackward(TargetArgs),
+    /// Push the last child out of the selected list.
+    BarfForward(TargetArgs),
+    /// Push the first child out of the selected list.
+    BarfBackward(TargetArgs),
+}
+
 #[derive(Debug, Subcommand)]
 #[command(
     after_help = "Examples:\n  paredit refactor plan --symbol old-name src/foo.lisp src/bar.lisp\n  paredit refactor preview --from old-name --to new-name src/foo.lisp src/bar.lisp\n  paredit refactor verify --symbol old-name --new-symbol new-name --phase post src/foo.lisp src/bar.lisp"
@@ -34,61 +106,6 @@ pub(super) enum RefactorCommand {
     WorkspacePreview(refactor::args::WorkspaceRefactorPreviewArgs),
     /// Execute a workspace refactor with preview gates and post-write verification.
     WorkspaceExecute(refactor::args::WorkspaceRefactorExecuteArgs),
-}
-
-#[derive(Debug, Subcommand)]
-#[command(
-    after_help = "Examples:\n  paredit workspace report .\n  paredit refactor workspace-plan --symbol old-name .\n  paredit refactor workspace-execute --from old-name --to new-name --write ."
-)]
-pub(super) enum WorkspaceCommand {
-    /// Discover Lisp sources under roots and report parse/refactor inventory.
-    Report(workspace_report::args::WorkspaceReportArgs),
-}
-
-#[derive(Debug, Subcommand)]
-pub(super) enum Command {
-    /// Validate that input is a balanced S-expression document.
-    Check(InputArgs),
-    /// Detect Lisp dialect from --file extension or explicit --dialect.
-    Dialect(AnalyzeArgs),
-    /// Print parse, dialect, and structural metrics for agent planning.
-    Stats(AnalyzeArgs),
-    /// Print a complete JSON report for AI coding agent refactor planning.
-    AgentReport(AnalyzeArgs),
-    /// Print top-level forms with paths, spans, and definition hints.
-    Outline(AnalyzeArgs),
-    /// Report one selected form with local structure for agent refactor planning.
-    FormReport(form_report::args::FormReportArgs),
-    /// Find exact atom occurrences without touching strings or comments.
-    FindSymbol(symbol_report::args::SymbolQueryArgs),
-    /// Report exact atom occurrences across explicit files for rename planning.
-    SymbolReport(symbol_report::args::SymbolReportArgs),
-    /// Report list-head call sites across explicit files for arity refactor planning.
-    CallReport(call_report::args::CallReportArgs),
-    /// Compare callable definitions and call-site arity across explicit files.
-    SignatureReport(signature_report::args::SignatureReportArgs),
-    /// Report internal and optional external call graph edges across explicit files.
-    CallGraph(call_graph_report::args::CallGraphArgs),
-    /// Report refactoring impact risks for one symbol across explicit files.
-    ImpactReport(impact_report::args::ImpactReportArgs),
-    /// Public namespace for refactor planning, preview, verification, and apply flows.
-    Refactor {
-        #[command(subcommand)]
-        command: RefactorCommand,
-    },
-    /// Public namespace for workspace inventory and workspace refactor flows.
-    Workspace {
-        #[command(subcommand)]
-        command: WorkspaceCommand,
-    },
-    /// Report package, system, load, and qualified-symbol dependencies across explicit files.
-    DependencyReport(dependency_report::args::DependencyReportArgs),
-    /// Report Common Lisp package declarations across explicit files.
-    PackageReport(package::types::PackageReportArgs),
-    /// Report definition-like top-level forms across explicit files.
-    DefinitionReport(definition_report::args::DefinitionReportArgs),
-    /// Report definition-like top-level forms with no external exact atom references.
-    UnusedDefinitionReport(definition_report::args::UnusedDefinitionReportArgs),
     /// Plan or remove a top-level definition from one file.
     RemoveDefinition(definition_removal::args::RemoveDefinitionArgs),
     /// Plan or remove unused top-level definitions across explicit files.
@@ -101,10 +118,6 @@ pub(super) enum Command {
     SortDefinitions(definition_movement::args::SortDefinitionsArgs),
     /// Plan or move any top-level form between files.
     MoveForm(definition_movement::args::MoveFormArgs),
-    /// Report repeated structural S-expression shapes across explicit files.
-    DuplicateReport(duplicate_report::args::DuplicateReportArgs),
-    /// Report structurally similar S-expression forms across explicit files.
-    SimilarityReport(similarity_report::args::SimilarityReportArgs),
     /// Convert duplicate groups into reviewed replace-forms batches.
     ReplacementPlan(duplicate_report::args::ReplacementPlanArgs),
     /// Plan or replace multiple reviewed forms in one file.
@@ -127,18 +140,13 @@ pub(super) enum Command {
     RenameBinding(rename::args::RenameBindingArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(rename::args::RenameSymbolsArgs),
-    /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files,
-    /// including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names,
-    /// and definition forms such as define-method-combination.
+    /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files, including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names, and definition forms such as define-method-combination.
     RenameFunction(rename::args::RenameFunctionArgs),
-    /// Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename across explicit files,
-    /// while keeping expander bodies out of scope.
+    /// Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename across explicit files while keeping expander bodies out of scope.
     RenameMacrolet(rename::args::RenameMacroletArgs),
-    /// Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename across explicit files,
-    /// while keeping expansion and lexical shadowing boundaries separate.
+    /// Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename across explicit files while keeping expansion and lexical shadowing boundaries separate.
     RenameSymbolMacro(rename::args::RenameSymbolMacroArgs),
-    /// Plan or apply a Common Lisp flet/labels local function binding and call-site rename across explicit files,
-    /// preserving the difference between non-recursive flet bodies and recursive labels bodies.
+    /// Plan or apply a Common Lisp flet/labels local function binding and call-site rename across explicit files, preserving the difference between non-recursive flet bodies and recursive labels bodies.
     RenameLocalFunction(rename::args::RenameLocalFunctionArgs),
     /// Plan or replace callable call-site heads across explicit files.
     ReplaceFunctionCalls(rename::args::ReplaceFunctionCallsArgs),
@@ -174,28 +182,23 @@ pub(super) enum Command {
     InlineLet(inline_let::InlineLetArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
-    /// Report local let bindings and inline safety for agent refactor planning.
-    LetReport(let_report::LetReportArgs),
-    /// Print a canonical, indentation-based rendering.
-    Format(FormatArgs),
-    /// Print the S-expression selected by --path or --at.
-    Select(TargetArgs),
-    /// Replace the selected S-expression with replacement text.
-    Replace(ReplaceArgs),
-    /// Remove the selected S-expression.
-    Kill(TargetArgs),
-    /// Wrap the selected S-expression in a new list.
-    Wrap(TargetArgs),
-    /// Remove one list pair while keeping its children.
-    Splice(TargetArgs),
-    /// Replace the selected expression's parent list with the selected expression.
-    Raise(TargetArgs),
-    /// Pull the next sibling into the selected list.
-    SlurpForward(TargetArgs),
-    /// Pull the previous sibling into the selected list.
-    SlurpBackward(TargetArgs),
-    /// Push the last child out of the selected list.
-    BarfForward(TargetArgs),
-    /// Push the first child out of the selected list.
-    BarfBackward(TargetArgs),
+}
+
+#[derive(Debug, Subcommand)]
+pub(super) enum Command {
+    /// Read-only inventory, validation, and analysis.
+    Inspect {
+        #[command(subcommand)]
+        command: InspectCommand,
+    },
+    /// Structural edits on one selected form. Rewritten source is printed to stdout.
+    Edit {
+        #[command(subcommand)]
+        command: EditCommand,
+    },
+    /// Semantic refactors, including planning, previews, verification, and apply flows.
+    Refactor {
+        #[command(subcommand)]
+        command: RefactorCommand,
+    },
 }

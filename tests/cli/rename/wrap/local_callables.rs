@@ -11,7 +11,8 @@ fn cli_rejects_wrap_function_calls_for_shadowed_labels_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -37,7 +38,8 @@ fn cli_rejects_wrap_function_calls_for_shadowed_cl_user_flet_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -63,7 +65,8 @@ fn cli_writes_wrap_function_calls_inside_cl_user_flet_binding_bodies_only() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -95,7 +98,8 @@ fn cli_writes_wrap_function_calls_skipping_labels_local_calls() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_remove_unused_binding_without_writing() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0.3",
@@ -29,6 +30,7 @@ fn cli_plans_remove_unused_binding_without_writing() {
 fn cli_plans_remove_unused_binding_alongside_a_bare_symbol_sibling_binding() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0.3",
@@ -51,6 +53,7 @@ fn cli_plans_remove_unused_binding_alongside_a_bare_symbol_sibling_binding() {
 fn cli_plans_remove_all_unused_bindings_without_writing() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0.3",
@@ -74,6 +77,7 @@ fn cli_plans_remove_all_unused_bindings_without_writing() {
 fn cli_plans_remove_all_unused_bindings_with_multiple_body_expressions() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -100,6 +104,7 @@ fn cli_plans_remove_all_unused_bindings_with_multiple_body_expressions() {
 fn cli_plans_remove_unused_binding_for_clojure_vector_binding() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--dialect",
         "clojure",

@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_common_lisp_destructuring_bind_rename_without_touching_value_form() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -29,8 +30,7 @@ fn cli_plans_common_lisp_destructuring_bind_rename_without_touching_value_form()
 #[test]
 fn cli_plans_common_lisp_multiple_value_bind_rename_without_shadow_capture() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -59,6 +59,7 @@ fn cli_plans_common_lisp_multiple_value_bind_rename_without_shadow_capture() {
 fn cli_plans_common_lisp_flet_destructured_lambda_list_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -84,8 +85,7 @@ fn cli_plans_common_lisp_flet_destructured_lambda_list_parameter_rename() {
 #[test]
 fn cli_plans_common_lisp_handler_case_clause_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -110,8 +110,7 @@ fn cli_plans_common_lisp_handler_case_clause_parameter_rename() {
 #[test]
 fn cli_plans_common_lisp_restart_case_clause_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",

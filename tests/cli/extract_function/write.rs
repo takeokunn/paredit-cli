@@ -7,7 +7,8 @@ fn cli_writes_extract_function_for_emacs_lisp_file() {
     fs::write(&elisp_file, "(defun render () (+ 1 2))\n").expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("extract-function")
+    cmd.arg("refactor")
+        .arg("extract-function")
         .arg("--file")
         .arg(&elisp_file)
         .arg("--path")
@@ -37,7 +38,8 @@ fn cli_writes_parameterized_extract_function_before_anchor() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("extract-function")
+    cmd.arg("refactor")
+        .arg("extract-function")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -78,7 +80,8 @@ fn cli_writes_extract_function_for_common_lisp_macrolet_body() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("extract-function")
+    cmd.arg("refactor")
+        .arg("extract-function")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -108,7 +111,8 @@ fn cli_writes_extract_function_for_common_lisp_symbol_macrolet_body() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("extract-function")
+    cmd.arg("refactor")
+        .arg("extract-function")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")

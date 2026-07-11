@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_thread_first_expression_without_writing() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "thread-expression",
         "--path",
         "0",
@@ -29,7 +30,8 @@ fn cli_writes_thread_last_expression_for_clojure_file() {
     fs::write(&clj_file, "(sum (map score users))\n").expect("write clojure fixture");
 
     let mut cmd = paredit();
-    cmd.arg("thread-expression")
+    cmd.arg("refactor")
+        .arg("thread-expression")
         .arg("--file")
         .arg(&clj_file)
         .arg("--path")
@@ -55,6 +57,7 @@ fn cli_writes_thread_last_expression_for_clojure_file() {
 fn cli_rejects_thread_expression_write_without_file() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "thread-expression",
         "--path",
         "0",
@@ -71,17 +74,25 @@ fn cli_rejects_thread_expression_write_without_file() {
 #[test]
 fn cli_rejects_already_threaded_expression() {
     let mut cmd = paredit();
-    cmd.args(["thread-expression", "--path", "0", "--style", "first"])
-        .write_stdin("(-> x f)")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("already threaded"));
+    cmd.args([
+        "refactor",
+        "thread-expression",
+        "--path",
+        "0",
+        "--style",
+        "first",
+    ])
+    .write_stdin("(-> x f)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("already threaded"));
 }
 
 #[test]
 fn cli_rejects_package_qualified_already_threaded_expression() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "thread-expression",
         "--dialect",
         "common-lisp",
