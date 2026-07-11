@@ -73,6 +73,82 @@ fn cli_writes_definition_move_between_files() {
 }
 
 #[test]
+fn cli_writes_definition_move_into_new_file_with_in_package_header() {
+    let dir = fresh_temp_dir("move-definition-new-file-package");
+    let from_file = dir.join("core.lisp");
+    let to_file = dir.join("render.lisp");
+    fs::write(
+        &from_file,
+        "(in-package #:demo)\n(defun keep () :ok)\n(defun render-pane () :render)\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("move-definition")
+        .arg("--from-file")
+        .arg(&from_file)
+        .arg("--to-file")
+        .arg(&to_file)
+        .arg("--path")
+        .arg("2")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"to_file_existed\": false"))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    let destination = fs::read_to_string(&to_file).expect("read new destination file");
+    assert!(
+        destination.contains("(in-package #:demo)"),
+        "new destination file must declare the source package, got: {destination}"
+    );
+    assert!(destination.contains("(defun render-pane () :render)"));
+    let package_index = destination
+        .find("(in-package #:demo)")
+        .expect("in-package present");
+    let definition_index = destination
+        .find("(defun render-pane () :render)")
+        .expect("definition present");
+    assert!(
+        package_index < definition_index,
+        "in-package must precede the moved definition"
+    );
+}
+
+#[test]
+fn cli_writes_definition_move_between_files_with_matching_package_without_duplicating_in_package() {
+    let dir = fresh_temp_dir("move-definition-matching-package");
+    let from_file = dir.join("core.lisp");
+    let to_file = dir.join("render.lisp");
+    fs::write(
+        &from_file,
+        "(in-package #:demo)\n(defun keep () :ok)\n(defun render-pane () :render)\n",
+    )
+    .expect("write source fixture");
+    fs::write(&to_file, "(in-package #:demo)\n(defun boot () :boot)\n")
+        .expect("write destination fixture with the same package");
+
+    let mut cmd = paredit();
+    cmd.arg("move-definition")
+        .arg("--from-file")
+        .arg(&from_file)
+        .arg("--to-file")
+        .arg(&to_file)
+        .arg("--path")
+        .arg("2")
+        .arg("--write")
+        .assert()
+        .success();
+
+    let destination = fs::read_to_string(&to_file).expect("read rewritten destination");
+    assert_eq!(
+        destination.matches("in-package").count(),
+        1,
+        "must not duplicate an already-matching in-package header, got: {destination}"
+    );
+}
+
+#[test]
 fn cli_writes_symbol_macro_definition_move_between_files() {
     let dir = fresh_temp_dir("move-definition-symbol-macro-write");
     let from_file = dir.join("core.lisp");

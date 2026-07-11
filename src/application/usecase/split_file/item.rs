@@ -48,7 +48,7 @@ pub(super) fn build_split_file_item(
     })
 }
 
-fn package_context_before_top_level(
+pub(super) fn package_context_before_top_level(
     tree: &SyntaxTree,
     dialect: Dialect,
     target_index: usize,

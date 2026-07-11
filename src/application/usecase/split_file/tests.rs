@@ -54,6 +54,47 @@ fn plan_split_file_moves_selected_definitions_in_source_order() {
     assert!(!plan.written);
 }
 
+#[test]
+fn plan_split_file_injects_in_package_header_into_new_destination() {
+    let plan = plan_split_file(split_request(
+        "(in-package #:demo)\n\n(defun keep () :keep)\n\n(defun render () :render)\n\n(defmacro with-render () nil)\n",
+        "",
+    ))
+    .expect("split-file plan should be valid");
+
+    assert!(
+        plan.to_rewritten.contains("(in-package #:demo)"),
+        "new destination file must declare the source package, got: {}",
+        plan.to_rewritten
+    );
+    let package_index = plan
+        .to_rewritten
+        .find("(in-package #:demo)")
+        .expect("in-package present");
+    let first_definition_index = plan
+        .to_rewritten
+        .find("(defun keep () :keep)")
+        .expect("first moved definition present");
+    assert!(package_index < first_definition_index);
+    assert_eq!(plan.to_rewritten.matches("in-package").count(), 1);
+}
+
+#[test]
+fn plan_split_file_skips_in_package_header_when_destination_already_matches() {
+    let plan = plan_split_file(split_request(
+        "(in-package #:demo)\n\n(defun keep () :keep)\n\n(defun render () :render)\n\n(defmacro with-render () nil)\n",
+        "(in-package #:demo)\n\n(defun boot () :boot)\n",
+    ))
+    .expect("split-file plan should be valid");
+
+    assert_eq!(
+        plan.to_rewritten.matches("in-package").count(),
+        1,
+        "must not duplicate an already-matching in-package header, got: {}",
+        plan.to_rewritten
+    );
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(32))]
 

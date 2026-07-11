@@ -60,6 +60,7 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
     };
 
     let definition_text = selection.text(&from_input.text).to_owned();
+    let source_package = package_context_before_top_level(&from_tree, target_index)?;
     let definition = DefinitionReportItem {
         path: args.path.to_string(),
         span,
@@ -68,10 +69,18 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         category: shape.category,
         parameter_count: shape.lambda_parameter_count(&view),
         body_form_count: Some(shape.body_form_count(&view)),
-        package: package_context_before_top_level(&from_tree, target_index)?,
+        package: source_package.clone(),
     };
     let from_rewritten = Edit::kill(&from_input.text, &from_tree, selection)?;
-    let to_rewritten = append_top_level_form(&to_input.text, &definition_text);
+    let to_tree = SyntaxTree::parse(&to_input.text)?;
+    let dest_package = package_context_before_top_level(&to_tree, to_tree.root_children().len())?;
+    let appended = match &source_package {
+        Some(package) if dest_package.as_deref() != Some(package.as_str()) => {
+            format!("(in-package {package})\n\n{definition_text}")
+        }
+        _ => definition_text.clone(),
+    };
+    let to_rewritten = append_top_level_form(&to_input.text, &appended);
 
     SyntaxTree::parse(&from_rewritten).with_context(|| {
         format!(

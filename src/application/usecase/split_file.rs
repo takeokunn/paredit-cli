@@ -12,7 +12,7 @@ mod syntax;
 mod tests;
 mod types;
 
-use item::build_split_file_item;
+use item::{build_split_file_item, package_context_before_top_level};
 use rewrite::{
     append_top_level_definitions, ensure_non_overlapping_spans, expand_definition_removal,
     replace_byte_span,
@@ -27,7 +27,7 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
 
     let from_tree = SyntaxTree::parse(request.from_input)
         .with_context(|| format!("failed to parse {}", request.from_file.display()))?;
-    SyntaxTree::parse(request.to_input).with_context(|| {
+    let to_tree = SyntaxTree::parse(request.to_input).with_context(|| {
         format!(
             "destination file is not a valid S-expression document: {}",
             request.to_file.display()
@@ -122,9 +122,20 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
     items.sort_by_key(|item| item.span.start().get());
     ensure_non_overlapping_spans(items.iter().map(|item| item.span))?;
 
+    let mut running_package = package_context_before_top_level(
+        &to_tree,
+        request.to_dialect,
+        to_tree.root_children().len(),
+    )?;
     let definition_texts = items
         .iter()
-        .map(|item| item.definition_text.clone())
+        .map(|item| match &item.definition.package {
+            Some(package) if running_package.as_deref() != Some(package.as_str()) => {
+                running_package = Some(package.clone());
+                format!("(in-package {package})\n\n{}", item.definition_text)
+            }
+            _ => item.definition_text.clone(),
+        })
         .collect::<Vec<_>>();
     let mut from_rewritten = request.from_input.to_owned();
     for item in items.iter_mut().rev() {
