@@ -25,14 +25,11 @@ pub(super) fn collect_parallel_let_references(
     };
 
     for binding in &bindings {
-        collect_unshadowed_symbol_references_in_context(
-            dialect,
-            &binding.value,
-            symbol,
-            input,
-            output,
-            0,
-        );
+        if let Some(value) = &binding.value {
+            collect_unshadowed_symbol_references_in_context(
+                dialect, value, symbol, input, output, 0,
+            );
+        }
     }
 
     if bindings
@@ -60,14 +57,11 @@ pub(super) fn collect_sequential_let_references(
     };
 
     for binding in &bindings {
-        collect_unshadowed_symbol_references_in_context(
-            dialect,
-            &binding.value,
-            symbol,
-            input,
-            output,
-            0,
-        );
+        if let Some(value) = &binding.value {
+            collect_unshadowed_symbol_references_in_context(
+                dialect, value, symbol, input, output, 0,
+            );
+        }
         if binding_binds(binding, symbol) {
             return;
         }
