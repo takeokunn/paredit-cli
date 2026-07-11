@@ -14,6 +14,19 @@ with no external effect.
 
 ### Fixed
 
+- Scope-aware reference collection (used by `unused-definition-report`,
+  `remove-unused-definitions`, and every rename/refactor command built on
+  it) no longer treats a Common Lisp `FUNCTION` *type specifier*
+  (`(function (arg-types...) return-type)`, as in `(declaim (ftype
+  (function (my-word) my-word) f))`) the same as the unrelated
+  function-namespace accessor form `(function name)` (the explicit
+  spelling of `#'name`). Both share the head symbol `function`, but only
+  the accessor form names exactly one symbol; the type specifier's
+  contents are ordinary type-position atoms — most commonly a
+  `deftype`-defined alias used nowhere else — and were previously
+  invisible to reference scanning entirely, so a type alias used
+  correctly (only in `ftype`/`the`/`check-type` position) was reported as
+  unused and would have been deleted by `--write`.
 - `find-symbol`, `symbol-report`, `rename-symbol`, `refactor plan/preview`,
   `unused-definition-report`, and `remove-unused-definitions` now recognize
   a Common Lisp symbol referenced through a package qualifier
