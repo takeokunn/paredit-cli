@@ -45,7 +45,11 @@ pub fn plan_reorder_function_parameters(
         .collect::<Vec<_>>();
     let new_relative_order =
         build_new_relative_order(&old_parameter_order, &request.parameter_order)?;
-    ensure_reorder_stays_within_parameter_groups(&reorderable_parameters, &new_relative_order)?;
+    ensure_reorder_stays_within_parameter_groups(
+        &reorderable_parameters,
+        &new_relative_order,
+        "reorder-function-parameters",
+    )?;
     let call_paths = resolve_function_call_paths(FunctionCallPathRequest {
         tree: &tree,
         dialect: request.dialect,
@@ -61,6 +65,7 @@ pub fn plan_reorder_function_parameters(
     if !is_identity_order(&new_relative_order) {
         edits.push(reorder_function_definition_edit(
             request.input,
+            &tree,
             &target.parameter_container,
             &reorderable_parameters,
             &new_relative_order,
@@ -86,6 +91,7 @@ pub fn plan_reorder_function_parameters(
             target.call_argument_offset,
             &reorderable_parameters,
             &new_relative_order,
+            "reorder-function-parameters",
         )?;
         call_spans.push(call_span);
         reordered_arguments.push(reordered_argument);

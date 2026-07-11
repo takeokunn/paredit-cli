@@ -40,7 +40,7 @@ pub(in crate::application::usecase::function_parameter) fn remove_function_param
         );
     };
     let removed_argument = argument.span.slice(input).to_owned();
-    let edit = removal_edit_for_list_item(call.view, argument_item_index)?;
+    let edit = removal_edit_for_list_item(input, call.view, argument_item_index)?;
     Ok((call.view.span, Some(removed_argument), Some(edit)))
 }
 

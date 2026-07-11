@@ -45,6 +45,7 @@ pub(super) fn resolve_remove_parameter_metadata(
 
     Ok(RemoveParameterMetadata {
         definition_edit: removal_edit_for_list_item(
+            request.input,
             &target.parameter_container,
             parameter_item_index,
         )?,

@@ -52,7 +52,11 @@ pub fn plan_move_function_parameter(
     let moved = new_parameter_order.remove(from_index);
     new_parameter_order.insert(request.to_index, moved);
     let new_relative_order = build_new_relative_order(&old_parameter_order, &new_parameter_order)?;
-    ensure_reorder_stays_within_parameter_groups(&reorderable_parameters, &new_relative_order)?;
+    ensure_reorder_stays_within_parameter_groups(
+        &reorderable_parameters,
+        &new_relative_order,
+        "move-function-parameter",
+    )?;
     let call_paths = resolve_function_call_paths(FunctionCallPathRequest {
         tree: &tree,
         dialect: request.dialect,
@@ -68,6 +72,7 @@ pub fn plan_move_function_parameter(
     if from_index != request.to_index {
         edits.push(reorder_function_definition_edit(
             request.input,
+            &tree,
             &target.parameter_container,
             &reorderable_parameters,
             &new_relative_order,
@@ -101,6 +106,7 @@ pub fn plan_move_function_parameter(
             target.call_argument_offset,
             &reorderable_parameters,
             &new_relative_order,
+            "move-function-parameter",
         )?;
         call_spans.push(call_span);
         moved_arguments.push(moved_argument);

@@ -52,6 +52,7 @@ pub(super) fn insertion_edit_for_list_item(
 }
 
 pub(super) fn removal_edit_for_list_item(
+    input: &str,
     container: &ExpressionView,
     item_index: usize,
 ) -> Result<SpanEdit> {
@@ -78,13 +79,27 @@ pub(super) fn removal_edit_for_list_item(
         ByteSpan::new(previous.span.end(), item.span.end())
     } else if item_index == 0 {
         let next = &container.children[1];
-        ByteSpan::new(item.span.start(), next.span.start())
+        // Only consume up to the newline that ends this item's own line: the
+        // gap beyond that newline is the next item's leading trivia (for
+        // example a comment describing it), and removing the first item must
+        // not take that with it.
+        let end = first_newline_or(input, item.span.end().get(), next.span.start().get());
+        ByteSpan::new(item.span.start(), ByteOffset::new(end))
     } else {
         let previous = &container.children[item_index - 1];
         ByteSpan::new(previous.span.end(), item.span.end())
     };
 
     Ok((span, String::new()))
+}
+
+/// Returns the byte offset of the first newline in `input[start..end]`, or
+/// `end` if the gap has no newline (the two items share a line).
+fn first_newline_or(input: &str, start: usize, end: usize) -> usize {
+    input.as_bytes()[start..end]
+        .iter()
+        .position(|&byte| byte == b'\n')
+        .map_or(end, |offset| start + offset)
 }
 
 pub(super) fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {

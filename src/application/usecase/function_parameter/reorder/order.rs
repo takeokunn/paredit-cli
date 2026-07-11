@@ -9,11 +9,12 @@ use super::parameter::ReorderableParameter;
 pub(in crate::application::usecase::function_parameter) fn ensure_reorder_stays_within_parameter_groups(
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
+    command: &str,
 ) -> Result<()> {
     for (new_index, &old_index) in new_relative_order.iter().enumerate() {
         if parameters[new_index].group != parameters[old_index].group {
             anyhow::bail!(
-                "reorder-function-parameters cannot move '{}' across Common Lisp lambda-list sections",
+                "{command} cannot move '{}' across Common Lisp lambda-list sections",
                 parameters[old_index].name
             );
         }

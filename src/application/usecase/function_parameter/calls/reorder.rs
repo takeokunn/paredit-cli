@@ -16,13 +16,9 @@ pub(in crate::application::usecase::function_parameter) fn reorder_function_para
     call_argument_offset: usize,
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
+    command: &str,
 ) -> Result<ReorderArgumentEdit> {
-    let call = resolve_function_call_view(
-        view,
-        function_name,
-        call_argument_offset,
-        "reorder-function-parameters",
-    )?;
+    let call = resolve_function_call_view(view, function_name, call_argument_offset, command)?;
 
     let mut reordered_arguments = call.view.children[call.argument_offset + 1..]
         .iter()
@@ -35,6 +31,7 @@ pub(in crate::application::usecase::function_parameter) fn reorder_function_para
         parameters,
         new_relative_order,
         &mut reordered_arguments,
+        command,
     )?;
     reorder_keyword_arguments(
         call.view,
@@ -42,6 +39,7 @@ pub(in crate::application::usecase::function_parameter) fn reorder_function_para
         parameters,
         new_relative_order,
         &mut reordered_arguments,
+        command,
     )?;
 
     let old_arguments = call.view.children[call.argument_offset + 1..]
@@ -82,6 +80,7 @@ fn reorder_positional_arguments(
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
     reordered_arguments: &mut [String],
+    command: &str,
 ) -> Result<()> {
     let positional_parameters = parameters
         .iter()
@@ -95,7 +94,7 @@ fn reorder_positional_arguments(
     let argument_count = reordered_arguments.len();
     if argument_count < positional_argument_count {
         anyhow::bail!(
-            "reorder-function-parameters call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments",
+            "{command} call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments",
             function_name,
             view.span.start().get(),
             view.span.end().get(),
@@ -115,7 +114,7 @@ fn reorder_positional_arguments(
             .call_index
             .with_context(|| {
                 format!(
-                    "reorder-function-parameters metadata for '{}' at {}..{} is missing call_index for positional parameter '{}'",
+                    "{command} metadata for '{}' at {}..{} is missing call_index for positional parameter '{}'",
                     function_name,
                     view.span.start().get(),
                     view.span.end().get(),
@@ -134,6 +133,7 @@ fn reorder_keyword_arguments(
     parameters: &[ReorderableParameter],
     new_relative_order: &[usize],
     reordered_arguments: &mut Vec<String>,
+    command: &str,
 ) -> Result<()> {
     let keyword_parameters = parameters
         .iter()
@@ -147,7 +147,7 @@ fn reorder_keyword_arguments(
         .positional_prefix_count
         .with_context(|| {
             format!(
-                "reorder-function-parameters metadata for '{}' at {}..{} is missing positional_prefix_count for keyword parameter '{}'",
+                "{command} metadata for '{}' at {}..{} is missing positional_prefix_count for keyword parameter '{}'",
                 function_name,
                 view.span.start().get(),
                 view.span.end().get(),
@@ -156,7 +156,7 @@ fn reorder_keyword_arguments(
         })?;
     if reordered_arguments.len() < positional_prefix_count {
         anyhow::bail!(
-            "reorder-function-parameters call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments before keyword arguments",
+            "{command} call to '{}' at {}..{} has {} arguments but needs at least {} positional arguments before keyword arguments",
             function_name,
             view.span.start().get(),
             view.span.end().get(),
@@ -168,7 +168,7 @@ fn reorder_keyword_arguments(
     let keyword_items = reordered_arguments.split_off(positional_prefix_count);
     if keyword_items.len() % 2 != 0 {
         anyhow::bail!(
-            "reorder-function-parameters call to '{}' at {}..{} has an incomplete keyword argument list",
+            "{command} call to '{}' at {}..{} has an incomplete keyword argument list",
             function_name,
             view.span.start().get(),
             view.span.end().get()
@@ -189,7 +189,7 @@ fn reorder_keyword_arguments(
                 .is_some()
             {
                 anyhow::bail!(
-                    "reorder-function-parameters call to '{}' at {}..{} contains duplicate keyword argument {}",
+                    "{command} call to '{}' at {}..{} contains duplicate keyword argument {}",
                     function_name,
                     view.span.start().get(),
                     view.span.end().get(),
@@ -208,18 +208,15 @@ fn reorder_keyword_arguments(
         .filter(|&index| parameters[index].group == ParameterGroup::Keyword)
         .collect::<Vec<_>>();
     for old_index in keyword_relative_order {
-        let keyword = parameters[old_index]
-            .keyword
-            .as_deref()
-            .with_context(|| {
-                format!(
-                    "reorder-function-parameters metadata for '{}' at {}..{} is missing keyword name for parameter '{}'",
-                    function_name,
-                    view.span.start().get(),
-                    view.span.end().get(),
-                    parameters[old_index].name
-                )
-            })?;
+        let keyword = parameters[old_index].keyword.as_deref().with_context(|| {
+            format!(
+                "{command} metadata for '{}' at {}..{} is missing keyword name for parameter '{}'",
+                function_name,
+                view.span.start().get(),
+                view.span.end().get(),
+                parameters[old_index].name
+            )
+        })?;
         if let Some(pair) = known_pairs.remove(keyword) {
             reordered_arguments.extend(pair);
         }

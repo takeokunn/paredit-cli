@@ -62,7 +62,11 @@ pub fn plan_swap_function_parameters(
         .collect::<Vec<_>>();
     new_parameter_order.swap(left_index, right_index);
     let new_relative_order = build_new_relative_order(&old_parameter_order, &new_parameter_order)?;
-    ensure_reorder_stays_within_parameter_groups(&reorderable_parameters, &new_relative_order)?;
+    ensure_reorder_stays_within_parameter_groups(
+        &reorderable_parameters,
+        &new_relative_order,
+        "swap-function-parameters",
+    )?;
     let call_paths = resolve_function_call_paths(FunctionCallPathRequest {
         tree: &tree,
         dialect: request.dialect,
@@ -77,6 +81,7 @@ pub fn plan_swap_function_parameters(
     let mut edits = Vec::<SpanEdit>::with_capacity(call_paths.len() + 1);
     edits.push(reorder_function_definition_edit(
         request.input,
+        &tree,
         &target.parameter_container,
         &reorderable_parameters,
         &new_relative_order,
@@ -125,6 +130,7 @@ pub fn plan_swap_function_parameters(
             target.call_argument_offset,
             &reorderable_parameters,
             &new_relative_order,
+            "swap-function-parameters",
         )?;
         call_spans.push(call_span);
         swapped_arguments.push((original_left_argument, original_right_argument));

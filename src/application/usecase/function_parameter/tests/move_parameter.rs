@@ -22,6 +22,23 @@ fn moves_parameter_and_call_argument() {
 }
 
 #[test]
+fn rejects_move_when_the_parameter_list_contains_a_comment() {
+    let input = "(defun f (a b\n          ;; c is optional context\n          c) (list a b c))\n(print (f 1 2 3))";
+    let error = plan_move_function_parameter(MoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("c"),
+        to_index: 0,
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+    })
+    .expect_err("a comment in the parameter list must not be silently discarded");
+
+    assert!(error.to_string().contains("comment"));
+}
+
+#[test]
 fn moves_parameter_within_common_lisp_macrolet_binding_and_call_argument() {
     let input = "(defun outer ()\n  (macrolet ((render (width height margin) `(list ,width ,height ,margin)))\n    (render 10 20 5)))";
     let plan = plan_move_function_parameter(MoveFunctionParameterRequest {
@@ -296,5 +313,29 @@ fn rejects_move_parameter_across_common_lisp_lambda_list_section() {
         error
             .to_string()
             .contains("cannot move 'b' across Common Lisp lambda-list sections")
+    );
+    assert!(
+        error.to_string().starts_with("move-function-parameter"),
+        "move error must name its own command, got: {error}"
+    );
+}
+
+#[test]
+fn move_parameter_call_arity_error_names_its_own_command() {
+    let input = "(defun f (a b c) (list a b c))\n(print (f 1 2))";
+    let error = plan_move_function_parameter(MoveFunctionParameterRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        definition_path: path("0"),
+        name: symbol("c"),
+        to_index: 0,
+        call_paths: vec![path("1.1")],
+        all_calls: false,
+    })
+    .expect_err("call with too few positional arguments must fail");
+
+    assert!(
+        error.to_string().starts_with("move-function-parameter"),
+        "call-arity error must name its own command, got: {error}"
     );
 }
