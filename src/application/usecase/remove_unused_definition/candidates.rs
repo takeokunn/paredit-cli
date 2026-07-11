@@ -202,7 +202,7 @@ fn collect_local_callable_function_quote_references(
     }
 }
 
-fn callable_reference_target<'a>(view: &'a ExpressionView) -> Option<&'a ExpressionView> {
+fn callable_reference_target(view: &ExpressionView) -> Option<&ExpressionView> {
     if view.reader_prefixes.contains(&ReaderPrefix::Function) {
         return Some(view);
     }
@@ -211,7 +211,7 @@ fn callable_reference_target<'a>(view: &'a ExpressionView) -> Option<&'a Express
     Some(target)
 }
 
-fn callable_accessor_target<'a>(view: &'a ExpressionView) -> Option<&'a ExpressionView> {
+fn callable_accessor_target(view: &ExpressionView) -> Option<&ExpressionView> {
     (view.kind == ExpressionKind::List).then_some(())?;
     let head = atom_text(view.children.first()?)?;
     let target = view.children.get(1)?;
