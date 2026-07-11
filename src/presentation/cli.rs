@@ -10,6 +10,7 @@ mod definition_report;
 mod dependency_report;
 mod dispatch;
 mod duplicate_report;
+mod extract_constant;
 mod extract_function;
 mod form_report;
 mod function_parameter;

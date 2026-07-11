@@ -86,6 +86,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::ThreadExpression(args) => thread_expression::thread_expression(args)?,
         Command::UnthreadExpression(args) => unthread_expression::unthread_expression(args)?,
         Command::ExtractFunction(args) => extract_function::extract_function(args)?,
+        Command::ExtractConstant(args) => extract_constant::extract_constant(args)?,
         Command::InlineFunction(args) => inline_function::inline_function(args)?,
         Command::AddFunctionParameter(args) => {
             function_parameter::add::add_function_parameter(args)?
