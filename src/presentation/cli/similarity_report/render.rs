@@ -40,6 +40,7 @@ fn print_text(
     println!("form_scope\t{}", args.form_scope.label());
     println!("overlap_policy\t{}", args.overlap_policy.label());
     println!("max_comparisons\t{}", optional_usize(args.max_comparisons));
+    println!("max_candidates\t{}", optional_usize(args.max_candidates));
     println!("max_results\t{}", optional_usize(args.max_results));
     println!("error_policy\t{}", args.error_policy.label());
     println!("scanned_files\t{}", discovery.files.len());
@@ -51,6 +52,11 @@ fn print_text(
     println!("skipped_symlink\t{}", discovery.skipped_symlink_count);
     println!("skipped_excluded\t{}", discovery.skipped_excluded_count);
     println!("possible_pairs\t{}", summary.possible_pairs);
+    println!(
+        "candidate_limit_reached\t{}",
+        summary.candidate_limit_reached
+    );
+    println!("omitted_candidates\t{}", summary.omitted_candidates);
     println!("evaluated_pairs\t{}", summary.evaluated_pairs);
     println!("pruned_by_size\t{}", summary.pruned_by_size);
     println!(
@@ -102,6 +108,7 @@ fn json_report(
             "form_scope": args.form_scope.label(),
             "overlap_policy": args.overlap_policy.label(),
             "max_comparisons": args.max_comparisons,
+            "max_candidates": args.max_candidates,
             "max_results": args.max_results,
             "error_policy": args.error_policy.label(),
             "include_unknown": args.include_unknown,
@@ -121,6 +128,8 @@ fn json_report(
             "skipped_symlink": discovery.skipped_symlink_count,
             "skipped_excluded": discovery.skipped_excluded_count,
             "possible_pairs": report.summary.possible_pairs,
+            "candidate_limit_reached": report.summary.candidate_limit_reached,
+            "omitted_candidates": report.summary.omitted_candidates,
             "evaluated_pairs": report.summary.evaluated_pairs,
             "pruned_by_size": report.summary.pruned_by_size,
             "comparison_limit_reached": report.summary.comparison_limit_reached,

@@ -68,6 +68,8 @@ pub fn build_similarity_pairs(
 
     SimilarityReport {
         summary: SimilarityReportSummary {
+            candidate_limit_reached: false,
+            omitted_candidates: 0,
             possible_pairs,
             evaluated_pairs,
             pruned_by_size,

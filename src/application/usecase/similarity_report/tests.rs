@@ -142,14 +142,16 @@ fn empty_and_single_candidates_produce_no_pairs() {
             .pairs
             .is_empty()
     );
-    assert!(build_similarity_pairs(
-        candidates("a.lisp", "(foo a)", 2),
-        0.0,
-        SimilarityOverlapPolicy::All,
-        None,
-    )
-    .pairs
-    .is_empty());
+    assert!(
+        build_similarity_pairs(
+            candidates("a.lisp", "(foo a)", 2),
+            0.0,
+            SimilarityOverlapPolicy::All,
+            None,
+        )
+        .pairs
+        .is_empty()
+    );
 }
 
 #[test]

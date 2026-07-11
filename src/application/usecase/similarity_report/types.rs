@@ -101,6 +101,7 @@ pub struct SimilarityReportOptions {
     pub comparison_scope: SimilarityComparisonScope,
     pub form_scope: SimilarityFormScope,
     pub overlap_policy: SimilarityOverlapPolicy,
+    pub max_candidates: Option<usize>,
     pub max_comparisons: Option<usize>,
     pub max_results: Option<usize>,
 }
@@ -114,6 +115,7 @@ impl Default for SimilarityReportOptions {
             comparison_scope: SimilarityComparisonScope::All,
             form_scope: SimilarityFormScope::All,
             overlap_policy: SimilarityOverlapPolicy::Maximal,
+            max_candidates: None,
             max_comparisons: None,
             max_results: None,
         }
@@ -143,6 +145,8 @@ impl FromStr for SimilarityOverlapPolicy {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityReportSummary {
+    pub candidate_limit_reached: bool,
+    pub omitted_candidates: usize,
     pub possible_pairs: usize,
     pub evaluated_pairs: usize,
     pub pruned_by_size: usize,

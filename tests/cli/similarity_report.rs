@@ -25,9 +25,11 @@ fn cli_reports_cross_file_similarity_as_json() {
     let pairs = report["pairs"].as_array().unwrap();
     assert_eq!(report["pair_count"].as_u64().unwrap() as usize, pairs.len());
     assert!(!pairs.is_empty());
-    assert!(pairs
-        .iter()
-        .all(|pair| pair["similarity"].as_f64().unwrap() >= 0.8));
+    assert!(
+        pairs
+            .iter()
+            .all(|pair| pair["similarity"].as_f64().unwrap() >= 0.8)
+    );
     assert_ne!(pairs[0]["left"]["path"], pairs[0]["right"]["path"]);
 }
 
@@ -48,9 +50,11 @@ fn cli_accepts_exact_similarity_threshold_endpoint() {
     let report: Value = serde_json::from_slice(&output.stdout).unwrap();
     let pairs = report["pairs"].as_array().unwrap();
     assert!(!pairs.is_empty());
-    assert!(pairs
-        .iter()
-        .all(|pair| pair["similarity"].as_f64() == Some(1.0)));
+    assert!(
+        pairs
+            .iter()
+            .all(|pair| pair["similarity"].as_f64() == Some(1.0))
+    );
 }
 
 #[cfg(unix)]
@@ -279,6 +283,7 @@ fn cli_json_contract_reports_options_summary_and_pair_count() {
     assert_eq!(report["options"]["comparison_scope"], "all");
     assert_eq!(report["options"]["form_scope"], "all");
     assert_eq!(report["options"]["overlap_policy"], "all");
+    assert_eq!(report["options"]["max_candidates"], Value::Null);
     assert_eq!(report["options"]["max_comparisons"], Value::Null);
     assert_eq!(report["options"]["max_results"], 1);
     assert_eq!(report["options"]["error_policy"], "fail");
@@ -287,6 +292,8 @@ fn cli_json_contract_reports_options_summary_and_pair_count() {
     assert_eq!(report["summary"]["matched_pairs"], 3);
     assert_eq!(report["summary"]["reported_pairs"], 1);
     assert_eq!(report["summary"]["truncated"], true);
+    assert_eq!(report["summary"]["candidate_limit_reached"], false);
+    assert_eq!(report["summary"]["omitted_candidates"], 0);
     assert_eq!(report["summary"]["comparison_limit_reached"], false);
     assert_eq!(report["summary"]["unprocessed_pairs"], 0);
     assert_eq!(report["pair_count"], 1);
@@ -336,10 +343,12 @@ fn cli_skips_malformed_input_and_reports_stable_json_errors() {
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0]["path"], invalid.display().to_string());
     assert_eq!(errors[0]["stage"], "parse");
-    assert!(!errors[0]["message"]
-        .as_str()
-        .unwrap()
-        .contains(&invalid.display().to_string()));
+    assert!(
+        !errors[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains(&invalid.display().to_string())
+    );
 }
 
 #[test]
@@ -390,6 +399,36 @@ fn cli_skip_still_applies_fail_on_duplicates_to_successful_files() {
 }
 
 #[test]
+fn fail_on_duplicates_rejects_skipped_files_as_indeterminate() {
+    let dir = fresh_temp_dir("similarity-error-policy-indeterminate");
+    let valid = dir.join("valid.lisp");
+    let invalid = dir.join("invalid.lisp");
+    fs::write(&valid, "(foo a b)\n").unwrap();
+    fs::write(&invalid, [0xff, 0xfe]).unwrap();
+
+    let output = paredit()
+        .arg("similarity-report")
+        .arg("--error-policy=skip")
+        .arg("--fail-on-duplicates")
+        .arg(&valid)
+        .arg(&invalid)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["pair_count"], 0);
+    assert_eq!(report["summary"]["skipped_error_files"], 1);
+    let errors = report["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0]["path"], invalid.display().to_string());
+    assert_eq!(errors[0]["stage"], "read");
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "similarity-report policy indeterminate: 1 file(s) skipped due to processing errors"
+    ));
+}
+
+#[test]
 fn cli_text_report_includes_skipped_file_summary_and_error() {
     let dir = fresh_temp_dir("similarity-error-text");
     let invalid = dir.join("invalid.lisp");
@@ -434,9 +473,11 @@ fn cli_filters_pairs_by_comparison_scope() {
         assert_eq!(report["options"]["comparison_scope"], scope);
         let pairs = report["pairs"].as_array().unwrap();
         assert!(!pairs.is_empty());
-        assert!(pairs
-            .iter()
-            .all(|pair| { (pair["left"]["path"] == pair["right"]["path"]) == same_file }));
+        assert!(
+            pairs
+                .iter()
+                .all(|pair| { (pair["left"]["path"] == pair["right"]["path"]) == same_file })
+        );
     }
 }
 
@@ -528,6 +569,57 @@ fn max_results_does_not_hide_duplicates_from_failure_policy() {
 }
 
 #[test]
+fn max_candidates_reports_precise_omissions_and_fails_closed() {
+    let dir = fresh_temp_dir("similarity-candidate-limit");
+    let file = dir.join("suite.lisp");
+    fs::write(&file, "(foo a) (bar b) (baz c)\n").unwrap();
+
+    let output = paredit()
+        .arg("similarity-report")
+        .arg("--threshold=1")
+        .arg("--min-node-count=2")
+        .arg("--form-scope=top-level")
+        .arg("--max-candidates=2")
+        .arg("--fail-on-duplicates")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["options"]["max_candidates"], 2);
+    assert_eq!(report["summary"]["candidate_limit_reached"], true);
+    assert_eq!(report["summary"]["omitted_candidates"], 1);
+    assert_eq!(report["summary"]["matched_pairs"], 0);
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "similarity-report policy indeterminate: candidate limit reached with 1 candidate(s) omitted"
+    ));
+}
+
+#[test]
+fn max_candidates_not_reached_reports_complete_collection() {
+    let dir = fresh_temp_dir("similarity-candidate-limit-complete");
+    let file = dir.join("suite.lisp");
+    fs::write(&file, "(foo a) (bar b) (baz c)\n").unwrap();
+
+    let output = paredit()
+        .arg("similarity-report")
+        .arg("--threshold=1")
+        .arg("--min-node-count=2")
+        .arg("--form-scope=top-level")
+        .arg("--max-candidates=3")
+        .arg("--fail-on-duplicates")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["summary"]["candidate_limit_reached"], false);
+    assert_eq!(report["summary"]["omitted_candidates"], 0);
+}
+
+#[test]
 fn max_comparisons_is_reported_and_failure_uses_processed_matches() {
     let dir = fresh_temp_dir("similarity-comparison-limit");
     let file = dir.join("suite.lisp");
@@ -553,6 +645,59 @@ fn max_comparisons_is_reported_and_failure_uses_processed_matches() {
     assert_eq!(report["summary"]["comparison_limit_reached"], true);
     assert_eq!(report["summary"]["matched_pairs"], 1);
     assert!(String::from_utf8_lossy(&output.stderr).contains("1 duplicate pair(s) found"));
+}
+
+#[test]
+fn fail_on_duplicates_rejects_an_indeterminate_comparison_limit() {
+    let dir = fresh_temp_dir("similarity-comparison-limit-indeterminate");
+    let file = dir.join("suite.lisp");
+    fs::write(&file, "(foo a) (bar b) (foo a)\n").unwrap();
+
+    let output = paredit()
+        .arg("similarity-report")
+        .arg("--threshold=1")
+        .arg("--min-node-count=2")
+        .arg("--form-scope=top-level")
+        .arg("--overlap-policy=all")
+        .arg("--max-comparisons=1")
+        .arg("--fail-on-duplicates")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["summary"]["matched_pairs"], 0);
+    assert_eq!(report["summary"]["comparison_limit_reached"], true);
+    assert_eq!(report["summary"]["unprocessed_pairs"], 2);
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "similarity-report policy indeterminate: comparison limit reached with 2 pair(s) unprocessed"
+    ));
+}
+
+#[test]
+fn fail_on_duplicates_succeeds_when_comparison_limit_is_not_reached() {
+    let dir = fresh_temp_dir("similarity-comparison-limit-complete");
+    let file = dir.join("suite.lisp");
+    fs::write(&file, "(foo a) (bar b) (baz c)\n").unwrap();
+
+    let output = paredit()
+        .arg("similarity-report")
+        .arg("--threshold=1")
+        .arg("--min-node-count=2")
+        .arg("--form-scope=top-level")
+        .arg("--overlap-policy=all")
+        .arg("--max-comparisons=3")
+        .arg("--fail-on-duplicates")
+        .arg(&file)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["summary"]["matched_pairs"], 0);
+    assert_eq!(report["summary"]["comparison_limit_reached"], false);
+    assert_eq!(report["summary"]["unprocessed_pairs"], 0);
 }
 
 #[test]
@@ -616,5 +761,14 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
         .failure()
         .stderr(predicate::str::contains(
             "--max-comparisons must be at least 1",
+        ));
+    paredit()
+        .arg("similarity-report")
+        .arg("--max-candidates=0")
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "--max-candidates must be at least 1",
         ));
 }

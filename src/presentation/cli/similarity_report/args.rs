@@ -53,6 +53,9 @@ pub(in crate::presentation::cli) struct SimilarityReportArgs {
     /// Maximum number of tree-edit-distance comparisons to evaluate.
     #[arg(long)]
     pub(super) max_comparisons: Option<usize>,
+    /// Maximum number of candidate forms to retain across all scanned files.
+    #[arg(long)]
+    pub(super) max_candidates: Option<usize>,
     /// Control whether a file processing error stops the report or skips that file.
     #[arg(long, default_value = "fail")]
     pub(super) error_policy: ErrorPolicy,

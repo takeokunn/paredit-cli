@@ -1,10 +1,10 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::application::usecase::similarity_report::{
-    build_similarity_pairs, collect_similarity_candidates, SimilarityReportOptions,
+    SimilarityReportOptions, build_similarity_pairs, collect_similarity_candidates,
 };
 use crate::domain::sexpr::SyntaxTree;
-use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
+use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 use super::super::{detect_dialect, read_input};
 use super::args::SimilarityReportArgs;
@@ -16,6 +16,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         args.threshold,
         args.min_node_count,
         args.min_line_span,
+        args.max_candidates,
         args.max_comparisons,
         args.max_results,
     )?;
@@ -38,33 +39,58 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         comparison_scope: args.comparison_scope,
         form_scope: args.form_scope,
         overlap_policy: args.overlap_policy,
+        max_candidates: args.max_candidates,
         max_comparisons: args.max_comparisons,
         max_results: args.max_results,
     };
+    let mut omitted_candidates = 0usize;
     for file in &discovery.files {
-        if let Err(error) = process_file(file, args.dialect, &options, &mut candidates) {
-            if args.error_policy == ErrorPolicy::Fail {
-                return Err(error.source.context(format!(
-                    "failed to {} {}",
-                    error.stage,
-                    file.display()
-                )));
+        match process_file(file, args.dialect, &options, &mut candidates) {
+            Ok(omitted) => omitted_candidates = omitted_candidates.saturating_add(omitted),
+            Err(error) => {
+                if args.error_policy == ErrorPolicy::Fail {
+                    return Err(error.source.context(format!(
+                        "failed to {} {}",
+                        error.stage,
+                        file.display()
+                    )));
+                }
+                errors.push(FileProcessingError {
+                    path: file.clone(),
+                    stage: error.stage,
+                    message: error.source.root_cause().to_string(),
+                });
             }
-            errors.push(FileProcessingError {
-                path: file.clone(),
-                stage: error.stage,
-                message: error.source.root_cause().to_string(),
-            });
         }
     }
 
-    let report = build_similarity_pairs(candidates, &options);
+    let mut report = build_similarity_pairs(candidates, &options);
+    report.summary.candidate_limit_reached = omitted_candidates > 0;
+    report.summary.omitted_candidates = omitted_candidates;
     print_similarity_report(&report, &discovery, &errors, &args)?;
 
     if args.fail_on_duplicates && report.summary.matched_pairs > 0 {
         bail!(
             "similarity-report policy failed: {} duplicate pair(s) found",
             report.summary.matched_pairs
+        );
+    }
+    if args.fail_on_duplicates && report.summary.comparison_limit_reached {
+        bail!(
+            "similarity-report policy indeterminate: comparison limit reached with {} pair(s) unprocessed",
+            report.summary.unprocessed_pairs
+        );
+    }
+    if args.fail_on_duplicates && report.summary.candidate_limit_reached {
+        bail!(
+            "similarity-report policy indeterminate: candidate limit reached with {} candidate(s) omitted",
+            report.summary.omitted_candidates
+        );
+    }
+    if args.fail_on_duplicates && !errors.is_empty() {
+        bail!(
+            "similarity-report policy indeterminate: {} file(s) skipped due to processing errors",
+            errors.len()
         );
     }
 
@@ -81,7 +107,7 @@ fn process_file(
     dialect: Option<super::super::DialectArg>,
     options: &SimilarityReportOptions,
     candidates: &mut Vec<crate::application::usecase::similarity_report::SimilarityCandidate>,
-) -> std::result::Result<(), ProcessingError> {
+) -> std::result::Result<usize, ProcessingError> {
     let input = read_input(Some(file.to_path_buf())).map_err(|source| ProcessingError {
         stage: "read",
         source,
@@ -91,27 +117,24 @@ fn process_file(
         stage: "parse",
         source: source.into(),
     })?;
-    let mut file_candidates = Vec::new();
-    collect_similarity_candidates(
-        &tree,
-        &input.text,
-        file,
-        dialect,
-        options,
-        &mut file_candidates,
-    )
-    .map_err(|source| ProcessingError {
-        stage: "collect",
-        source,
-    })?;
-    candidates.extend(file_candidates);
-    Ok(())
+    let initial_candidate_count = candidates.len();
+    let result =
+        collect_similarity_candidates(&tree, &input.text, file, dialect, options, candidates)
+            .map_err(|source| ProcessingError {
+                stage: "collect",
+                source,
+            });
+    if result.is_err() {
+        candidates.truncate(initial_candidate_count);
+    }
+    result
 }
 
 fn ensure_options(
     threshold: f64,
     min_node_count: usize,
     min_line_span: usize,
+    max_candidates: Option<usize>,
     max_comparisons: Option<usize>,
     max_results: Option<usize>,
 ) -> Result<()> {
@@ -129,6 +152,9 @@ fn ensure_options(
     }
     if max_comparisons == Some(0) {
         bail!("--max-comparisons must be at least 1");
+    }
+    if max_candidates == Some(0) {
+        bail!("--max-candidates must be at least 1");
     }
     Ok(())
 }
