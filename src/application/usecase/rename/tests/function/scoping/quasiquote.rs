@@ -8,9 +8,9 @@ fn preserves_unquote_prefixes_when_renaming_function_calls_inside_quasiquote() {
         from: "helper",
         to: "renamed",
         definitions: 1,
-        calls: 2,
+        calls: 3,
         changed: true,
-        rewritten_contains: ["(defun renamed (x) x)", "`(list ,(renamed 1) ,@(renamed 2) (helper 3))"]
+        rewritten_contains: ["(defun renamed (x) x)", "`(list ,(renamed 1) ,@(renamed 2) (renamed 3))"]
     };
 }
 

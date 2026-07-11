@@ -184,6 +184,11 @@ pub fn definition_shape(
     })
 }
 
+/// Whether the definition body returns code to be evaluated by a Lisp macro expander.
+pub fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool {
+    classify::is_macro_expander_definition(dialect, head)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,6 +259,19 @@ mod tests {
             classify_definition_head(Dialect::EmacsLisp, "define-minor-mode"),
             Some(DefinitionCategory::Mode)
         );
+    }
+
+    #[test]
+    fn identifies_macro_expander_definition_forms() {
+        assert!(is_macro_expander_definition(Dialect::CommonLisp, "defmacro"));
+        assert!(is_macro_expander_definition(
+            Dialect::CommonLisp,
+            "cl:define-compiler-macro"
+        ));
+        assert!(is_macro_expander_definition(Dialect::EmacsLisp, "cl-defmacro"));
+        assert!(!is_macro_expander_definition(Dialect::CommonLisp, "defun"));
+        assert!(!is_macro_expander_definition(Dialect::Scheme, "define-syntax"));
+        assert!(!is_macro_expander_definition(Dialect::Clojure, "defmacro"));
     }
 
     #[test]

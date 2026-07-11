@@ -119,6 +119,57 @@ fn renames_function_calls_generated_by_compiler_macrolet_quasiquote_expanders() 
 }
 
 #[test]
+fn renames_function_calls_generated_by_defmacro_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(defmacro local (value) `(helper ,value))\n(local 1)",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(defmacro local (value) `(renamed ,value))"
+        ]
+    };
+}
+
+#[test]
+fn renames_function_calls_generated_by_emacs_lisp_cl_defmacro_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(cl-defmacro local (value) `(helper ,value))\n(local 1)",
+        dialect: Dialect::EmacsLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(cl-defmacro local (value) `(renamed ,value))"
+        ]
+    };
+}
+
+#[test]
+fn renames_function_calls_generated_by_define_compiler_macro_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(define-compiler-macro local (value) `(helper ,value))\n(local 1)",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(define-compiler-macro local (value) `(renamed ,value))"
+        ]
+    };
+}
+
+#[test]
 fn renames_function_designators_generated_by_macrolet_quasiquote_expanders() {
     assert_function_rename! {
         input: "(defun helper (value) value)\n(defun caller () (macrolet ((local () `(#'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (local)))",

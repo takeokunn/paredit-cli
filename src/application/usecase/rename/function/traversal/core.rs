@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::common_lisp_symbol_name_eq;
-use crate::domain::definition::definition_shape;
+use crate::domain::definition::{definition_shape, is_macro_expander_definition};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -67,6 +67,15 @@ impl<'a> TraversalState<'a> {
         }
     }
 
+    pub(super) fn in_macro_expander(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            local_callables: self.local_callables,
+            quasiquote_depth: self.quasiquote_depth,
+            in_macro_expander: true,
+            shadowed_depth: self.shadowed_depth,
+        }
+    }
 }
 
 pub(in crate::application::usecase::rename::function) fn allows_function_reference_rename(
@@ -148,6 +157,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
     }
 
     let mut definition_body_range = None;
+    let mut macro_expander_body_range = None;
 
     if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
         if let Some(head) = list_head(view) {
@@ -187,6 +197,9 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
             }
             if let Some(shape) = shape {
                 definition_body_range = Some(shape.body_range());
+                if is_macro_expander_definition(context.dialect, head) {
+                    macro_expander_body_range = definition_body_range;
+                }
             }
         }
     }
@@ -197,12 +210,20 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
                 continue;
             }
         }
+        let child_state = state
+            .with_quasiquote_depth(0)
+            .with_path(state.path.child(index));
+        let child_state = if macro_expander_body_range
+            .is_some_and(|range| range.contains_child(index))
+        {
+            child_state.in_macro_expander()
+        } else {
+            child_state
+        };
         collect_function_call_head_renames_from_view(
             child,
             context,
-            state
-                .with_quasiquote_depth(0)
-                .with_path(state.path.child(index)),
+            child_state,
             renames,
         );
     }
