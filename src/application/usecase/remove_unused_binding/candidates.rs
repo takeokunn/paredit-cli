@@ -223,18 +223,33 @@ fn list_pair_let_binding_removal_candidates(
         .enumerate()
         .map(|(index, pair)| {
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("let binding must be a (name value) pair");
+                if pair.kind != ExpressionKind::Atom {
+                    anyhow::bail!("let binding must be a name, (name), or (name value)");
+                }
+                let name = atom_text(pair)
+                    .context("let binding name must be an atom")?
+                    .to_owned();
+                return Ok(LetBindingRemovalCandidate {
+                    index,
+                    name,
+                    value_span: pair.span,
+                    removal_span: pair.span,
+                });
             }
-            if pair.children.len() != 2 {
-                anyhow::bail!("let binding pair must contain a name and value");
+            if pair.children.is_empty() || pair.children.len() > 2 {
+                anyhow::bail!("let binding pair must be (name) or (name value)");
             }
             let name = atom_text(&pair.children[0])
                 .context("let binding name must be an atom")?
                 .to_owned();
+            let value_span = pair
+                .children
+                .get(1)
+                .map_or(pair.children[0].span, |value| value.span);
             Ok(LetBindingRemovalCandidate {
                 index,
                 name,
-                value_span: pair.children[1].span,
+                value_span,
                 removal_span: pair.span,
             })
         })
