@@ -81,3 +81,126 @@ fn cli_plans_common_lisp_explicit_callable_designator_forms_rename() {
         ],
     });
 }
+
+#[test]
+fn cli_plans_cl_user_define_method_combination_rename() {
+    assert_plan_case(PlanCase {
+        fixture_name: "rename-function-cl-user-method-combination-plan",
+        from: "render-combination",
+        to: "compose-render",
+        input_files: &[
+            FixtureFile {
+                path: "macro.lisp",
+                contents: "(cl-user:define-method-combination render-combination (pane theme) ((primary *)) (list pane theme primary))\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (list #'render-combination (function render-combination) render-combination))\n",
+            },
+        ],
+        stdout_needles: &[
+            "\"definitionCount\": 1",
+            "\"callCount\": 2",
+            "\"path\": \"0.1\"",
+            "\"path\": \"0.3.1\"",
+            "\"path\": \"0.3.2.1\"",
+            "\"replacement\": \"compose-render\"",
+            "\"rewritten\": \"(cl-user:define-method-combination compose-render (pane theme) ((primary *)) (list pane theme primary))\\n\"",
+            "\"rewritten\": \"(defun caller () (list #'compose-render (function compose-render) render-combination))\\n\"",
+        ],
+        unchanged_files: &[
+            FixtureFile {
+                path: "macro.lisp",
+                contents: "(cl-user:define-method-combination render-combination (pane theme) ((primary *)) (list pane theme primary))\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (list #'render-combination (function render-combination) render-combination))\n",
+            },
+        ],
+    });
+}
+
+#[test]
+fn cli_plans_common_lisp_macrolet_expander_callable_designators_only() {
+    assert_plan_case(PlanCase {
+        fixture_name: "rename-function-common-lisp-macrolet-expander-callable-designators-plan",
+        from: "helper",
+        to: "renamed",
+        input_files: &[
+            FixtureFile {
+                path: "macro.lisp",
+                contents: "(defmacro helper (x) x)\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (macrolet ((helper () (list #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (helper) #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))\n",
+            },
+        ],
+        stdout_needles: &[
+            "\"definitionCount\": 1",
+            "\"callCount\": 6",
+            "\"path\": \"0.1\"",
+            "\"path\": \"0.3.1.0.2.1\"",
+            "\"path\": \"0.3.1.0.2.2.1\"",
+            "\"path\": \"0.3.1.0.2.3.1\"",
+            "\"path\": \"0.3.1.0.2.4.1\"",
+            "\"path\": \"0.3.1.0.2.5.1\"",
+            "\"path\": \"0.3.1.0.2.6.1\"",
+            "\"replacement\": \"renamed\"",
+            "\"rewritten\": \"(defun caller () (macrolet ((helper () (list #'renamed (function renamed) (macro-function 'renamed) (compiler-macro-function 'renamed) (symbol-function 'renamed) (fdefinition 'renamed)))) (helper) #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))\\n\"",
+        ],
+        unchanged_files: &[
+            FixtureFile {
+                path: "macro.lisp",
+                contents: "(defmacro helper (x) x)\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (macrolet ((helper () (list #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (helper) #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))\n",
+            },
+        ],
+    });
+}
+
+#[test]
+fn cli_plans_common_lisp_compiler_macrolet_expander_callable_designators_only() {
+    assert_plan_case(PlanCase {
+        fixture_name: "rename-function-common-lisp-compiler-macrolet-expander-callable-designators-plan",
+        from: "helper",
+        to: "renamed",
+        input_files: &[
+            FixtureFile {
+                path: "macro.lisp",
+                contents: "(defmacro helper (x) x)\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (compiler-macrolet ((helper () (list #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (helper) #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))\n",
+            },
+        ],
+        stdout_needles: &[
+            "\"definitionCount\": 1",
+            "\"callCount\": 6",
+            "\"path\": \"0.1\"",
+            "\"path\": \"0.3.1.0.2.1\"",
+            "\"path\": \"0.3.1.0.2.2.1\"",
+            "\"path\": \"0.3.1.0.2.3.1\"",
+            "\"path\": \"0.3.1.0.2.4.1\"",
+            "\"path\": \"0.3.1.0.2.5.1\"",
+            "\"path\": \"0.3.1.0.2.6.1\"",
+            "\"replacement\": \"renamed\"",
+            "\"rewritten\": \"(defun caller () (compiler-macrolet ((helper () (list #'renamed (function renamed) (macro-function 'renamed) (compiler-macro-function 'renamed) (symbol-function 'renamed) (fdefinition 'renamed)))) (helper) #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))\\n\"",
+        ],
+        unchanged_files: &[
+            FixtureFile {
+                path: "macro.lisp",
+                contents: "(defmacro helper (x) x)\n",
+            },
+            FixtureFile {
+                path: "caller.lisp",
+                contents: "(defun caller () (compiler-macrolet ((helper () (list #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (helper) #'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))\n",
+            },
+        ],
+    });
+}
