@@ -1,6 +1,7 @@
 use crate::application::usecase::callable_scope::is_local_callable_bound;
 use crate::application::usecase::rename::reader::{
-    explicit_reader_form_kind, explicit_reader_function_lambda_body_children,
+    bare_lambda_body_children, explicit_reader_form_kind,
+    explicit_reader_function_lambda_body_children,
 };
 use crate::domain::common_lisp::common_lisp_symbol_name_eq;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
@@ -33,6 +34,30 @@ pub(in crate::application::usecase::rename::function) fn collect_function_design
     }
 
     false
+}
+
+/// Handles a bare `(lambda ...)` form directly, skipping its parameter list
+/// the same way the `#'(lambda ...)` case below skips it via
+/// `explicit_reader_function_lambda_body_children`; see `bare_lambda_body_children`.
+pub(in crate::application::usecase::rename::function) fn collect_bare_lambda_call_renames(
+    view: &ExpressionView,
+    context: &TraversalContext<'_>,
+    state: &TraversalState<'_>,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) -> bool {
+    let Some(children) = bare_lambda_body_children(view) else {
+        return false;
+    };
+
+    for (child_index, child) in children {
+        collect_function_call_head_renames_from_view(
+            child,
+            context,
+            state.with_path(state.path.child(child_index)),
+            renames,
+        );
+    }
+    true
 }
 
 pub(in crate::application::usecase::rename::function) fn collect_explicit_reader_form_call_renames(

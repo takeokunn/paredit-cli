@@ -19,6 +19,12 @@ pub struct UnwrapFunctionCallSite {
     pub text: String,
 }
 
+impl super::selection::SpannedCallSite for UnwrapFunctionCallSite {
+    fn span(&self) -> ByteSpan {
+        self.span
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum UnwrapFunctionCallsScope {
     AllCalls,

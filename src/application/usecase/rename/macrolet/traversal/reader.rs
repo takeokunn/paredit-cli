@@ -1,9 +1,8 @@
 use crate::application::usecase::rename::reader::{
-    explicit_reader_form_kind, explicit_reader_function_lambda_body_children,
+    bare_lambda_body_children, explicit_reader_form_kind,
+    explicit_reader_function_lambda_body_children,
 };
-use crate::application::usecase::rename::selection::list_head;
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, ReaderPrefix};
+use crate::domain::sexpr::{ExpressionView, Path};
 
 use super::super::RenameFunctionOccurrence;
 use super::super::scope::reader_lambda_body_scope as activate_reader_lambda_body_scope;
@@ -81,6 +80,8 @@ pub(in crate::application::usecase::rename::macrolet) fn collect_explicit_reader
     }
 }
 
+/// Handles a bare `(lambda ...)` form directly, not just the `#'(lambda ...)`
+/// spelling handled by the "function" arm above; see `bare_lambda_body_children`.
 pub(in crate::application::usecase::rename::macrolet) fn collect_reader_lambda_renames<
     M: RenameTraversalMode,
 >(
@@ -90,20 +91,12 @@ pub(in crate::application::usecase::rename::macrolet) fn collect_reader_lambda_r
     state: TraversalState,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
-    if view.kind != ExpressionKind::List || !view.reader_prefixes.contains(&ReaderPrefix::Function)
-    {
-        return false;
-    }
-
-    let Some(head) = list_head(view) else {
+    let Some(children) = bare_lambda_body_children(view) else {
         return false;
     };
-    if !common_lisp_operator_head_eq(head, "lambda") {
-        return false;
-    }
 
     let lambda_scope = activate_reader_lambda_body_scope(state.reader_lambda_body_scope);
-    for (child_index, child) in view.children.iter().enumerate().skip(2) {
+    for (child_index, child) in children {
         let child_path = path.child(child_index);
         if M::collect_reader_quoted_lambda_atom_renames(
             child,

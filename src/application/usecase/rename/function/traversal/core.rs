@@ -18,7 +18,8 @@ use super::modes::{
     collect_local_callable_function_call_renames, collect_symbol_macrolet_function_call_renames,
 };
 use super::reader::{
-    collect_explicit_reader_form_call_renames, collect_function_designator_renames,
+    collect_bare_lambda_call_renames, collect_explicit_reader_form_call_renames,
+    collect_function_designator_renames,
 };
 
 pub(in crate::application::usecase::rename::function) struct TraversalContext<'a> {
@@ -103,6 +104,10 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
 
     let reader_state = state.with_quasiquote_depth(quasiquote_depth);
     if collect_function_designator_renames(view, &reader_state, context, renames) {
+        return;
+    }
+
+    if collect_bare_lambda_call_renames(view, context, &reader_state, renames) {
         return;
     }
 

@@ -36,3 +36,20 @@ pub(crate) fn explicit_reader_function_lambda_body_children(
     explicit_reader_function_lambda_view(view)
         .map(|lambda_view| lambda_view.children.iter().enumerate().skip(2))
 }
+
+/// Body children of a bare `(lambda (params...) body...)` form, skipping the
+/// lambda-list at index 1 so it is never visited as if it were call/reference
+/// position. `lambda` is a standard macro that expands to `(function (lambda
+/// ...))` (CLHS 3.1.2.1.2.4), so a bare lambda introduces the same
+/// callable-namespace scope as its reader-quoted spelling and must skip its
+/// parameter list the same way `explicit_reader_function_lambda_body_children`
+/// does for the `#'(lambda ...)` case.
+pub(crate) fn bare_lambda_body_children(
+    view: &ExpressionView,
+) -> Option<impl Iterator<Item = (usize, &ExpressionView)>> {
+    let head = list_head(view)?;
+    if !common_lisp_operator_head_eq(head, "lambda") {
+        return None;
+    }
+    Some(view.children.iter().enumerate().skip(2))
+}

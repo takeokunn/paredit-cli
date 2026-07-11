@@ -15,6 +15,24 @@ fn plans_function_rename_without_value_references() {
 }
 
 #[test]
+fn renames_function_calls_inside_bare_lambda_bodies_without_touching_shadowing_parameter() {
+    assert_function_rename! {
+        input: "(defun helper (v) (+ v 1))\n(defun main () (let ((fn (lambda (helper) (helper 1)))) (funcall fn (helper 2))))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 2,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (v) (+ v 1))",
+            "(lambda (helper) (renamed 1))",
+            "(funcall fn (renamed 2))"
+        ]
+    };
+}
+
+#[test]
 fn skips_labels_local_function_calls_when_renaming_function() {
     assert_function_rename! {
         input: "(defun helper (x) x)\n(defun main () (labels ((helper (x) (helper x))) (helper 1)))\n(defun caller () (helper 2))",

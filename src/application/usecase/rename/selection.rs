@@ -80,3 +80,36 @@ pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
 pub(super) fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
+
+pub(super) trait SpannedCallSite {
+    fn span(&self) -> ByteSpan;
+}
+
+/// Keeps only the outermost call site among any that nest inside one
+/// another (e.g. `(foo (foo x))`), since rewriting the outer site already
+/// rewrites everything nested inside its span.
+pub(super) fn select_outermost_call_sites<T: SpannedCallSite>(
+    mut candidates: Vec<T>,
+) -> (Vec<T>, Vec<T>) {
+    candidates.sort_by_key(|site| {
+        (
+            site.span().start().get(),
+            std::cmp::Reverse(site.span().len()),
+        )
+    });
+
+    let mut selected: Vec<T> = Vec::new();
+    let mut skipped_nested = Vec::new();
+    for site in candidates {
+        if selected.iter().any(|selected: &T| {
+            span_contains(selected.span(), site.span()) && selected.span() != site.span()
+        }) {
+            skipped_nested.push(site);
+        } else {
+            selected.push(site);
+        }
+    }
+    selected.sort_by_key(|site| site.span().start());
+    skipped_nested.sort_by_key(|site| site.span().start());
+    (selected, skipped_nested)
+}
