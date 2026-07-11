@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_remove_unused_flet_binding_ignoring_definition_body_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -26,11 +27,18 @@ fn cli_plans_remove_unused_flet_binding_ignoring_definition_body_reference() {
 #[test]
 fn cli_rejects_recursive_labels_binding() {
     let mut cmd = paredit();
-    cmd.args(["remove-unused-binding", "--path", "0", "--name", "unused"])
-        .write_stdin("(labels ((unused () (unused)) (used () (list used))) (used))")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "remove-unused-binding requires zero in-scope references",
-        ));
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "unused",
+    ])
+    .write_stdin("(labels ((unused () (unused)) (used () (list used))) (used))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding requires zero in-scope references",
+    ));
 }

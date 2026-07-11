@@ -11,7 +11,8 @@ fn cli_writes_remove_unused_single_binding_when_drop_value_allowed() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-binding")
+    cmd.arg("refactor")
+        .arg("remove-unused-binding")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -44,7 +45,8 @@ fn cli_writes_remove_all_unused_bindings_when_drop_value_allowed() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-binding")
+    cmd.arg("refactor")
+        .arg("remove-unused-binding")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -78,7 +80,8 @@ fn cli_writes_remove_all_unused_bindings_with_multiple_body_expressions() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-binding")
+    cmd.arg("refactor")
+        .arg("remove-unused-binding")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")

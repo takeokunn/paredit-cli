@@ -11,7 +11,8 @@ fn cli_plans_definition_move_between_files_without_writing() {
     fs::write(&from_file, original_from).expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-definition")
+    cmd.arg("refactor")
+        .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -54,7 +55,8 @@ fn cli_moves_a_definitions_leading_comment_with_it_and_keeps_neighbors_intact() 
     .expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-definition")
+    cmd.arg("refactor")
+        .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -83,6 +85,7 @@ fn cli_moves_a_definitions_leading_comment_with_it_and_keeps_neighbors_intact() 
 
     let mut check_cmd = paredit();
     check_cmd
+        .arg("inspect")
         .arg("check")
         .arg("--file")
         .arg(&from_file)
@@ -103,7 +106,8 @@ fn cli_writes_definition_move_between_files() {
     fs::write(&to_file, "(in-package #:demo.render)\n").expect("write destination fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-definition")
+    cmd.arg("refactor")
+        .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -136,7 +140,8 @@ fn cli_writes_definition_move_into_new_file_with_in_package_header() {
     .expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-definition")
+    cmd.arg("refactor")
+        .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -181,7 +186,8 @@ fn cli_writes_definition_move_between_files_with_matching_package_without_duplic
         .expect("write destination fixture with the same package");
 
     let mut cmd = paredit();
-    cmd.arg("move-definition")
+    cmd.arg("refactor")
+        .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -215,7 +221,8 @@ fn cli_writes_symbol_macro_definition_move_between_files() {
     fs::write(&to_file, "(in-package #:demo.session)\n").expect("write destination fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-definition")
+    cmd.arg("refactor")
+        .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -258,6 +265,7 @@ fn cli_rolls_back_definition_move_when_later_file_write_fails() {
         .expect("make nested dir read only");
 
     let assert_result = paredit()
+        .arg("refactor")
         .arg("move-definition")
         .arg("--from-file")
         .arg(&from_file)
@@ -295,7 +303,8 @@ fn cli_plans_top_level_form_move_without_writing() {
     fs::write(&from_file, original_from).expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-form")
+    cmd.arg("refactor")
+        .arg("move-form")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -339,7 +348,8 @@ fn cli_writes_top_level_form_move_before_anchor() {
     .expect("write destination fixture");
 
     let mut cmd = paredit();
-    cmd.arg("move-form")
+    cmd.arg("refactor")
+        .arg("move-form")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")

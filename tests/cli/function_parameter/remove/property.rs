@@ -27,7 +27,7 @@ proptest! {
             .map_err(|err| TestCaseError::fail(format!("write fixture: {err}")))?;
 
         let output = remove_command()
-            .arg("remove-function-parameter")
+            .arg("refactor").arg("remove-function-parameter")
             .arg("--file")
             .arg(&path)
             .arg("--definition-path")

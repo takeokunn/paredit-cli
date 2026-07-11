@@ -11,7 +11,8 @@ fn cli_writes_unwrap_function_calls_and_skips_non_unary_wrappers() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -46,7 +47,8 @@ fn cli_unwrap_function_calls_can_target_call_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -85,6 +87,7 @@ fn cli_unwrap_function_calls_aggregates_counts_across_multiple_files() {
     .expect("write unchanged fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("unwrap-function-calls")
         .arg(&changed_file)
         .arg(&unchanged_file)
@@ -136,7 +139,8 @@ fn cli_unwrap_function_calls_skips_nested_all_call_rewrites() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

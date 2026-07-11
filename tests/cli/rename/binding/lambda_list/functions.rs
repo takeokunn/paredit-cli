@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_lambda_parameter_rename_without_shadow_capture() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -29,6 +30,7 @@ fn cli_plans_lambda_parameter_rename_without_shadow_capture() {
 fn cli_plans_defun_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -53,6 +55,7 @@ fn cli_plans_defun_parameter_rename() {
 fn cli_plans_emacs_lisp_lambda_parameter_rename_without_shadow_capture() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "emacs-lisp",
@@ -80,6 +83,7 @@ fn cli_plans_emacs_lisp_lambda_parameter_rename_without_shadow_capture() {
 fn cli_plans_emacs_lisp_defun_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "emacs-lisp",
@@ -106,6 +110,7 @@ fn cli_plans_emacs_lisp_defun_parameter_rename() {
 fn cli_plans_defmethod_specialized_parameter_rename_without_touching_specializer() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -129,8 +134,7 @@ fn cli_plans_defmethod_specialized_parameter_rename_without_touching_specializer
 #[test]
 fn cli_plans_defmethod_qualifier_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",
@@ -155,8 +159,7 @@ fn cli_plans_defmethod_qualifier_parameter_rename() {
 #[test]
 fn cli_plans_cl_defmethod_optional_parameter_rename_without_touching_default_form() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",

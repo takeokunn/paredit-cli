@@ -24,7 +24,8 @@ fn assert_cli_local_function_plan(
     let fixture = write_local_function_fixture(case_name, extension, input);
 
     let mut cmd = paredit();
-    cmd.arg("rename-local-function")
+    cmd.arg("refactor")
+        .arg("rename-local-function")
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -57,7 +58,8 @@ fn assert_cli_local_function_write(
     let fixture = write_local_function_fixture(case_name, extension, input);
 
     let mut cmd = paredit();
-    cmd.arg("rename-local-function")
+    cmd.arg("refactor")
+        .arg("rename-local-function")
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -93,6 +95,7 @@ fn assert_cli_rename_local_function_property(
 
     let output = paredit()
         .args([
+            "refactor",
             "rename-local-function",
             "--from",
             &from,

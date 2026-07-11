@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_remove_unused_symbol_macrolet_without_counting_expansion_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -37,7 +38,8 @@ fn cli_plans_remove_unused_emacs_lisp_cl_symbol_macrolet_without_counting_expans
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-binding")
+    cmd.arg("refactor")
+        .arg("remove-unused-binding")
         .arg("--file")
         .arg(&elisp_file)
         .arg("--path")
@@ -62,6 +64,7 @@ fn cli_plans_remove_unused_emacs_lisp_cl_symbol_macrolet_without_counting_expans
 fn cli_plans_remove_unused_cl_user_symbol_macrolet_without_counting_expansion_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -89,11 +92,18 @@ fn cli_plans_remove_unused_cl_user_symbol_macrolet_without_counting_expansion_re
 #[test]
 fn cli_rejects_referenced_symbol_macrolet_binding() {
     let mut cmd = paredit();
-    cmd.args(["remove-unused-binding", "--path", "0", "--name", "value"])
-        .write_stdin("(symbol-macrolet ((value (compute))) (list value))")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "remove-unused-binding requires zero in-scope references",
-        ));
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "value",
+    ])
+    .write_stdin("(symbol-macrolet ((value (compute))) (list value))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding requires zero in-scope references",
+    ));
 }

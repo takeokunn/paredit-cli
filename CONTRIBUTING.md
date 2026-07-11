@@ -21,8 +21,11 @@ nix build .#
 ```
 
 `nix flake check` is the automated baseline for workflow linting, formatting,
-clippy, nextest, package build/tests, and publish dry-run, but it does not
-replace the full release checklist in [RELEASE.md](RELEASE.md).
+clippy, nextest, package build/tests, documentation build, and lint/format
+integration, but it does not replace the full release checklist in
+[RELEASE.md](RELEASE.md). `cargo publish --dry-run` needs network access to
+the crates-io index, so it stays a local pre-release step in
+[RELEASE.md](RELEASE.md) rather than a flake check.
 
 The declared MSRV is also part of the public contract. Before release, and when
 changing parser, refactor, packaging, or public API surfaces, verify it

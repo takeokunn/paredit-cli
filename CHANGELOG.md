@@ -12,8 +12,46 @@ with no external effect.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-12
+
+### Changed
+
+- The flake no longer depends on `flake-utils` (systems are enumerated
+  explicitly) and `rust-overlay` now follows the flake's `nixpkgs`, shrinking
+  `flake.lock` for downstream flake consumers.
+- Flake packages now declare `meta` (description, homepage, changelog,
+  license, and `mainProgram`), so `nix run` and `lib.getExe` resolve the
+  `paredit` binary without heuristics.
+- **Breaking:** every command now lives under exactly three top-level
+  namespaces — `paredit inspect ...` (read-only reports), `paredit edit ...`
+  (one structural edit, printed to stdout), and `paredit refactor ...`
+  (plan/preview/verify/apply workflows and named semantic refactors). The
+  former top-level command aliases (for example `agent-report`,
+  `rename-symbol`, `add-function-parameter`, `workspace plan`) were removed;
+  automation must use the namespaced paths, as documented in
+  [COMPATIBILITY.md](COMPATIBILITY.md).
+- `COMPATIBILITY.md` was rewritten as a command-evolution policy: the CLI does
+  not promise backward compatibility for command paths, flags, text output, or
+  JSON schemas between releases; the command reference in the current
+  documentation release is the supported surface.
+
+### Added
+
+- A published documentation site built with mdBook from `docs/src`
+  (<https://takeokunn.github.io/paredit-cli/>), covering the command model,
+  the refactor workflow lifecycle, safety guidance, and CI/Nix integrations.
+- A `docs` flake package (`nix build .#docs`) that builds the documentation
+  site; `nix flake check` validates it and the GitHub Pages workflow deploys
+  the same derivation.
+- Documentation site pages for installation (Nix run/profile, flake overlay,
+  Cachix binary cache, `cargo install`) and for development (dev shell,
+  `nix flake check` gate, documentation-as-contract testing, MSRV, releases).
+
 ### Fixed
 
+- `CONTRIBUTING.md` no longer claims `nix flake check` runs the publish
+  dry-run; that step needs crates-io network access and remains a local
+  pre-release step in `RELEASE.md`.
 - Scope-aware reference collection (the shared traversal behind
   `unused-definition-report`, `remove-unused-definitions`, `let-report`,
   `dependency-report`, and every rename/refactor command built on it) no

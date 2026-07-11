@@ -11,6 +11,7 @@ fn cli_writes_add_function_parameter_for_scheme_start() {
     .expect("write scheme fixture");
 
     let output = paredit()
+        .arg("refactor")
         .arg("add-function-parameter")
         .arg("--file")
         .arg(&scheme_file)

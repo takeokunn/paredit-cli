@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_binding_rename_inside_quasiquote_preserving_unquote_prefixes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -28,6 +29,7 @@ fn cli_plans_binding_rename_inside_quasiquote_preserving_unquote_prefixes() {
 fn cli_plans_binding_rename_only_after_matching_nested_unquote_depth() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",

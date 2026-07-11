@@ -13,7 +13,8 @@ fn cli_reports_duplicate_structural_forms_for_refactor_planning() {
     .expect("write duplicate fixture");
 
     let mut cmd = paredit();
-    cmd.arg("duplicate-report")
+    cmd.arg("inspect")
+        .arg("duplicates")
         .arg("--min-node-count")
         .arg("8")
         .arg("--output")
@@ -49,7 +50,8 @@ fn cli_plans_replacement_batches_from_duplicate_forms() {
     .expect("write secondary duplicate fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replacement-plan")
+    cmd.arg("refactor")
+        .arg("replacement-plan")
         .arg("--min-node-count")
         .arg("8")
         .arg("--replacement")
@@ -93,6 +95,7 @@ fn cli_plans_replacement_batches_can_keep_canonical_first_form() {
 
     let mut cmd = paredit();
     let output = cmd
+        .arg("refactor")
         .arg("replacement-plan")
         .arg("--min-node-count")
         .arg("8")
@@ -150,7 +153,8 @@ fn cli_filters_replacement_plan_by_per_file_group_size() {
     .expect("write duplicate fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replacement-plan")
+    cmd.arg("refactor")
+        .arg("replacement-plan")
         .arg("--min-node-count")
         .arg("8")
         .arg("--min-group-size")
@@ -176,7 +180,8 @@ fn cli_uses_review_placeholder_for_default_replacement_plan_output() {
     .expect("write duplicate fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replacement-plan")
+    cmd.arg("refactor")
+        .arg("replacement-plan")
         .arg("--min-node-count")
         .arg("8")
         .arg("--output")

@@ -62,9 +62,23 @@ fn security_supported_line_and_acknowledgement_policy_match_public_docs() {
         ),
         "security policy must define the active support line"
     );
+    let manifest = std::fs::read_to_string("Cargo.toml").expect("read Cargo.toml");
+    let version = manifest
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("version = "))
+        .map(|value| value.trim_matches('"'))
+        .expect("Cargo.toml version");
+    let release_line = version
+        .rsplit_once('.')
+        .map(|(major_minor, _)| major_minor)
+        .expect("semver version in Cargo.toml");
+    let supported_line = format!(
+        "| Latest tagged release line (currently `v{release_line}.x`) | Yes, until superseded by a newer supported line |"
+    );
+
     for needle in [
         "| Unreleased `main` | Yes |",
-        "| Latest tagged release line (currently `v0.1.x`) | Yes, until superseded by a newer supported line |",
+        supported_line.as_str(),
         "| Released versions older than the latest tagged line | No |",
     ] {
         assert!(

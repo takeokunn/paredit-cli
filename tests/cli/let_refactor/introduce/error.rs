@@ -4,6 +4,7 @@ use super::*;
 fn cli_rejects_introduce_let_write_without_file() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "introduce-let",
         "--path",
         "0.3.1",

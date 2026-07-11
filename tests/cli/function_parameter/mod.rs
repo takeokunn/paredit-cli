@@ -265,6 +265,7 @@ pub(super) fn parse_move_function_parameter_report(
 
 pub(super) fn assert_cli_check_succeeds(path: &std::path::Path) -> Result<(), TestCaseError> {
     let check_output = paredit()
+        .arg("inspect")
         .arg("check")
         .arg("--file")
         .arg(path)

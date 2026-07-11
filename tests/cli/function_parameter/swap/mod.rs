@@ -2,7 +2,7 @@ pub(super) use super::*;
 
 fn swap_command() -> Command {
     let mut cmd = paredit();
-    cmd.arg("swap-function-parameters");
+    cmd.arg("refactor").arg("swap-function-parameters");
     cmd
 }
 

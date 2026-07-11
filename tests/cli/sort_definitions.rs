@@ -13,7 +13,8 @@ fn cli_plans_definition_sort_without_writing() {
     fs::write(&file, original).expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-definitions")
+    cmd.arg("refactor")
+        .arg("sort-definitions")
         .arg("--file")
         .arg(&file)
         .arg("--output")
@@ -52,7 +53,8 @@ fn cli_writes_sorted_definitions() {
     .expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-definitions")
+    cmd.arg("refactor")
+        .arg("sort-definitions")
         .arg("--file")
         .arg(&file)
         .arg("--write")
@@ -82,7 +84,8 @@ fn cli_respects_non_definition_barriers() {
     fs::write(&file, original).expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-definitions")
+    cmd.arg("refactor")
+        .arg("sort-definitions")
         .arg("--file")
         .arg(&file)
         .arg("--write")
@@ -110,6 +113,7 @@ fn assert_sort_definitions_property(definition_count: usize) -> Result<(), TestC
     fs::write(&file, source).expect("write generated source");
 
     let output = paredit()
+        .arg("refactor")
         .arg("sort-definitions")
         .arg("--file")
         .arg(&file)
@@ -144,6 +148,7 @@ fn assert_sort_definitions_property(definition_count: usize) -> Result<(), TestC
     }
 
     let check_output = paredit()
+        .arg("inspect")
         .arg("check")
         .write_stdin(rewritten)
         .output()

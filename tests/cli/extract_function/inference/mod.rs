@@ -23,7 +23,8 @@ fn assert_extract_function_inference(
     definition: Option<&str>,
 ) {
     let mut cmd = paredit();
-    cmd.arg("extract-function")
+    cmd.arg("refactor")
+        .arg("extract-function")
         .args(args)
         .write_stdin(input)
         .assert()

@@ -8,7 +8,8 @@ fn cli_plans_package_export_sort_without_writing() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-exports")
+    cmd.arg("refactor")
+        .arg("sort-package-exports")
         .arg("--file")
         .arg(&package_file)
         .arg("--package")
@@ -40,7 +41,8 @@ fn cli_writes_package_export_sort() {
     .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-exports")
+    cmd.arg("refactor")
+        .arg("sort-package-exports")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")
@@ -63,7 +65,8 @@ fn cli_keeps_sorted_package_exports_idempotent() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-exports")
+    cmd.arg("refactor")
+        .arg("sort-package-exports")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")

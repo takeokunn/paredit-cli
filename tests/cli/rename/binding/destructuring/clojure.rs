@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_destructured_let_binding_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "clojure",
@@ -30,6 +31,7 @@ fn cli_plans_destructured_let_binding_rename() {
 fn cli_plans_destructured_fn_parameter_rename_without_shadow_capture() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "clojure",
@@ -57,6 +59,7 @@ fn cli_plans_destructured_fn_parameter_rename_without_shadow_capture() {
 fn cli_plans_clojure_keys_destructured_fn_parameter_rename_preserving_lookup_key() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "clojure",
@@ -84,6 +87,7 @@ fn cli_plans_clojure_keys_destructured_fn_parameter_rename_preserving_lookup_key
 fn cli_plans_clojure_as_destructured_fn_parameter_rename_without_shadow_capture() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "clojure",

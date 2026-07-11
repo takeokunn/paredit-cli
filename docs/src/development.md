@@ -1,0 +1,81 @@
+# Development
+
+Everything a contributor needs is provided by the Nix flake; no manually
+installed Rust toolchain is required.
+
+## Environment
+
+```sh
+nix develop        # rustc, cargo, rust-analyzer, cargo-nextest, clippy, mdbook
+```
+
+With [direnv](https://direnv.net/), `direnv allow` activates the same shell
+automatically via the committed `.envrc`.
+
+## Development loop
+
+```sh
+cargo fmt --all
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
+cargo nextest run --locked
+```
+
+Formatting for the whole repository (Rust via rustfmt, Nix via nixfmt, and
+Lisp sources via `paredit edit format`) is one command:
+
+```sh
+nix fmt
+```
+
+## The verification gate
+
+Pull requests run exactly one command, and the same command works locally:
+
+```sh
+nix flake check
+```
+
+It builds and runs every check the project defines:
+
+| Check | What it verifies |
+| --- | --- |
+| `treefmt` | Rust, Nix, and Lisp sources are canonically formatted |
+| `actionlint` | GitHub Actions workflows are well-formed |
+| `clippy` | No clippy warnings with `-D warnings` |
+| `nextest` | The full test suite under cargo-nextest |
+| `package` | The crate builds and its `cargo test` suite passes |
+| `documentation` | The mdBook site builds to a valid `index.html` |
+| `lint-format-integration` | The `paredit-lint` / `paredit-format` gates behave end to end |
+
+## Documentation is tested
+
+The repository treats documentation as part of the public contract. Tests in
+`tests/cli/*_contract.rs` read `README.md`, `docs/src/*.md`, `action.yml`, and
+`flake.nix` and fail when documented commands, integration surfaces, or policy
+statements drift from reality. When you change behaviour, update the
+documentation in the same commit — CI enforces it.
+
+To preview the book locally:
+
+```sh
+nix build .#docs   # rendered site in ./result
+mdbook serve docs  # live-reloading preview from the dev shell
+```
+
+## MSRV
+
+The minimum supported Rust version is declared in `Cargo.toml`
+(`rust-version = "1.85"`). Verify it before touching parser, refactor,
+packaging, or public API surfaces:
+
+```sh
+cargo +1.85 test --locked
+```
+
+## Releases
+
+The release checklist, versioning policy, and publish steps live in
+[RELEASE.md](https://github.com/takeokunn/paredit-cli/blob/main/RELEASE.md).
+Command evolution follows the no-backward-compatibility policy in
+[COMPATIBILITY.md](https://github.com/takeokunn/paredit-cli/blob/main/COMPATIBILITY.md).

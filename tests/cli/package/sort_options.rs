@@ -9,7 +9,8 @@ fn cli_plans_package_option_sort_without_writing() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-options")
+    cmd.arg("refactor")
+        .arg("sort-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--package")
@@ -43,7 +44,8 @@ fn cli_writes_package_option_sort() {
     .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-options")
+    cmd.arg("refactor")
+        .arg("sort-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")
@@ -69,7 +71,8 @@ fn cli_writes_package_option_sort_dropping_a_blank_line_left_behind_at_the_front
     .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-options")
+    cmd.arg("refactor")
+        .arg("sort-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")
@@ -92,7 +95,8 @@ fn cli_keeps_sorted_package_options_idempotent() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("sort-package-options")
+    cmd.arg("refactor")
+        .arg("sort-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")

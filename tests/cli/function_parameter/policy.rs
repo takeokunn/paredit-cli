@@ -4,6 +4,7 @@ use super::*;
 fn cli_requires_file_for_add_function_parameter_writes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "add-function-parameter",
         "--definition-path",
         "0",
@@ -24,6 +25,7 @@ fn cli_requires_file_for_add_function_parameter_writes() {
 fn cli_requires_file_for_move_function_parameter_writes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "move-function-parameter",
         "--definition-path",
         "0",
@@ -44,6 +46,7 @@ fn cli_requires_file_for_move_function_parameter_writes() {
 fn cli_requires_file_for_swap_function_parameters_writes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "swap-function-parameters",
         "--definition-path",
         "0",
@@ -64,6 +67,7 @@ fn cli_requires_file_for_swap_function_parameters_writes() {
 fn cli_requires_file_for_reorder_function_parameters_writes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "reorder-function-parameters",
         "--definition-path",
         "0",
@@ -86,6 +90,7 @@ fn cli_requires_file_for_reorder_function_parameters_writes() {
 fn cli_requires_file_for_remove_function_parameter_writes() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-function-parameter",
         "--definition-path",
         "0",
@@ -104,6 +109,7 @@ fn cli_requires_file_for_remove_function_parameter_writes() {
 fn cli_rejects_function_parameter_all_calls_with_explicit_call_path() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-function-parameter",
         "--definition-path",
         "0",

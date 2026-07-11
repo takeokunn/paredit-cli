@@ -28,7 +28,7 @@ pub fn refactor_plan_steps(
             action: "run-dependency-report",
             rationale: "Check package, ASDF, load, and qualified-symbol dependencies that can invalidate a cross-file refactor."
                 .to_owned(),
-            command: Some(format!("paredit dependency-report --output json {file_args}")),
+            command: Some(format!("paredit inspect dependencies --output json {file_args}")),
         },
     ];
 
@@ -44,28 +44,28 @@ pub fn refactor_plan_steps(
             "apply-symbol-macro-rename",
             "Target definition is a symbol macro; use the dedicated symbol-macro rename workflow to preserve macro expansion and value references.",
             Some(format!(
-                "paredit rename-symbol-macro --from {symbol_arg} --to <new-symbol> --output json {file_args}"
+                "paredit refactor rename-symbol-macro --from {symbol_arg} --to <new-symbol> --output json {file_args}"
             )),
         ),
         RefactorOperation::Rename if target_kind.is_macro_like() => (
             "apply-macro-rename",
             "Target definition is macro-like; use the callable rename workflow because it already rewrites the definition and invocation sites.",
             Some(format!(
-                "paredit rename-function --from {symbol_arg} --to <new-symbol> --output json {file_args}"
+                "paredit refactor rename-function --from {symbol_arg} --to <new-symbol> --output json {file_args}"
             )),
         ),
         RefactorOperation::Rename if has_non_call_references => (
             "apply-symbol-rename",
             "Non-call references exist; use atom-wide rename after reviewing the exact impact scope.",
             Some(format!(
-                "paredit rename-symbols --from {symbol_arg} --to <new-symbol> --output json {file_args}"
+                "paredit refactor rename-symbols --from {symbol_arg} --to <new-symbol> --output json {file_args}"
             )),
         ),
         RefactorOperation::Rename => (
             "apply-rename",
             "No blocking rename gates were found; use callable rename when every reference is a call/definition.",
             Some(format!(
-                "paredit rename-function --from {symbol_arg} --to <new-symbol> --output json {file_args}"
+                "paredit refactor rename-function --from {symbol_arg} --to <new-symbol> --output json {file_args}"
             )),
         ),
         RefactorOperation::Remove if blocked => (
@@ -76,7 +76,7 @@ pub fn refactor_plan_steps(
         RefactorOperation::Remove => (
             "apply-unused-definition-removal",
             "No blocking removal gates were found; remove unused definition candidates across the reviewed file set with a dry-run plan first.",
-            Some(format!("paredit remove-unused-definitions --output json {file_args}")),
+            Some(format!("paredit refactor remove-unused-definitions --output json {file_args}")),
         ),
         RefactorOperation::Move if blocked => (
             "review-move-scope",
@@ -86,7 +86,7 @@ pub fn refactor_plan_steps(
         RefactorOperation::Move => (
             "apply-move",
             "No blocking move gates were found; move the selected top-level definition with a dry-run plan first.",
-            Some("paredit move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json".to_owned()),
+            Some("paredit refactor move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json".to_owned()),
         ),
         RefactorOperation::Signature if target_kind.skips_signature_compatibility() => (
             "review-signature-scope",
@@ -101,7 +101,7 @@ pub fn refactor_plan_steps(
         RefactorOperation::Signature => (
             "apply-signature-change",
             "No blocking signature gates were found; use the dedicated parameter-edit commands with plans first.",
-            Some("paredit add-function-parameter --file <file> --path <definition-path> --name <parameter> --plan --output json".to_owned()),
+            Some("paredit refactor add-function-parameter --file <file> --path <definition-path> --name <parameter> --plan --output json".to_owned()),
         ),
     };
 
@@ -130,10 +130,10 @@ fn verification_command(
 ) -> String {
     match operation {
         RefactorOperation::Remove => format!(
-            "paredit refactor verify --symbol {symbol_arg} --operation remove --phase post --output json {file_args} && paredit dependency-report --output json {file_args}"
+            "paredit refactor verify --symbol {symbol_arg} --operation remove --phase post --output json {file_args} && paredit inspect dependencies --output json {file_args}"
         ),
         RefactorOperation::Rename | RefactorOperation::Move | RefactorOperation::Signature => {
-            format!("{impact_command} && paredit dependency-report --output json {file_args}")
+            format!("{impact_command} && paredit inspect dependencies --output json {file_args}")
         }
     }
 }
@@ -151,7 +151,7 @@ fn gated_impact_report_command(
     };
 
     format!(
-        "paredit impact-report --symbol {symbol_arg} --fail-on-risk-level warning --require-definitions 1 --require-references 1{require_calls} --output json {file_args}"
+        "paredit inspect impact --symbol {symbol_arg} --fail-on-risk-level warning --require-definitions 1 --require-references 1{require_calls} --output json {file_args}"
     )
 }
 

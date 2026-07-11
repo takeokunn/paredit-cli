@@ -20,7 +20,7 @@ fn cli_reports_workspace_inventory_from_directory_roots() {
     fs::write(&unknown_file, "not lisp").expect("write unknown fixture");
 
     let mut cmd = paredit();
-    cmd.args(["workspace", "report"])
+    cmd.args(["inspect", "workspace"])
         .arg("--output")
         .arg("json")
         .arg(&dir)
@@ -57,7 +57,7 @@ fn cli_reports_workspace_inventory_with_include_flags() {
     fs::write(&unknown_file, "plain-text-note\n").expect("write unknown fixture");
 
     let mut cmd = paredit();
-    cmd.args(["workspace", "report"])
+    cmd.args(["inspect", "workspace"])
         .arg("--include-hidden")
         .arg("--include-generated")
         .arg("--include-unknown")
@@ -90,7 +90,7 @@ fn cli_reports_workspace_inventory_with_max_depth_limit() {
     fs::write(&nested_file, "(defun deep () t)\n").expect("write nested fixture");
 
     let mut cmd = paredit();
-    cmd.args(["workspace", "report"])
+    cmd.args(["inspect", "workspace"])
         .arg("--max-depth")
         .arg("1")
         .arg("--output")

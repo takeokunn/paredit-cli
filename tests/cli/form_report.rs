@@ -16,7 +16,8 @@ fn generated_form_report_input(depth: usize) -> String {
 fn assert_form_report_property(input: String) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
-            "form-report",
+            "inspect",
+            "form",
             "--dialect",
             "common-lisp",
             "--path",
@@ -59,6 +60,7 @@ proptest! {
 fn cli_prints_agent_report_json() {
     let mut cmd = paredit();
     cmd.args([
+        "inspect",
         "agent-report",
         "--file",
         "tests/fixtures/system.asd",

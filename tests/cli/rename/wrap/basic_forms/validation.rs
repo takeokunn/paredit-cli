@@ -7,7 +7,8 @@ fn cli_rejects_wrap_function_calls_without_explicit_scope() {
     fs::write(&lisp_file, "(defun render () (fetch-user id))\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -27,7 +28,8 @@ fn cli_rejects_wrap_function_calls_with_conflicting_scope_flags() {
     fs::write(&lisp_file, "(defun render () (fetch-user id))\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

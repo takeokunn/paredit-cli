@@ -11,7 +11,8 @@ fn cli_unwraps_only_calls_in_executable_reader_contexts() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -42,7 +43,8 @@ fn cli_rejects_unwrap_call_path_in_non_executable_reader_context() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
+    cmd.arg("refactor")
+        .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

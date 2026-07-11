@@ -24,7 +24,8 @@ fn cli_reports_dependency_inventory_for_agent_planning() {
     .expect("write dependency fixture");
 
     let mut cmd = paredit();
-    cmd.arg("dependency-report")
+    cmd.arg("inspect")
+        .arg("dependencies")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -57,7 +58,8 @@ fn cli_excludes_symbol_macrolet_binding_names_and_shadowed_body_references_from_
     .expect("write symbol-macrolet dependency fixture");
 
     let mut cmd = paredit();
-    cmd.arg("dependency-report")
+    cmd.arg("inspect")
+        .arg("dependencies")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -80,7 +82,8 @@ fn cli_respects_local_callable_scopes_in_common_lisp_dependency_report() {
     .expect("write local-callable dependency fixture");
 
     let mut cmd = paredit();
-    cmd.arg("dependency-report")
+    cmd.arg("inspect")
+        .arg("dependencies")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -110,7 +113,8 @@ fn cli_reports_quasiquote_unquotes_and_quote_wrapped_unquotes_as_dependencies() 
     .expect("write quasiquote dependency fixture");
 
     let mut cmd = paredit();
-    cmd.arg("dependency-report")
+    cmd.arg("inspect")
+        .arg("dependencies")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -133,7 +137,8 @@ fn cli_skips_reader_eval_bodies_in_dependency_analysis() {
     .expect("write reader-eval dependency fixture");
 
     let mut cmd = paredit();
-    cmd.arg("dependency-report")
+    cmd.arg("inspect")
+        .arg("dependencies")
         .arg("--output")
         .arg("json")
         .arg(&file)

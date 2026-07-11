@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_remove_unused_with_slots_without_counting_instance_expression() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -28,6 +29,7 @@ fn cli_plans_remove_unused_with_slots_without_counting_instance_expression() {
 fn cli_plans_remove_unused_with_accessors_without_counting_instance_expression() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",

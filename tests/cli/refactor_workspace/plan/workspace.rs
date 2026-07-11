@@ -13,7 +13,7 @@ fn cli_builds_workspace_refactor_plan_for_symbol_macro_targets() {
         "rename",
         "symbol_macro",
         "apply-symbol-macro-rename",
-        "paredit rename-symbol-macro --from 'current-user' --to <new-symbol> --output json",
+        "paredit refactor rename-symbol-macro --from 'current-user' --to <new-symbol> --output json",
     );
 }
 
@@ -30,7 +30,7 @@ fn cli_builds_workspace_refactor_plan_for_symbol_macro_move_targets() {
         "move",
         "symbol_macro",
         "apply-move",
-        "paredit move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json",
+        "paredit refactor move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json",
     );
 }
 
@@ -47,7 +47,7 @@ fn cli_builds_workspace_refactor_plan_for_macro_targets() {
         "rename",
         "macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'render-pane' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'render-pane' --to <new-symbol> --output json",
     );
 }
 
@@ -64,7 +64,7 @@ fn cli_builds_workspace_refactor_plan_for_define_method_combination_targets() {
         "rename",
         "macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'render-combination' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'render-combination' --to <new-symbol> --output json",
     );
 }
 
@@ -81,7 +81,7 @@ fn cli_builds_workspace_refactor_plan_for_define_modify_macro_targets() {
         "rename",
         "macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'updatef' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'updatef' --to <new-symbol> --output json",
     );
 }
 
@@ -98,7 +98,7 @@ fn cli_builds_workspace_refactor_plan_for_compiler_macro_targets() {
         "rename",
         "compiler_macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'fast-add' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'fast-add' --to <new-symbol> --output json",
     );
 }
 
@@ -129,11 +129,9 @@ fn cli_builds_workspace_refactor_plan_from_directory_roots() {
     assert!(output.stdout.contains("\"file_count\": 1"));
     assert!(output.stdout.contains("\"definition_count\": 1"));
     assert!(output.stdout.contains("\"call_count\": 1"));
-    assert!(
-        output.stdout.contains(
-            "paredit rename-symbols --from 'render-pane' --to <new-symbol> --output json"
-        )
-    );
+    assert!(output.stdout.contains(
+        "paredit refactor rename-symbols --from 'render-pane' --to <new-symbol> --output json"
+    ));
 }
 
 #[test]
@@ -198,7 +196,7 @@ fn cli_builds_workspace_refactor_plan_with_hidden_and_generated_inputs() {
     assert!(
         output
             .stdout
-            .contains("paredit impact-report --symbol 'render-pane'")
+            .contains("paredit inspect impact --symbol 'render-pane'")
     );
 }
 
@@ -236,11 +234,9 @@ fn cli_builds_workspace_refactor_plan_with_max_depth_limit() {
     assert!(output.stdout.contains("\"status\": \"ready\""));
     assert!(output.stdout.contains("\"safe_to_automate\": true"));
     assert!(output.stdout.contains("\"blocking_gate_count\": 0"));
-    assert!(
-        output.stdout.contains(
-            "paredit rename-symbols --from 'render-pane' --to <new-symbol> --output json"
-        )
-    );
+    assert!(output.stdout.contains(
+        "paredit refactor rename-symbols --from 'render-pane' --to <new-symbol> --output json"
+    ));
 }
 
 #[test]
@@ -277,11 +273,9 @@ fn cli_builds_workspace_refactor_plan_with_unknown_inputs() {
     assert!(output.stdout.contains("\"blocking_gate_count\": 0"));
     assert!(output.stdout.contains("core.lisp"));
     assert!(output.stdout.contains("scratch.txt"));
-    assert!(
-        output.stdout.contains(
-            "paredit rename-function --from 'render-pane' --to <new-symbol> --output json"
-        )
-    );
+    assert!(output.stdout.contains(
+        "paredit refactor rename-function --from 'render-pane' --to <new-symbol> --output json"
+    ));
 }
 
 #[cfg(unix)]
@@ -340,7 +334,7 @@ fn cli_builds_workspace_remove_plan_with_unused_definition_cleanup_command() {
     assert!(
         output
             .stdout
-            .contains("paredit remove-unused-definitions --output json")
+            .contains("paredit refactor remove-unused-definitions --output json")
     );
     assert!(output.stdout.contains(
         "paredit refactor verify --symbol 'stale-helper' --operation remove --phase post --output json",

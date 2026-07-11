@@ -12,7 +12,8 @@ fn cli_plans_file_split_without_writing() {
     fs::write(&from_file, original_from).expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("split-file")
+    cmd.arg("refactor")
+        .arg("split-file")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -58,7 +59,8 @@ fn cli_writes_file_split_into_nested_directory() {
     .expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("split-file")
+    cmd.arg("refactor")
+        .arg("split-file")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -108,7 +110,8 @@ fn cli_plans_file_split_by_name_and_kind() {
     .expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("split-file")
+    cmd.arg("refactor")
+        .arg("split-file")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -159,6 +162,7 @@ fn cli_rolls_back_split_file_when_later_file_write_fails() {
         .expect("make nested dir read only");
 
     let assert_result = paredit()
+        .arg("refactor")
         .arg("split-file")
         .arg("--from-file")
         .arg(&from_file)
@@ -196,7 +200,8 @@ fn assert_split_file_property(definition_count: usize) -> Result<(), TestCaseErr
     fs::write(&from_file, source).expect("write generated source");
 
     let mut cmd = paredit();
-    cmd.arg("split-file")
+    cmd.arg("refactor")
+        .arg("split-file")
         .arg("--from-file")
         .arg(&from_file)
         .arg("--to-file")
@@ -242,6 +247,7 @@ fn assert_split_file_property(definition_count: usize) -> Result<(), TestCaseErr
 
     for rewritten in [rewritten_source, destination] {
         let check_output = paredit()
+            .arg("inspect")
             .arg("check")
             .write_stdin(rewritten)
             .output()

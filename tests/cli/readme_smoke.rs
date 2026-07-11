@@ -32,12 +32,12 @@ fn readme_quickstart_commands_smoke() {
     let helper_file_arg = helper_file.display().to_string();
 
     paredit()
-        .args(["check", "--file", &source_file_arg])
+        .args(["inspect", "check", "--file", &source_file_arg])
         .assert()
         .success();
 
     paredit()
-        .args(["workspace", "report", "--output", "json", &workspace_arg])
+        .args(["inspect", "workspace", "--output", "json", &workspace_arg])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"file_count\": 2"))
@@ -46,7 +46,8 @@ fn readme_quickstart_commands_smoke() {
 
     paredit()
         .args([
-            "form-report",
+            "inspect",
+            "form",
             "--file",
             &source_file_arg,
             "--path",

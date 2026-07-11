@@ -3,8 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -15,18 +17,74 @@
     {
       self,
       nixpkgs,
-      flake-utils,
       rust-overlay,
       treefmt-nix,
     }:
     let
+      inherit (nixpkgs) lib;
+
+      cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+
+      pkgsFor = lib.genAttrs systems (
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        }
+      );
+
+      forAllSystems = f: lib.genAttrs systems (system: f pkgsFor.${system});
+
       mkParedit =
         pkgs:
         pkgs.rustPlatform.buildRustPackage {
           pname = "paredit-cli";
-          version = "0.1.2";
+          version = cargoToml.package.version;
+          # The whole tracked tree is the build input on purpose: the crate's
+          # contract tests assert on README, docs/, action.yml, and workflow
+          # files, so documentation belongs to the test fixture surface.
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          meta = {
+            description = cargoToml.package.description;
+            homepage = cargoToml.package.homepage;
+            changelog = "${cargoToml.package.repository}/blob/main/CHANGELOG.md";
+            license = lib.licenses.mit;
+            mainProgram = "paredit";
+          };
+        };
+
+      mkDocs =
+        pkgs:
+        pkgs.stdenvNoCC.mkDerivation {
+          pname = "paredit-cli-docs";
+          version = cargoToml.package.version;
+          src = lib.fileset.toSource {
+            root = ./docs;
+            fileset = lib.fileset.unions [
+              ./docs/book.toml
+              ./docs/src
+            ];
+          };
+          nativeBuildInputs = [ pkgs.mdbook ];
+          buildPhase = ''
+            runHook preBuild
+            mdbook build --dest-dir "$out" .
+            runHook postBuild
+          '';
+          dontInstall = true;
+          meta = {
+            description = "Rendered mdBook documentation for paredit-cli";
+            homepage = cargoToml.package.homepage;
+            license = lib.licenses.mit;
+          };
         };
 
       mkLint =
@@ -37,13 +95,14 @@
             (mkParedit pkgs)
             pkgs.jq
           ];
+          meta.description = "Fail when discovered Lisp sources contain structural parse errors";
           text = ''
             # Structural lint gate: fail when any discovered Lisp source does
             # not parse as a balanced S-expression document.
             if [ "$#" -eq 0 ]; then
               set -- .
             fi
-            report=$(paredit workspace report --output json "$@")
+            report=$(paredit inspect workspace --output json "$@")
             jq -r '.files[] | select(.status == "parse-error") | "\(.path): \(.error)"' <<<"$report"
             if [ "''${GITHUB_ACTIONS:-}" = "true" ]; then
               jq -r '.files[] | select(.status == "parse-error") | "::error file=\(.path)::structural parse error: \(.error)"' <<<"$report"
@@ -63,6 +122,7 @@
             (mkParedit pkgs)
             pkgs.jq
           ];
+          meta.description = "Rewrite discovered Lisp sources into canonical paredit edit format";
           text = ''
             # Canonical formatter over discovered Lisp sources.
             # Default mode rewrites files in place; --check only reports
@@ -78,16 +138,16 @@
             if [ "''${#args[@]}" -eq 0 ]; then
               args=(.)
             fi
-            report=$(paredit workspace report --output json "''${args[@]}")
+            report=$(paredit inspect workspace --output json "''${args[@]}")
             fail=0
             changed=0
             while IFS= read -r file; do
-              formatted=$(paredit format --file "$file")
+              formatted=$(paredit edit format --file "$file")
               if ! printf '%s\n' "$formatted" | cmp -s - "$file"; then
                 if [ "$check" -eq 1 ]; then
                   echo "would reformat: $file"
                   if [ "''${GITHUB_ACTIONS:-}" = "true" ]; then
-                    echo "::error file=$file::not in canonical paredit format (run: paredit-format $file)"
+                    echo "::error file=$file::not in canonical paredit edit format (run: paredit-format $file)"
                   fi
                   fail=1
                 else
@@ -126,12 +186,13 @@
         pkgs.writeShellApplication {
           name = "paredit-format-files";
           runtimeInputs = [ (mkParedit pkgs) ];
+          meta.description = "treefmt-style formatter: rewrite each argument file in place";
           text = ''
             # treefmt-style formatter: rewrite each argument file in place.
             # Files that do not parse are left untouched; paredit-lint owns
             # structural failures.
             for file in "$@"; do
-              if formatted=$(paredit format --file "$file"); then
+              if formatted=$(paredit edit format --file "$file"); then
                 printf '%s\n' "$formatted" | cmp -s - "$file" || printf '%s\n' "$formatted" > "$file"
               fi
             done
@@ -144,7 +205,7 @@
         programs.rustfmt.edition = "2024";
         programs.nixfmt.enable = true;
         settings.formatter.paredit = {
-          command = pkgs.lib.getExe (mkFormatFiles pkgs);
+          command = lib.getExe (mkFormatFiles pkgs);
           includes = lispIncludes;
           # Test fixtures are byte-exact parser inputs; formatting them would
           # change the spans the tests assert on.
@@ -152,183 +213,192 @@
         };
       };
 
-      perSystem = flake-utils.lib.eachDefaultSystem (
-        system:
-        let
-          overlays = [ rust-overlay.overlays.default ];
-          pkgs = import nixpkgs { inherit system overlays; };
-          rustToolchain = pkgs.rust-bin.stable.latest.default;
-          treefmtEval = treefmt-nix.lib.evalModule pkgs (mkTreefmtModule pkgs);
-        in
-        {
-          packages = {
-            default = mkParedit pkgs;
-            lint = mkLint pkgs;
-            format = mkFormat pkgs;
-            format-files = mkFormatFiles pkgs;
-          };
-
-          apps = {
-            default = {
-              type = "app";
-              program = "${self.packages.${system}.default}/bin/paredit";
-              meta.description = "Run paredit-cli";
-            };
-            lint = {
-              type = "app";
-              program = "${self.packages.${system}.lint}/bin/paredit-lint";
-              meta.description = "Fail when discovered Lisp sources contain structural parse errors";
-            };
-            format = {
-              type = "app";
-              program = "${self.packages.${system}.format}/bin/paredit-format";
-              meta.description = "Rewrite discovered Lisp sources into canonical paredit format (--check to verify only)";
-            };
-          };
-
-          lib = {
-            treefmtFormatter = {
-              command = pkgs.lib.getExe (mkFormatFiles pkgs);
-              includes = lispIncludes;
-            };
-            mkLintCheck =
-              {
-                src,
-                name ? "paredit-lint-check",
-              }:
-              pkgs.runCommand name { nativeBuildInputs = [ (mkLint pkgs) ]; } ''
-                paredit-lint ${src}
-                touch $out
-              '';
-            mkFormatCheck =
-              {
-                src,
-                name ? "paredit-format-check",
-              }:
-              pkgs.runCommand name { nativeBuildInputs = [ (mkFormat pkgs) ]; } ''
-                paredit-format --check ${src}
-                touch $out
-              '';
-          };
-
-          devShells.default = pkgs.mkShell {
-            packages = [
-              rustToolchain
-              pkgs.rust-analyzer
-              pkgs.cargo-nextest
-              pkgs.rustfmt
-              pkgs.clippy
-            ];
-            shellHook = ''
-              cat <<'USAGE_EOF'
-
-              === paredit-cli Development Shell ===
-
-              Development loop:
-                cargo fmt --all
-                cargo clippy --all-targets --all-features -- -D warnings
-                cargo test
-                cargo nextest run --locked
-                cargo publish --dry-run --allow-dirty --locked
-
-              Quick verification:
-                nix flake check  # treefmt + actionlint + clippy + nextest + package build/tests + lint/format integration
-
-              Build and run:
-                nix build .#              # result/bin/paredit
-                nix run .# -- check --file source.lisp
-                nix run .#lint -- .       # structural lint gate
-                nix run .#format -- --check .
-
-              Format everything (Rust + Nix + Lisp via treefmt):
-                nix fmt
-
-              USAGE_EOF
-            '';
-          };
-
-          formatter = treefmtEval.config.build.wrapper;
-
-          checks = {
-            treefmt = treefmtEval.config.build.check self;
-            actionlint =
-              pkgs.runCommand "paredit-cli-actionlint"
-                {
-                  nativeBuildInputs = [ pkgs.actionlint ];
-                  src = self;
-                }
-                ''
-                  cp -r $src/. .
-                  chmod -R u+w .
-                  actionlint -color .github/workflows/*.yml
-                  touch $out
-                '';
-            lint-format-integration =
-              pkgs.runCommand "paredit-cli-lint-format-integration"
-                {
-                  nativeBuildInputs = [
-                    (mkLint pkgs)
-                    (mkFormat pkgs)
-                  ];
-                }
-                ''
-                  mkdir demo
-                  printf '(defun ok (x)\n  (+ x 1))\n' > demo/good.lisp
-
-                  paredit-lint demo
-
-                  printf '(defun broken (' > demo/bad.lisp
-                  if paredit-lint demo; then
-                    echo "expected paredit-lint to fail on demo/bad.lisp" >&2
-                    exit 1
-                  fi
-                  rm demo/bad.lisp
-
-                  printf '(defun messy (x)\n(+ x\n1))\n' > demo/messy.lisp
-                  if paredit-format --check demo; then
-                    echo "expected paredit-format --check to fail on demo/messy.lisp" >&2
-                    exit 1
-                  fi
-                  paredit-format demo
-                  paredit-format --check demo
-
-                  touch $out
-                '';
-            clippy = (self.packages.${system}.default).overrideAttrs (old: {
-              pname = "paredit-cli-clippy";
-              nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.clippy ];
-              doCheck = false;
-              buildPhase = ''
-                cargo clippy --all-targets --all-features -- -D warnings
-              '';
-              installPhase = ''
-                touch $out
-              '';
-            });
-            nextest = (self.packages.${system}.default).overrideAttrs (old: {
-              pname = "paredit-cli-nextest";
-              nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
-              doCheck = false;
-              buildPhase = ''
-                cargo nextest run --locked
-              '';
-              installPhase = ''
-                touch $out
-              '';
-            });
-            package = self.packages.${system}.default;
-            # NOTE: `cargo publish --dry-run` is intentionally NOT a flake check.
-            # It resolves the crates-io registry index over the network, which
-            # the Nix build sandbox blocks on Linux CI (sandbox = true), making
-            # `nix flake check` fail there even though the crate is fine. The
-            # publish dry-run remains a documented local pre-release step in
-            # RELEASE.md, where network access is available.
-          };
-        }
+      treefmtFor = lib.genAttrs systems (
+        system: treefmt-nix.lib.evalModule pkgsFor.${system} (mkTreefmtModule pkgsFor.${system})
       );
     in
-    perSystem
-    // {
+    {
+      packages = forAllSystems (pkgs: {
+        default = mkParedit pkgs;
+        docs = mkDocs pkgs;
+        lint = mkLint pkgs;
+        format = mkFormat pkgs;
+        format-files = mkFormatFiles pkgs;
+      });
+
+      apps = lib.genAttrs systems (system: {
+        default = {
+          type = "app";
+          program = lib.getExe self.packages.${system}.default;
+          meta.description = "Run paredit-cli";
+        };
+        lint = {
+          type = "app";
+          program = lib.getExe self.packages.${system}.lint;
+          meta.description = "Fail when discovered Lisp sources contain structural parse errors";
+        };
+        format = {
+          type = "app";
+          program = lib.getExe self.packages.${system}.format;
+          meta.description = "Rewrite discovered Lisp sources into canonical paredit edit format (--check to verify only)";
+        };
+      });
+
+      lib = forAllSystems (pkgs: {
+        treefmtFormatter = {
+          command = lib.getExe (mkFormatFiles pkgs);
+          includes = lispIncludes;
+        };
+        mkLintCheck =
+          {
+            src,
+            name ? "paredit-lint-check",
+          }:
+          pkgs.runCommand name { nativeBuildInputs = [ (mkLint pkgs) ]; } ''
+            paredit-lint ${src}
+            touch $out
+          '';
+        mkFormatCheck =
+          {
+            src,
+            name ? "paredit-format-check",
+          }:
+          pkgs.runCommand name { nativeBuildInputs = [ (mkFormat pkgs) ]; } ''
+            paredit-format --check ${src}
+            touch $out
+          '';
+      });
+
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = [
+            pkgs.rust-bin.stable.latest.default
+            pkgs.rust-analyzer
+            pkgs.cargo-nextest
+            pkgs.rustfmt
+            pkgs.clippy
+            pkgs.mdbook
+          ];
+          shellHook = ''
+            cat <<'USAGE_EOF'
+
+            === paredit-cli Development Shell ===
+
+            Development loop:
+              cargo fmt --all
+              cargo clippy --all-targets --all-features -- -D warnings
+              cargo test
+              cargo nextest run --locked
+              cargo publish --dry-run --allow-dirty --locked
+
+            Quick verification:
+              nix flake check  # treefmt + actionlint + clippy + nextest + package build/tests + lint/format integration
+
+            Build and run:
+              nix build .#              # result/bin/paredit
+              nix build .#docs          # result/index.html (mdBook site)
+              nix run .# -- inspect check --file source.lisp
+              nix run .#lint -- .       # structural lint gate
+              nix run .#format -- --check .
+
+            Format everything (Rust + Nix + Lisp via treefmt):
+              nix fmt
+
+            USAGE_EOF
+          '';
+        };
+      });
+
+      formatter = lib.genAttrs systems (system: treefmtFor.${system}.config.build.wrapper);
+
+      checks = lib.genAttrs systems (
+        system:
+        let
+          pkgs = pkgsFor.${system};
+        in
+        {
+          treefmt = treefmtFor.${system}.config.build.check self;
+          actionlint =
+            pkgs.runCommand "paredit-cli-actionlint"
+              {
+                nativeBuildInputs = [ pkgs.actionlint ];
+                src = self;
+              }
+              ''
+                cp -r $src/. .
+                chmod -R u+w .
+                actionlint -color .github/workflows/*.yml
+                touch $out
+              '';
+          documentation =
+            pkgs.runCommand "paredit-cli-documentation" { docs = self.packages.${system}.docs; }
+              ''
+                test -f "$docs/index.html"
+                touch $out
+              '';
+          lint-format-integration =
+            pkgs.runCommand "paredit-cli-lint-format-integration"
+              {
+                nativeBuildInputs = [
+                  (mkLint pkgs)
+                  (mkFormat pkgs)
+                ];
+              }
+              ''
+                mkdir demo
+                printf '(defun ok (x)\n  (+ x 1))\n' > demo/good.lisp
+
+                paredit-lint demo
+
+                printf '(defun broken (' > demo/bad.lisp
+                if paredit-lint demo; then
+                  echo "expected paredit-lint to fail on demo/bad.lisp" >&2
+                  exit 1
+                fi
+                rm demo/bad.lisp
+
+                printf '(defun messy (x)\n(+ x\n1))\n' > demo/messy.lisp
+                if paredit-format --check demo; then
+                  echo "expected paredit-format --check to fail on demo/messy.lisp" >&2
+                  exit 1
+                fi
+                paredit-format demo
+                paredit-format --check demo
+
+                touch $out
+              '';
+          clippy = (self.packages.${system}.default).overrideAttrs (old: {
+            pname = "paredit-cli-clippy";
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.clippy ];
+            doCheck = false;
+            buildPhase = ''
+              cargo clippy --all-targets --all-features -- -D warnings
+            '';
+            installPhase = ''
+              touch $out
+            '';
+          });
+          nextest = (self.packages.${system}.default).overrideAttrs (old: {
+            pname = "paredit-cli-nextest";
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
+            doCheck = false;
+            buildPhase = ''
+              cargo nextest run --locked
+            '';
+            installPhase = ''
+              touch $out
+            '';
+          });
+          package = self.packages.${system}.default;
+          # NOTE: `cargo publish --dry-run` is intentionally NOT a flake check.
+          # It resolves the crates-io registry index over the network, which
+          # the Nix build sandbox blocks on Linux CI (sandbox = true), making
+          # `nix flake check` fail there even though the crate is fine. The
+          # publish dry-run remains a documented local pre-release step in
+          # RELEASE.md, where network access is available.
+        }
+      );
+
       overlays.default = final: _prev: {
         paredit-cli = mkParedit final;
         paredit-lint = mkLint final;

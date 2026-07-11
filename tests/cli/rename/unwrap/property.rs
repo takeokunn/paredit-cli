@@ -19,6 +19,7 @@ fn assert_cli_unwrap_function_calls_property(
         .map_err(|err| TestCaseError::fail(format!("write lisp fixture: {err}")))?;
 
     let output = paredit()
+        .arg("refactor")
         .arg("unwrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")

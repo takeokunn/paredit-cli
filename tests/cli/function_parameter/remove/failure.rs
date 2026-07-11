@@ -4,6 +4,7 @@ pub(super) use super::*;
 fn cli_rejects_remove_common_lisp_parameter_after_allow_other_keys() {
     remove_command()
         .args([
+            "refactor",
             "remove-function-parameter",
             "--dialect",
             "common-lisp",
@@ -26,6 +27,7 @@ fn cli_rejects_remove_common_lisp_parameter_after_allow_other_keys() {
 fn cli_rejects_remove_function_parameter_missing_argument() {
     remove_command()
         .args([
+            "refactor",
             "remove-function-parameter",
             "--definition-path",
             "0",

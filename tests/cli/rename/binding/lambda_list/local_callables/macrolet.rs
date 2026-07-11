@@ -4,6 +4,7 @@ use super::super::*;
 fn cli_plans_macrolet_lambda_list_parameter_rename_without_touching_expansion_site() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -30,6 +31,7 @@ fn cli_plans_macrolet_lambda_list_parameter_rename_without_touching_expansion_si
 fn cli_plans_macrolet_whole_parameter_rename_without_touching_call_site_form() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -55,8 +57,7 @@ fn cli_plans_macrolet_whole_parameter_rename_without_touching_call_site_form() {
 #[test]
 fn cli_plans_macrolet_aux_parameter_rename_without_touching_aux_initializer() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -83,8 +84,7 @@ fn cli_plans_macrolet_aux_parameter_rename_without_touching_aux_initializer() {
 #[test]
 fn cli_plans_macrolet_key_parameter_rename_without_touching_key_designator_or_call_site() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",

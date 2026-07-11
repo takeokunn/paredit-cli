@@ -17,7 +17,8 @@ fn cli_reports_multi_file_symbol_occurrences_with_outline_context() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("symbol-report")
+    cmd.arg("inspect")
+        .arg("symbols")
         .arg("--symbol")
         .arg("target")
         .arg(&lisp_file)
@@ -46,7 +47,8 @@ fn cli_reports_unqualified_query_for_package_qualified_common_lisp_symbol() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("symbol-report")
+    cmd.arg("inspect")
+        .arg("symbols")
         .arg("--symbol")
         .arg("target")
         .arg(&lisp_file)

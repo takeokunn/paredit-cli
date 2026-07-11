@@ -9,7 +9,8 @@ fn run_rename_symbol_macro(
     write: bool,
 ) -> std::process::Output {
     let mut cmd = paredit();
-    cmd.arg("rename-symbol-macro")
+    cmd.arg("refactor")
+        .arg("rename-symbol-macro")
         .arg("--from")
         .arg(from)
         .arg("--to")

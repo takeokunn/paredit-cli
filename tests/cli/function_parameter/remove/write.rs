@@ -11,6 +11,7 @@ fn cli_writes_remove_function_parameter_for_scheme() {
     .expect("write scheme fixture");
 
     let output = remove_command()
+        .arg("refactor")
         .arg("remove-function-parameter")
         .arg("--file")
         .arg(&scheme_file)

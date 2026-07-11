@@ -8,7 +8,8 @@ fn cli_plans_common_lisp_export_addition() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("add-export")
+    cmd.arg("refactor")
+        .arg("add-export")
         .arg("--file")
         .arg(&package_file)
         .arg("--package")
@@ -38,7 +39,8 @@ fn cli_writes_common_lisp_export_addition() {
         .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("add-export")
+    cmd.arg("refactor")
+        .arg("add-export")
         .arg("--file")
         .arg(&package_file)
         .arg("--symbol")
@@ -64,7 +66,8 @@ fn cli_keeps_existing_common_lisp_export_idempotent() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("add-export")
+    cmd.arg("refactor")
+        .arg("add-export")
         .arg("--file")
         .arg(&package_file)
         .arg("--package")

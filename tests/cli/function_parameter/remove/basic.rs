@@ -4,6 +4,7 @@ pub(super) use super::*;
 fn cli_plans_remove_function_parameter_for_common_lisp() {
     let report = assert_remove_success_output(
         &[
+            "refactor",
             "remove-function-parameter",
             "--definition-path",
             "0",

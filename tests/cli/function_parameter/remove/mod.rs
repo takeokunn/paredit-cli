@@ -44,6 +44,7 @@ fn common_lisp_remove_args<'a>(
     call_path: &'a str,
 ) -> Vec<&'a str> {
     vec![
+        "refactor",
         "remove-function-parameter",
         "--dialect",
         "common-lisp",

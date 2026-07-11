@@ -4,6 +4,7 @@ use super::super::*;
 fn cli_plans_flet_lambda_list_parameter_rename_without_touching_call_args() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -30,6 +31,7 @@ fn cli_plans_flet_lambda_list_parameter_rename_without_touching_call_args() {
 fn cli_rejects_ambiguous_local_callable_lambda_list_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",

@@ -11,7 +11,8 @@ fn cli_wraps_only_calls_in_executable_reader_contexts() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")
@@ -38,7 +39,8 @@ fn cli_rejects_wrap_call_path_in_non_executable_reader_context() {
     fs::write(&lisp_file, "(defun render () '(fetch-user quoted))\n").expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_binding_rename_without_shadowed_inner_binding() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0.3",
@@ -30,6 +31,7 @@ fn cli_plans_binding_rename_without_shadowed_inner_binding() {
 fn cli_plans_let_star_binding_rename_through_later_binding_values() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -54,6 +56,7 @@ fn cli_plans_let_star_binding_rename_through_later_binding_values() {
 fn cli_plans_emacs_lisp_let_binding_rename_without_shadowed_inner_binding() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "emacs-lisp",
@@ -82,6 +85,7 @@ fn cli_plans_emacs_lisp_let_binding_rename_without_shadowed_inner_binding() {
 fn cli_plans_emacs_lisp_let_star_binding_rename_through_later_binding_values() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "emacs-lisp",
@@ -108,6 +112,7 @@ fn cli_plans_emacs_lisp_let_star_binding_rename_through_later_binding_values() {
 fn cli_plans_common_lisp_bare_let_binding_rename_without_touching_later_init() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -132,6 +137,7 @@ fn cli_plans_common_lisp_bare_let_binding_rename_without_touching_later_init() {
 fn cli_plans_common_lisp_bare_let_star_binding_rename_through_later_init() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -156,6 +162,7 @@ fn cli_plans_common_lisp_bare_let_star_binding_rename_through_later_init() {
 fn cli_plans_outer_let_binding_rename_without_touching_inner_bare_binding() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",

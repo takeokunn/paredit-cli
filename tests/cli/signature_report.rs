@@ -13,7 +13,8 @@ fn cli_reports_signature_arity_across_dialects() {
     fs::write(&elisp_file, "(defun draw () (area 5 6))\n").expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("area")
         .arg(&lisp_file)
@@ -45,7 +46,8 @@ fn cli_gates_signature_report_policy_for_ci() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("render")
         .arg("--fail-on-mismatch")
@@ -88,7 +90,8 @@ fn cli_accepts_signature_report_policy_when_compatible() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("render")
         .arg("--fail-on-mismatch")
@@ -119,7 +122,8 @@ fn cli_reports_common_lisp_setf_callable_signature_usage() {
     .expect("write setf signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("accessor")
         .arg(&lisp_file)
@@ -143,7 +147,8 @@ fn cli_reports_common_lisp_defmacro_signature_usage() {
     .expect("write defmacro signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("with-pane")
         .arg(&lisp_file)
@@ -168,7 +173,8 @@ fn cli_reports_common_lisp_define_compiler_macro_signature_usage() {
     .expect("write compiler macro signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("optimize-render")
         .arg(&lisp_file)
@@ -190,7 +196,8 @@ fn cli_reports_common_lisp_define_modify_macro_signature_usage() {
         .expect("write modify macro signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("updatef")
         .arg(&lisp_file)
@@ -213,7 +220,8 @@ fn cli_reports_common_lisp_define_method_combination_signature_usage() {
     .expect("write method combination signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("render-combination")
         .arg(&lisp_file)
@@ -236,7 +244,8 @@ fn cli_reports_common_lisp_defsetf_long_form_signature_usage() {
     .expect("write defsetf signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("accessor")
         .arg(&lisp_file)
@@ -260,7 +269,8 @@ fn cli_marks_common_lisp_short_defsetf_signature_as_unknown() {
     .expect("write short defsetf signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("accessor")
         .arg(&lisp_file)
@@ -285,7 +295,8 @@ fn cli_reports_common_lisp_symbol_macro_without_arity_signature() {
     .expect("write symbol macro signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("current-user")
         .arg("--output")
@@ -310,7 +321,8 @@ fn cli_reports_common_lisp_symbol_macrolet_expansion_and_body_calls_without_bind
     .expect("write symbol-macrolet signature fixture");
 
     let mut cmd = paredit();
-    cmd.arg("signature-report")
+    cmd.arg("inspect")
+        .arg("signature")
         .arg("--symbol")
         .arg("target")
         .arg("--output")

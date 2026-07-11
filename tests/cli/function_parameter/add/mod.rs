@@ -4,6 +4,7 @@ use proptest::test_runner::TestCaseError;
 
 fn run_add_function_parameter(args: &[&str], stdin: &str) -> std::process::Output {
     paredit()
+        .arg("refactor")
         .args(args)
         .write_stdin(stdin)
         .output()
