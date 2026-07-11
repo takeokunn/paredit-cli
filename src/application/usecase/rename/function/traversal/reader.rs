@@ -50,6 +50,29 @@ pub(in crate::application::usecase::rename::function) fn collect_function_design
     false
 }
 
+/// Handles a bare quoted-symbol designator (`'foo`, i.e. an atom carrying its
+/// own `ReaderPrefix::Quote`) reached via `apply_reader_prefix_context`
+/// bailing out of the traversal at top-level quote depth. `'foo` is the
+/// standard idiom for referencing a symbol as data -- e.g. `(error 'foo
+/// ...)`, `(typep x 'foo)`, `(make-instance 'foo)` -- so a function rename
+/// treats it the same as `#'foo` above: a live reference in the same
+/// namespace as the definition, subject to the same local-callable shadowing
+/// rules. A quoted *list* such as `'(foo 1)` keeps its reader prefix on the
+/// list node rather than on `foo` itself, so this never fires for genuine
+/// quoted data literals.
+pub(in crate::application::usecase::rename::function) fn collect_quoted_symbol_designator_rename(
+    view: &ExpressionView,
+    state: &TraversalState<'_>,
+    context: &TraversalContext<'_>,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) -> bool {
+    if view.kind != ExpressionKind::Atom || !view.reader_prefixes.contains(&ReaderPrefix::Quote) {
+        return false;
+    }
+
+    collect_callable_target_rename(view, state.path.clone(), state, context, renames)
+}
+
 /// Handles a bare `(lambda ...)` form directly, skipping its parameter list
 /// the same way the `#'(lambda ...)` case below skips it via
 /// `explicit_reader_function_lambda_body_children`; see `bare_lambda_body_children`.
@@ -89,6 +112,24 @@ pub(in crate::application::usecase::rename::function) fn collect_explicit_reader
     };
 
     match head.as_str() {
+        "quote" if state.quasiquote_depth == 0 => {
+            // `(quote foo)` is the unabbreviated spelling of `'foo`; treat a
+            // bare symbol argument the same way `collect_quoted_symbol_designator_rename`
+            // treats `'foo` above. `(quote (foo 1))` -- a quoted *list* -- is
+            // left untouched: `view.children.get(1)` is a list there, and
+            // `collect_callable_target_rename` only matches atoms (or a
+            // `(setf foo)` spec), so it is a no-op for genuine quoted data.
+            if let Some(target) = view.children.get(1) {
+                collect_callable_target_rename(
+                    target,
+                    state.path.child(1),
+                    &state,
+                    context,
+                    renames,
+                );
+            }
+            true
+        }
         "quote" => true,
         "macro-function" | "compiler-macro-function" | "symbol-function" | "fdefinition"
             if state.quasiquote_depth == 0 =>

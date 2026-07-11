@@ -1,8 +1,71 @@
-use crate::domain::sexpr::formatter::Formatter;
+use crate::domain::sexpr::formatter::{Formatter, MAX_INLINE_WIDTH};
 use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
 use crate::domain::sexpr::types::NodeId;
 
 impl Formatter {
+    /// Formats ASDF `defsystem` forms, whose body is a name followed by a
+    /// keyword/value option plist rather than a lambda list plus body forms.
+    ///
+    /// Unlike [`Formatter::format_definition`], the whole form is kept on one
+    /// line when it fits the width budget, and when it must break each
+    /// keyword/value pair stays together on its own line.
+    pub(in crate::domain::sexpr::formatter) fn format_system_definition(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        if let Some(inline) = self.compact_form(tree, node_id) {
+            output.push_str(&inline);
+            return;
+        }
+
+        let node = tree.node(node_id);
+        let delimiter = self.list_delimiter(node);
+        output.push(delimiter.open());
+
+        self.format_node(tree, node.children[0], depth + 1, output);
+        if let Some(name) = node.children.get(1) {
+            output.push(' ');
+            self.format_inline_or_node(tree, *name, depth + 1, output);
+        }
+
+        for pair in node.children.get(2..).unwrap_or_default().chunks(2) {
+            output.push('\n');
+            output.push_str(&self.indent(depth + 1));
+            self.format_inline_or_node(tree, pair[0], depth + 1, output);
+            if let Some(value) = pair.get(1) {
+                output.push(' ');
+                self.format_inline_or_node(tree, *value, depth + 1, output);
+            }
+        }
+
+        output.push(delimiter.close());
+    }
+
+    /// Compacts a whole list onto one line regardless of its head style,
+    /// returning `None` when the result would exceed the width budget or any
+    /// child cannot be compacted.
+    fn compact_form(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
+        let node = tree.node(node_id);
+        if self.is_opaque_reader_form(node) {
+            return node.source_text.clone();
+        }
+        let delimiter = self.list_delimiter(node);
+        let mut output = String::new();
+        self.write_reader_prefixes(node, &mut output);
+        output.push(delimiter.open());
+        for (position, child) in node.children.iter().enumerate() {
+            if position > 0 {
+                output.push(' ');
+            }
+            output.push_str(&self.compact_node(tree, *child)?);
+        }
+        output.push(delimiter.close());
+        (output.len() <= MAX_INLINE_WIDTH).then_some(output)
+    }
+
     pub(in crate::domain::sexpr::formatter) fn format_definition(
         &self,
         tree: &SyntaxTree,

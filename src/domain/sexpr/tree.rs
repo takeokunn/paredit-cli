@@ -236,6 +236,35 @@ impl SyntaxTree {
         occurrences
     }
 
+    /// Collects bare quoted-symbol designators (`'foo`, i.e. an atom whose own
+    /// reader prefix is `'`), which `atom_occurrences` deliberately treats as
+    /// inert data and excludes (see `does_not_rename_quoted_atom_occurrences`).
+    ///
+    /// That exclusion is right for `atom_occurrences`'s other consumers
+    /// (unused-definition/impact/analysis reports, which have their own,
+    /// more precise quote-aware reference collectors when they need one), but
+    /// `'foo` is also the standard Common Lisp idiom for referencing a symbol
+    /// in the value/type namespace as data -- e.g. `(error 'foo ...)`,
+    /// `(typep x 'foo)`, `(make-instance 'foo)`. A blunt, tree-wide rename
+    /// (`rename-symbol`, `refactor preview --mode symbol`) that skips these
+    /// would silently leave behind references to a definition that no longer
+    /// exists, so those two entry points additionally consult this method.
+    ///
+    /// Only a *bare* quoted atom counts: a quoted list such as `'(foo bar)`
+    /// keeps its reader prefix on the list node, not on `foo`/`bar`, so those
+    /// remain ordinary atoms already covered by `atom_occurrences` and are
+    /// left untouched here.
+    pub fn quoted_symbol_designator_occurrences(&self) -> Vec<AtomOccurrence> {
+        let mut occurrences = Vec::new();
+        let mut path_stack = Vec::new();
+        for (index, child) in self.node(NodeId::ROOT).children.iter().enumerate() {
+            path_stack.push(index);
+            self.collect_quoted_symbol_designators(*child, &mut path_stack, &mut occurrences);
+            path_stack.pop();
+        }
+        occurrences
+    }
+
     /// Rewrites matching atom occurrences while preserving the rest of the source text.
     ///
     /// # Examples
@@ -258,6 +287,7 @@ impl SyntaxTree {
         let mut occurrences = self
             .atom_occurrences()
             .into_iter()
+            .chain(self.quoted_symbol_designator_occurrences())
             .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, from.as_str()))
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.span.start());
@@ -352,6 +382,47 @@ impl SyntaxTree {
         for (index, child) in node.children.iter().enumerate() {
             path_stack.push(index);
             self.collect_atoms(*child, path_stack, output);
+            path_stack.pop();
+        }
+    }
+
+    fn collect_quoted_symbol_designators(
+        &self,
+        node_id: NodeId,
+        path_stack: &mut Vec<usize>,
+        output: &mut Vec<AtomOccurrence>,
+    ) {
+        let node = self.node(node_id);
+        if node
+            .reader_prefixes
+            .iter()
+            .any(|prefix| prefix.is_opaque_reader_form())
+        {
+            return;
+        }
+        if node.kind == NodeKind::Atom {
+            if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
+                if let Some(symbol_text) = node
+                    .text
+                    .as_deref()
+                    .and_then(|text| text.get(node.symbol_offset..))
+                {
+                    let symbol_span = ByteSpan::new(
+                        ByteOffset::new(node.span.start().get() + node.symbol_offset),
+                        node.span.end(),
+                    );
+                    output.push(AtomOccurrence {
+                        path: ExpressionPath::from_indexes(path_stack.clone()),
+                        span: symbol_span,
+                        text: symbol_text.to_string(),
+                    });
+                }
+            }
+            return;
+        }
+        for (index, child) in node.children.iter().enumerate() {
+            path_stack.push(index);
+            self.collect_quoted_symbol_designators(*child, path_stack, output);
             path_stack.pop();
         }
     }

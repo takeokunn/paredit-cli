@@ -217,6 +217,14 @@ fn exposes_common_lisp_dependency_and_package_capabilities_by_dialect() {
     );
     assert_eq!(
         Dialect::EmacsLisp.common_lisp_runtime_dependency_form_for_head("require"),
+        Some(CommonLispRuntimeDependencyForm::Require)
+    );
+    assert_eq!(
+        Dialect::EmacsLisp.common_lisp_runtime_dependency_form_for_head("use-package"),
+        None
+    );
+    assert_eq!(
+        Dialect::EmacsLisp.common_lisp_runtime_dependency_form_for_head("import"),
         None
     );
     assert_eq!(

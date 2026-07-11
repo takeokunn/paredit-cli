@@ -46,6 +46,10 @@ pub(super) fn print_unused_definition_report(
     println!("files\t{}", reports.len());
     println!("definition_count\t{}", policy.definition_count);
     println!("candidate_count\t{}", policy.candidate_count);
+    println!(
+        "actionable_candidate_count\t{}",
+        policy.actionable_candidate_count
+    );
     println!("policy_passed\t{}", policy.passed);
     for violation in &policy.violations {
         println!("policy_violation\t{violation}");
@@ -62,14 +66,15 @@ pub(super) fn print_unused_definition_report(
         for item in &report.definitions {
             let definition = &item.definition;
             println!(
-                "\t{}\t{}\t{}\t{}..{}\treferences={}\tunused={}",
+                "\t{}\t{}\t{}\t{}..{}\treferences={}\tunused={}\tbulk_removable={}",
                 definition.category.label(),
                 definition.head,
                 definition.name.as_deref().unwrap_or(""),
                 definition.span.start().get(),
                 definition.span.end().get(),
                 item.references.len(),
-                item.references.is_empty()
+                item.references.is_empty(),
+                definition.category.is_bulk_removable()
             );
         }
     }

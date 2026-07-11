@@ -12,7 +12,10 @@ pub use collect::{
     build_definition_report, build_parsed_definition_file, collect_definition_forms,
 };
 pub use policy::evaluate_unused_definition_policy;
-pub use references::{collect_unused_definition_candidates, unused_definition_candidate_count};
+pub use references::{
+    collect_unused_definition_candidates, unused_definition_actionable_candidate_count,
+    unused_definition_candidate_count,
+};
 pub use types::{
     DefinitionReference, DefinitionReportFile, DefinitionReportItem, ParsedDefinitionFile,
     UnusedDefinitionFile, UnusedDefinitionItem, UnusedDefinitionPolicy,

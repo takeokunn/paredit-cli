@@ -176,6 +176,9 @@ impl Formatter {
                         ListStyle::Definition => {
                             self.format_definition(tree, node_id, depth, output);
                         }
+                        ListStyle::SystemDefinition => {
+                            self.format_system_definition(tree, node_id, depth, output);
+                        }
                         ListStyle::Defmethod => {
                             self.format_defmethod(tree, node_id, depth, output);
                         }

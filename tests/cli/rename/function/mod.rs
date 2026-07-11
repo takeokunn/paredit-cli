@@ -236,5 +236,6 @@ mod plan;
 mod plan_macrolet_scope;
 mod plan_symbol_macro_scope;
 mod setf_and_generic;
+mod setf_scope;
 mod symbol_macro_scope;
 mod write_basic;

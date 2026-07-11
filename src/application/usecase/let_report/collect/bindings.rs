@@ -70,8 +70,36 @@ fn list_pair_let_binding_candidates(
         .iter()
         .enumerate()
         .map(|(index, pair)| {
+            // A bare symbol, or a parenthesized `(name)` with no value form,
+            // binds NAME to an implicit nil per the `let`/`let*` binding-list
+            // grammar. Use a zero-width span right after NAME as a sentinel
+            // for "no explicit value form": `view_at_span` never matches a
+            // zero-width span against a real node, so downstream lookups
+            // correctly see no value expression to inspect.
+            if pair.kind == ExpressionKind::Atom {
+                let name = atom_text(pair)
+                    .context("let binding name must be an atom")?
+                    .to_owned();
+                let end = pair.span.end();
+                return Ok(LetBindingCandidate {
+                    index,
+                    name,
+                    value_span: ByteSpan::new(end, end),
+                });
+            }
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("let binding must be a (name value) pair");
+                anyhow::bail!("let binding must be a symbol or a (name value) pair");
+            }
+            if pair.children.len() == 1 {
+                let name = atom_text(&pair.children[0])
+                    .context("let binding name must be an atom")?
+                    .to_owned();
+                let end = pair.span.end();
+                return Ok(LetBindingCandidate {
+                    index,
+                    name,
+                    value_span: ByteSpan::new(end, end),
+                });
             }
             if pair.children.len() != 2 {
                 anyhow::bail!("let binding pair must contain a name and value");

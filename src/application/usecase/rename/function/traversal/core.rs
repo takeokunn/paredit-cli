@@ -19,7 +19,7 @@ use super::modes::{
 };
 use super::reader::{
     collect_bare_lambda_call_renames, collect_explicit_reader_form_call_renames,
-    collect_function_designator_renames,
+    collect_function_designator_renames, collect_quoted_symbol_designator_rename,
 };
 
 pub(in crate::application::usecase::rename::function) struct TraversalContext<'a> {
@@ -99,6 +99,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
     let Some(quasiquote_depth) = apply_reader_prefix_context(view, state.quasiquote_depth) else {
+        collect_quoted_symbol_designator_rename(view, &state, context, renames);
         return;
     };
 

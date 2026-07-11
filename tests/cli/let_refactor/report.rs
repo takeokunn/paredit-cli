@@ -127,6 +127,32 @@ fn cli_reports_clojure_vector_let_references_from_later_bindings() {
 }
 
 #[test]
+fn cli_reports_bare_symbol_let_binding_as_implicit_nil() {
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .write_stdin("(defun f () (let ((opoint (point)) beg end) (setq beg 1) (setq end 2) (list opoint beg end)))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"let_form_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"beg\""))
+        .stdout(predicate::str::contains("\"name\": \"end\""))
+        .stdout(predicate::str::contains("\"value\": \"nil\""));
+}
+
+#[test]
+fn cli_reports_let_star_later_bare_symbol_binding_without_erroring() {
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .write_stdin("(let* ((x 1) y) (+ x (or y 0)))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"form\": \"let*\""))
+        .stdout(predicate::str::contains("\"name\": \"x\""))
+        .stdout(predicate::str::contains("\"name\": \"y\""))
+        .stdout(predicate::str::contains("\"value\": \"nil\""));
+}
+
+#[test]
 fn cli_fails_let_report_policy_after_printing_json() {
     let mut cmd = paredit();
     cmd.args([
@@ -148,4 +174,36 @@ fn cli_fails_let_report_policy_after_printing_json() {
     ))
     .stdout(predicate::str::contains("\"unused_binding_count\": 1"))
     .stderr(predicate::str::contains("let-report policy failed"));
+}
+
+#[test]
+fn cli_reports_let_bindings_across_multiple_files_with_aggregated_policy() {
+    let dir = fresh_temp_dir("let-report-multi-file");
+    let first_file = dir.join("first.lisp");
+    let second_file = dir.join("second.lisp");
+    fs::write(
+        &first_file,
+        "(defun f () (let ((unused 1) (used 2)) used))\n",
+    )
+    .expect("write first let-report fixture");
+    fs::write(&second_file, "(defun g () (let ((x (compute))) (+ x x)))\n")
+        .expect("write second let-report fixture");
+
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .arg(&first_file)
+        .arg(&second_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 2"))
+        .stdout(predicate::str::contains("\"unused_binding_count\": 1"))
+        .stdout(predicate::str::contains(
+            "\"duplicate_evaluation_count\": 1",
+        ))
+        .stdout(predicate::str::contains(
+            first_file.display().to_string(),
+        ))
+        .stdout(predicate::str::contains(
+            second_file.display().to_string(),
+        ));
 }

@@ -1,5 +1,5 @@
 use crate::application::usecase::remove_unused_definition::{
-    collect_function_quote_references, collect_quoted_data_references,
+    collect_function_quote_references, collect_package_form_spans, collect_quoted_data_references,
 };
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
@@ -24,6 +24,18 @@ pub fn collect_unused_definition_candidates(
             SyntaxTree::parse(&file.text)
                 .ok()
                 .map(|tree| tree.root_view())
+        })
+        .collect();
+
+    let package_form_spans: Vec<Vec<ByteSpan>> = files
+        .iter()
+        .enumerate()
+        .map(|(index, file)| {
+            let mut spans = Vec::new();
+            if let Some(view) = &views[index] {
+                collect_package_form_spans(file.dialect, view, &mut spans);
+            }
+            spans
         })
         .collect();
 
@@ -67,6 +79,13 @@ pub fn collect_unused_definition_candidates(
                                 );
                             }
 
+                            let other_package_spans = &package_form_spans[other_index];
+                            spans.retain(|span| {
+                                !other_package_spans
+                                    .iter()
+                                    .any(|package| span_contains(*package, *span))
+                            });
+
                             spans
                                 .into_iter()
                                 .filter(move |span| {
@@ -96,6 +115,20 @@ pub fn unused_definition_candidate_count(reports: &[UnusedDefinitionFile]) -> us
         .iter()
         .flat_map(|report| &report.definitions)
         .filter(|item| item.references.is_empty())
+        .count()
+}
+
+/// Counts only candidates whose category `DefinitionCategory::is_bulk_removable`
+/// accepts. `Test`, `Package`, `Struct`, and the other protected categories are
+/// normally unreferenced by symbol from other code by design (an `ert-deftest`
+/// is invoked by name from a test runner, a `provide` form by the module
+/// loader, ...), so counting them toward "unused" would make `--fail-on-unused`
+/// trip on a healthy codebase's ordinary test suite.
+pub fn unused_definition_actionable_candidate_count(reports: &[UnusedDefinitionFile]) -> usize {
+    reports
+        .iter()
+        .flat_map(|report| &report.definitions)
+        .filter(|item| item.references.is_empty() && item.definition.category.is_bulk_removable())
         .count()
 }
 
