@@ -10,6 +10,7 @@ mod definition_report;
 mod dependency_report;
 mod dispatch;
 mod duplicate_report;
+mod extract_constant;
 mod extract_function;
 mod form_report;
 mod function_parameter;
@@ -71,7 +72,7 @@ use shared::*;
     version,
     about,
     long_about = None,
-    after_help = "Workflow namespaces:\n  Use `paredit refactor ...` for file-scoped refactoring workflows.\n  Use `paredit workspace ...` for workspace discovery and workspace-scoped refactoring workflows."
+    after_help = "Workflow namespaces:\n  Use `paredit refactor ...` for file- and workspace-scoped refactoring workflows.\n  Use `paredit workspace ...` for workspace discovery and reporting."
 )]
 struct Cli {
     #[command(subcommand)]

@@ -37,6 +37,8 @@ mod definition_report;
 mod dependency_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
+#[path = "cli/extract_constant/mod.rs"]
+mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
 mod extract_function;
 #[path = "cli/feature_request_contract.rs"]

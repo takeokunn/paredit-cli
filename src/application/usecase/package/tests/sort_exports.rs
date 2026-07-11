@@ -21,6 +21,24 @@ fn sorts_package_exports_without_moving_other_options() {
 }
 
 #[test]
+fn sorts_exports_only_in_target_defpackage_among_mixed_top_level_forms() {
+    let input = "(in-package #:cl-user)\n(defpackage #:other (:export #:z #:a))\n42\n(defpackage #:target (:export #:y #:b))\n(main)\n";
+    let plan = plan_sort_package_exports(SortPackageExportsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: Some(&SymbolName::new("target").unwrap()),
+    })
+    .unwrap();
+
+    assert_eq!(plan.exports.len(), 1);
+    assert_eq!(plan.exports[0].package, "#:target");
+    assert_eq!(
+        plan.rewritten,
+        "(in-package #:cl-user)\n(defpackage #:other (:export #:z #:a))\n42\n(defpackage #:target (:export #:b #:y))\n(main)\n"
+    );
+}
+
+#[test]
 fn sorted_package_exports_are_idempotent() {
     let input = "(defpackage #:demo (:export #:a #:b #:c))\n";
     let plan = plan_sort_package_exports(SortPackageExportsRequest {

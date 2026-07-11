@@ -12,6 +12,7 @@ mod sort_exports;
 mod sort_options;
 mod syntax;
 mod types;
+mod visit;
 
 use export::find_defpackage_export_edit;
 use merge_options::defpackage_option_merge_edits;

@@ -11,7 +11,8 @@ mod syntax;
 mod tests;
 mod types;
 
-use rewrite::{extracted_call, extracted_definition, insert_top_level_form, replace_span};
+use crate::application::usecase::extract_shared::{insert_top_level_form, replace_span};
+use rewrite::{extracted_call, extracted_definition};
 
 pub use types::{ExtractFunctionInsert, ExtractFunctionPlan, ExtractFunctionRequest};
 
@@ -43,6 +44,7 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
         &definition,
         request.insert,
         request.anchor_path.as_ref(),
+        "extract-function --anchor-path",
     )?;
 
     SyntaxTree::parse(&rewritten)

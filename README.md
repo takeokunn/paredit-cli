@@ -398,6 +398,8 @@ paredit rename-symbols --from old-name --to new-name src/*.lisp lisp/*.el
 paredit rename-symbols --from old-name --to new-name --write src/*.lisp lisp/*.el
 paredit extract-function --file source.lisp --path 0.3 --name helper --output json
 paredit extract-function --file source.lisp --path 0.3 --name helper --write
+paredit extract-constant --file source.lisp --path 0.3 --name +answer+ --output json
+paredit extract-constant --file source.lisp --path 0.3 --name +answer+ --write
 paredit inline-function --file source.lisp --definition-path 0 --call-path 1.3 --output json
 paredit inline-function --file source.lisp --definition-path 0 --all-calls --output json
 paredit inline-function --file source.lisp --definition-path 0 --call-path 1.3 --remove-definition --write

@@ -1,15 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 mod merge;
 mod slots;
 
 use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
     dialect::Dialect,
-    sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree},
+    sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree},
 };
 
-use super::syntax::{atom_text, is_package_head, package_atoms_match};
+use super::visit::visit_defpackage_forms;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct OptionMergeEdit {
@@ -55,97 +54,21 @@ pub(super) fn defpackage_option_merge_edits(
     package: Option<&SymbolName>,
 ) -> Result<Vec<OptionMergeEdit>> {
     let mut edits = Vec::new();
-    let mut matched_defpackages = 0usize;
-
-    for index in 0..tree.root_children().len() {
-        let path = Path::root_child(index);
-        let view = tree.select_path(&path)?.view();
-        collect_option_merge_edits(
-            tree,
-            &view,
-            path.clone(),
-            dialect,
-            package,
-            &mut matched_defpackages,
-            &mut edits,
-        )
-        .with_context(|| format!("failed to inspect package form at {path}"))?;
-    }
-
-    if matched_defpackages == 0 {
-        if let Some(target) = package {
-            anyhow::bail!("no matching defpackage form found for {target}");
-        }
-    }
+    visit_defpackage_forms(tree, dialect, package, |view, path, package_name| {
+        analyze_defpackage_options(tree, view, path, package_name, &mut edits)
+    })?;
 
     let _ = input;
     Ok(edits)
-}
-
-fn collect_option_merge_edits(
-    tree: &SyntaxTree,
-    view: &ExpressionView,
-    path: Path,
-    dialect: Dialect,
-    package: Option<&SymbolName>,
-    matched_defpackages: &mut usize,
-    edits: &mut Vec<OptionMergeEdit>,
-) -> Result<()> {
-    analyze_defpackage_options(
-        tree,
-        view,
-        &path,
-        dialect,
-        package,
-        matched_defpackages,
-        edits,
-    )?;
-
-    for (index, child) in view.children.iter().enumerate() {
-        collect_option_merge_edits(
-            tree,
-            child,
-            path.child(index),
-            dialect,
-            package,
-            matched_defpackages,
-            edits,
-        )?;
-    }
-
-    Ok(())
 }
 
 fn analyze_defpackage_options(
     tree: &SyntaxTree,
     view: &ExpressionView,
     path: &Path,
-    dialect: Dialect,
-    package: Option<&SymbolName>,
-    matched_defpackages: &mut usize,
+    package_name: &str,
     edits: &mut Vec<OptionMergeEdit>,
 ) -> Result<()> {
-    if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-        return Ok(());
-    }
-    if view.children.len() < 2 {
-        return Ok(());
-    }
-    let Some(head) = atom_text(&view.children[0]) else {
-        return Ok(());
-    };
-    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::Defpackage) {
-        return Ok(());
-    }
-
-    let Some(package_name) = atom_text(&view.children[1]) else {
-        return Ok(());
-    };
-    if package.is_some_and(|package| !package_atoms_match(package_name, package.as_str())) {
-        return Ok(());
-    }
-    *matched_defpackages += 1;
-
     if view.children.len() <= 3 {
         return Ok(());
     }

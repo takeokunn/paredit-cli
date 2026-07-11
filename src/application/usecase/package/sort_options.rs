@@ -1,15 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 mod ordering;
 mod slots;
 
 use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
     dialect::Dialect,
-    sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree},
+    sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree},
 };
 
-use super::syntax::{atom_text, is_package_head, package_atoms_match};
+use super::visit::visit_defpackage_forms;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageOptionSortOrder {
@@ -57,85 +56,29 @@ pub(super) fn defpackage_option_sort_edits(
 ) -> Result<Vec<OptionSortEdit>> {
     let mut traversal = OptionSortTraversal {
         input,
-        dialect,
-        package,
         order,
-        matched_defpackages: 0,
         edits: Vec::new(),
     };
 
-    for index in 0..tree.root_children().len() {
-        let path = Path::root_child(index);
-        let view = tree.select_path(&path)?.view();
-        collect_option_sort_edits(&mut traversal, &view, path.clone())
-            .with_context(|| format!("failed to inspect package form at {path}"))?;
-    }
-
-    if traversal.matched_defpackages == 0 {
-        if let Some(target) = package {
-            anyhow::bail!("no matching defpackage form found for {target}");
-        }
-    }
+    visit_defpackage_forms(tree, dialect, package, |view, path, package_name| {
+        analyze_defpackage_options(&mut traversal, view, path, package_name)
+    })?;
 
     Ok(traversal.edits)
 }
 
 struct OptionSortTraversal<'a> {
     input: &'a str,
-    dialect: Dialect,
-    package: Option<&'a SymbolName>,
     order: PackageOptionSortOrder,
-    matched_defpackages: usize,
     edits: Vec<OptionSortEdit>,
-}
-
-fn collect_option_sort_edits(
-    traversal: &mut OptionSortTraversal<'_>,
-    view: &ExpressionView,
-    path: Path,
-) -> Result<()> {
-    analyze_defpackage_options(traversal, view, &path)?;
-
-    for (index, child) in view.children.iter().enumerate() {
-        collect_option_sort_edits(traversal, child, path.child(index))?;
-    }
-
-    Ok(())
 }
 
 fn analyze_defpackage_options(
     traversal: &mut OptionSortTraversal<'_>,
     view: &ExpressionView,
     path: &Path,
+    package_name: &str,
 ) -> Result<()> {
-    if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-        return Ok(());
-    }
-    if view.children.len() < 2 {
-        return Ok(());
-    }
-    let Some(head) = atom_text(&view.children[0]) else {
-        return Ok(());
-    };
-    if !is_package_head(
-        traversal.dialect,
-        head,
-        CommonLispPackageDeclarationForm::Defpackage,
-    ) {
-        return Ok(());
-    }
-
-    let Some(package_name) = atom_text(&view.children[1]) else {
-        return Ok(());
-    };
-    if traversal
-        .package
-        .is_some_and(|package| !package_atoms_match(package_name, package.as_str()))
-    {
-        return Ok(());
-    }
-    traversal.matched_defpackages += 1;
-
     if view.children.len() <= 3 {
         return Ok(());
     }
