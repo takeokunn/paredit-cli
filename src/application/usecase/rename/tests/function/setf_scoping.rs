@@ -1,0 +1,52 @@
+use super::*;
+
+#[test]
+fn renames_quoted_setf_function_names_in_fdefinition() {
+    assert_function_rename! {
+        input: "(defun accessor (x) x)\n(fdefinition '(setf accessor))",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun slot-accessor (x) x)",
+            "(fdefinition '(setf slot-accessor))"
+        ]
+    };
+}
+
+#[test]
+fn renames_unquoted_setf_function_designators_inside_quasiquote() {
+    assert_function_rename! {
+        input: "(defun accessor (x) x)\n(defun caller () `(list ,#'(setf accessor) ,(function (setf accessor)) ,(fdefinition '(setf accessor))))",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(defun slot-accessor (x) x)",
+            "(defun caller () `(list ,#'(setf slot-accessor) ,(function (setf slot-accessor)) ,(fdefinition '(setf slot-accessor))))"
+        ]
+    };
+}
+
+#[test]
+fn renames_setf_function_designators_inside_reader_quoted_lambda_bodies() {
+    assert_function_rename! {
+        input: "(defun accessor (x) x)\n(defun caller () #'(lambda () #'(setf accessor) (function (setf accessor)) (fdefinition '(setf accessor)) (setf (accessor thing) 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 4,
+        changed: true,
+        rewritten_contains: [
+            "(defun slot-accessor (x) x)",
+            "#'(lambda () #'(setf slot-accessor) (function (setf slot-accessor)) (fdefinition '(setf slot-accessor)) (setf (slot-accessor thing) 1))"
+        ]
+    };
+}

@@ -37,3 +37,4 @@ mod generic_forms;
 mod macro_forms;
 mod property;
 mod scoping;
+mod setf_scoping;
