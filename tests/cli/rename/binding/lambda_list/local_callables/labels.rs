@@ -4,6 +4,7 @@ use super::super::*;
 fn cli_plans_labels_lambda_list_parameter_rename_without_touching_outer_body_call() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -30,6 +31,7 @@ fn cli_plans_labels_lambda_list_parameter_rename_without_touching_outer_body_cal
 fn cli_rejects_ambiguous_labels_local_callable_lambda_list_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",

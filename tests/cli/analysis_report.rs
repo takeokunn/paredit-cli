@@ -3,7 +3,8 @@ use super::*;
 #[test]
 fn check_accepts_valid_input() {
     let mut cmd = paredit();
-    cmd.arg("check")
+    cmd.arg("inspect")
+        .arg("check")
         .write_stdin("(defun add (x y) (+ x y))")
         .assert()
         .success()
@@ -13,7 +14,8 @@ fn check_accepts_valid_input() {
 #[test]
 fn check_rejects_invalid_input() {
     let mut cmd = paredit();
-    cmd.arg("check")
+    cmd.arg("inspect")
+        .arg("check")
         .write_stdin("(defun add (x y)")
         .assert()
         .failure()
@@ -23,7 +25,7 @@ fn check_rejects_invalid_input() {
 #[test]
 fn cli_selects_by_path() {
     let mut cmd = paredit();
-    cmd.args(["select", "--path", "0.2"])
+    cmd.args(["edit", "select", "--path", "0.2"])
         .write_stdin("(defun add (x y) (+ x y))")
         .assert()
         .success()
@@ -33,7 +35,7 @@ fn cli_selects_by_path() {
 #[test]
 fn cli_replaces_by_path() {
     let mut cmd = paredit();
-    cmd.args(["replace", "--path", "0.1", "--with", "sum"])
+    cmd.args(["edit", "replace", "--path", "0.1", "--with", "sum"])
         .write_stdin("(defun add (x y) (+ x y))")
         .assert()
         .success()
@@ -43,7 +45,7 @@ fn cli_replaces_by_path() {
 #[test]
 fn cli_detects_emacs_lisp_from_extension() {
     let mut cmd = paredit();
-    cmd.args(["dialect", "--file", "tests/fixtures/sample.el"])
+    cmd.args(["inspect", "dialect", "--file", "tests/fixtures/sample.el"])
         .assert()
         .success()
         .stdout("emacs-lisp\n");
@@ -52,7 +54,7 @@ fn cli_detects_emacs_lisp_from_extension() {
 #[test]
 fn cli_prints_definition_outline() {
     let mut cmd = paredit();
-    cmd.args(["outline", "--file", "tests/fixtures/sample.el"])
+    cmd.args(["inspect", "outline", "--file", "tests/fixtures/sample.el"])
         .assert()
         .success()
         .stdout(predicate::str::contains("0\t0..37\tdefun\ttrue"));
@@ -62,7 +64,8 @@ fn cli_prints_definition_outline() {
 fn cli_reports_selected_form_structure_for_agents() {
     let mut cmd = paredit();
     cmd.args([
-        "form-report",
+        "inspect",
+        "form",
         "--dialect",
         "common-lisp",
         "--path",
@@ -89,7 +92,7 @@ fn cli_reports_selected_form_structure_for_agents() {
 #[test]
 fn cli_reports_form_by_byte_offset() {
     let mut cmd = paredit();
-    cmd.args(["form-report", "--at", "17", "--output", "json"])
+    cmd.args(["inspect", "form", "--at", "17", "--output", "json"])
         .write_stdin("(defun add (x y) (+ x y))")
         .assert()
         .success()

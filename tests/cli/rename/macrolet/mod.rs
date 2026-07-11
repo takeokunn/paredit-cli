@@ -4,7 +4,8 @@ use std::path::Path;
 
 fn run_rename_macrolet(path: &Path, from: &str, to: &str, write: bool) -> std::process::Output {
     let mut cmd = paredit();
-    cmd.arg("rename-macrolet")
+    cmd.arg("refactor")
+        .arg("rename-macrolet")
         .arg("--from")
         .arg(from)
         .arg("--to")
@@ -78,7 +79,15 @@ fn assert_cli_rename_macrolet_property(from: String, to: String) -> Result<(), T
         .map_err(|err| TestCaseError::fail(format!("write lisp fixture: {err}")))?;
 
     let output = paredit()
-        .args(["rename-macrolet", "--from", &from, "--to", &to, "--write"])
+        .args([
+            "refactor",
+            "rename-macrolet",
+            "--from",
+            &from,
+            "--to",
+            &to,
+            "--write",
+        ])
         .arg(&lisp_file)
         .output()
         .map_err(|err| TestCaseError::fail(format!("run paredit: {err}")))?;

@@ -82,11 +82,9 @@ fn cli_builds_gated_refactor_plan_for_agents() {
     assert!(output.stdout.contains("--require-definitions 1"));
     assert!(output.stdout.contains("--require-references 1"));
     assert!(output.stdout.contains("--require-calls 1"));
-    assert!(
-        output.stdout.contains(
-            "paredit rename-symbols --from 'render-pane' --to <new-symbol> --output json"
-        )
-    );
+    assert!(output.stdout.contains(
+        "paredit refactor rename-symbols --from 'render-pane' --to <new-symbol> --output json"
+    ));
 }
 
 #[test]
@@ -102,7 +100,7 @@ fn cli_builds_refactor_plan_for_macro_targets() {
         "rename",
         "macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'render-pane' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'render-pane' --to <new-symbol> --output json",
     );
 }
 
@@ -119,7 +117,7 @@ fn cli_builds_refactor_plan_for_define_modify_macro_targets() {
         "rename",
         "macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'updatef' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'updatef' --to <new-symbol> --output json",
     );
 }
 
@@ -136,7 +134,7 @@ fn cli_builds_refactor_plan_for_compiler_macro_targets() {
         "rename",
         "compiler_macro",
         "apply-macro-rename",
-        "paredit rename-function --from 'fast-add' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'fast-add' --to <new-symbol> --output json",
     );
 }
 
@@ -153,7 +151,7 @@ fn cli_builds_refactor_plan_for_setf_expander_targets() {
         "rename",
         "setf_expander",
         "apply-macro-rename",
-        "paredit rename-function --from 'accessor' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'accessor' --to <new-symbol> --output json",
     );
 }
 
@@ -187,7 +185,7 @@ fn cli_builds_refactor_plan_for_symbol_macro_targets() {
         "rename",
         "symbol_macro",
         "apply-symbol-macro-rename",
-        "paredit rename-symbol-macro --from 'current-user' --to <new-symbol> --output json",
+        "paredit refactor rename-symbol-macro --from 'current-user' --to <new-symbol> --output json",
     );
 }
 
@@ -204,7 +202,7 @@ fn cli_builds_refactor_plan_for_package_qualified_common_lisp_callable_targets()
         "rename",
         "callable",
         "apply-rename",
-        "paredit rename-function --from 'render-pane' --to <new-symbol> --output json",
+        "paredit refactor rename-function --from 'render-pane' --to <new-symbol> --output json",
     );
 }
 

@@ -13,7 +13,7 @@ fn cli_reports_cross_file_similarity_as_json() {
     fs::write(&left, "(defun alpha (x) (+ x 1))\n").unwrap();
     fs::write(&right, "(defun beta (y) (+ y 2))\n").unwrap();
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("0.8")
         .arg(&right)
@@ -40,7 +40,7 @@ fn cli_accepts_exact_similarity_threshold_endpoint() {
     fs::write(&file, "(foo a b) (foo a b) (foo a c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg(&file)
         .output()
@@ -67,7 +67,7 @@ fn cli_deduplicates_the_same_canonical_input_path() {
     std::os::unix::fs::symlink(&file, &alias).unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg(&file)
         .arg(&alias)
         .output()
@@ -85,7 +85,7 @@ fn cli_renders_text_report() {
     let file = dir.join("suite.lisp");
     fs::write(&file, "(foo a b) (foo x y)\n").unwrap();
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("0.8")
         .arg("--output")
@@ -103,7 +103,7 @@ fn cli_rejects_invalid_thresholds() {
     let file = dir.join("suite.lisp");
     fs::write(&file, "(foo a b)\n").unwrap();
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("1.1")
         .arg(&file)
@@ -111,7 +111,7 @@ fn cli_rejects_invalid_thresholds() {
         .failure()
         .stderr(predicate::str::contains("--threshold must be between"));
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--min-node-count")
         .arg("1")
         .arg(&file)
@@ -128,7 +128,7 @@ fn fail_on_duplicates_preserves_stdout_report() {
     let file = dir.join("suite.lisp");
     fs::write(&file, "(foo a b) (foo x y)\n").unwrap();
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("0.8")
         .arg("--fail-on-duplicates")
@@ -154,7 +154,7 @@ fn cli_recursively_discovers_sources_and_skips_hidden_and_generated_directories(
     fs::write(generated.join("generated.lisp"), "(foo g h)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("0")
         .arg("--min-node-count")
@@ -184,7 +184,7 @@ fn cli_excludes_repeated_file_and_subtree_paths_without_prefix_false_positives()
     fs::write(prefix_sibling.join("keep.lisp"), "(foo x y)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=0")
         .arg("--exclude")
         .arg(&excluded_dir)
@@ -216,7 +216,7 @@ fn cli_resolves_relative_excludes_from_cwd_and_reports_text_summary() {
 
     paredit()
         .current_dir(&dir)
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--output=text")
         .arg("--exclude=excluded.lisp")
         .arg(".")
@@ -235,7 +235,7 @@ fn cli_dialect_override_includes_unknown_extensions() {
     fs::write(&right, "(foo x y)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--dialect")
         .arg("common-lisp")
         .arg("--threshold")
@@ -262,7 +262,7 @@ fn cli_json_contract_reports_options_summary_and_pair_count() {
     fs::write(&file, "(foo a) (foo b) (foo c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("0")
         .arg("--min-node-count")
@@ -308,7 +308,7 @@ fn cli_fails_on_malformed_input_by_default() {
     fs::write(&invalid, "(").unwrap();
 
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg(&invalid)
         .assert()
         .failure()
@@ -325,7 +325,7 @@ fn cli_skips_malformed_input_and_reports_stable_json_errors() {
     fs::write(&invalid, "(").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--error-policy=skip")
         .arg(&valid)
@@ -360,7 +360,7 @@ fn cli_skip_succeeds_with_an_empty_report_when_all_inputs_are_invalid() {
     fs::write(&second, "(").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--error-policy=skip")
         .arg(&second)
         .arg(&first)
@@ -385,7 +385,7 @@ fn cli_skip_still_applies_fail_on_duplicates_to_successful_files() {
     fs::write(&invalid, "(").unwrap();
 
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--error-policy=skip")
         .arg("--fail-on-duplicates")
@@ -407,7 +407,7 @@ fn fail_on_duplicates_rejects_skipped_files_as_indeterminate() {
     fs::write(&invalid, [0xff, 0xfe]).unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--error-policy=skip")
         .arg("--fail-on-duplicates")
         .arg(&valid)
@@ -435,7 +435,7 @@ fn cli_text_report_includes_skipped_file_summary_and_error() {
     fs::write(&invalid, "(").unwrap();
 
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--error-policy=skip")
         .arg("--output=text")
         .arg(&invalid)
@@ -459,7 +459,7 @@ fn cli_filters_pairs_by_comparison_scope() {
 
     for (scope, same_file) in [("same-file", true), ("cross-file", false)] {
         let output = paredit()
-            .arg("similarity-report")
+            .args(["inspect", "similarity"])
             .arg("--threshold=1")
             .arg("--min-node-count=2")
             .arg("--overlap-policy=all")
@@ -488,7 +488,7 @@ fn cli_top_level_form_scope_excludes_nested_candidates() {
     fs::write(&file, "(outer (foo a b) (foo a b))\n").unwrap();
 
     let all_output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--overlap-policy=all")
@@ -497,7 +497,7 @@ fn cli_top_level_form_scope_excludes_nested_candidates() {
         .output()
         .unwrap();
     let top_level_output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--overlap-policy=all")
@@ -522,7 +522,7 @@ fn cli_min_line_span_keeps_only_multiline_candidates() {
     fs::write(&file, "(foo a b) (foo a b)\n(foo\n a\n b)\n(foo\n a\n b)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--min-line-span=2")
@@ -548,7 +548,7 @@ fn max_results_does_not_hide_duplicates_from_failure_policy() {
     fs::write(&file, "(foo a) (foo b) (foo c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold")
         .arg("0")
         .arg("--min-node-count")
@@ -575,7 +575,7 @@ fn max_candidates_reports_precise_omissions_and_fails_closed() {
     fs::write(&file, "(foo a) (bar b) (baz c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--form-scope=top-level")
@@ -603,7 +603,7 @@ fn max_candidates_not_reached_reports_complete_collection() {
     fs::write(&file, "(foo a) (bar b) (baz c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--form-scope=top-level")
@@ -626,7 +626,7 @@ fn max_comparisons_is_reported_and_failure_uses_processed_matches() {
     fs::write(&file, "(foo a) (foo b) (foo c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=0")
         .arg("--min-node-count=2")
         .arg("--overlap-policy=all")
@@ -654,7 +654,7 @@ fn fail_on_duplicates_rejects_an_indeterminate_comparison_limit() {
     fs::write(&file, "(foo a) (bar b) (foo a)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--form-scope=top-level")
@@ -682,7 +682,7 @@ fn fail_on_duplicates_succeeds_when_comparison_limit_is_not_reached() {
     fs::write(&file, "(foo a) (bar b) (baz c)\n").unwrap();
 
     let output = paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=1")
         .arg("--min-node-count=2")
         .arg("--form-scope=top-level")
@@ -707,7 +707,7 @@ fn text_output_reports_max_comparisons_summary() {
     fs::write(&file, "(foo a) (foo b) (foo c)\n").unwrap();
 
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--threshold=0")
         .arg("--min-node-count=2")
         .arg("--overlap-policy=all")
@@ -729,7 +729,7 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
 
     for threshold in ["NaN", "inf", "-inf"] {
         paredit()
-            .arg("similarity-report")
+            .args(["inspect", "similarity"])
             .arg(format!("--threshold={threshold}"))
             .arg(&file)
             .assert()
@@ -737,7 +737,7 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
             .stderr(predicate::str::contains("--threshold must be between"));
     }
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--min-line-span=0")
         .arg(&file)
         .assert()
@@ -746,7 +746,7 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
             "--min-line-span must be at least 1",
         ));
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--max-results")
         .arg("0")
         .arg(&file)
@@ -754,7 +754,7 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
         .failure()
         .stderr(predicate::str::contains("--max-results must be at least 1"));
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--max-comparisons=0")
         .arg(&file)
         .assert()
@@ -763,7 +763,7 @@ fn cli_rejects_non_finite_thresholds_and_zero_max_results() {
             "--max-comparisons must be at least 1",
         ));
     paredit()
-        .arg("similarity-report")
+        .args(["inspect", "similarity"])
         .arg("--max-candidates=0")
         .arg(&file)
         .assert()

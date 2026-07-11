@@ -8,7 +8,8 @@ fn cli_plans_wrap_function_calls_without_writing() {
     fs::write(&lisp_file, source).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("wrap-function-calls")
+    cmd.arg("refactor")
+        .arg("wrap-function-calls")
         .arg(&lisp_file)
         .arg("--function")
         .arg("fetch-user")

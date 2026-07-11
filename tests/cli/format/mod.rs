@@ -12,7 +12,8 @@ fn assert_format_output(fixture_name: &str, file_name: &str, input: &str, expect
     fs::write(&file, input).expect("write source fixture");
 
     let mut cmd = paredit();
-    cmd.arg("format")
+    cmd.arg("edit")
+        .arg("format")
         .arg("--file")
         .arg(&file)
         .assert()

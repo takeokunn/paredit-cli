@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_with_slots_binding_rename_preserving_slot_name() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -28,6 +29,7 @@ fn cli_plans_with_slots_binding_rename_preserving_slot_name() {
 fn cli_plans_outer_binding_rename_without_touching_with_slots_shadow() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -56,8 +58,7 @@ fn cli_plans_outer_binding_rename_without_touching_with_slots_shadow() {
 #[test]
 fn cli_plans_with_accessors_binding_rename_preserving_accessor_name() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",
@@ -82,8 +83,7 @@ fn cli_plans_with_accessors_binding_rename_preserving_accessor_name() {
 #[test]
 fn cli_plans_outer_binding_rename_without_touching_with_accessors_shadow() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",
@@ -110,6 +110,7 @@ fn cli_plans_outer_binding_rename_without_touching_with_accessors_shadow() {
 fn cli_rejects_ambiguous_with_slots_binding_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",

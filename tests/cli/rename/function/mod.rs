@@ -59,7 +59,7 @@ fn run_rename_function(
     paths: &[PathBuf],
 ) -> std::process::Output {
     let mut cmd = paredit();
-    cmd.arg("rename-function");
+    cmd.arg("refactor").arg("rename-function");
     if let Some(dialect) = dialect {
         cmd.arg("--dialect").arg(dialect);
     }

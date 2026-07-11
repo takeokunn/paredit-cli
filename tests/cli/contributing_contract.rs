@@ -6,11 +6,10 @@ fn readme_contributing_and_release_keep_verification_boundary_aligned() {
 
     assert!(
         normalize_whitespace(&readme).contains(
-            "Release readiness still requires the broader local verification loop in \
-             [CONTRIBUTING.md](CONTRIBUTING.md) and the maintainer checklist in \
-             [RELEASE.md](RELEASE.md), including tests, docs, packaging, and smoke checks."
+            "Contributions and releases follow [CONTRIBUTING.md](CONTRIBUTING.md), \
+             [RELEASE.md](RELEASE.md), and [COMPATIBILITY.md](COMPATIBILITY.md)."
         ),
-        "README must route local verification and release review to CONTRIBUTING and RELEASE"
+        "README must route contributions and releases to the policy documents"
     );
     assert!(
         normalize_whitespace(&contributing).contains(
@@ -26,12 +25,8 @@ fn readme_contributing_and_release_keep_verification_boundary_aligned() {
         "RELEASE must preserve the automation boundary"
     );
     assert!(
-        normalize_whitespace(&readme).contains(
-            "The declared MSRV is part of the public contract. Until CI grows a dedicated \
-             MSRV lane, verify it locally with `cargo +1.85 test --locked` before release or \
-             when changing parser, refactor, packaging, or public API surfaces."
-        ),
-        "README must document how the declared MSRV is verified before CI adds an MSRV lane"
+        readme.contains("The current minimum supported Rust version is `1.85`."),
+        "README must state the declared MSRV"
     );
 }
 

@@ -32,27 +32,23 @@ fn composite_action_exposes_lint_format_and_fix_modes() {
 }
 
 #[test]
-fn readme_documents_lint_and_format_integration_surfaces() {
-    let readme = fs::read_to_string("README.md").expect("read README");
+fn documentation_covers_lint_and_format_integration_surfaces() {
+    let docs =
+        fs::read_to_string("docs/src/integrations.md").expect("read integrations documentation");
 
     assert!(
-        readme.contains("## Lint and Format Integration"),
-        "README must document the lint/format integration section"
+        docs.contains("## GitHub Actions"),
+        "documentation must include integration guidance"
     );
     for needle in [
         "uses: takeokunn/paredit-cli@",
         "mode: lint",
-        "mode: format",
-        "nix run github:takeokunn/paredit-cli#lint -- .",
-        "nix run github:takeokunn/paredit-cli#format -- --check .",
-        "overlays.default",
-        "mkLintCheck",
-        "mkFormatCheck",
-        "treefmtFormatter",
+        "nix run github:takeokunn/paredit-cli -- inspect check",
+        "paredit inspect check --file source.lisp",
     ] {
         assert!(
-            readme.contains(needle),
-            "README lint/format integration must document: {needle}"
+            docs.contains(needle),
+            "integration documentation must include: {needle}"
         );
     }
 }

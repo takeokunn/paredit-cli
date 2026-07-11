@@ -27,7 +27,8 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("definition-report")
+    cmd.arg("inspect")
+        .arg("definitions")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)
@@ -70,7 +71,8 @@ fn cli_reports_unrecognized_define_style_macros_as_unknown_macro_category() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("definition-report")
+    cmd.arg("inspect")
+        .arg("definitions")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)
@@ -100,7 +102,8 @@ fn cli_reports_unused_definitions_for_dead_code_planning() {
     .expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unused-definition-report")
+    cmd.arg("inspect")
+        .arg("unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)
@@ -138,7 +141,8 @@ fn cli_treats_a_shadowing_let_binding_as_no_reference_to_the_global_definition()
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unused-definition-report")
+    cmd.arg("inspect")
+        .arg("unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&lisp_file)
@@ -161,7 +165,8 @@ fn cli_reports_package_qualified_common_lisp_definition_as_used_by_unqualified_r
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unused-definition-report")
+    cmd.arg("inspect")
+        .arg("unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -186,7 +191,8 @@ fn cli_gates_unused_definition_report_for_ci() {
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unused-definition-report")
+    cmd.arg("inspect")
+        .arg("unused-definitions")
         .arg("--fail-on-unused")
         .arg("--require-unused-definitions")
         .arg("2")
@@ -229,7 +235,8 @@ fn cli_fail_on_unused_ignores_protected_category_candidates() {
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unused-definition-report")
+    cmd.arg("inspect")
+        .arg("unused-definitions")
         .arg("--fail-on-unused")
         .arg("--output")
         .arg("json")
@@ -259,7 +266,8 @@ fn cli_accepts_unused_definition_requirement_when_satisfied() {
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unused-definition-report")
+    cmd.arg("inspect")
+        .arg("unused-definitions")
         .arg("--require-unused-definitions")
         .arg("2")
         .arg("--output")

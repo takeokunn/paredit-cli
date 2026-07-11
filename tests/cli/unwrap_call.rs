@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_unwrap_call_without_writing() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "unwrap-call",
         "--path",
         "0",
@@ -34,7 +35,8 @@ fn cli_writes_unwrap_call_for_emacs_lisp_file() {
         .expect("write emacs lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("unwrap-call")
+    cmd.arg("refactor")
+        .arg("unwrap-call")
         .arg("--file")
         .arg(&el_file)
         .arg("--path")
@@ -64,6 +66,7 @@ fn cli_writes_unwrap_call_for_emacs_lisp_file() {
 fn cli_rejects_unwrap_call_function_mismatch() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "unwrap-call",
         "--path",
         "0",
@@ -93,6 +96,7 @@ fn cli_keeps_unwrap_call_input_unchanged_when_write_fails() {
 
     let mut cmd = paredit();
     let assert = cmd
+        .arg("refactor")
         .arg("unwrap-call")
         .arg("--file")
         .arg(&blocked_file)
@@ -141,6 +145,7 @@ fn generated_unwrap_call_input(depth: usize) -> String {
 fn assert_unwrap_call_property(input: String) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
+            "refactor",
             "unwrap-call",
             "--path",
             "0",
@@ -169,6 +174,7 @@ fn assert_unwrap_call_property(input: String) -> Result<(), TestCaseError> {
 
     let rewritten = report["rewritten"].as_str().unwrap_or_default();
     let check_output = paredit()
+        .arg("inspect")
         .arg("check")
         .write_stdin(rewritten.to_owned())
         .output()

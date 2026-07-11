@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_dolist_iteration_binding_rename_without_touching_source() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -28,6 +29,7 @@ fn cli_plans_dolist_iteration_binding_rename_without_touching_source() {
 fn cli_plans_dotimes_iteration_binding_rename_without_touching_count() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -52,6 +54,7 @@ fn cli_plans_dotimes_iteration_binding_rename_without_touching_count() {
 fn cli_plans_outer_binding_rename_without_touching_dolist_iteration_scope() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",

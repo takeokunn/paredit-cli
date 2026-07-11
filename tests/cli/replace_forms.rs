@@ -3,12 +3,20 @@ use super::*;
 #[test]
 fn cli_requires_file_for_replace_forms_writes() {
     let mut cmd = paredit();
-    cmd.args(["replace-forms", "--path", "0", "--with", "(x)", "--write"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "replace-forms --write requires --file",
-        ));
+    cmd.args([
+        "refactor",
+        "replace-forms",
+        "--path",
+        "0",
+        "--with",
+        "(x)",
+        "--write",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "replace-forms --write requires --file",
+    ));
 }
 
 #[test]
@@ -19,7 +27,8 @@ fn cli_plans_replace_forms_for_duplicate_refactor() {
     fs::write(&lisp_file, source).expect("write duplicate fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-forms")
+    cmd.arg("refactor")
+        .arg("replace-forms")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -60,7 +69,8 @@ fn cli_writes_replace_forms_in_reverse_span_order() {
     .expect("write duplicate fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-forms")
+    cmd.arg("refactor")
+        .arg("replace-forms")
         .arg("--file")
         .arg(&lisp_file)
         .arg("--path")
@@ -87,6 +97,7 @@ fn cli_writes_replace_forms_in_reverse_span_order() {
 fn cli_rejects_replace_forms_overlapping_paths() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "replace-forms",
         "--path",
         "0",
@@ -105,6 +116,7 @@ fn cli_rejects_replace_forms_overlapping_paths() {
 fn cli_rejects_replace_forms_shape_mismatch_when_required() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "replace-forms",
         "--path",
         "0",

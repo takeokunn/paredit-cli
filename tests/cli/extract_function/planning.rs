@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_extract_function_for_common_lisp() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "extract-function",
         "--path",
         "0.3",
@@ -28,8 +29,7 @@ fn cli_plans_extract_function_for_common_lisp() {
 #[test]
 fn cli_plans_extract_function_for_common_lisp_macrolet_body() {
     let mut cmd = paredit();
-    cmd.args([
-        "extract-function",
+    cmd.args(["refactor", "extract-function",
         "--path",
         "0.3",
         "--name",
@@ -55,8 +55,7 @@ fn cli_plans_extract_function_for_common_lisp_macrolet_body() {
 #[test]
 fn cli_plans_extract_function_for_common_lisp_symbol_macrolet_body() {
     let mut cmd = paredit();
-    cmd.args([
-        "extract-function",
+    cmd.args(["refactor", "extract-function",
         "--path",
         "0.3",
         "--name",

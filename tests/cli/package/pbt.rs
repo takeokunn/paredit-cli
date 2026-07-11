@@ -21,7 +21,7 @@ proptest! {
         .expect("write package fixture");
 
         let mut cmd = paredit();
-        cmd.arg("sort-package-exports")
+        cmd.arg("refactor").arg("sort-package-exports")
             .arg("--file")
             .arg(&package_file)
             .arg("--write")
@@ -34,7 +34,7 @@ proptest! {
         prop_assert!(rewritten.contains(&expected_export));
 
         let mut check = paredit();
-        check.arg("check")
+        check.arg("inspect").arg("check")
             .arg("--file")
             .arg(&package_file)
             .assert()
@@ -59,7 +59,7 @@ proptest! {
         .expect("write package fixture");
 
         let mut cmd = paredit();
-        cmd.arg("sort-package-options")
+        cmd.arg("refactor").arg("sort-package-options")
             .arg("--file")
             .arg(&package_file)
             .arg("--write")
@@ -71,7 +71,7 @@ proptest! {
         assert_substrings_in_order(&rewritten, &expected_options);
 
         let mut check = paredit();
-        check.arg("check")
+        check.arg("inspect").arg("check")
             .arg("--file")
             .arg(&package_file)
             .assert()
@@ -101,7 +101,7 @@ proptest! {
         .expect("write package fixture");
 
         let mut cmd = paredit();
-        cmd.arg("merge-package-options")
+        cmd.arg("refactor").arg("merge-package-options")
             .arg("--file")
             .arg(&package_file)
             .arg("--write")
@@ -113,7 +113,7 @@ proptest! {
         prop_assert!(rewritten.contains(&expected_export));
 
         let mut check = paredit();
-        check.arg("check")
+        check.arg("inspect").arg("check")
             .arg("--file")
             .arg(&package_file)
             .assert()

@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn cli_reports_let_inline_safety_for_common_lisp() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(defun render () (let ((product (* width height))) (+ product margin)))")
         .assert()
         .success()
@@ -20,7 +20,7 @@ fn cli_reports_let_inline_safety_for_common_lisp() {
 #[test]
 fn cli_reports_multi_body_let_supported_by_inline_let() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(let ((x 1)) (print x) (+ x 2))")
         .assert()
         .success()
@@ -35,7 +35,7 @@ fn cli_reports_multi_body_let_supported_by_inline_let() {
 #[test]
 fn cli_reports_let_duplicate_evaluation_risk() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(let ((x (compute))) (+ x x))")
         .assert()
         .success()
@@ -51,7 +51,7 @@ fn cli_reports_let_duplicate_evaluation_risk() {
 #[test]
 fn cli_reports_let_star_references_from_later_bindings() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(let* ((x 1) (y (+ x 2))) y)")
         .assert()
         .success()
@@ -64,7 +64,7 @@ fn cli_reports_let_star_references_from_later_bindings() {
 #[test]
 fn cli_reports_symbol_macrolet_bindings_without_counting_expansion_reference() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(symbol-macrolet ((value (compute value)) (used other)) (list used))")
         .assert()
         .success()
@@ -83,7 +83,7 @@ fn cli_reports_symbol_macrolet_bindings_without_counting_expansion_reference() {
 #[test]
 fn cli_reports_single_binding_symbol_macrolet_supported_by_inline_let() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(symbol-macrolet ((used other)) (list used))")
         .assert()
         .success()
@@ -101,35 +101,49 @@ fn cli_reports_single_binding_symbol_macrolet_supported_by_inline_let() {
 #[test]
 fn cli_reports_clojure_vector_let_bindings() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--dialect", "clojure", "--output", "json"])
-        .write_stdin("(let [x 1 y (+ x 2)] (+ x y))")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("\"dialect\": \"clojure\""))
-        .stdout(predicate::str::contains("\"binding_style\": \"vector\""))
-        .stdout(predicate::str::contains("\"name\": \"x\""))
-        .stdout(predicate::str::contains("\"name\": \"y\""))
-        .stdout(predicate::str::contains("\"multiple-bindings\""));
+    cmd.args([
+        "inspect",
+        "lets",
+        "--dialect",
+        "clojure",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(let [x 1 y (+ x 2)] (+ x y))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"dialect\": \"clojure\""))
+    .stdout(predicate::str::contains("\"binding_style\": \"vector\""))
+    .stdout(predicate::str::contains("\"name\": \"x\""))
+    .stdout(predicate::str::contains("\"name\": \"y\""))
+    .stdout(predicate::str::contains("\"multiple-bindings\""));
 }
 
 #[test]
 fn cli_reports_clojure_vector_let_references_from_later_bindings() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--dialect", "clojure", "--output", "json"])
-        .write_stdin("(let [x 1 y (+ x 2)] y)")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("\"dialect\": \"clojure\""))
-        .stdout(predicate::str::contains("\"binding_style\": \"vector\""))
-        .stdout(predicate::str::contains("\"name\": \"x\""))
-        .stdout(predicate::str::contains("\"reference_count\": 1"))
-        .stdout(predicate::str::contains("\"unused_binding_count\": 0"));
+    cmd.args([
+        "inspect",
+        "lets",
+        "--dialect",
+        "clojure",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(let [x 1 y (+ x 2)] y)")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"dialect\": \"clojure\""))
+    .stdout(predicate::str::contains("\"binding_style\": \"vector\""))
+    .stdout(predicate::str::contains("\"name\": \"x\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains("\"unused_binding_count\": 0"));
 }
 
 #[test]
 fn cli_reports_bare_symbol_let_binding_as_implicit_nil() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(defun f () (let ((opoint (point)) beg end) (setq beg 1) (setq end 2) (list opoint beg end)))")
         .assert()
         .success()
@@ -142,7 +156,7 @@ fn cli_reports_bare_symbol_let_binding_as_implicit_nil() {
 #[test]
 fn cli_reports_let_star_later_bare_symbol_binding_without_erroring() {
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .write_stdin("(let* ((x 1) y) (+ x (or y 0)))")
         .assert()
         .success()
@@ -156,7 +170,8 @@ fn cli_reports_let_star_later_bare_symbol_binding_without_erroring() {
 fn cli_fails_let_report_policy_after_printing_json() {
     let mut cmd = paredit();
     cmd.args([
-        "let-report",
+        "inspect",
+        "lets",
         "--fail-on-duplicate-evaluation",
         "--fail-on-unused-binding",
         "--require-inlineable-bindings",
@@ -190,7 +205,7 @@ fn cli_reports_let_bindings_across_multiple_files_with_aggregated_policy() {
         .expect("write second let-report fixture");
 
     let mut cmd = paredit();
-    cmd.args(["let-report", "--output", "json"])
+    cmd.args(["inspect", "lets", "--output", "json"])
         .arg(&first_file)
         .arg(&second_file)
         .assert()

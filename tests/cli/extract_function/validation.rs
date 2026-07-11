@@ -4,6 +4,7 @@ use super::*;
 fn cli_rejects_extract_function_write_without_file() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "extract-function",
         "--path",
         "0.3",

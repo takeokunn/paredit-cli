@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_outer_binding_rename_through_macrolet_expander_only() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -29,6 +30,7 @@ fn cli_plans_outer_binding_rename_through_macrolet_expander_only() {
 fn cli_plans_outer_binding_rename_through_cl_user_macrolet_expander_only() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -56,6 +58,7 @@ fn cli_plans_outer_binding_rename_through_cl_user_macrolet_expander_only() {
 fn cli_plans_outer_binding_rename_through_compiler_macrolet_expander_only() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--path",
         "0",
@@ -82,8 +85,7 @@ fn cli_plans_outer_binding_rename_through_compiler_macrolet_expander_only() {
 #[test]
 fn cli_plans_outer_binding_rename_through_cl_user_compiler_macrolet_expander_only() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--path",
         "0",
         "--from",

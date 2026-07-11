@@ -13,7 +13,7 @@ const INLINE_FUNCTION_COMMON_LISP_ARGS: &[&str] = &[
 
 fn run_inline_function(args: &[&str], stdin: Option<&str>) -> std::process::Output {
     let mut cmd = paredit();
-    cmd.arg("inline-function");
+    cmd.arg("refactor").arg("inline-function");
     cmd.args(args);
     if let Some(stdin) = stdin {
         cmd.write_stdin(stdin);

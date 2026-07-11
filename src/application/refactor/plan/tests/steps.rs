@@ -18,7 +18,7 @@ fn remove_plan_uses_unused_definition_cleanup_usecase() {
         .expect("apply step");
     assert_eq!(apply.action, "apply-unused-definition-removal");
     let apply_command = apply.command.as_deref().expect("apply command");
-    assert!(apply_command.contains("paredit remove-unused-definitions --output json"));
+    assert!(apply_command.contains("paredit refactor remove-unused-definitions --output json"));
     assert!(apply_command.contains("'src/core.lisp'"));
     assert!(apply_command.contains("'src/ui.el'"));
 
@@ -52,7 +52,7 @@ fn rename_plan_uses_symbol_macro_rename_usecase_for_symbol_macros() {
     assert_eq!(apply.action, "apply-symbol-macro-rename");
     let apply_command = apply.command.as_deref().expect("apply command");
     assert!(apply_command.contains(
-        "paredit rename-symbol-macro --from 'current-user' --to <new-symbol> --output json"
+        "paredit refactor rename-symbol-macro --from 'current-user' --to <new-symbol> --output json"
     ));
     assert!(apply_command.contains("'src/core.lisp'"));
 
@@ -62,10 +62,10 @@ fn rename_plan_uses_symbol_macro_rename_usecase_for_symbol_macros() {
         .expect("verify step");
     let verify_command = verify.command.as_deref().expect("verify command");
     assert!(verify_command.contains(
-        "paredit impact-report --symbol 'current-user' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --output json"
+        "paredit inspect impact --symbol 'current-user' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --output json"
     ));
     assert!(!verify_command.contains("--require-calls 1"));
-    assert!(verify_command.contains("paredit dependency-report --output json"));
+    assert!(verify_command.contains("paredit inspect dependencies --output json"));
 }
 
 #[test]
@@ -85,11 +85,9 @@ fn rename_plan_uses_callable_rename_workflow_for_macros() {
         .expect("apply step");
     assert_eq!(apply.action, "apply-macro-rename");
     let apply_command = apply.command.as_deref().expect("apply command");
-    assert!(
-        apply_command.contains(
-            "paredit rename-function --from 'render-pane' --to <new-symbol> --output json"
-        )
-    );
+    assert!(apply_command.contains(
+        "paredit refactor rename-function --from 'render-pane' --to <new-symbol> --output json"
+    ));
     assert!(apply_command.contains("'src/core.lisp'"));
 
     let verify = steps
@@ -98,9 +96,9 @@ fn rename_plan_uses_callable_rename_workflow_for_macros() {
         .expect("verify step");
     let verify_command = verify.command.as_deref().expect("verify command");
     assert!(verify_command.contains(
-        "paredit impact-report --symbol 'render-pane' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --require-calls 1 --output json"
+        "paredit inspect impact --symbol 'render-pane' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --require-calls 1 --output json"
     ));
-    assert!(verify_command.contains("paredit dependency-report --output json"));
+    assert!(verify_command.contains("paredit inspect dependencies --output json"));
 }
 
 #[test]
@@ -126,7 +124,7 @@ fn rename_plan_uses_callable_rename_workflow_for_macro_like_targets() {
         assert_eq!(apply.action, "apply-macro-rename");
         let apply_command = apply.command.as_deref().expect("apply command");
         assert!(apply_command.contains(
-            "paredit rename-function --from 'render-pane' --to <new-symbol> --output json"
+            "paredit refactor rename-function --from 'render-pane' --to <new-symbol> --output json"
         ));
         assert!(apply_command.contains("'src/core.lisp'"));
     }
@@ -149,7 +147,7 @@ fn move_plan_uses_definition_move_workflow_for_symbol_macros_without_call_covera
         .expect("apply step");
     assert_eq!(apply.action, "apply-move");
     let apply_command = apply.command.as_deref().expect("apply command");
-    assert!(apply_command.contains("paredit move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json"));
+    assert!(apply_command.contains("paredit refactor move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json"));
 
     let verify = steps
         .iter()
@@ -157,10 +155,10 @@ fn move_plan_uses_definition_move_workflow_for_symbol_macros_without_call_covera
         .expect("verify step");
     let verify_command = verify.command.as_deref().expect("verify command");
     assert!(verify_command.contains(
-        "paredit impact-report --symbol 'current-user' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --output json"
+        "paredit inspect impact --symbol 'current-user' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --output json"
     ));
     assert!(!verify_command.contains("--require-calls 1"));
-    assert!(verify_command.contains("paredit dependency-report --output json"));
+    assert!(verify_command.contains("paredit inspect dependencies --output json"));
 }
 
 #[test]
@@ -193,7 +191,7 @@ fn signature_plan_uses_manual_review_for_macro_like_targets() {
             .expect("verify step");
         let verify_command = verify.command.as_deref().expect("verify command");
         assert!(verify_command.contains(
-            "paredit impact-report --symbol 'current-user' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --output json"
+            "paredit inspect impact --symbol 'current-user' --fail-on-risk-level warning --require-definitions 1 --require-references 1 --output json"
         ));
         assert!(!verify_command.contains("--require-calls 1"));
     }

@@ -47,6 +47,7 @@ fn assert_thread_expression_property(
 ) -> Result<(), TestCaseError> {
     let output = paredit()
         .args([
+            "refactor",
             "thread-expression",
             "--path",
             "0",
@@ -73,6 +74,7 @@ fn assert_thread_expression_property(
 
     let rewritten = report["rewritten"].as_str().unwrap_or_default();
     let check_output = paredit()
+        .arg("inspect")
         .arg("check")
         .write_stdin(rewritten.to_owned())
         .output()
@@ -87,7 +89,14 @@ fn assert_thread_expression_property(
 
 fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseError> {
     let output = paredit()
-        .args(["unthread-expression", "--path", "0", "--output", "json"])
+        .args([
+            "refactor",
+            "unthread-expression",
+            "--path",
+            "0",
+            "--output",
+            "json",
+        ])
         .write_stdin(input)
         .output()
         .map_err(|err| TestCaseError::fail(format!("run paredit: {err}")))?;
@@ -104,6 +113,7 @@ fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseErro
     prop_assert!(replacement.starts_with('('));
 
     let check_output = paredit()
+        .arg("inspect")
         .arg("check")
         .write_stdin(replacement.to_owned())
         .output()

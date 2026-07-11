@@ -11,7 +11,8 @@ fn cli_rejects_replace_function_calls_for_shadowed_compiler_macrolet_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -37,7 +38,8 @@ fn cli_rejects_replace_function_calls_for_shadowed_cl_user_compiler_macrolet_pat
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -63,7 +65,8 @@ fn cli_rejects_replace_function_calls_for_shadowed_cl_user_macrolet_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -89,7 +92,8 @@ fn cli_writes_replace_function_calls_inside_cl_user_macrolet_expanders_only() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -121,7 +125,8 @@ fn cli_writes_replace_function_call_at_macrolet_expander_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")
@@ -154,7 +159,8 @@ fn cli_writes_replace_function_call_at_compiler_macrolet_expander_path() {
     .expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("replace-function-calls")
+    cmd.arg("refactor")
+        .arg("replace-function-calls")
         .arg(&lisp_file)
         .arg("--from")
         .arg("fetch-user")

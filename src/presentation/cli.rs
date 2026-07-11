@@ -73,7 +73,7 @@ use shared::*;
     version,
     about,
     long_about = None,
-    after_help = "Workflow namespaces:\n  Use `paredit refactor ...` for file- and workspace-scoped refactoring workflows.\n  Use `paredit workspace ...` for workspace discovery and reporting."
+    after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form and writes source to stdout.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll commands are available only through these namespaces."
 )]
 struct Cli {
     #[command(subcommand)]

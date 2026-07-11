@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_handler_bind_lambda_parameter_rename() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "rename-binding",
         "--dialect",
         "common-lisp",
@@ -31,8 +32,7 @@ fn cli_plans_handler_bind_lambda_parameter_rename() {
 #[test]
 fn cli_plans_restart_bind_lambda_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -59,8 +59,7 @@ fn cli_plans_restart_bind_lambda_parameter_rename() {
 #[test]
 fn cli_rejects_ambiguous_handler_bind_lambda_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -85,8 +84,7 @@ fn cli_rejects_ambiguous_handler_bind_lambda_parameter_rename() {
 #[test]
 fn cli_plans_qualified_handler_bind_lambda_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -113,8 +111,7 @@ fn cli_plans_qualified_handler_bind_lambda_parameter_rename() {
 #[test]
 fn cli_plans_qualified_handler_bind_qualified_lambda_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",
@@ -141,8 +138,7 @@ fn cli_plans_qualified_handler_bind_qualified_lambda_parameter_rename() {
 #[test]
 fn cli_plans_qualified_restart_bind_lambda_parameter_rename() {
     let mut cmd = paredit();
-    cmd.args([
-        "rename-binding",
+    cmd.args(["refactor", "rename-binding",
         "--dialect",
         "common-lisp",
         "--path",

@@ -9,6 +9,7 @@ fn cli_skips_common_lisp_macrolet_shadowed_global_definition_edges() {
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")
@@ -31,6 +32,7 @@ fn cli_skips_common_lisp_cl_user_macrolet_shadowed_global_definition_edges() {
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")
@@ -53,6 +55,7 @@ fn cli_skips_common_lisp_cl_macrolet_shadowed_global_definition_edges() {
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")
@@ -75,6 +78,7 @@ fn cli_skips_emacs_lisp_cl_macrolet_shadowed_global_definition_edges() {
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")
@@ -98,6 +102,7 @@ fn cli_skips_common_lisp_compiler_macrolet_shadowed_global_definition_edges() {
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")
@@ -120,6 +125,7 @@ fn cli_skips_common_lisp_cl_compiler_macrolet_shadowed_global_definition_edges()
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")
@@ -142,6 +148,7 @@ fn cli_skips_common_lisp_cl_user_compiler_macrolet_shadowed_global_definition_ed
     );
 
     let output = paredit()
+        .arg("inspect")
         .arg("call-graph")
         .arg("--output")
         .arg("json")

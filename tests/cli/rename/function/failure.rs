@@ -37,7 +37,7 @@ fn cli_rejects_function_rename_without_matching_definition() {
 #[test]
 fn cli_help_describes_rename_function_contract() {
     let mut cmd = paredit();
-    cmd.arg("rename-function")
+    cmd.arg("refactor").arg("rename-function")
         .arg("--help")
         .assert()
         .success()

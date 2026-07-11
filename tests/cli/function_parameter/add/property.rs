@@ -26,7 +26,7 @@ proptest! {
         fs::write(&path, &input).map_err(|err| TestCaseError::fail(format!("write fixture: {err}")))?;
 
         let output = paredit()
-            .arg("add-function-parameter")
+            .arg("refactor").arg("add-function-parameter")
             .arg("--file")
             .arg(&path)
             .arg("--definition-path")

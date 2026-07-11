@@ -13,7 +13,8 @@ fn cli_reports_refactor_impact_across_dialects() {
     fs::write(&elisp_file, "(defun draw () (area 5 6))\n").expect("write elisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("impact-report")
+    cmd.arg("inspect")
+        .arg("impact")
         .arg("--symbol")
         .arg("area")
         .arg(&lisp_file)
@@ -54,7 +55,8 @@ fn cli_gates_refactor_impact_policy_for_ci() {
         .expect("write elisp impact policy fixture");
 
     let mut cmd = paredit();
-    cmd.arg("impact-report")
+    cmd.arg("inspect")
+        .arg("impact")
         .arg("--symbol")
         .arg("area")
         .arg("--fail-on-risk-level")
@@ -103,7 +105,8 @@ fn cli_accepts_refactor_impact_policy_when_thresholds_pass() {
     .expect("write passing impact policy fixture");
 
     let mut cmd = paredit();
-    cmd.arg("impact-report")
+    cmd.arg("inspect")
+        .arg("impact")
         .arg("--symbol")
         .arg("area")
         .arg("--fail-on-risk-level")
@@ -135,7 +138,8 @@ fn cli_reports_common_lisp_setf_callable_impact() {
     .expect("write setf impact fixture");
 
     let mut cmd = paredit();
-    cmd.arg("impact-report")
+    cmd.arg("inspect")
+        .arg("impact")
         .arg("--symbol")
         .arg("accessor")
         .arg(&file)
@@ -160,7 +164,8 @@ fn cli_excludes_symbol_macrolet_binding_names_and_shadowed_body_references_from_
     .expect("write symbol-macrolet impact fixture");
 
     let mut cmd = paredit();
-    cmd.arg("impact-report")
+    cmd.arg("inspect")
+        .arg("impact")
         .arg("--symbol")
         .arg("helper")
         .arg(&file)

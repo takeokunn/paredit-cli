@@ -2,7 +2,7 @@ pub(super) use super::*;
 
 fn reorder_command() -> Command {
     let mut cmd = paredit();
-    cmd.arg("reorder-function-parameters");
+    cmd.arg("refactor").arg("reorder-function-parameters");
     cmd
 }
 

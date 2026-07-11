@@ -13,7 +13,8 @@ fn cli_reports_common_lisp_package_declarations() {
     .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("package-report")
+    cmd.arg("inspect")
+        .arg("packages")
         .arg(&system_file)
         .arg(&package_file)
         .assert()
@@ -47,7 +48,8 @@ fn cli_reports_nested_common_lisp_package_forms() {
     .expect("write nested package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("package-report")
+    cmd.arg("inspect")
+        .arg("packages")
         .arg(&package_file)
         .assert()
         .success()

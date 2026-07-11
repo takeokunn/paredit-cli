@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_remove_unused_binding_ignoring_shadowed_lambda_parameter() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -25,19 +26,27 @@ fn cli_plans_remove_unused_binding_ignoring_shadowed_lambda_parameter() {
 #[test]
 fn cli_rejects_remove_unused_let_star_binding_used_later() {
     let mut cmd = paredit();
-    cmd.args(["remove-unused-binding", "--path", "0", "--name", "x"])
-        .write_stdin("(let* ((x 1) (y (+ x 2))) y)")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "remove-unused-binding requires zero in-scope references",
-        ));
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "x",
+    ])
+    .write_stdin("(let* ((x 1) (y (+ x 2))) y)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding requires zero in-scope references",
+    ));
 }
 
 #[test]
 fn cli_keeps_let_star_binding_used_by_later_binding_in_all_bindings() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",

@@ -4,6 +4,7 @@ use super::*;
 fn cli_plans_remove_unused_macrolet_without_counting_expander_body_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -30,6 +31,7 @@ fn cli_plans_remove_unused_macrolet_without_counting_expander_body_reference() {
 fn cli_plans_remove_unused_cl_macrolet_without_counting_expander_body_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -56,6 +58,7 @@ fn cli_plans_remove_unused_cl_macrolet_without_counting_expander_body_reference(
 fn cli_plans_remove_unused_cl_user_macrolet_without_counting_expander_body_reference() {
     let mut cmd = paredit();
     cmd.args([
+        "refactor",
         "remove-unused-binding",
         "--path",
         "0",
@@ -83,11 +86,18 @@ fn cli_plans_remove_unused_cl_user_macrolet_without_counting_expander_body_refer
 #[test]
 fn cli_rejects_referenced_macrolet_binding() {
     let mut cmd = paredit();
-    cmd.args(["remove-unused-binding", "--path", "0", "--name", "value"])
-        .write_stdin("(macrolet ((value (x) (compute x))) (list (value 1)))")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "remove-unused-binding requires zero in-scope references",
-        ));
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "value",
+    ])
+    .write_stdin("(macrolet ((value (x) (compute x))) (list (value 1)))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding requires zero in-scope references",
+    ));
 }

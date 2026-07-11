@@ -8,7 +8,8 @@ fn cli_plans_package_option_merge_without_writing() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("merge-package-options")
+    cmd.arg("refactor")
+        .arg("merge-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--package")
@@ -41,7 +42,8 @@ fn cli_writes_package_option_merge() {
     .expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("merge-package-options")
+    cmd.arg("refactor")
+        .arg("merge-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")
@@ -56,6 +58,7 @@ fn cli_writes_package_option_merge() {
 
     let mut check = paredit();
     check
+        .arg("inspect")
         .arg("check")
         .arg("--file")
         .arg(&package_file)
@@ -71,7 +74,8 @@ fn cli_keeps_merged_package_options_idempotent() {
     fs::write(&package_file, original).expect("write package fixture");
 
     let mut cmd = paredit();
-    cmd.arg("merge-package-options")
+    cmd.arg("refactor")
+        .arg("merge-package-options")
         .arg("--file")
         .arg(&package_file)
         .arg("--write")

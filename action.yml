@@ -11,7 +11,7 @@ inputs:
   mode:
     description: >-
       lint: fail when any discovered Lisp source has structural parse errors.
-      format: fail when any parsed source is not in canonical paredit format.
+      format: fail when any parsed source is not in canonical paredit edit format.
       fix: rewrite sources into canonical format in place (pair with a
       commit/suggestion step of your choice).
     required: false

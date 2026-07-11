@@ -43,7 +43,7 @@
             if [ "$#" -eq 0 ]; then
               set -- .
             fi
-            report=$(paredit workspace report --output json "$@")
+            report=$(paredit inspect workspace --output json "$@")
             jq -r '.files[] | select(.status == "parse-error") | "\(.path): \(.error)"' <<<"$report"
             if [ "''${GITHUB_ACTIONS:-}" = "true" ]; then
               jq -r '.files[] | select(.status == "parse-error") | "::error file=\(.path)::structural parse error: \(.error)"' <<<"$report"
@@ -78,16 +78,16 @@
             if [ "''${#args[@]}" -eq 0 ]; then
               args=(.)
             fi
-            report=$(paredit workspace report --output json "''${args[@]}")
+            report=$(paredit inspect workspace --output json "''${args[@]}")
             fail=0
             changed=0
             while IFS= read -r file; do
-              formatted=$(paredit format --file "$file")
+              formatted=$(paredit edit format --file "$file")
               if ! printf '%s\n' "$formatted" | cmp -s - "$file"; then
                 if [ "$check" -eq 1 ]; then
                   echo "would reformat: $file"
                   if [ "''${GITHUB_ACTIONS:-}" = "true" ]; then
-                    echo "::error file=$file::not in canonical paredit format (run: paredit-format $file)"
+                    echo "::error file=$file::not in canonical paredit edit format (run: paredit-format $file)"
                   fi
                   fail=1
                 else
@@ -131,7 +131,7 @@
             # Files that do not parse are left untouched; paredit-lint owns
             # structural failures.
             for file in "$@"; do
-              if formatted=$(paredit format --file "$file"); then
+              if formatted=$(paredit edit format --file "$file"); then
                 printf '%s\n' "$formatted" | cmp -s - "$file" || printf '%s\n' "$formatted" > "$file"
               fi
             done
@@ -182,7 +182,7 @@
             format = {
               type = "app";
               program = "${self.packages.${system}.format}/bin/paredit-format";
-              meta.description = "Rewrite discovered Lisp sources into canonical paredit format (--check to verify only)";
+              meta.description = "Rewrite discovered Lisp sources into canonical paredit edit format (--check to verify only)";
             };
           };
 
@@ -218,6 +218,7 @@
               pkgs.cargo-nextest
               pkgs.rustfmt
               pkgs.clippy
+              pkgs.mdbook
             ];
             shellHook = ''
               cat <<'USAGE_EOF'
@@ -236,7 +237,7 @@
 
               Build and run:
                 nix build .#              # result/bin/paredit
-                nix run .# -- check --file source.lisp
+                nix run .# -- inspect check --file source.lisp
                 nix run .#lint -- .       # structural lint gate
                 nix run .#format -- --check .
 
@@ -261,6 +262,19 @@
                   cp -r $src/. .
                   chmod -R u+w .
                   actionlint -color .github/workflows/*.yml
+                  touch $out
+                '';
+            documentation =
+              pkgs.runCommand "paredit-cli-documentation"
+                {
+                  nativeBuildInputs = [ pkgs.mdbook ];
+                  src = self;
+                }
+                ''
+                  cp -r $src/. .
+                  chmod -R u+w .
+                  mdbook build docs
+                  test -f docs/book/index.html
                   touch $out
                 '';
             lint-format-integration =

@@ -6,19 +6,22 @@ fn top_level_help_routes_new_automation_to_grouped_namespaces() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Workflow namespaces:"))
+        .stdout(predicate::str::contains("Canonical namespaces:"))
         .stdout(predicate::str::contains(
-            "Use `paredit refactor ...` for file- and workspace-scoped refactoring workflows.",
+            "`paredit inspect ...` reads and reports without writing.",
         ))
         .stdout(predicate::str::contains(
-            "Use `paredit workspace ...` for workspace discovery and reporting.",
+            "`paredit edit ...` transforms one selected form and writes source to stdout.",
+        ))
+        .stdout(predicate::str::contains(
+            "`paredit refactor ...` plans, previews, verifies, and applies semantic changes.",
         ));
 }
 
 #[test]
 fn rename_function_help_surfaces_common_lisp_callable_designators() {
     paredit()
-        .args(["rename-function", "--help"])
+        .args(["refactor", "rename-function", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
@@ -33,7 +36,7 @@ fn rename_function_help_surfaces_common_lisp_callable_designators() {
 #[test]
 fn rename_macrolet_help_surfaces_expander_body_boundary() {
     paredit()
-        .args(["rename-macrolet", "--help"])
+        .args(["refactor", "rename-macrolet", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
@@ -47,7 +50,7 @@ fn rename_macrolet_help_surfaces_expander_body_boundary() {
 #[test]
 fn rename_symbol_macro_help_surfaces_lexical_shadowing_boundary() {
     paredit()
-        .args(["rename-symbol-macro", "--help"])
+        .args(["refactor", "rename-symbol-macro", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(
@@ -61,7 +64,7 @@ fn rename_symbol_macro_help_surfaces_lexical_shadowing_boundary() {
 #[test]
 fn rename_local_function_help_surfaces_flet_and_labels_boundary() {
     paredit()
-        .args(["rename-local-function", "--help"])
+        .args(["refactor", "rename-local-function", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains(

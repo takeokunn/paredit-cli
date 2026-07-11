@@ -10,7 +10,8 @@ fn cli_plans_definition_removal_without_writing() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-definition")
+    cmd.arg("refactor")
+        .arg("remove-definition")
         .arg("--file")
         .arg(&file)
         .arg("--path")
@@ -41,7 +42,8 @@ fn cli_writes_definition_removal() {
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-definition")
+    cmd.arg("refactor")
+        .arg("remove-definition")
         .arg("--file")
         .arg(&file)
         .arg("--path")
@@ -69,7 +71,8 @@ fn cli_plans_unused_definition_removal_without_writing() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -105,7 +108,8 @@ fn cli_writes_unused_definition_removal() {
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--write")
         .arg("--output")
         .arg("json")
@@ -143,7 +147,8 @@ fn cli_keeps_callable_accessor_references_when_removing_unused_definitions() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -174,7 +179,8 @@ fn cli_keeps_emacs_lisp_require_and_provide_by_default() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -203,7 +209,8 @@ fn cli_keeps_definition_only_referenced_from_quoted_dispatch_data() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--write")
         .arg("--output")
         .arg("json")
@@ -237,7 +244,8 @@ fn cli_keeps_definition_only_referenced_from_a_quasiquoted_code_generation_templ
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--write")
         .arg("--output")
         .arg("json")
@@ -268,7 +276,8 @@ fn cli_keeps_a_defstruct_referenced_only_through_its_derived_constructor() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--write")
         .arg("--output")
         .arg("json")
@@ -299,7 +308,8 @@ fn cli_keeps_exported_unused_definition_by_default() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -334,7 +344,8 @@ fn cli_keeps_exported_unused_definition_when_in_package_uses_nickname() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
@@ -369,7 +380,8 @@ fn cli_removes_exported_unused_definition_when_requested() {
     .expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--include-exported")
         .arg("--write")
         .arg("--output")
@@ -415,7 +427,8 @@ fn cli_does_not_crash_on_an_asdf_defsystem_string_literal_name() {
     .expect("write core fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&asd)
@@ -440,7 +453,8 @@ fn cli_keeps_definition_referenced_inside_a_bare_symbol_let_binding() {
     fs::write(&file, original).expect("write fixture");
 
     let mut cmd = paredit();
-    cmd.arg("remove-unused-definitions")
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
         .arg("--output")
         .arg("json")
         .arg(&file)
