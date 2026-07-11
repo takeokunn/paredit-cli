@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionView, Path};
+use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
 use proptest::prelude::*;
 
 fn target(input: &str) -> ExpressionView {
@@ -57,6 +57,38 @@ fn plans_unthread_last_pipeline_into_nested_call() {
     assert_eq!(plan.replacement, "(map f (filter pred rows))");
     assert_eq!(plan.steps.len(), 2);
     assert!(plan.changed);
+}
+
+#[test]
+fn rejects_style_alone_on_an_unrecognized_operator() {
+    let input = "(+ a b)";
+    let err = plan_unthread_expression(UnthreadExpressionRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: Some("0".parse().expect("path")),
+        target: target(input),
+        style: Some(UnthreadStyle::First),
+        operator: None,
+    })
+    .expect_err("bare --style must not accept an unrecognized operator");
+
+    assert!(err.to_string().contains("--operator"));
+}
+
+#[test]
+fn accepts_style_with_explicit_operator_confirming_a_custom_pipeline() {
+    let input = "(my-pipe value (normalize mode) render)";
+    let plan = plan_unthread_expression(UnthreadExpressionRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: Some("0".parse().expect("path")),
+        target: target(input),
+        style: Some(UnthreadStyle::First),
+        operator: Some(SymbolName::new("my-pipe").expect("symbol")),
+    })
+    .expect("plan");
+
+    assert_eq!(plan.replacement, "(render (normalize value mode))");
 }
 
 proptest! {

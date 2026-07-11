@@ -36,14 +36,23 @@ pub fn plan_unthread_expression(
             );
         }
     }
+    let explicit_operator = request.operator.is_some();
     let operator = match request.operator {
         Some(operator) => operator,
         None => SymbolName::new(head)?,
     };
-    let style = match (
-        request.style,
-        UnthreadStyle::from_operator(operator.as_str()),
-    ) {
+    let recognized = UnthreadStyle::from_operator(operator.as_str());
+    if !explicit_operator && recognized.is_none() {
+        // Without an explicit --operator confirming the caller's intent, an
+        // unrecognized head is not known to be a threading pipeline at all —
+        // trusting a bare --style here would rewrite an ordinary call (e.g.
+        // `(+ a b)`) into garbage nested-call output.
+        anyhow::bail!(
+            "unthread-expression operator {} is not a recognized threading operator (->, ->>); pass --operator to confirm a custom threading macro",
+            operator
+        );
+    }
+    let style = match (request.style, recognized) {
         (Some(style), _) => style,
         (None, Some(style)) => style,
         (None, None) => anyhow::bail!(
