@@ -1,12 +1,13 @@
 use anyhow::Result;
 
 use crate::domain::dialect::Dialect;
+use crate::domain::lexical_scope::value_capture;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName};
 
-use super::super::syntax::atom_text;
+use super::super::syntax::{atom_text, view_at_span};
 use super::super::types::{LetBindingReport, LetFormReport};
 use super::bindings::let_binding_candidates;
-use super::references::{fallback_reference_count, let_binding_reference_count};
+use super::references::{fallback_reference_count, let_binding_reference_spans};
 
 pub(super) fn analyze_let_form(
     dialect: Dialect,
@@ -39,20 +40,37 @@ pub(super) fn analyze_let_form(
 
     for candidate in &candidates {
         let symbol = SymbolName::new(candidate.name.clone());
-        let reference_count = match &symbol {
-            Ok(symbol) => let_binding_reference_count(
+        let (reference_count, reference_spans) = match &symbol {
+            Ok(symbol) => {
+                let spans = let_binding_reference_spans(
+                    dialect,
+                    input,
+                    view,
+                    binding_form,
+                    &candidates,
+                    candidate,
+                    symbol,
+                )?;
+                (spans.len(), spans)
+            }
+            Err(_) => (
+                view.children[2..]
+                    .iter()
+                    .map(|body| fallback_reference_count(body, &candidate.name))
+                    .sum(),
+                Vec::new(),
+            ),
+        };
+        let captured = match (&symbol, view_at_span(binding_form, candidate.value_span)) {
+            (Ok(symbol), Some(value_view)) => value_capture(
                 dialect,
                 input,
-                view,
-                binding_form,
-                &candidates,
-                candidate,
+                view.span,
                 symbol,
-            )?,
-            Err(_) => view.children[2..]
-                .iter()
-                .map(|body| fallback_reference_count(body, &candidate.name))
-                .sum(),
+                value_view,
+                &reference_spans,
+            ),
+            _ => Vec::new(),
         };
         let mut risks = Vec::new();
         if !single_binding {
@@ -66,6 +84,9 @@ pub(super) fn analyze_let_form(
         }
         if reference_count > 1 {
             risks.push("duplicate-evaluation");
+        }
+        if !captured.is_empty() {
+            risks.push("capture");
         }
         if !inline_supported_by_inline_let {
             risks.push("unsupported-by-inline-let");

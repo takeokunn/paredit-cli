@@ -5,6 +5,7 @@ use expansion::{
     count_references_in_expanded_expression, expand_unquote_expression, expand_unquote_splicing,
 };
 
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::InlineFunctionParameterPlan;
@@ -14,6 +15,7 @@ mod expansion;
 mod literal_render;
 
 pub(super) fn expand_inline_macro_body(
+    dialect: Dialect,
     input: &str,
     body: &ExpressionView,
     body_bindings: &[(String, String)],
@@ -28,6 +30,7 @@ pub(super) fn expand_inline_macro_body(
 
     let replacement = if body.reader_prefixes.first() == Some(&ReaderPrefix::Quasiquote) {
         render_macro_template(
+            dialect,
             input,
             body,
             0,
@@ -37,6 +40,7 @@ pub(super) fn expand_inline_macro_body(
         )?
     } else {
         expand_plain_macro_body(
+            dialect,
             input,
             body,
             body_bindings,
@@ -73,6 +77,7 @@ pub(super) fn expand_inline_macro_body(
 }
 
 fn expand_plain_macro_body(
+    dialect: Dialect,
     input: &str,
     body: &ExpressionView,
     body_bindings: &[(String, String)],
@@ -80,6 +85,7 @@ fn expand_plain_macro_body(
     reference_counts: &mut BTreeMap<String, usize>,
 ) -> Result<String> {
     let (intermediate, _) = substitute_inline_function_body(
+        dialect,
         input,
         body,
         &body_bindings
@@ -93,13 +99,14 @@ fn expand_plain_macro_body(
         true,
         true,
     )?;
-    count_references_in_expanded_expression(&intermediate, reference_counts)?;
+    count_references_in_expanded_expression(dialect, &intermediate, reference_counts)?;
 
     let intermediate_tree = expansion::parse_single_expression_tree(&intermediate)?;
     let intermediate_expression = intermediate_tree
         .select_path(&crate::domain::sexpr::Path::root_child(0))?
         .view();
     let (expanded, _) = substitute_inline_function_body(
+        dialect,
         &intermediate,
         &intermediate_expression,
         &argument_bindings
@@ -117,6 +124,7 @@ fn expand_plain_macro_body(
 }
 
 fn render_macro_template(
+    dialect: Dialect,
     input: &str,
     view: &ExpressionView,
     quasiquote_depth: usize,
@@ -125,6 +133,7 @@ fn render_macro_template(
     reference_counts: &mut BTreeMap<String, usize>,
 ) -> Result<String> {
     render_prefixed_expression(
+        dialect,
         input,
         view,
         0,
@@ -135,7 +144,12 @@ fn render_macro_template(
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "macro template rendering threads the full expansion context plus dialect"
+)]
 fn render_prefixed_expression(
+    dialect: Dialect,
     input: &str,
     view: &ExpressionView,
     prefix_index: usize,
@@ -146,6 +160,7 @@ fn render_prefixed_expression(
 ) -> Result<String> {
     let Some(prefix) = view.reader_prefixes.get(prefix_index).copied() else {
         return render_core_expression(
+            dialect,
             input,
             view,
             quasiquote_depth,
@@ -158,6 +173,7 @@ fn render_prefixed_expression(
     match prefix {
         ReaderPrefix::Quasiquote => {
             let rendered = render_prefixed_expression(
+                dialect,
                 input,
                 view,
                 prefix_index + 1,
@@ -174,9 +190,16 @@ fn render_prefixed_expression(
         }
         ReaderPrefix::Unquote => {
             if quasiquote_depth == 1 {
-                expand_unquote_expression(view, body_bindings, argument_bindings, reference_counts)
+                expand_unquote_expression(
+                    dialect,
+                    view,
+                    body_bindings,
+                    argument_bindings,
+                    reference_counts,
+                )
             } else {
                 let rendered = render_prefixed_expression(
+                    dialect,
                     input,
                     view,
                     prefix_index + 1,
@@ -193,6 +216,7 @@ fn render_prefixed_expression(
                 anyhow::bail!("inline-function found unsupported top-level ,@expr in defmacro body")
             } else {
                 let rendered = render_prefixed_expression(
+                    dialect,
                     input,
                     view,
                     prefix_index + 1,
@@ -207,6 +231,7 @@ fn render_prefixed_expression(
         ReaderPrefix::Quote => Ok(format!(
             "'{}",
             render_prefixed_expression(
+                dialect,
                 input,
                 view,
                 prefix_index + 1,
@@ -219,6 +244,7 @@ fn render_prefixed_expression(
         ReaderPrefix::Function => Ok(format!(
             "#'{}",
             render_prefixed_expression(
+                dialect,
                 input,
                 view,
                 prefix_index + 1,
@@ -236,6 +262,7 @@ fn render_prefixed_expression(
             "{}{}",
             prefix.as_source(),
             render_prefixed_expression(
+                dialect,
                 input,
                 view,
                 prefix_index + 1,
@@ -249,6 +276,7 @@ fn render_prefixed_expression(
 }
 
 fn render_core_expression(
+    dialect: Dialect,
     input: &str,
     view: &ExpressionView,
     quasiquote_depth: usize,
@@ -271,6 +299,7 @@ fn render_core_expression(
                     && child.reader_prefixes.first() == Some(&ReaderPrefix::UnquoteSplicing)
                 {
                     rendered_children.extend(expand_unquote_splicing(
+                        dialect,
                         child,
                         body_bindings,
                         argument_bindings,
@@ -279,6 +308,7 @@ fn render_core_expression(
                     continue;
                 }
                 rendered_children.push(render_macro_template(
+                    dialect,
                     input,
                     child,
                     quasiquote_depth,

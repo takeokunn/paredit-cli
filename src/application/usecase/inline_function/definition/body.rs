@@ -34,6 +34,7 @@ pub(super) fn inline_function_body_view(body_forms: &[ExpressionView]) -> Result
             span: ByteSpan::new(first.span.start(), last.span.end()),
             text: None,
             children: body_forms.to_vec(),
+            symbol_offset: 0,
         });
     };
     Ok(body.clone())

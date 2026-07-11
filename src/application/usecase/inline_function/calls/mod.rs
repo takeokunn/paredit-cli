@@ -17,6 +17,7 @@ use super::syntax::{atom_text, list_head};
 use types::{InlineArgumentBindings, InlineFunctionCall};
 
 pub(super) fn bind_inline_function_arguments(
+    dialect: Dialect,
     params: &[InlineParameter],
     call: InlineFunctionCall,
     function_name: &SymbolName,
@@ -24,6 +25,7 @@ pub(super) fn bind_inline_function_arguments(
     allow_drop_arguments: bool,
 ) -> Result<InlineArgumentBindings> {
     binding::bind_inline_function_arguments(
+        dialect,
         params,
         call,
         function_name,

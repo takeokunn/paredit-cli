@@ -62,6 +62,44 @@ fn plans_extract_function_before_anchor() {
 }
 
 #[test]
+fn plans_extract_function_for_common_lisp_macrolet_body() {
+    let plan = plan_at(
+        "(defun render (outer input) (macrolet ((with-local (local) (list local outer))) (with-local input)))",
+        &[0, 3],
+        "build",
+        &[],
+        true,
+    );
+
+    assert_eq!(plan.call, "(build outer input)");
+    assert_eq!(
+        plan.definition,
+        "(defun build (outer input) (macrolet ((with-local (local) (list local outer))) (with-local input)))"
+    );
+    assert_eq!(plan.inferred_params, vec!["outer", "input"]);
+    SyntaxTree::parse(&plan.rewritten).expect("rewritten output remains parseable");
+}
+
+#[test]
+fn plans_extract_function_for_common_lisp_symbol_macrolet_body() {
+    let plan = plan_at(
+        "(defun render (outer) (symbol-macrolet ((local (compute outer))) (list local outer)))",
+        &[0, 3],
+        "build",
+        &[],
+        true,
+    );
+
+    assert_eq!(plan.call, "(build outer)");
+    assert_eq!(
+        plan.definition,
+        "(defun build (outer) (symbol-macrolet ((local (compute outer))) (list local outer)))"
+    );
+    assert_eq!(plan.inferred_params, vec!["outer"]);
+    SyntaxTree::parse(&plan.rewritten).expect("rewritten output remains parseable");
+}
+
+#[test]
 fn rejects_relative_extract_function_insertion_without_anchor_path() {
     let input = "(defun render () (+ x y))\n";
     let tree = SyntaxTree::parse(input).expect("parse fixture");

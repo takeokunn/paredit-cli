@@ -66,3 +66,63 @@ fn cli_writes_parameterized_extract_function_before_anchor() {
         "(in-package #:demo)\n(defun render (width height margin)\n  (area-with-margin width height margin))\n(defun area-with-margin (width height margin) (+ (* width height) margin))\n\n(defun boot () :boot)\n"
     );
 }
+
+#[test]
+fn cli_writes_extract_function_for_common_lisp_macrolet_body() {
+    let dir = fresh_temp_dir("extract-macrolet");
+    let lisp_file = dir.join("render.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun render (outer input) (macrolet ((with-local (local) (list local outer))) (with-local input)))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("extract-function")
+        .arg("--file")
+        .arg(&lisp_file)
+        .arg("--path")
+        .arg("0.3")
+        .arg("--name")
+        .arg("build")
+        .arg("--infer-params")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read extracted lisp"),
+        "(defun render (outer input) (build outer input))\n\n(defun build (outer input) (macrolet ((with-local (local) (list local outer))) (with-local input)))\n"
+    );
+}
+
+#[test]
+fn cli_writes_extract_function_for_common_lisp_symbol_macrolet_body() {
+    let dir = fresh_temp_dir("extract-symbol-macrolet");
+    let lisp_file = dir.join("render.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun render (outer) (symbol-macrolet ((local (compute outer))) (list local outer)))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("extract-function")
+        .arg("--file")
+        .arg(&lisp_file)
+        .arg("--path")
+        .arg("0.3")
+        .arg("--name")
+        .arg("build")
+        .arg("--infer-params")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read extracted lisp"),
+        "(defun render (outer) (build outer))\n\n(defun build (outer) (symbol-macrolet ((local (compute outer))) (list local outer)))\n"
+    );
+}

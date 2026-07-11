@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SymbolName;
 
 use self::parameter_binding::{
@@ -14,6 +15,7 @@ mod parameter_binding;
 use keyword_validation::validate_unknown_keyword_arguments;
 
 struct InlineBindingContext<'a> {
+    dialect: Dialect,
     params: &'a [InlineParameter],
     non_aux_params: &'a [InlineParameter],
     keyword_params: &'a [InlineParameter],
@@ -29,6 +31,7 @@ struct InlineBindingContext<'a> {
 }
 
 pub(super) fn bind_inline_function_arguments(
+    dialect: Dialect,
     params: &[InlineParameter],
     call: InlineFunctionCall,
     function_name: &SymbolName,
@@ -78,6 +81,7 @@ pub(super) fn bind_inline_function_arguments(
 
     if keyword_params.is_empty() {
         let ctx = InlineBindingContext {
+            dialect,
             params,
             non_aux_params,
             keyword_params,
@@ -95,6 +99,7 @@ pub(super) fn bind_inline_function_arguments(
     }
 
     let ctx = InlineBindingContext {
+        dialect,
         params,
         non_aux_params,
         keyword_params,
@@ -125,6 +130,7 @@ fn bind_non_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineAr
     let mut argument_bindings = Vec::new();
     let mut default_scope = Vec::new();
     bind_leading_parameters(
+        ctx.dialect,
         &ctx.non_aux_params[..ctx.keyword_start],
         &ctx.raw_args,
         &ctx.whole_call,
@@ -136,6 +142,7 @@ fn bind_non_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineAr
     if let Some(rest_index) = ctx.rest_index {
         let rest_argument = list_argument(&ctx.raw_args[ctx.positional_count..]);
         let rest_entries = bound_parameter_argument_entries(
+            ctx.dialect,
             &ctx.params[rest_index],
             rest_argument,
             ctx.allow_drop_arguments,
@@ -144,7 +151,7 @@ fn bind_non_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineAr
         argument_bindings.extend(rest_entries);
     }
     for param in &ctx.params[ctx.aux_start..] {
-        let binding = bind_aux_parameter(param, &default_scope)?;
+        let binding = bind_aux_parameter(ctx.dialect, param, &default_scope)?;
         default_scope.extend(binding.default_scope_entries.clone());
         body_bindings.extend(binding.body_entries);
     }
@@ -170,6 +177,7 @@ fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgume
     let mut argument_bindings = Vec::new();
     let mut default_scope = Vec::new();
     bind_leading_parameters(
+        ctx.dialect,
         &ctx.non_aux_params[..ctx.keyword_start],
         &ctx.raw_args,
         &ctx.whole_call,
@@ -181,6 +189,7 @@ fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgume
     if let Some(rest_index) = ctx.rest_index {
         let rest_argument = list_argument(keyword_args);
         let rest_entries = bound_parameter_argument_entries(
+            ctx.dialect,
             &ctx.params[rest_index],
             rest_argument,
             ctx.allow_drop_arguments,
@@ -214,14 +223,19 @@ fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgume
                 matched = Some(value.clone());
             }
         }
-        let binding =
-            bind_keyword_parameter(param, matched, &default_scope, ctx.allow_drop_arguments)?;
+        let binding = bind_keyword_parameter(
+            ctx.dialect,
+            param,
+            matched,
+            &default_scope,
+            ctx.allow_drop_arguments,
+        )?;
         default_scope.extend(binding.default_scope_entries.clone());
         body_bindings.extend(binding.body_entries);
         argument_bindings.extend(binding.argument_entries);
     }
     for param in &ctx.params[ctx.aux_start..] {
-        let binding = bind_aux_parameter(param, &default_scope)?;
+        let binding = bind_aux_parameter(ctx.dialect, param, &default_scope)?;
         default_scope.extend(binding.default_scope_entries.clone());
         body_bindings.extend(binding.body_entries);
     }
@@ -242,7 +256,12 @@ fn bind_keyword_arguments(ctx: &InlineBindingContext<'_>) -> Result<InlineArgume
     })
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "leading-parameter binding threads the argument buffers plus dialect"
+)]
 fn bind_leading_parameters(
+    dialect: Dialect,
     params: &[InlineParameter],
     raw_args: &[String],
     whole_call: &str,
@@ -256,6 +275,7 @@ fn bind_leading_parameters(
         match &param.kind {
             InlineParameterKind::Whole => {
                 let whole_entries = bound_parameter_argument_entries(
+                    dialect,
                     param,
                     whole_call.to_owned(),
                     allow_drop_arguments,
@@ -268,6 +288,7 @@ fn bind_leading_parameters(
                 let argument = raw_args.get(positional_index).cloned();
                 positional_index += 1;
                 let binding = bind_positional_parameter(
+                    dialect,
                     param,
                     argument,
                     default_scope,
@@ -292,15 +313,17 @@ fn list_argument(arguments: &[String]) -> String {
 }
 
 pub(super) fn bind_aux_parameter(
+    dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
 ) -> Result<super::types::ParameterBinding> {
-    parameter_binding::bind_aux_parameter(param, default_scope)
+    parameter_binding::bind_aux_parameter(dialect, param, default_scope)
 }
 
 pub(super) fn destructured_binding_entries(
+    dialect: Dialect,
     pattern: &super::super::definition::InlineDestructurePattern,
     argument: String,
 ) -> Result<Vec<(String, String)>> {
-    parameter_binding::destructured_binding_entries(pattern, argument)
+    parameter_binding::destructured_binding_entries(dialect, pattern, argument)
 }

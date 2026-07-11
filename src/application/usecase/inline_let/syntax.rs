@@ -1,8 +1,10 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-pub(super) fn vector_let_binding(binding_form: &ExpressionView) -> Result<(String, ByteSpan)> {
+pub(super) fn vector_let_binding(
+    binding_form: &ExpressionView,
+) -> Result<(String, &ExpressionView)> {
     if binding_form.kind != ExpressionKind::List
         || binding_form.delimiter != Some(Delimiter::Bracket)
     {
@@ -14,10 +16,12 @@ pub(super) fn vector_let_binding(binding_form: &ExpressionView) -> Result<(Strin
     let name = atom_text(&binding_form.children[0])
         .context("let binding name must be an atom")?
         .to_owned();
-    Ok((name, binding_form.children[1].span))
+    Ok((name, &binding_form.children[1]))
 }
 
-pub(super) fn list_pair_let_binding(binding_form: &ExpressionView) -> Result<(String, ByteSpan)> {
+pub(super) fn list_pair_let_binding(
+    binding_form: &ExpressionView,
+) -> Result<(String, &ExpressionView)> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
         anyhow::bail!("dialect expects list-pair let bindings: ((name value))");
@@ -35,7 +39,7 @@ pub(super) fn list_pair_let_binding(binding_form: &ExpressionView) -> Result<(St
     let name = atom_text(&pair.children[0])
         .context("let binding name must be an atom")?
         .to_owned();
-    Ok((name, pair.children[1].span))
+    Ok((name, &pair.children[1]))
 }
 
 pub(super) fn atom_text(view: &ExpressionView) -> Option<&str> {

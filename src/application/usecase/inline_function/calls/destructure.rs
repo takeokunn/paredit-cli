@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::super::definition::{
@@ -12,6 +13,7 @@ use super::keyword_args::{call_side_allow_other_keys_from_views, is_allow_other_
 use super::types::CallSideAllowOtherKeys;
 
 pub(super) fn destructure_argument_entries(
+    dialect: Dialect,
     pattern: &InlineDestructurePattern,
     argument: &str,
     allow_drop_arguments: bool,
@@ -29,6 +31,7 @@ pub(super) fn destructure_argument_entries(
 
     let mut entries = Vec::new();
     collect_destructured_argument_entries(
+        dialect,
         pattern,
         &argument_expression,
         argument,
@@ -39,6 +42,7 @@ pub(super) fn destructure_argument_entries(
 }
 
 fn collect_destructured_argument_entries(
+    dialect: Dialect,
     pattern: &InlineDestructurePattern,
     argument: &ExpressionView,
     source: &str,
@@ -58,6 +62,7 @@ fn collect_destructured_argument_entries(
                 );
             }
             collect_destructured_list_argument_entries(
+                dialect,
                 items,
                 argument,
                 source,
@@ -69,6 +74,7 @@ fn collect_destructured_argument_entries(
 }
 
 fn collect_destructured_list_argument_entries(
+    dialect: Dialect,
     pattern: &InlineDestructureListPattern,
     argument: &ExpressionView,
     source: &str,
@@ -107,21 +113,23 @@ fn collect_destructured_list_argument_entries(
     }
 
     for (item, child) in pattern.required.iter().zip(argument.children.iter()) {
-        let entries = destructured_binding_entries(item, child.span.slice(source).to_owned())?;
+        let entries =
+            destructured_binding_entries(dialect, item, child.span.slice(source).to_owned())?;
         default_scope.extend(entries.clone());
         output.extend(entries);
     }
 
     for (index, item) in pattern.optional.iter().enumerate() {
         let child = argument.children.get(pattern.required.len() + index);
-        let binding = bind_optional_destructure_pattern(item, child, source, &default_scope)?;
+        let binding =
+            bind_optional_destructure_pattern(dialect, item, child, source, &default_scope)?;
         default_scope.extend(binding.clone());
         output.extend(binding);
     }
 
     if let Some(rest) = &pattern.rest {
         let rest_argument = list_destructure_argument(key_args, source);
-        let entries = destructured_binding_entries(rest, rest_argument)?;
+        let entries = destructured_binding_entries(dialect, rest, rest_argument)?;
         default_scope.extend(entries.clone());
         output.extend(entries);
     }
@@ -146,13 +154,13 @@ fn collect_destructured_list_argument_entries(
                 matched = Some(value.to_owned());
             }
         }
-        let binding = bind_key_destructure_pattern(item, matched, &default_scope)?;
+        let binding = bind_key_destructure_pattern(dialect, item, matched, &default_scope)?;
         default_scope.extend(binding.clone());
         output.extend(binding);
     }
 
     for item in &pattern.aux {
-        let binding = bind_aux_parameter(item, &default_scope)?;
+        let binding = bind_aux_parameter(dialect, item, &default_scope)?;
         default_scope.extend(binding.default_scope_entries.clone());
         output.extend(binding.body_entries);
     }
@@ -251,21 +259,25 @@ fn list_destructure_argument(arguments: &[ExpressionView], source: &str) -> Stri
 }
 
 fn bind_optional_destructure_pattern(
+    dialect: Dialect,
     pattern: &InlineDestructureOptionalPattern,
     argument: Option<&ExpressionView>,
     source: &str,
     default_scope: &[(String, String)],
 ) -> Result<Vec<(String, String)>> {
     let mut entries = if let Some(argument) = argument {
-        let mut entries =
-            destructured_binding_entries(&pattern.binding, argument.span.slice(source).to_owned())?;
+        let mut entries = destructured_binding_entries(
+            dialect,
+            &pattern.binding,
+            argument.span.slice(source).to_owned(),
+        )?;
         if let Some(supplied_p) = &pattern.supplied_p {
             entries.push((supplied_p.clone(), "t".to_owned()));
         }
         entries
     } else {
-        let default_value = resolve_destructure_default_value(pattern, default_scope)?;
-        let mut entries = destructured_binding_entries(&pattern.binding, default_value)?;
+        let default_value = resolve_destructure_default_value(dialect, pattern, default_scope)?;
+        let mut entries = destructured_binding_entries(dialect, &pattern.binding, default_value)?;
         if let Some(supplied_p) = &pattern.supplied_p {
             entries.push((supplied_p.clone(), "nil".to_owned()));
         }
@@ -275,6 +287,7 @@ fn bind_optional_destructure_pattern(
 }
 
 fn resolve_destructure_default_value(
+    dialect: Dialect,
     pattern: &InlineDestructureOptionalPattern,
     default_scope: &[(String, String)],
 ) -> Result<String> {
@@ -282,23 +295,24 @@ fn resolve_destructure_default_value(
         return Ok("nil".to_owned());
     };
     let (names, arguments): (Vec<_>, Vec<_>) = default_scope.iter().cloned().unzip();
-    substitute_expression(value, &names, &arguments)
+    substitute_expression(dialect, value, &names, &arguments)
 }
 
 fn bind_key_destructure_pattern(
+    dialect: Dialect,
     pattern: &InlineDestructureKeyPattern,
     argument: Option<String>,
     default_scope: &[(String, String)],
 ) -> Result<Vec<(String, String)>> {
     let mut entries = if let Some(argument) = argument {
-        let mut entries = destructured_binding_entries(&pattern.binding, argument)?;
+        let mut entries = destructured_binding_entries(dialect, &pattern.binding, argument)?;
         if let Some(supplied_p) = &pattern.supplied_p {
             entries.push((supplied_p.clone(), "t".to_owned()));
         }
         entries
     } else {
-        let default_value = resolve_key_destructure_default_value(pattern, default_scope)?;
-        let mut entries = destructured_binding_entries(&pattern.binding, default_value)?;
+        let default_value = resolve_key_destructure_default_value(dialect, pattern, default_scope)?;
+        let mut entries = destructured_binding_entries(dialect, &pattern.binding, default_value)?;
         if let Some(supplied_p) = &pattern.supplied_p {
             entries.push((supplied_p.clone(), "nil".to_owned()));
         }
@@ -308,6 +322,7 @@ fn bind_key_destructure_pattern(
 }
 
 fn resolve_key_destructure_default_value(
+    dialect: Dialect,
     pattern: &InlineDestructureKeyPattern,
     default_scope: &[(String, String)],
 ) -> Result<String> {
@@ -315,5 +330,5 @@ fn resolve_key_destructure_default_value(
         return Ok("nil".to_owned());
     };
     let (names, arguments): (Vec<_>, Vec<_>) = default_scope.iter().cloned().unzip();
-    substitute_expression(value, &names, &arguments)
+    substitute_expression(dialect, value, &names, &arguments)
 }

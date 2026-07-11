@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 
+use crate::domain::dialect::Dialect;
+
 use super::super::super::definition::{
     InlineDestructurePattern, InlineParameter, InlineParameterBinding,
 };
@@ -8,37 +10,40 @@ use super::super::destructure::destructure_argument_entries;
 use super::super::types::ParameterBinding;
 
 pub(super) fn bind_positional_parameter(
+    dialect: Dialect,
     param: &InlineParameter,
     argument: Option<String>,
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
 ) -> Result<ParameterBinding> {
     if let Some(argument) = argument {
-        return supplied_parameter_binding(param, argument, allow_drop_arguments);
+        return supplied_parameter_binding(dialect, param, argument, allow_drop_arguments);
     }
 
-    missing_parameter_binding(param, default_scope, allow_drop_arguments)
+    missing_parameter_binding(dialect, param, default_scope, allow_drop_arguments)
 }
 
 pub(super) fn bind_keyword_parameter(
+    dialect: Dialect,
     param: &InlineParameter,
     argument: Option<String>,
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
 ) -> Result<ParameterBinding> {
     if let Some(argument) = argument {
-        return supplied_parameter_binding(param, argument, allow_drop_arguments);
+        return supplied_parameter_binding(dialect, param, argument, allow_drop_arguments);
     }
 
-    missing_parameter_binding(param, default_scope, allow_drop_arguments)
+    missing_parameter_binding(dialect, param, default_scope, allow_drop_arguments)
 }
 
 pub(super) fn bind_aux_parameter(
+    dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
 ) -> Result<ParameterBinding> {
     let name = simple_binding_name(param)?;
-    let argument = resolve_default_value(param, default_scope)?;
+    let argument = resolve_default_value(dialect, param, default_scope)?;
     Ok(ParameterBinding {
         body_entries: vec![(name.clone(), argument.clone())],
         argument_entries: Vec::new(),
@@ -47,6 +52,7 @@ pub(super) fn bind_aux_parameter(
 }
 
 fn supplied_parameter_binding(
+    dialect: Dialect,
     param: &InlineParameter,
     argument: String,
     allow_drop_arguments: bool,
@@ -55,7 +61,8 @@ fn supplied_parameter_binding(
         .supplied_p
         .as_ref()
         .map(|name| (name.clone(), "t".to_owned()));
-    let argument_entries = bound_parameter_argument_entries(param, argument, allow_drop_arguments)?;
+    let argument_entries =
+        bound_parameter_argument_entries(dialect, param, argument, allow_drop_arguments)?;
 
     Ok(ParameterBinding {
         body_entries: supplied_p.clone().into_iter().collect(),
@@ -69,13 +76,14 @@ fn supplied_parameter_binding(
 }
 
 fn missing_parameter_binding(
+    dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
 ) -> Result<ParameterBinding> {
-    let argument = resolve_default_value(param, default_scope)?;
+    let argument = resolve_default_value(dialect, param, default_scope)?;
     let mut body_entries =
-        bound_parameter_argument_entries(param, argument.clone(), allow_drop_arguments)?;
+        bound_parameter_argument_entries(dialect, param, argument.clone(), allow_drop_arguments)?;
     let mut default_scope_entries = body_entries.clone();
     if let Some(supplied_p) = &param.supplied_p {
         let supplied_entry = (supplied_p.clone(), "nil".to_owned());
@@ -91,6 +99,7 @@ fn missing_parameter_binding(
 }
 
 fn resolve_default_value(
+    dialect: Dialect,
     param: &InlineParameter,
     default_scope: &[(String, String)],
 ) -> Result<String> {
@@ -98,7 +107,7 @@ fn resolve_default_value(
         return Ok("nil".to_owned());
     };
     let (names, arguments): (Vec<_>, Vec<_>) = default_scope.iter().cloned().unzip();
-    substitute_expression(value, &names, &arguments)
+    substitute_expression(dialect, value, &names, &arguments)
 }
 
 fn supplied_parameter_default_scope_entries(
@@ -117,6 +126,7 @@ fn supplied_parameter_default_scope_entries(
 }
 
 pub(super) fn bound_parameter_argument_entries(
+    dialect: Dialect,
     param: &InlineParameter,
     argument: String,
     allow_drop_arguments: bool,
@@ -124,7 +134,7 @@ pub(super) fn bound_parameter_argument_entries(
     match &param.binding {
         InlineParameterBinding::Name(name) => Ok(vec![(name.clone(), argument)]),
         InlineParameterBinding::Destructure(pattern) => {
-            destructure_argument_entries(pattern, &argument, allow_drop_arguments)
+            destructure_argument_entries(dialect, pattern, &argument, allow_drop_arguments)
         }
     }
 }
@@ -137,13 +147,14 @@ fn simple_binding_name(param: &InlineParameter) -> Result<String> {
 }
 
 pub(super) fn destructured_binding_entries(
+    dialect: Dialect,
     pattern: &InlineDestructurePattern,
     argument: String,
 ) -> Result<Vec<(String, String)>> {
     match pattern {
         InlineDestructurePattern::Name(name) => Ok(vec![(name.clone(), argument)]),
         InlineDestructurePattern::List(_) => {
-            destructure_argument_entries(pattern, &argument, false)
+            destructure_argument_entries(dialect, pattern, &argument, false)
         }
     }
 }

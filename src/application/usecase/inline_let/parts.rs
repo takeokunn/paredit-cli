@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use crate::domain::dialect::Dialect;
-use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
+use crate::domain::lexical_scope::{collect_unshadowed_symbol_references, value_capture};
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::syntax::{atom_text, list_pair_let_binding, vector_let_binding};
@@ -33,7 +33,7 @@ pub(super) fn inline_let_parts(
         anyhow::bail!("inline-let selection must start with let");
     }
 
-    let (binding_name, binding_value_span) = match dialect {
+    let (binding_name, binding_value_view) = match dialect {
         Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
             vector_let_binding(&target.children[1])?
         }
@@ -41,11 +41,33 @@ pub(super) fn inline_let_parts(
             list_pair_let_binding(&target.children[1])?
         }
     };
+    let binding_value_span = binding_value_view.span;
     let binding_name = SymbolName::new(binding_name)?;
     let mut reference_spans = Vec::new();
     for body in &target.children[2..] {
-        collect_unshadowed_symbol_references(body, &binding_name, input, &mut reference_spans);
+        collect_unshadowed_symbol_references(
+            dialect,
+            body,
+            &binding_name,
+            input,
+            &mut reference_spans,
+        );
     }
+
+    let captured = value_capture(
+        dialect,
+        input,
+        target.span,
+        &binding_name,
+        binding_value_view,
+        &reference_spans,
+    );
+    if let Some(name) = captured.first() {
+        anyhow::bail!(
+            "inline-let would capture variable `{name}`: it is free in the binding value but a nested binding in the let body would shadow it, changing the meaning of the code"
+        );
+    }
+
     let first_body = &target.children[2];
     let last_body = target
         .children

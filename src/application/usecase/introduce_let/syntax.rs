@@ -27,10 +27,6 @@ pub(super) fn binding_form_binds_name(dialect: Dialect, view: &ExpressionView, n
             .children
             .get(2)
             .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
-        None if head == "defn" => view
-            .children
-            .get(2)
-            .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
         Some(CommonLispValueScopeForm::Value) => view
             .children
             .get(1)
@@ -73,7 +69,6 @@ pub(super) fn child_shadowed_by_binding(
         Some(CommonLispValueScopeForm::Definition) => {
             child_index >= 3 && binding_form_binds_name(dialect, view, name)
         }
-        None if head == "defn" => child_index >= 3 && binding_form_binds_name(dialect, view, name),
         Some(CommonLispValueScopeForm::Value) => {
             child_index >= 3 && binding_form_binds_name(dialect, view, name)
         }

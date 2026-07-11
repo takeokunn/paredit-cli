@@ -58,6 +58,24 @@ fn reports_ignore_lambda_parameter_shadowed_references() {
 }
 
 #[test]
+fn reports_capture_risk_when_value_free_variable_is_shadowed() {
+    let reports = reports_for("(let ((y x)) (let ((x 99)) y))", Dialect::CommonLisp);
+
+    assert_eq!(reports[0].bindings[0].name, "y");
+    assert_eq!(reports[0].bindings[0].reference_count, 1);
+    assert!(reports[0].bindings[0].risks.contains(&"capture"));
+    assert!(!reports[0].bindings[0].can_inline_without_duplication);
+}
+
+#[test]
+fn reports_no_capture_risk_when_value_free_variable_is_unshadowed() {
+    let reports = reports_for("(let ((y x)) (+ y 1))", Dialect::CommonLisp);
+
+    assert!(!reports[0].bindings[0].risks.contains(&"capture"));
+    assert!(reports[0].bindings[0].can_inline_without_duplication);
+}
+
+#[test]
 fn reports_symbol_macrolet_without_counting_expansion_reference() {
     let reports = reports_for(
         "(symbol-macrolet ((value (compute value)) (used other)) (list used))",

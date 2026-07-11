@@ -46,6 +46,17 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     let tree = SyntaxTree::parse(request.input)?;
     let definition_selection = tree.select_path(&request.definition_path)?;
     let definition_span = definition_selection.span();
+    // Inlining substitutes parsed parameters into the call site; it never
+    // copies the definition's own comments there. Removing a definition that
+    // has a comment (for example, documenting what the body does) would
+    // silently discard it, since it is not preserved anywhere else.
+    if request.remove_definition && tree.has_comment_in(definition_span) {
+        anyhow::bail!(
+            "inline-function cannot remove a definition that contains a comment; \
+             the comment is not copied to call sites and would be discarded. \
+             Drop --remove-definition or remove the comment first"
+        );
+    }
     let definition = parse_inline_function_definition(
         request.dialect,
         request.input,
@@ -135,10 +146,11 @@ fn inline_function_parts(
 ) -> Result<InlineFunctionParts> {
     let definition =
         parse_inline_function_definition(dialect, input, definition_selection.clone())?;
-    validate_macro_environment_parameters(input, &definition)?;
+    validate_macro_environment_parameters(dialect, input, &definition)?;
     let function_name = definition.name.clone();
     let call = parse_inline_function_call(call_selection.clone(), &function_name, input)?;
     let bindings = bind_inline_function_arguments(
+        dialect,
         &definition.params,
         call,
         &function_name,
@@ -150,6 +162,7 @@ fn inline_function_parts(
             let (body_param_names, body_args): (Vec<_>, Vec<_>) =
                 bindings.body_bindings.into_iter().unzip();
             let (intermediate_replacement, mut parameters) = substitute_inline_function_body(
+                dialect,
                 input,
                 &definition.body,
                 &body_param_names,
@@ -162,6 +175,7 @@ fn inline_function_parts(
             let replacement_tree = SyntaxTree::parse(&intermediate_replacement)?;
             let replacement_body = replacement_view_for_inline_function(&replacement_tree)?;
             let (replacement, argument_parameters) = substitute_inline_function_body(
+                dialect,
                 &intermediate_replacement,
                 &replacement_body,
                 &argument_param_names,
@@ -176,6 +190,7 @@ fn inline_function_parts(
             )
         }
         InlineDefinitionKind::Macro => expand_inline_macro_body(
+            dialect,
             input,
             &definition.body,
             &bindings.body_bindings,
@@ -217,7 +232,11 @@ fn wrap_inline_function_sequence(
     )
 }
 
-fn validate_macro_environment_parameters(input: &str, definition: &InlineDefinition) -> Result<()> {
+fn validate_macro_environment_parameters(
+    dialect: Dialect,
+    input: &str,
+    definition: &InlineDefinition,
+) -> Result<()> {
     if definition.kind != InlineDefinitionKind::Macro {
         return Ok(());
     }
@@ -235,7 +254,13 @@ fn validate_macro_environment_parameters(input: &str, definition: &InlineDefinit
             "inline-function internal error: &environment parameter must use a simple binding",
         )?;
 
-        reject_environment_references_in_expression(name, "macro body", input, &definition.body)?;
+        reject_environment_references_in_expression(
+            dialect,
+            name,
+            "macro body",
+            input,
+            &definition.body,
+        )?;
 
         for (context, default_value) in &initialization_expressions {
             let default_tree = SyntaxTree::parse(default_value).with_context(|| {
@@ -245,6 +270,7 @@ fn validate_macro_environment_parameters(input: &str, definition: &InlineDefinit
                 .select_path(&crate::domain::sexpr::Path::root_child(0))?
                 .view();
             reject_environment_references_in_expression(
+                dialect,
                 name,
                 context,
                 default_value,
@@ -307,6 +333,7 @@ fn collect_macro_destructure_initialization_expressions<'a>(
 }
 
 fn reject_environment_references_in_expression(
+    dialect: Dialect,
     parameter_name: &str,
     context: &str,
     input: &str,
@@ -314,7 +341,7 @@ fn reject_environment_references_in_expression(
 ) -> Result<()> {
     let symbol = SymbolName::new(parameter_name.to_owned())?;
     let mut spans = Vec::new();
-    collect_unshadowed_symbol_references(expression, &symbol, input, &mut spans);
+    collect_unshadowed_symbol_references(dialect, expression, &symbol, input, &mut spans);
     if spans.is_empty() {
         return Ok(());
     }
