@@ -69,7 +69,7 @@ pub(super) fn collect_wrap_explicit_call_sites(
 
     for path in paths {
         let view = tree.select_path(path)?.view();
-        if !executable_reader_context_at_path(tree, path)? {
+        if !executable_reader_context_at_path(tree, dialect, path)? {
             anyhow::bail!("call-path {path} is not in an executable reader context");
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;

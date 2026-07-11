@@ -109,3 +109,36 @@ fn cli_writes_replace_function_calls_inside_cl_user_macrolet_expanders_only() {
         "(defun render () (cl-user:macrolet ((fetch-user (id) `(load-user ,id))) (fetch-user user)) (load-user root))\n"
     );
 }
+
+#[test]
+fn cli_writes_replace_function_call_at_macrolet_expander_path() {
+    let dir = fresh_temp_dir("replace-function-calls-macrolet-expander-path");
+    let lisp_file = dir.join("service.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun render () (macrolet ((expand (id) `(fetch-user ,id))) (expand user)))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("replace-function-calls")
+        .arg(&lisp_file)
+        .arg("--from")
+        .arg("fetch-user")
+        .arg("--to")
+        .arg("load-user")
+        .arg("--call-path")
+        .arg("0.3.1.0.2")
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"callCount\": 1"))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read rewritten lisp"),
+        "(defun render () (macrolet ((expand (id) `(load-user ,id))) (expand user)))\n"
+    );
+}
