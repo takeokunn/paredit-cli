@@ -390,3 +390,111 @@ fn formats_loop_binding_and_action_clauses() {
         "(loop with total = 0\n      for item in items\n      do (incf total item)\n      finally (return total))\n"
     );
 }
+
+#[test]
+fn preserves_leading_line_comment_above_form() {
+    let input = ";; doc\n(defun f (x) (+ x 1))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        ";; doc\n(defun f (x)\n  (+ x 1))\n"
+    );
+}
+
+#[test]
+fn preserves_trailing_line_comment_on_form_line() {
+    let input = "(foo)  ; note\n(bar)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), "(foo) ; note\n\n(bar)\n");
+}
+
+#[test]
+fn preserves_interior_comment_by_rendering_form_verbatim() {
+    let input = "(defun f (x)\n  ;; inner\n  (+ x 1))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(defun f (x)\n  ;; inner\n  (+ x 1))\n"
+    );
+}
+
+#[test]
+fn preserves_comment_only_document() {
+    let input = ";; alpha\n;; beta\n";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), ";; alpha\n;; beta\n");
+}
+
+#[test]
+fn preserves_leading_block_comment() {
+    let input = "#| header |#\n(foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), "#| header |#\n(foo)\n");
+}
+
+#[test]
+fn preserves_datum_reader_comment() {
+    let input = "#;(ignored form)\n(kept)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "#;(ignored form)\n(kept)\n"
+    );
+}
+
+#[test]
+fn preserves_trailing_standalone_comment_at_end_of_file() {
+    let input = "(foo)\n;; tail";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(Formatter::new(2).format(&tree), "(foo)\n\n;; tail\n");
+}
+
+#[test]
+fn preserves_string_that_contains_a_semicolon() {
+    let input = "(defvar path \";not-a-comment\")";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(defvar path \";not-a-comment\")\n"
+    );
+}
+
+#[test]
+fn formatting_never_drops_comments_and_is_idempotent() {
+    let input = concat!(
+        ";;; header -*- lexical-binding: t; -*-\n",
+        ";; commentary\n",
+        "(defun add (a b)\n",
+        "  ;; inner note\n",
+        "  (+ a b)) ; trailing\n",
+        "#| block |#\n",
+        "#;(skipped)\n",
+        "(defvar x 1)\n",
+        ";; footer\n",
+    );
+    let formatter = Formatter::new(2);
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatted = formatter.format(&tree);
+
+    for comment in [
+        ";;; header -*- lexical-binding: t; -*-",
+        ";; commentary",
+        ";; inner note",
+        "; trailing",
+        "#| block |#",
+        "#;(skipped)",
+        ";; footer",
+    ] {
+        assert!(
+            formatted.contains(comment),
+            "formatted output dropped comment: {comment}\n---\n{formatted}"
+        );
+    }
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("formatted output parses again");
+    let reformatted = formatter.format(&reparsed);
+    assert_eq!(
+        formatted, reformatted,
+        "comment-preserving format must be idempotent"
+    );
+}

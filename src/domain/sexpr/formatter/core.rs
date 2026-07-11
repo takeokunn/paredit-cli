@@ -4,21 +4,137 @@ use crate::domain::sexpr::tree::{Node, NodeKind, ReaderPrefix, SyntaxTree};
 use crate::domain::sexpr::types::Delimiter;
 use crate::domain::sexpr::types::NodeId;
 
+/// One planned unit of top-level output: either a form (with the comments that
+/// attach to it) or a run of standalone comments with no following form.
+enum TopLevelItem {
+    Form {
+        node_id: NodeId,
+        /// Own-line comments emitted immediately above the form.
+        leading: Vec<usize>,
+        /// A comment trailing the form on the same source line, if any.
+        trailing: Option<usize>,
+        /// Render the form's original source verbatim to preserve interior
+        /// comments rather than reformatting it.
+        verbatim: bool,
+    },
+    Comments(Vec<usize>),
+}
+
 impl Formatter {
     pub fn new(indent: usize) -> Self {
         Self { indent }
     }
 
     pub fn format(&self, tree: &SyntaxTree) -> String {
-        let mut output = String::new();
-        for (position, child) in tree.root_children().iter().enumerate() {
-            if position > 0 {
-                output.push('\n');
-            }
-            self.format_node(tree, *child, 0, &mut output);
-            output.push('\n');
+        let items = self.plan_top_level(tree);
+        if items.is_empty() {
+            return String::new();
         }
+        let mut output = String::new();
+        for (position, item) in items.iter().enumerate() {
+            if position > 0 {
+                // Top-level items are separated by a single blank line, matching
+                // the canonical style for comment-free documents.
+                output.push_str("\n\n");
+            }
+            self.render_top_level_item(tree, item, &mut output);
+        }
+        output.push('\n');
         output
+    }
+
+    /// Groups root-level forms with the comments that surround them so the
+    /// formatter can re-emit every comment without dropping or reordering it.
+    ///
+    /// Comments that sit *inside* a form force that form to render verbatim,
+    /// which keeps interior comments exactly where the author placed them while
+    /// still canonicalising comment-free forms.
+    fn plan_top_level(&self, tree: &SyntaxTree) -> Vec<TopLevelItem> {
+        let comments = &tree.comments;
+        let mut order: Vec<usize> = (0..comments.len()).collect();
+        order.sort_by_key(|&index| comments[index].span.start().get());
+
+        let mut cursor = 0usize;
+        let mut items: Vec<TopLevelItem> = Vec::new();
+
+        for &node_id in tree.root_children() {
+            let node = tree.node(node_id);
+            let start = node.span.start().get();
+            let end = node.span.end().get();
+
+            let mut leading = Vec::new();
+            while cursor < order.len() && comments[order[cursor]].span.start().get() < start {
+                leading.push(order[cursor]);
+                cursor += 1;
+            }
+
+            let mut verbatim = false;
+            while cursor < order.len() && comments[order[cursor]].span.start().get() < end {
+                verbatim = true;
+                cursor += 1;
+            }
+
+            let item_index = items.len();
+            items.push(TopLevelItem::Form {
+                node_id,
+                leading,
+                trailing: None,
+                verbatim,
+            });
+
+            if cursor < order.len() {
+                let comment = &comments[order[cursor]];
+                let comment_start = comment.span.start().get();
+                let same_line =
+                    comment_start >= end && !tree.source[end..comment_start].contains('\n');
+                if !comment.own_line && same_line {
+                    if let TopLevelItem::Form { trailing, .. } = &mut items[item_index] {
+                        *trailing = Some(order[cursor]);
+                    }
+                    cursor += 1;
+                }
+            }
+        }
+
+        if cursor < order.len() {
+            items.push(TopLevelItem::Comments(order[cursor..].to_vec()));
+        }
+
+        items
+    }
+
+    fn render_top_level_item(&self, tree: &SyntaxTree, item: &TopLevelItem, output: &mut String) {
+        let comments = &tree.comments;
+        match item {
+            TopLevelItem::Form {
+                node_id,
+                leading,
+                trailing,
+                verbatim,
+            } => {
+                for &comment in leading {
+                    output.push_str(comments[comment].text.trim_end());
+                    output.push('\n');
+                }
+                if *verbatim {
+                    output.push_str(&tree.source[tree.node(*node_id).span.as_range()]);
+                } else {
+                    self.format_node(tree, *node_id, 0, output);
+                }
+                if let Some(comment) = trailing {
+                    output.push(' ');
+                    output.push_str(comments[*comment].text.trim_end());
+                }
+            }
+            TopLevelItem::Comments(indices) => {
+                for (position, &comment) in indices.iter().enumerate() {
+                    if position > 0 {
+                        output.push('\n');
+                    }
+                    output.push_str(comments[comment].text.trim_end());
+                }
+            }
+        }
     }
 
     pub(super) fn format_node(

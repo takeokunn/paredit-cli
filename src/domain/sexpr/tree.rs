@@ -23,6 +23,27 @@ use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, Symb
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntaxTree {
     pub(in crate::domain::sexpr) nodes: Vec<Node>,
+    /// Comments discovered during parsing, in source order. They are kept
+    /// outside the node tree so structural refactors that walk `children` never
+    /// have to reason about them; only the canonical formatter re-emits them.
+    pub(in crate::domain::sexpr) comments: Vec<Comment>,
+    /// The exact source text the tree was parsed from, used by the formatter to
+    /// slice comment-bearing forms verbatim and to measure line breaks.
+    pub(in crate::domain::sexpr) source: String,
+}
+
+/// A comment captured verbatim during parsing together with the placement
+/// metadata the formatter needs to re-emit it without losing information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::domain::sexpr) struct Comment {
+    /// Byte range of the comment in the original source.
+    pub(in crate::domain::sexpr) span: ByteSpan,
+    /// Exact comment text (`; ...`, `#| ... |#`, or `#; <form>`), trailing
+    /// whitespace preserved as parsed.
+    pub(in crate::domain::sexpr) text: String,
+    /// `true` when only whitespace precedes the comment on its source line, i.e.
+    /// it stands on its own line rather than trailing code.
+    pub(in crate::domain::sexpr) own_line: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

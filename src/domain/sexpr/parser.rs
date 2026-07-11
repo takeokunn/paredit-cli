@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::tree::{Node, NodeKind, ReaderPrefix, SyntaxTree};
+use super::tree::{Comment, Node, NodeKind, ReaderPrefix, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId, is_symbol_boundary};
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -27,6 +27,11 @@ pub(in crate::domain::sexpr) struct Parser<'a> {
     pos: ByteOffset,
     nodes: Vec<Node>,
     stack: Vec<NodeId>,
+    comments: Vec<Comment>,
+    /// Nesting depth of `#;` datum comments currently being skipped. While
+    /// positive, inner trivia is folded into the enclosing datum comment span
+    /// instead of being recorded as separate comments.
+    suppress_depth: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -55,6 +60,8 @@ impl<'a> Parser<'a> {
             pos: ByteOffset::new(0),
             nodes: vec![root],
             stack: vec![NodeId::ROOT],
+            comments: Vec::new(),
+            suppress_depth: 0,
         }
     }
 
@@ -81,6 +88,8 @@ impl<'a> Parser<'a> {
         }
         Ok(SyntaxTree {
             nodes: std::mem::take(&mut self.nodes),
+            comments: std::mem::take(&mut self.comments),
+            source: self.input.to_string(),
         })
     }
 
@@ -90,18 +99,50 @@ impl<'a> Parser<'a> {
                 self.advance();
             }
             if self.pos.get() < self.bytes.len() && self.current_byte_is_block_comment() {
+                let start = self.pos;
                 self.skip_block_comment()?;
+                self.record_comment(start, self.pos);
                 continue;
             }
             if self.pos.get() < self.bytes.len() && self.current_byte() == b';' {
+                let start = self.pos;
                 while self.pos.get() < self.bytes.len() && self.current_byte() != b'\n' {
                     self.advance();
                 }
+                self.record_comment(start, self.pos);
                 continue;
             }
             break;
         }
         Ok(())
+    }
+
+    /// Records the byte range `[start, end)` as a comment, unless we are inside a
+    /// `#;` datum comment whose enclosing span already covers it.
+    fn record_comment(&mut self, start: ByteOffset, end: ByteOffset) {
+        if self.suppress_depth > 0 || end.get() <= start.get() {
+            return;
+        }
+        let text = self.input[start.get()..end.get()].to_string();
+        let own_line = self.is_line_start(start.get());
+        self.comments.push(Comment {
+            span: ByteSpan::new(start, end),
+            text,
+            own_line,
+        });
+    }
+
+    /// Returns `true` when only whitespace precedes byte `start` on its line.
+    fn is_line_start(&self, start: usize) -> bool {
+        let mut index = start;
+        while index > 0 {
+            match self.bytes[index - 1] {
+                b'\n' => return true,
+                b' ' | b'\t' | b'\r' | b'\x0c' => index -= 1,
+                _ => return false,
+            }
+        }
+        true
     }
 
     fn open_list_with_prefixes(&mut self, prefixes: Vec<PrefixToken>) {
@@ -295,10 +336,16 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_reader_comment(&mut self) -> std::result::Result<(), ParseError> {
+        let start = self.pos;
         self.advance();
         self.advance();
-        self.skip_trivia()?;
-        self.skip_form()
+        self.suppress_depth += 1;
+        let result = self.skip_trivia().and_then(|()| self.skip_form());
+        self.suppress_depth -= 1;
+        result?;
+        // Only the outermost datum comment records; nested `#;` are folded in.
+        self.record_comment(start, self.pos);
+        Ok(())
     }
 
     fn skip_form(&mut self) -> std::result::Result<(), ParseError> {
