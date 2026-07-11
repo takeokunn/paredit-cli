@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
@@ -27,8 +27,13 @@ pub(super) fn let_binding_reference_spans(
             .iter()
             .filter(|later| later.index > candidate.index)
         {
-            let later_value = view_at_span(binding_form, later.value_span)
-                .context("failed to resolve later binding value")?;
+            // A later binding with no explicit value form (implicit nil) has
+            // a zero-width value_span that matches no real node; it plainly
+            // cannot reference an earlier binding, so skip it instead of
+            // treating the lookup miss as an error.
+            let Some(later_value) = view_at_span(binding_form, later.value_span) else {
+                continue;
+            };
             collect_unshadowed_symbol_references(
                 dialect,
                 later_value,

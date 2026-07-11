@@ -127,6 +127,32 @@ fn cli_reports_clojure_vector_let_references_from_later_bindings() {
 }
 
 #[test]
+fn cli_reports_bare_symbol_let_binding_as_implicit_nil() {
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .write_stdin("(defun f () (let ((opoint (point)) beg end) (setq beg 1) (setq end 2) (list opoint beg end)))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"let_form_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"beg\""))
+        .stdout(predicate::str::contains("\"name\": \"end\""))
+        .stdout(predicate::str::contains("\"value\": \"nil\""));
+}
+
+#[test]
+fn cli_reports_let_star_later_bare_symbol_binding_without_erroring() {
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .write_stdin("(let* ((x 1) y) (+ x (or y 0)))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"form\": \"let*\""))
+        .stdout(predicate::str::contains("\"name\": \"x\""))
+        .stdout(predicate::str::contains("\"name\": \"y\""))
+        .stdout(predicate::str::contains("\"value\": \"nil\""));
+}
+
+#[test]
 fn cli_fails_let_report_policy_after_printing_json() {
     let mut cmd = paredit();
     cmd.args([
