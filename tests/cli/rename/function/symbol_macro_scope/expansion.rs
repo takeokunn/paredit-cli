@@ -34,6 +34,27 @@ fn cli_writes_function_calls_inside_symbol_macrolet_expansion_forms() {
     });
 }
 
+
+#[test]
+fn cli_writes_emacs_lisp_function_calls_inside_cl_symbol_macrolet_expansion_forms() {
+    assert_write_case(WriteCase {
+        fixture_name: "rename-function-emacs-lisp-cl-symbol-macrolet-expansion",
+        dialect: Some("emacs-lisp"),
+        from: "helper",
+        to: "renamed",
+        input_files: &[FixtureFile {
+            path: "core.el",
+            contents: "(defun helper (x) x)\n\n(defun caller ()\n\n  (cl-symbol-macrolet ((helper (helper 0)))\n\n    helper\n\n    #'helper\n\n    (function helper)\n\n    (helper 1))\n\n  (helper 2))\n",
+        }],
+        expected_files: &[FixtureFile {
+            path: "core.el",
+            contents: "(defun renamed (x) x)\n\n(defun caller ()\n\n  (cl-symbol-macrolet ((helper (renamed 0)))\n\n    helper\n\n    #'renamed\n\n    (function renamed)\n\n    (renamed 1))\n\n  (renamed 2))\n",
+        }],
+        expected_definition_count: 1,
+        expected_call_count: 5,
+    });
+}
+
 #[test]
 fn cli_writes_function_calls_inside_package_qualified_symbol_macrolet_expansion_forms() {
     assert_write_case(WriteCase {

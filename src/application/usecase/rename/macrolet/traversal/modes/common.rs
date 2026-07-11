@@ -46,12 +46,11 @@ pub(super) fn callable_list_head_target<'a>(
 mod tests {
     use super::*;
     use crate::application::usecase::rename::macrolet::scope::{
-        LocalCallableRenameKind, MacroletRenameScope, TargetBindingPresence, local_callable_scopes,
+        LocalCallableRenameKind, MacroletRenameScope,
     };
     use crate::application::usecase::rename::macrolet::traversal::BindingTraversal;
     use crate::application::usecase::rename::macrolet::traversal::core::RenameTraversalMode;
     use crate::application::usecase::rename::macrolet::traversal::state::TraversalState;
-    use crate::domain::common_lisp::CommonLispLocalCallableForm;
     use crate::domain::sexpr::{Path, SyntaxTree};
 
     #[test]
@@ -92,14 +91,8 @@ mod tests {
             to: &to,
             kind: LocalCallableRenameKind::Function,
         };
-        let scopes = local_callable_scopes(
-            MacroletRenameScope::default(),
-            LocalCallableRenameKind::Function,
-            CommonLispLocalCallableForm::Flet,
-            TargetBindingPresence::Present,
-        );
         let state = TraversalState {
-            scope: scopes.binding_body,
+            scope: MacroletRenameScope::default(),
             reader_lambda_body_scope: MacroletRenameScope::default(),
             quasiquote_depth: 0,
         };
