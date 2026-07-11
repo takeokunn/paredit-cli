@@ -154,10 +154,14 @@ fn fresh_temp_dir(name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system clock before unix epoch")
         .as_nanos();
+    // Deliberately excludes the current thread's name: libtest names each
+    // test thread after its fully-qualified test path, which can run past
+    // the filesystem's per-component name limit for deeply nested modules
+    // with long test names. `name` (a short caller-supplied label) plus the
+    // pid/timestamp/counter already guarantee a unique, readable directory.
     let dir = std::env::temp_dir().join(format!(
-        "paredit-cli-{name}-{}-{}-{timestamp}-{unique}",
+        "paredit-cli-{name}-{}-{timestamp}-{unique}",
         std::process::id(),
-        std::thread::current().name().unwrap_or("test")
     ));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("create temp dir");

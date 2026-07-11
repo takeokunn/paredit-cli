@@ -39,6 +39,58 @@ fn cli_plans_definition_move_between_files_without_writing() {
 }
 
 #[test]
+fn cli_moves_a_definitions_leading_comment_with_it_and_keeps_neighbors_intact() {
+    let dir = fresh_temp_dir("move-definition-comment");
+    let from_file = dir.join("core.lisp");
+    let to_file = dir.join("counting.lisp");
+    fs::write(
+        &from_file,
+        "(defun render-widget (w) w)\n\n\
+         ;; Counts the widgets in a list.\n\
+         (defun widget-count (widgets) (length widgets))\n\n\
+         ;; Trailing helper, unrelated.\n\
+         (defun widget-noop () nil)\n",
+    )
+    .expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("move-definition")
+        .arg("--from-file")
+        .arg(&from_file)
+        .arg("--to-file")
+        .arg(&to_file)
+        .arg("--path")
+        .arg("1")
+        .arg("--write")
+        .assert()
+        .success();
+
+    let source = fs::read_to_string(&from_file).expect("read rewritten source");
+    let destination = fs::read_to_string(&to_file).expect("read rewritten destination");
+    assert!(
+        !source.contains(";; Counts the widgets in a list."),
+        "comment must move with its definition, got: {source:?}"
+    );
+    assert!(
+        destination.contains(";; Counts the widgets in a list.\n(defun widget-count"),
+        "moved comment must stay directly above its definition, got: {destination:?}"
+    );
+    assert!(
+        !source.contains(")(defun"),
+        "remaining definitions must not be glued together, got: {source:?}"
+    );
+    assert!(source.contains(";; Trailing helper, unrelated.\n(defun widget-noop"));
+
+    let mut check_cmd = paredit();
+    check_cmd
+        .arg("check")
+        .arg("--file")
+        .arg(&from_file)
+        .assert()
+        .success();
+}
+
+#[test]
 fn cli_writes_definition_move_between_files() {
     let dir = fresh_temp_dir("move-definition-write");
     let from_file = dir.join("core.lisp");

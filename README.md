@@ -920,7 +920,9 @@ paredit thread-expression \
 
 `thread-expression` defaults to `->` for `--style first` and `->>` for
 `--style last`; pass `--operator` for dialect-specific threading macros after
-reviewing the JSON plan.
+reviewing the JSON plan. It refuses a selection containing a comment, since
+the pipeline is rebuilt from parsed parts and a comment would be silently
+discarded rather than placed somewhere in the rewritten form.
 
 Remove a reviewed wrapper call while keeping one argument:
 
@@ -958,7 +960,8 @@ paredit unthread-expression \
 
 `unthread-expression` infers `--style first` from `->` and `--style last` from
 `->>`. Pass both `--operator` and `--style` when a project-specific threading
-macro uses a different name.
+macro uses a different name. Like `thread-expression`, it refuses a selection
+containing a comment rather than discarding it while re-nesting into calls.
 
 Inline a reviewed helper call back into its caller:
 
@@ -994,6 +997,9 @@ reviewing the JSON plan. Pass repeated `--call-path` values for reviewed
 specific calls, or `--all-calls` to discover every same-file call whose list
 head matches the selected definition. The JSON plan reports both the legacy
 single-call fields and a `calls` array so agents can review each replacement.
+`--remove-definition` is refused when the definition body contains a comment,
+since only the parsed body is copied into call sites and the comment would be
+discarded along with the removed definition.
 
 Add a parameter to a reviewed definition and selected call sites:
 
@@ -1062,7 +1068,9 @@ positional parameters and lambda-list section members such as `&optional` and
 `&key` are supported, but the command refuses moves across section boundaries.
 It reports `from_index`, `to_index`, `call_paths`, and `moved_arguments`,
 verifies each call head against the selected definition, and re-parses the
-rewritten file.
+rewritten file. It also refuses to reorder a parameter list that contains a
+comment, since the list is rebuilt from each parameter's own text and the
+comment would be discarded.
 
 Swap two positional parameters within a reviewed definition and selected call
 sites:
@@ -1091,7 +1099,9 @@ positional parameters and lambda-list section members such as `&optional` and
 `&key` are supported, but the command refuses swaps across section boundaries.
 It reports `left_index`, `right_index`, `call_paths`, and `swapped_arguments`,
 verifies each call head against the selected definition, refuses calls missing
-either argument, and re-parses the rewritten file.
+either argument, and re-parses the rewritten file. Like
+`move-function-parameter`, it refuses to reorder a parameter list that
+contains a comment.
 
 Remove an obsolete positional parameter from a reviewed definition and selected
 call sites:
@@ -1119,7 +1129,10 @@ supported when the call shape still remains valid; unsupported tails such as
 entries after `&allow-other-keys` are rejected. It
 verifies each call head against the selected definition, reports
 `parameter_index`, `call_paths`, and `removed_arguments`, refuses missing call
-arguments by default, and re-parses the rewritten file.
+arguments by default, and re-parses the rewritten file. Removing the first
+parameter keeps any comment describing the next parameter in place; removing
+any other parameter that has its own leading comment removes that comment
+along with it, since it describes the parameter being removed.
 
 Introduce a local name for a complex subexpression:
 
