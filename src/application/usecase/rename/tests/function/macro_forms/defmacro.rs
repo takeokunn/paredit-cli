@@ -85,6 +85,57 @@ fn renames_defmacro_definition_inside_reader_quoted_lambda_body_without_touching
 }
 
 #[test]
+fn renames_function_calls_generated_by_macrolet_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(defun caller () (macrolet ((local (value) `(helper ,value))) (local 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(macrolet ((local (value) `(renamed ,value))) (local 1))"
+        ]
+    };
+}
+
+#[test]
+fn renames_function_calls_generated_by_compiler_macrolet_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(defun caller () (compiler-macrolet ((local (value) `(helper ,value))) (local 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(compiler-macrolet ((local (value) `(renamed ,value))) (local 1))"
+        ]
+    };
+}
+
+#[test]
+fn does_not_rename_function_calls_inside_flet_quasiquoted_data() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(defun caller () (flet ((local (value) `(helper ,value))) (local 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 0,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(flet ((local (value) `(helper ,value))) (local 1))"
+        ]
+    };
+}
+
+#[test]
 fn renames_common_lisp_qualified_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body()
 {
     assert_function_rename! {

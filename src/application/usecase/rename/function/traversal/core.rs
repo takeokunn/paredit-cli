@@ -32,6 +32,7 @@ pub(in crate::application::usecase::rename::function) struct TraversalState<'a> 
     pub(super) path: Path,
     pub(super) local_callables: &'a [String],
     pub(super) quasiquote_depth: usize,
+    pub(super) in_macro_expander: bool,
     pub(super) shadowed_depth: usize,
 }
 
@@ -41,6 +42,7 @@ impl<'a> TraversalState<'a> {
             path,
             local_callables: self.local_callables,
             quasiquote_depth: self.quasiquote_depth,
+            in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
         }
     }
@@ -50,6 +52,7 @@ impl<'a> TraversalState<'a> {
             path: self.path.clone(),
             local_callables: self.local_callables,
             quasiquote_depth,
+            in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
         }
     }
@@ -59,9 +62,11 @@ impl<'a> TraversalState<'a> {
             path: self.path.clone(),
             local_callables,
             quasiquote_depth: self.quasiquote_depth,
+            in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
         }
     }
+
 }
 
 pub(in crate::application::usecase::rename::function) fn allows_function_reference_rename(
@@ -99,6 +104,7 @@ pub fn collect_function_call_head_renames(
                 path,
                 local_callables: &[],
                 quasiquote_depth: 0,
+                in_macro_expander: false,
                 shadowed_depth: 0,
             },
             &mut renames,
@@ -131,7 +137,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
         return;
     }
 
-    if quasiquote_depth > 0 {
+    if quasiquote_depth > 0 && !state.in_macro_expander {
         collect_children(
             view,
             context,
