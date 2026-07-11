@@ -29,6 +29,7 @@ pub fn build_parsed_definition_file(
     path: PathBuf,
     dialect: Dialect,
     tree: &SyntaxTree,
+    text: &str,
 ) -> Result<ParsedDefinitionFile> {
     let (package, definitions) = collect_definition_forms(tree, dialect)?;
 
@@ -38,6 +39,7 @@ pub fn build_parsed_definition_file(
         package,
         definitions,
         atoms: tree.atom_occurrences(),
+        text: text.to_owned(),
     })
 }
 

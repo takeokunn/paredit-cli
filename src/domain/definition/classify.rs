@@ -37,7 +37,7 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
             DefinitionCategory::Mode
         }
         _ if dialect.is_definition_head(head) => DefinitionCategory::Other,
-        _ if normalized_lower.starts_with("define-") => DefinitionCategory::Other,
+        _ if normalized_lower.starts_with("define-") => DefinitionCategory::UnknownMacro,
         _ => return None,
     };
 

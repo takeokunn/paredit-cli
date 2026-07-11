@@ -31,6 +31,7 @@ pub struct ParsedDefinitionFile {
     pub package: Option<String>,
     pub definitions: Vec<DefinitionReportItem>,
     pub atoms: Vec<AtomOccurrence>,
+    pub text: String,
 }
 
 #[derive(Debug, Clone)]

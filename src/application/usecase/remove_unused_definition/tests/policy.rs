@@ -25,6 +25,60 @@ fn skips_protected_definition_categories_by_default() {
 }
 
 #[test]
+fn skips_unrecognized_define_style_macro_invocations_by_default() {
+    // A custom `define-*` macro (a strategy DSL, a DB-schema DSL, ...) is
+    // free to derive other exported symbol names from its argument via
+    // string concatenation, so the argument itself having no direct
+    // references does not mean the definition is safe to delete.
+    let text = "(in-package #:app)\n\
+                (define-trading-strategy d1-momentum :parameters 42)\n";
+    let form = "(define-trading-strategy d1-momentum :parameters 42)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            form,
+            "d1-momentum",
+            DefinitionCategory::UnknownMacro,
+        )],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 0);
+    assert_eq!(plan.skipped_count, 1);
+    assert_eq!(
+        plan.files[0].skipped[0].reason,
+        SkippedDefinitionRemovalReason::ProtectedDefinitionCategory
+    );
+    assert!(plan.files[0].rewritten.contains(form));
+}
+
+#[test]
+fn other_category_definitions_remain_bulk_removable() {
+    // `Other` covers a dialect's own recognized definition forms (Emacs
+    // Lisp `defun`, Clojure `defn`, ...) that are not broken out into a
+    // more specific category. Unlike `UnknownMacro`, these are known,
+    // non-generative shapes, so they should stay bulk-removable by default.
+    let text = "(defun stale-helper () 1)\n(defun live () 2)\n(live)\n";
+    let stale_form = "(defun stale-helper () 1)";
+    let live_form = "(defun live () 2)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![
+            definition(text, stale_form, "stale-helper", DefinitionCategory::Other),
+            definition(text, live_form, "live", DefinitionCategory::Function),
+        ],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert_eq!(plan.skipped_count, 0);
+    assert!(!plan.files[0].rewritten.contains(stale_form));
+}
+
+#[test]
 fn skips_exported_definition_by_default() {
     let text = "(in-package #:app)\n(defun public-entry () 1)\n";
     let form = "(defun public-entry () 1)";

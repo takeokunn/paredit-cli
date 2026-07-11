@@ -30,7 +30,12 @@ pub(in crate::presentation::cli) fn unused_definition_report(
         let dialect = detect_dialect(&input, args.dialect);
         let tree = SyntaxTree::parse(&input.text)
             .with_context(|| format!("failed to parse {}", file.display()))?;
-        parsed.push(build_parsed_definition_file(file.clone(), dialect, &tree)?);
+        parsed.push(build_parsed_definition_file(
+            file.clone(),
+            dialect,
+            &tree,
+            &input.text,
+        )?);
     }
 
     let reports = collect_unused_definition_candidates(&parsed);

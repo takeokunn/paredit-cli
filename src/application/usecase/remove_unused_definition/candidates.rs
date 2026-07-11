@@ -121,7 +121,11 @@ fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
 /// Collects every function-namespace designator matching `symbol`,
 /// appending their spans to `output` while respecting local callable
 /// shadowing from `flet`, `labels`, `macrolet`, and `compiler-macrolet`.
-fn collect_function_quote_references(
+///
+/// `pub(crate)`: also used by `definition_report::references` so
+/// `unused-definition-report` and `remove-unused-definitions` agree on what
+/// counts as a reference instead of drifting apart.
+pub(crate) fn collect_function_quote_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
@@ -296,7 +300,11 @@ fn function_quote_symbol_matches(dialect: Dialect, candidate: &str, symbol: &str
 /// `symbol` inside a quoted region is unambiguous evidence the definition
 /// is reachable, at the cost of occasionally counting an unrelated
 /// same-named symbol that only appears as incidental data.
-fn collect_quoted_data_references(
+///
+/// `pub(crate)`: also used by `definition_report::references` so
+/// `unused-definition-report` and `remove-unused-definitions` agree on what
+/// counts as a reference instead of drifting apart.
+pub(crate) fn collect_quoted_data_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,

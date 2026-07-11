@@ -30,6 +30,20 @@ with no external effect.
   contents of any plain-quoted form as opaque data, so a function or
   variable used exclusively through this extremely common Lisp idiom was
   reported as unreferenced and removable.
+- `remove-unused-definitions`: an unrecognized `define-*`-prefixed macro
+  invocation (a project's own strategy, schema, or handler DSL, for
+  example `(define-trading-strategy foo ...)`) is now reported under a
+  new `unknown-macro` category and protected by default like other
+  categories this tool cannot fully verify, instead of falling into the
+  generic, bulk-removable `other` bucket. Such a macro commonly derives
+  *other* exported symbol names from its argument via string
+  concatenation (the example above might generate and export
+  `make-foo-strategy`), so the argument symbol having zero direct
+  references does not mean the code it defines is unused. `other` itself
+  is now reserved for a dialect's own recognized definition forms (Emacs
+  Lisp `defun`, Clojure `defn`, ...) that are not broken out into a more
+  specific category but are still known, non-generative shapes, and
+  remains bulk-removable as before.
 - `sort-package-exports`: a `;; section` comment (or any own-line comment)
   that precedes an export symbol now travels with that symbol when the
   sort reorders the list, instead of staying at a fixed line and

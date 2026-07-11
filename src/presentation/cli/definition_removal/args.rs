@@ -32,7 +32,10 @@ pub(in crate::presentation::cli) struct RemoveUnusedDefinitionsArgs {
     /// Override extension-based dialect detection for every file.
     #[arg(long)]
     pub(in crate::presentation::cli::definition_removal) dialect: Option<DialectArg>,
-    /// Also remove package/system/test/customization/mode definitions.
+    /// Also remove package/system/test/customization/mode definitions, and
+    /// definitions from unrecognized `define-*`-style macros whose expansion
+    /// (and any symbol names it derives from the argument) this tool cannot
+    /// verify.
     #[arg(long)]
     pub(in crate::presentation::cli::definition_removal) include_protected: bool,
     /// Also remove definitions exported from their Common Lisp package.
