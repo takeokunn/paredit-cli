@@ -14,6 +14,16 @@ with no external effect.
 
 ### Fixed
 
+- `let-report` no longer analyzes a `let`-shaped form found inside a
+  quasiquote code-generation template (e.g. `` `(let ((,x ,val)) ...) ``
+  in a with-gensyms-style macro helper) as a real binding. Such a form's
+  "binding name" is frequently an unquoted gensym variable determined at
+  macro-expansion time, not a symbol whose unused-ness can be judged; it
+  was previously reported with `unused-binding` risk, and acting on that
+  report (or a future `remove-unused-binding` built on the same
+  `--include-protected`-style trust) would corrupt the macro's generated
+  code rather than remove dead code. A real `let` nested inside an
+  unquoted (`,`/`,@`) sub-expression is still analyzed normally.
 - Scope-aware reference collection (used by `unused-definition-report`,
   `remove-unused-definitions`, and every rename/refactor command built on
   it) no longer treats a Common Lisp `FUNCTION` *type specifier*

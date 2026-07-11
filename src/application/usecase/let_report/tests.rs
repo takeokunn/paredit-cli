@@ -58,6 +58,36 @@ fn reports_ignore_lambda_parameter_shadowed_references() {
 }
 
 #[test]
+fn ignores_a_let_form_inside_a_quasiquoted_code_generation_template() {
+    // A with-gensyms-style macro helper builds generated code via a
+    // quasiquote template, e.g. `` `(let ((,x ,val)) ...) ``. That inner
+    // `let` shape is not a real binding: its "name" is an unquoted gensym
+    // variable determined at macro-expansion time, not a symbol whose
+    // unused-ness this tool can judge. Only the outer, real `let` (which
+    // executes at macro-expansion time to create the gensym) should be
+    // reported.
+    let input = "(let ((b (gensym)))\n  `(let ((,b ,broker)) (frob ,b)))";
+    let reports = reports_for(input, Dialect::CommonLisp);
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].bindings[0].name, "b");
+}
+
+#[test]
+fn still_reports_a_real_let_form_nested_inside_an_unquote() {
+    // An unquoted (`,`) sub-expression inside a quasiquote template is
+    // ordinary evaluated code, not generated-code data, so a `let` there is
+    // real and must still be analyzed like any other.
+    let input = "`(foo ,(let ((y 1)) :unused))";
+    let reports = reports_for(input, Dialect::CommonLisp);
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].bindings[0].name, "y");
+    assert_eq!(reports[0].bindings[0].reference_count, 0);
+    assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+}
+
+#[test]
 fn reports_capture_risk_when_value_free_variable_is_shadowed() {
     let reports = reports_for("(let ((y x)) (let ((x 99)) y))", Dialect::CommonLisp);
 
