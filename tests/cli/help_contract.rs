@@ -8,10 +8,10 @@ fn top_level_help_routes_new_automation_to_grouped_namespaces() {
         .success()
         .stdout(predicate::str::contains("Workflow namespaces:"))
         .stdout(predicate::str::contains(
-            "Use `paredit refactor ...` for file-scoped refactoring workflows.",
+            "Use `paredit refactor ...` for file- and workspace-scoped refactoring workflows.",
         ))
         .stdout(predicate::str::contains(
-            "Use `paredit workspace ...` for workspace discovery and workspace-scoped refactoring workflows.",
+            "Use `paredit workspace ...` for workspace discovery and reporting.",
         ));
 }
 
