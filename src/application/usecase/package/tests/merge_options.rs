@@ -20,6 +20,24 @@ fn merges_duplicate_package_export_options() {
 }
 
 #[test]
+fn merges_options_only_in_target_defpackage_among_mixed_top_level_forms() {
+    let input = "(in-package #:cl-user)\n(defpackage #:other (:export #:a) (:export #:b))\n42\n(defpackage #:target (:export #:x) (:export #:y))\n(main)\n";
+    let plan = plan_merge_package_options(MergePackageOptionsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: Some(&SymbolName::new("target").unwrap()),
+    })
+    .unwrap();
+
+    assert_eq!(plan.merges.len(), 1);
+    assert_eq!(plan.merges[0].package, "#:target");
+    assert_eq!(
+        plan.rewritten,
+        "(in-package #:cl-user)\n(defpackage #:other (:export #:a) (:export #:b))\n42\n(defpackage #:target (:export #:x #:y))\n(main)\n"
+    );
+}
+
+#[test]
 fn merges_import_from_options_only_by_source_package() {
     let input = "(defpackage #:demo\n  (:import-from #:dep #:a)\n  (:import-from #:other #:b)\n  (:import-from #:dep #:a #:c))\n";
     let plan = plan_merge_package_options(MergePackageOptionsRequest {

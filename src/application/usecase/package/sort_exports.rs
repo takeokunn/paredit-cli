@@ -1,15 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::domain::{
-    common_lisp::CommonLispPackageDeclarationForm,
     dialect::Dialect,
-    sexpr::{
-        ByteOffset, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName,
-        SyntaxTree,
-    },
+    sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree},
 };
 
-use super::syntax::{atom_text, is_package_head, package_atoms_match, package_option_name};
+use super::{
+    syntax::{atom_text, package_option_name},
+    visit::visit_defpackage_forms,
+};
 use crate::application::usecase::leading_trivia::first_newline_or;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,96 +36,20 @@ pub(super) fn defpackage_export_sort_edits(
     package: Option<&SymbolName>,
 ) -> Result<Vec<ExportSortEdit>> {
     let mut edits = Vec::new();
-    let mut matched_defpackages = 0usize;
-
-    for index in 0..tree.root_children().len() {
-        let path = Path::root_child(index);
-        let view = tree.select_path(&path)?.view();
-        collect_export_sort_edits(
-            input,
-            &view,
-            path.clone(),
-            dialect,
-            package,
-            &mut matched_defpackages,
-            &mut edits,
-        )
-        .with_context(|| format!("failed to inspect package form at {path}"))?;
-    }
-
-    if matched_defpackages == 0 {
-        if let Some(target) = package {
-            anyhow::bail!("no matching defpackage form found for {target}");
-        }
-    }
+    visit_defpackage_forms(tree, dialect, package, |view, path, package_name| {
+        analyze_defpackage_exports(input, view, path, package_name, &mut edits)
+    })?;
 
     Ok(edits)
-}
-
-fn collect_export_sort_edits(
-    input: &str,
-    view: &ExpressionView,
-    path: Path,
-    dialect: Dialect,
-    package: Option<&SymbolName>,
-    matched_defpackages: &mut usize,
-    edits: &mut Vec<ExportSortEdit>,
-) -> Result<()> {
-    analyze_defpackage_exports(
-        input,
-        view,
-        &path,
-        dialect,
-        package,
-        matched_defpackages,
-        edits,
-    )?;
-
-    for (index, child) in view.children.iter().enumerate() {
-        collect_export_sort_edits(
-            input,
-            child,
-            path.child(index),
-            dialect,
-            package,
-            matched_defpackages,
-            edits,
-        )?;
-    }
-
-    Ok(())
 }
 
 fn analyze_defpackage_exports(
     input: &str,
     view: &ExpressionView,
     path: &Path,
-    dialect: Dialect,
-    package: Option<&SymbolName>,
-    matched_defpackages: &mut usize,
+    package_name: &str,
     edits: &mut Vec<ExportSortEdit>,
 ) -> Result<()> {
-    if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
-        return Ok(());
-    }
-    if view.children.len() < 2 {
-        return Ok(());
-    }
-    let Some(head) = atom_text(&view.children[0]) else {
-        return Ok(());
-    };
-    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::Defpackage) {
-        return Ok(());
-    }
-
-    let Some(package_name) = atom_text(&view.children[1]) else {
-        return Ok(());
-    };
-    if package.is_some_and(|package| !package_atoms_match(package_name, package.as_str())) {
-        return Ok(());
-    }
-    *matched_defpackages += 1;
-
     for (option_index, option) in view.children.iter().enumerate().skip(2) {
         if option.kind != ExpressionKind::List || option.children.is_empty() {
             continue;
