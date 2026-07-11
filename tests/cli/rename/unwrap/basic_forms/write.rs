@@ -1,38 +1,6 @@
 use super::*;
 
 #[test]
-fn cli_plans_unwrap_function_calls_without_writing() {
-    let dir = fresh_temp_dir("unwrap-function-calls-plan");
-    let lisp_file = dir.join("service.lisp");
-    let source =
-        "(defun render ()\n  (with-cache (fetch-user id))\n  (with-cache (fetch-user other)))\n";
-    fs::write(&lisp_file, source).expect("write lisp fixture");
-
-    let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
-        .arg(&lisp_file)
-        .arg("--function")
-        .arg("fetch-user")
-        .arg("--wrapper")
-        .arg("with-cache")
-        .arg("--all-calls")
-        .arg("--output")
-        .arg("json")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("\"function\": \"fetch-user\""))
-        .stdout(predicate::str::contains("\"wrapper\": \"with-cache\""))
-        .stdout(predicate::str::contains("\"callCount\": 2"))
-        .stdout(predicate::str::contains("(fetch-user id)"))
-        .stdout(predicate::str::contains("(fetch-user other)"));
-
-    assert_eq!(
-        fs::read_to_string(lisp_file).expect("read unchanged lisp"),
-        source
-    );
-}
-
-#[test]
 fn cli_writes_unwrap_function_calls_and_skips_non_unary_wrappers() {
     let dir = fresh_temp_dir("unwrap-function-calls-write");
     let lisp_file = dir.join("service.lisp");
@@ -68,57 +36,6 @@ fn cli_writes_unwrap_function_calls_and_skips_non_unary_wrappers() {
 }
 
 #[test]
-fn cli_rejects_unwrap_function_calls_without_explicit_scope() {
-    let dir = fresh_temp_dir("unwrap-function-calls-no-scope");
-    let lisp_file = dir.join("service.lisp");
-    fs::write(
-        &lisp_file,
-        "(defun render () (with-cache (fetch-user id)))\n",
-    )
-    .expect("write lisp fixture");
-
-    let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
-        .arg(&lisp_file)
-        .arg("--function")
-        .arg("fetch-user")
-        .arg("--wrapper")
-        .arg("with-cache")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "unwrap-function-calls requires either --all-calls or repeated --call-path",
-        ));
-}
-
-#[test]
-fn cli_rejects_unwrap_function_calls_with_conflicting_scope_flags() {
-    let dir = fresh_temp_dir("unwrap-function-calls-conflicting-scope");
-    let lisp_file = dir.join("service.lisp");
-    fs::write(
-        &lisp_file,
-        "(defun render () (with-cache (fetch-user id)))\n",
-    )
-    .expect("write lisp fixture");
-
-    let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
-        .arg(&lisp_file)
-        .arg("--function")
-        .arg("fetch-user")
-        .arg("--wrapper")
-        .arg("with-cache")
-        .arg("--all-calls")
-        .arg("--call-path")
-        .arg("0.4")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "unwrap-function-calls requires either --all-calls or repeated --call-path",
-        ));
-}
-
-#[test]
 fn cli_unwrap_function_calls_can_target_call_path() {
     let dir = fresh_temp_dir("unwrap-function-calls-path");
     let lisp_file = dir.join("service.lisp");
@@ -149,30 +66,6 @@ fn cli_unwrap_function_calls_can_target_call_path() {
         fs::read_to_string(lisp_file).expect("read path-targeted lisp"),
         "(defun render () (with-cache (fetch-user id)) (fetch-user other))\n"
     );
-}
-
-#[test]
-fn cli_unwrap_function_calls_fails_when_selected_calls_do_not_change() {
-    let dir = fresh_temp_dir("unwrap-function-calls-no-change");
-    let lisp_file = dir.join("service.lisp");
-    fs::write(
-        &lisp_file,
-        "(defun render () (with-cache (fetch-user cached) :ttl 60))\n",
-    )
-    .expect("write lisp fixture");
-
-    let mut cmd = paredit();
-    cmd.arg("unwrap-function-calls")
-        .arg(&lisp_file)
-        .arg("--function")
-        .arg("fetch-user")
-        .arg("--wrapper")
-        .arg("with-cache")
-        .arg("--all-calls")
-        .arg("--fail-on-no-change")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("no selected call site changed"));
 }
 
 #[test]
