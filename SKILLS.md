@@ -29,8 +29,8 @@ Use this skill when refactoring Common Lisp, Scheme, Clojure, Emacs Lisp, or any
 ```sh
 timeout 10s paredit check --file target.lisp
 timeout 10s paredit agent-report --file target.lisp --output json
-timeout 10s paredit workspace-report --output json .
-timeout 10s paredit workspace-refactor-plan --symbol old-name --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json .
+timeout 10s paredit workspace report --output json .
+timeout 10s paredit refactor workspace-plan --symbol old-name --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json .
 timeout 10s paredit outline --file target.lisp --output json
 timeout 10s paredit form-report --file target.lisp --path 0 --include-source --output json
 timeout 10s paredit find-symbol --file target.lisp --symbol old-name --output json
@@ -39,18 +39,18 @@ timeout 10s paredit call-report --symbol old-name --output json src/*.lisp elisp
 timeout 10s paredit signature-report --symbol old-name --fail-on-mismatch --require-definitions 1 --require-calls 1 --output json src/*.lisp elisp/*.el
 timeout 10s paredit call-graph --symbol old-name --fail-on-inbound-callers --require-edges 1 --require-internal-edges 1 --output json src/*.lisp elisp/*.el
 timeout 10s paredit impact-report --symbol old-name --fail-on-risk-level warning --require-definitions 1 --require-references 1 --require-calls 1 --output json src/*.lisp elisp/*.el
-timeout 10s paredit refactor-plan --symbol old-name --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp elisp/*.el
-timeout 10s paredit workspace-refactor-preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .
-timeout 10s paredit refactor-preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-edits 1 --output json src/*.lisp elisp/*.el
-timeout 10s paredit refactor-check --manifest rename.preview.json --root . --output json
-timeout 10s paredit refactor-status --manifest rename.preview.json --root . --output json
-HASH=<manifest.hash from refactor-status JSON>
-timeout 10s paredit refactor-diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
-timeout 10s paredit refactor-apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
-timeout 10s paredit refactor-apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
-timeout 10s paredit refactor-preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-edits 1 --write --output json src/*.lisp elisp/*.el
-timeout 10s paredit verify-refactor --symbol old-name --operation rename --phase pre --output json src/*.lisp elisp/*.el
-timeout 10s paredit verify-refactor --symbol old-name --new-symbol new-name --operation rename --phase post --output json src/*.lisp elisp/*.el
+timeout 10s paredit refactor plan --symbol old-name --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp elisp/*.el
+timeout 10s paredit refactor workspace-preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .
+timeout 10s paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-edits 1 --output json src/*.lisp elisp/*.el
+timeout 10s paredit refactor check --manifest rename.preview.json --root . --output json
+timeout 10s paredit refactor status --manifest rename.preview.json --root . --output json
+HASH=<manifest.hash from 'paredit refactor status' JSON>
+timeout 10s paredit refactor diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
+timeout 10s paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
+timeout 10s paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
+timeout 10s paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-edits 1 --write --output json src/*.lisp elisp/*.el
+timeout 10s paredit refactor verify --symbol old-name --operation rename --phase pre --output json src/*.lisp elisp/*.el
+timeout 10s paredit refactor verify --symbol old-name --new-symbol new-name --operation rename --phase post --output json src/*.lisp elisp/*.el
 timeout 10s paredit dependency-report --output json system.asd src/*.lisp elisp/*.el
 timeout 10s paredit package-report --output json system.asd src/*.lisp
 timeout 10s paredit definition-report --output json system.asd src/*.lisp elisp/*.el
@@ -115,21 +115,21 @@ mv /tmp/target.lisp target.lisp
 ## Common Operations
 
 - Detect a Lisp dialect: `paredit dialect --file target.el --output json`
-- Discover Lisp files and parse/refactor inventory from repository roots: `paredit workspace-report --output json .`
-- Discover Lisp files from repository roots and build an ordered, gated refactor plan with skipped-file accounting: `paredit workspace-refactor-plan --symbol old --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json .`
+- Discover Lisp files and parse/refactor inventory from repository roots: `paredit workspace report --output json .`
+- Discover Lisp files from repository roots and build an ordered, gated refactor plan with skipped-file accounting: `paredit refactor workspace-plan --symbol old --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json .`
 - Report project symbol occurrences with outline context: `paredit symbol-report --symbol old --output json src/*.lisp elisp/*.el`
 - Report callable list-head sites before signature or inline refactors: `paredit call-report --symbol old --output json src/*.lisp elisp/*.el`
 - Compare callable definition arity with call-site argument counts before required-parameter changes, and fail CI when the scan is empty or incompatible: `paredit signature-report --symbol old --fail-on-mismatch --require-definitions 1 --require-calls 1 --output json src/*.lisp elisp/*.el`
 - Report internal call graph edges before moving, inlining, deleting, or splitting definitions, and fail CI when an expected graph is empty or the focused symbol has inbound internal callers: `paredit call-graph --symbol old --fail-on-inbound-callers --require-edges 1 --require-internal-edges 1 --output json src/*.lisp elisp/*.el`
 - Run a preflight refactor blast-radius gate before rename, move, remove, inline, extraction, or required-parameter edits, and fail CI when the scan is empty or the risk exceeds policy: `paredit impact-report --symbol old --fail-on-risk-level warning --require-definitions 1 --require-references 1 --require-calls 1 --output json src/*.lisp elisp/*.el`
-- Build an ordered, gated plan with machine-checkable policy failures for AI coding agents before rename, remove, move, or signature edits: `paredit refactor-plan --symbol old --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp elisp/*.el`
-- Discover Lisp files from repository roots and preview exact rename rewrites with skipped-file accounting, byte-span edits, content hashes, target-symbol conflict checks, parse gates, and CI-friendly policy failures: `paredit workspace-refactor-preview --from old --to new --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .`
-- Preview refactor rewrites with byte-span edit scripts and CI-friendly policy failures before applying changes, then add `--write` to apply only after target-symbol conflict checks, policy gates, and rewritten-output parsing pass: `paredit refactor-preview --from old --to new --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --output json src/*.lisp elisp/*.el`
-- Validate a saved preview manifest without writing files or rendering a diff, and fail when preview policy, output parsing, hashes, manifest flags, or root containment drift. Inspect JSON `manifest.path`, `manifest.hash`, `summary.can_apply`, `manifest_policy_passed`, `manifest_outputs_parse`, and `root` in agent logs: `paredit refactor-check --manifest rename.preview.json --root . --output json`
-- Summarize a saved preview manifest into AI-agent next actions without writing files or failing on stale state. Inspect JSON `status`, `next_action`, `blocked_reasons`, `write_plan`, `manifest.hash`, `summary.can_apply`, and `root` before deciding whether to regenerate, diff, or apply: `paredit refactor-status --manifest rename.preview.json --root . --output json`
-- Render a saved preview manifest as a verified unified diff without writing files, and fail when the pinned manifest hash, file hashes, parse status, manifest consistency, or root containment drift. Inspect JSON `root.enforced` and `root.path` in agent logs: `paredit refactor-diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json`
-- Apply a saved preview manifest with manifest-hash pinning, stale-file hash guards, output-hash verification, parse gates, optional root containment, all-or-nothing write semantics, and JSON `root` audit evidence: `paredit refactor-apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json`
-- Verify pre/post refactor invariants with fixed pass/fail checks for AI coding agents and CI gates: `paredit verify-refactor --symbol old --new-symbol new --operation rename --phase post --output json src/*.lisp elisp/*.el`
+- Build an ordered, gated plan with machine-checkable policy failures for AI coding agents before rename, remove, move, or signature edits: `paredit refactor plan --symbol old --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp elisp/*.el`
+- Discover Lisp files from repository roots and preview exact rename rewrites with skipped-file accounting, byte-span edits, content hashes, target-symbol conflict checks, parse gates, and CI-friendly policy failures: `paredit refactor workspace-preview --from old --to new --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .`
+- Preview refactor rewrites with byte-span edit scripts and CI-friendly policy failures before applying changes, then add `--write` to apply only after target-symbol conflict checks, policy gates, and rewritten-output parsing pass: `paredit refactor preview --from old --to new --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --output json src/*.lisp elisp/*.el`
+- Validate a saved preview manifest without writing files or rendering a diff, and fail when preview policy, output parsing, hashes, manifest flags, or root containment drift. Inspect JSON `manifest.path`, `manifest.hash`, `summary.can_apply`, `manifest_policy_passed`, `manifest_outputs_parse`, and `root` in agent logs: `paredit refactor check --manifest rename.preview.json --root . --output json`
+- Summarize a saved preview manifest into AI-agent next actions without writing files or failing on stale state. Inspect JSON `status`, `next_action`, `blocked_reasons`, `write_plan`, `manifest.hash`, `summary.can_apply`, and `root` before deciding whether to regenerate, diff, or apply: `paredit refactor status --manifest rename.preview.json --root . --output json`
+- Render a saved preview manifest as a verified unified diff without writing files, and fail when the pinned manifest hash, file hashes, parse status, manifest consistency, or root containment drift. Inspect JSON `root.enforced` and `root.path` in agent logs: `paredit refactor diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json`
+- Apply a saved preview manifest with manifest-hash pinning, stale-file hash guards, output-hash verification, parse gates, optional root containment, all-or-nothing write semantics, and JSON `root` audit evidence: `paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json`
+- Verify pre/post refactor invariants with fixed pass/fail checks for AI coding agents and CI gates: `paredit refactor verify --symbol old --new-symbol new --operation rename --phase post --output json src/*.lisp elisp/*.el`
 - Report ASDF, package, load, provide/require, and qualified-symbol dependencies before file or package boundary changes: `paredit dependency-report --output json system.asd src/*.lisp elisp/*.el`
 - Report Common Lisp package declarations before package/export/import refactors: `paredit package-report --output json system.asd src/*.lisp`
 - Report definition inventory before file decomposition, API cleanup, macro consolidation, or test restructuring: `paredit definition-report --output json system.asd src/*.lisp elisp/*.el`
