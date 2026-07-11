@@ -140,6 +140,18 @@ fn cli_plans_macrolet_rename_inside_quasiquote_with_unquote_prefixes() {
 }
 
 #[test]
+fn cli_plans_macrolet_rename_only_after_nested_quasiquote_is_fully_unquoted() {
+    assert_plan_case_with_counts(
+        "rename-macrolet-nested-quasiquote-plan",
+        "core.lisp",
+        "(macrolet ((old-name (x) x)) ``(list ,(old-name 1) ,,(old-name 2)))\n",
+        "(macrolet ((new-name (x) x)) ``(list ,(old-name 1) ,,(new-name 2)))",
+        1,
+        1,
+    );
+}
+
+#[test]
 fn cli_skips_macrolet_definitions_and_calls_inside_quoted_data_during_plan() {
     assert_plan_case_with_counts(
         "rename-macrolet-quoted-data-plan",

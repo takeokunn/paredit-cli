@@ -42,6 +42,25 @@ fn parses_common_lisp_reader_prefixes() {
 }
 
 #[test]
+fn preserves_stacked_quasiquote_and_unquote_prefix_order() {
+    let tree = SyntaxTree::parse("``(list ,quoted ,,evaluated)").expect("valid");
+    let quasiquoted = tree.select_path(&parse_path("0")).expect("quasiquoted").view();
+
+    assert_eq!(
+        quasiquoted.reader_prefixes,
+        vec![ReaderPrefix::Quasiquote, ReaderPrefix::Quasiquote]
+    );
+    assert_eq!(
+        quasiquoted.children[1].reader_prefixes,
+        vec![ReaderPrefix::Unquote]
+    );
+    assert_eq!(
+        quasiquoted.children[2].reader_prefixes,
+        vec![ReaderPrefix::Unquote, ReaderPrefix::Unquote]
+    );
+}
+
+#[test]
 fn parses_clojure_hash_literals_as_one_node() {
     // `#{...}` (set) and `#(...)` (anonymous fn / CL-Scheme vector literal)
     // glue `#` directly onto the following collection with no space in every
