@@ -25,6 +25,15 @@ pub(crate) fn apply_reader_prefix_context(
                 quasiquote_depth = quasiquote_depth.saturating_sub(1);
             }
             ReaderPrefix::ReadEval => return None,
+            // `#(...)`/`#{...}`, `^...`, and `#?(...)`/`#?@(...)` carry live
+            // code or references in at least one supported dialect (Clojure
+            // anonymous functions and metadata targets), so treat them like
+            // `Function` rather than opaque data: keep traversing normally
+            // instead of hiding the contents from rename/reference tracking.
+            ReaderPrefix::HashLiteral
+            | ReaderPrefix::Metadata
+            | ReaderPrefix::ReaderConditional
+            | ReaderPrefix::ReaderConditionalSplicing => {}
         }
     }
 

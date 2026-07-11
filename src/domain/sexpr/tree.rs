@@ -38,8 +38,8 @@ pub struct SyntaxTree {
 pub(in crate::domain::sexpr) struct Comment {
     /// Byte range of the comment in the original source.
     pub(in crate::domain::sexpr) span: ByteSpan,
-    /// Exact comment text (`; ...`, `#| ... |#`, or `#; <form>`), trailing
-    /// whitespace preserved as parsed.
+    /// Exact comment text (`; ...`, `#| ... |#`, `#; <form>`, or `#_<form>`),
+    /// trailing whitespace preserved as parsed.
     pub(in crate::domain::sexpr) text: String,
     /// `true` when only whitespace precedes the comment on its source line, i.e.
     /// it stands on its own line rather than trailing code.
@@ -76,6 +76,19 @@ pub enum ReaderPrefix {
     UnquoteSplicing,
     Function,
     ReadEval,
+    /// A bare `#` immediately before an open delimiter: Common Lisp/Scheme
+    /// vector literals (`#(1 2 3)`) and Clojure set (`#{1 2}`) or anonymous
+    /// function (`#(+ % 1)`) literals. All three dialects glue `#` directly
+    /// onto the following collection with no space, so this keeps the `#`
+    /// attached to its list instead of scanning as a disconnected atom.
+    HashLiteral,
+    /// Clojure metadata sugar (`^{:doc "x"}`, `^:private`, `^String`)
+    /// prefixing the map, keyword, or symbol that carries the metadata.
+    Metadata,
+    /// Clojure reader conditional (`#?(:clj a :cljs b)`).
+    ReaderConditional,
+    /// Clojure splicing reader conditional (`#?@(:clj [a] :cljs [b])`).
+    ReaderConditionalSplicing,
 }
 
 impl ReaderPrefix {
@@ -88,6 +101,10 @@ impl ReaderPrefix {
             Self::UnquoteSplicing => ",@",
             Self::Function => "#'",
             Self::ReadEval => "#.",
+            Self::HashLiteral => "#",
+            Self::Metadata => "^",
+            Self::ReaderConditional => "#?",
+            Self::ReaderConditionalSplicing => "#?@",
         }
     }
 
@@ -182,6 +199,17 @@ impl SyntaxTree {
                 })
             })
             .collect()
+    }
+
+    /// Reports whether any comment discovered during parsing falls within
+    /// `span`. Callers that rebuild source text from parsed atoms (rather
+    /// than slicing it verbatim) can use this to detect when doing so would
+    /// silently discard a comment, since comments live outside the node tree
+    /// and are otherwise invisible to such callers.
+    pub fn has_comment_in(&self, span: ByteSpan) -> bool {
+        self.comments
+            .iter()
+            .any(|comment| comment.span.start() < span.end() && span.start() < comment.span.end())
     }
 
     /// Collects every atom in the tree together with its path and byte span.

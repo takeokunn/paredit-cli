@@ -229,6 +229,22 @@ fn render_prefixed_expression(
             )?
         )),
         ReaderPrefix::ReadEval => Ok(view.span.slice(input).to_owned()),
+        ReaderPrefix::HashLiteral
+        | ReaderPrefix::Metadata
+        | ReaderPrefix::ReaderConditional
+        | ReaderPrefix::ReaderConditionalSplicing => Ok(format!(
+            "{}{}",
+            prefix.as_source(),
+            render_prefixed_expression(
+                input,
+                view,
+                prefix_index + 1,
+                quasiquote_depth,
+                body_bindings,
+                argument_bindings,
+                reference_counts,
+            )?
+        )),
     }
 }
 

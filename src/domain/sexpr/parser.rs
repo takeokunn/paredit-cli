@@ -19,6 +19,8 @@ pub enum ParseError {
     UnterminatedString(usize),
     #[error("unterminated block comment starting at byte {0}")]
     UnterminatedBlockComment(usize),
+    #[error("unterminated multiple-escape symbol starting at byte {0}")]
+    UnterminatedSymbol(usize),
 }
 
 pub(in crate::domain::sexpr) struct Parser<'a> {
@@ -252,12 +254,25 @@ impl<'a> Parser<'a> {
         Err(ParseError::UnterminatedString(start.get()))
     }
 
-    fn atom_with_prefixes(&mut self, prefixes: Vec<PrefixToken>) {
+    fn atom_with_prefixes(
+        &mut self,
+        prefixes: Vec<PrefixToken>,
+    ) -> std::result::Result<(), ParseError> {
         let start = self.pos;
+        if self.current_byte_is_feature_dispatch() {
+            self.advance();
+            self.advance();
+            self.push_atom(prefixes, start, self.pos);
+            return Ok(());
+        }
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
             if byte == b'\\' {
                 self.consume_single_escape();
+                continue;
+            }
+            if byte == b'|' {
+                self.consume_multiple_escape()?;
                 continue;
             }
             if is_symbol_boundary(byte) {
@@ -266,6 +281,7 @@ impl<'a> Parser<'a> {
             self.advance();
         }
         self.push_atom(prefixes, start, self.pos);
+        Ok(())
     }
 
     /// Consumes a Lisp single-escape (`\`) and the following character literally.
@@ -278,6 +294,31 @@ impl<'a> Parser<'a> {
         if self.pos.get() < self.bytes.len() {
             self.advance();
         }
+    }
+
+    /// Consumes a Lisp multiple-escape (`|...|`) region and the following
+    /// character literally, per CLHS 2.1.4.2.
+    ///
+    /// Every character inside the region, including whitespace and delimiters,
+    /// is a literal symbol constituent rather than a token boundary, so `|Foo
+    /// Bar|` scans as one atom instead of splitting at the space. A nested `\`
+    /// still single-escapes the character that follows it.
+    fn consume_multiple_escape(&mut self) -> std::result::Result<(), ParseError> {
+        let start = self.pos;
+        self.advance();
+        while self.pos.get() < self.bytes.len() {
+            let byte = self.current_byte();
+            if byte == b'\\' {
+                self.consume_single_escape();
+                continue;
+            }
+            if byte == b'|' {
+                self.advance();
+                return Ok(());
+            }
+            self.advance();
+        }
+        Err(ParseError::UnterminatedSymbol(start.get()))
     }
 
     fn push_atom(&mut self, prefixes: Vec<PrefixToken>, start: ByteOffset, end: ByteOffset) {
@@ -316,7 +357,7 @@ impl<'a> Parser<'a> {
             byte if Delimiter::from_open(byte).is_some() => self.open_list_with_prefixes(prefixes),
             byte if Delimiter::from_close(byte).is_some() => self.close_list()?,
             b'"' => self.atom_string_with_prefixes(prefixes)?,
-            _ => self.atom_with_prefixes(prefixes),
+            _ => self.atom_with_prefixes(prefixes)?,
         }
         Ok(())
     }
@@ -343,7 +384,7 @@ impl<'a> Parser<'a> {
         let result = self.skip_trivia().and_then(|()| self.skip_form());
         self.suppress_depth -= 1;
         result?;
-        // Only the outermost datum comment records; nested `#;` are folded in.
+        // Only the outermost datum comment records; nested `#;`/`#_` are folded in.
         self.record_comment(start, self.pos);
         Ok(())
     }
@@ -384,7 +425,7 @@ impl<'a> Parser<'a> {
                 });
             }
             b'"' => self.skip_string(),
-            _ => self.skip_atom(),
+            _ => self.skip_atom()?,
         }
         Ok(())
     }
@@ -452,11 +493,20 @@ impl<'a> Parser<'a> {
         Err(ParseError::UnterminatedBlockComment(start.get()))
     }
 
-    fn skip_atom(&mut self) {
+    fn skip_atom(&mut self) -> std::result::Result<(), ParseError> {
+        if self.current_byte_is_feature_dispatch() {
+            self.advance();
+            self.advance();
+            return Ok(());
+        }
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
             if byte == b'\\' {
                 self.consume_single_escape();
+                continue;
+            }
+            if byte == b'|' {
+                self.consume_multiple_escape()?;
                 continue;
             }
             if is_symbol_boundary(byte) {
@@ -464,10 +514,26 @@ impl<'a> Parser<'a> {
             }
             self.advance();
         }
+        Ok(())
     }
 
+    /// `#+`/`#-` (CLHS 2.4.8/2.4.9 feature-conditional dispatch) must scan as
+    /// their own fixed two-byte token, distinct from the feature expression
+    /// that follows. Without this, `#+sbcl` glues into one opaque atom while
+    /// `#+(and sbcl x86-64)` splits at the list delimiter, so equivalent
+    /// feature conditionals produce inconsistent tree shapes: the guarded
+    /// feature symbol is findable/renameable in one spelling but hidden
+    /// inside an opaque token in the other.
+    fn current_byte_is_feature_dispatch(&self) -> bool {
+        self.current_byte() == b'#' && matches!(self.peek_byte(), Some(b'+') | Some(b'-'))
+    }
+
+    /// Matches Scheme/Common Lisp `#;` datum comments and Clojure `#_`
+    /// discard forms. Both are two-byte dispatch macros that read and
+    /// discard exactly one following form, so they share the same skip
+    /// path and are recorded as comments rather than tree nodes.
     fn current_byte_is_reader_comment(&self) -> bool {
-        self.current_byte() == b'#' && self.peek_byte() == Some(b';')
+        self.current_byte() == b'#' && matches!(self.peek_byte(), Some(b';') | Some(b'_'))
     }
 
     fn current_byte_is_block_comment(&self) -> bool {
@@ -483,16 +549,32 @@ impl<'a> Parser<'a> {
             b'`' => Some(ReaderPrefix::Quasiquote),
             b',' if self.peek_byte() == Some(b'@') => Some(ReaderPrefix::UnquoteSplicing),
             b',' => Some(ReaderPrefix::Unquote),
+            b'^' => Some(ReaderPrefix::Metadata),
             b'#' if self.peek_byte() == Some(b'.') => Some(ReaderPrefix::ReadEval),
             b'#' if self.peek_byte() == Some(b'\'') => Some(ReaderPrefix::Function),
+            b'#' if self.peek_byte() == Some(b'?') && self.peek_byte_at(2) == Some(b'@') => {
+                Some(ReaderPrefix::ReaderConditionalSplicing)
+            }
+            b'#' if self.peek_byte() == Some(b'?') => Some(ReaderPrefix::ReaderConditional),
+            b'#' if Delimiter::from_open(self.peek_byte().unwrap_or(0)).is_some() => {
+                Some(ReaderPrefix::HashLiteral)
+            }
             _ => None,
         }
     }
 
     fn advance_reader_prefix(&mut self, prefix: ReaderPrefix) {
         let width = match prefix {
-            ReaderPrefix::UnquoteSplicing | ReaderPrefix::Function | ReaderPrefix::ReadEval => 2,
-            ReaderPrefix::Quote | ReaderPrefix::Quasiquote | ReaderPrefix::Unquote => 1,
+            ReaderPrefix::ReaderConditionalSplicing => 3,
+            ReaderPrefix::UnquoteSplicing
+            | ReaderPrefix::Function
+            | ReaderPrefix::ReadEval
+            | ReaderPrefix::ReaderConditional => 2,
+            ReaderPrefix::Quote
+            | ReaderPrefix::Quasiquote
+            | ReaderPrefix::Unquote
+            | ReaderPrefix::HashLiteral
+            | ReaderPrefix::Metadata => 1,
         };
         for _ in 0..width {
             self.advance();
@@ -505,6 +587,10 @@ impl<'a> Parser<'a> {
 
     fn peek_byte(&self) -> Option<u8> {
         self.bytes.get(self.pos.get() + 1).copied()
+    }
+
+    fn peek_byte_at(&self, offset: usize) -> Option<u8> {
+        self.bytes.get(self.pos.get() + offset).copied()
     }
 
     fn advance(&mut self) {

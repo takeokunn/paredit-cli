@@ -42,6 +42,72 @@ fn parses_common_lisp_reader_prefixes() {
 }
 
 #[test]
+fn parses_clojure_hash_literals_as_one_node() {
+    // `#{...}` (set) and `#(...)` (anonymous fn / CL-Scheme vector literal)
+    // glue `#` directly onto the following collection with no space in every
+    // supported dialect, so both must parse as one prefixed list rather than
+    // a disconnected `#` atom followed by an unrelated sibling list.
+    let tree = SyntaxTree::parse("#{1 2 3} #(+ % 1)").expect("valid");
+    let root = tree.root_children();
+    assert_eq!(root.len(), 2);
+
+    let set = tree.select_path(&parse_path("0")).expect("set").view();
+    assert_eq!(set.reader_prefixes, vec![ReaderPrefix::HashLiteral]);
+    assert_eq!(set.delimiter, Some(Delimiter::Brace));
+
+    let anon_fn = tree.select_path(&parse_path("1")).expect("anon_fn").view();
+    assert_eq!(anon_fn.reader_prefixes, vec![ReaderPrefix::HashLiteral]);
+    assert_eq!(anon_fn.delimiter, Some(Delimiter::Paren));
+}
+
+#[test]
+fn parses_clojure_metadata_prefix_on_map_and_atom() {
+    let tree = SyntaxTree::parse(r#"^{:doc "x"} target ^:private y"#).expect("valid");
+    let root = tree.root_children();
+    assert_eq!(root.len(), 4);
+
+    let metadata_map = tree.select_path(&parse_path("0")).expect("map").view();
+    assert_eq!(metadata_map.reader_prefixes, vec![ReaderPrefix::Metadata]);
+    assert_eq!(metadata_map.delimiter, Some(Delimiter::Brace));
+
+    let target = tree.select_path(&parse_path("1")).expect("target").view();
+    assert_eq!(target.reader_prefixes, Vec::new());
+    assert_eq!(target.text.as_deref(), Some("target"));
+
+    let metadata_keyword = tree.select_path(&parse_path("2")).expect("kw").view();
+    assert_eq!(
+        metadata_keyword.reader_prefixes,
+        vec![ReaderPrefix::Metadata]
+    );
+    assert_eq!(metadata_keyword.text.as_deref(), Some("^:private"));
+}
+
+#[test]
+fn parses_clojure_reader_conditionals_as_one_node() {
+    let tree =
+        SyntaxTree::parse("#?(:clj (foo) :cljs (bar)) #?@(:clj [a] :cljs [b])").expect("valid");
+    let root = tree.root_children();
+    assert_eq!(root.len(), 2);
+
+    let conditional = tree
+        .select_path(&parse_path("0"))
+        .expect("conditional")
+        .view();
+    assert_eq!(
+        conditional.reader_prefixes,
+        vec![ReaderPrefix::ReaderConditional]
+    );
+    assert_eq!(conditional.delimiter, Some(Delimiter::Paren));
+
+    let splicing = tree.select_path(&parse_path("1")).expect("splicing").view();
+    assert_eq!(
+        splicing.reader_prefixes,
+        vec![ReaderPrefix::ReaderConditionalSplicing]
+    );
+    assert_eq!(splicing.delimiter, Some(Delimiter::Paren));
+}
+
+#[test]
 fn parses_common_lisp_reader_eval_as_opaque_form() {
     let tree = SyntaxTree::parse("#.(foo (bar baz))").expect("valid");
     let root = tree.root_children();
@@ -65,6 +131,22 @@ fn skips_common_lisp_reader_comments() {
     assert_eq!(
         tree.rename_symbol(input, &from, &to),
         "(bar bar) #;(foo baz) (bar qux)"
+    );
+}
+
+#[test]
+fn skips_clojure_discard_forms() {
+    // `#_` is Clojure's discard reader macro: it reads and discards exactly
+    // one following form, the same shape as Scheme/CL `#;` datum comments,
+    // so it must not surface as a live tree node or a rename target.
+    let input = "(foo bar) #_(foo baz) (foo qux)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(tree.root_children().len(), 2);
+    let from = SymbolName::new("foo").expect("symbol");
+    let to = SymbolName::new("bar").expect("symbol");
+    assert_eq!(
+        tree.rename_symbol(input, &from, &to),
+        "(bar bar) #_(foo baz) (bar qux)"
     );
 }
 
@@ -142,6 +224,74 @@ fn character_literal_does_not_break_rename() {
         ),
         "(defun f () (write-char #\\[ out) (bar))"
     );
+}
+
+#[test]
+fn parses_pipe_escaped_symbol_with_embedded_space_as_one_atom() {
+    // `|Foo Bar|` is a single multiple-escaped symbol (CLHS 2.1.4.2); the
+    // embedded space must not act as a token boundary.
+    let input = "(defun |Foo Bar| (x) (+ x 1))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let form = tree.select_path(&parse_path("0")).expect("form").view();
+    assert_eq!(form.children[1].text.as_deref(), Some("|Foo Bar|"));
+    assert_eq!(form.children[2].span.slice(input), "(x)");
+}
+
+#[test]
+fn parses_pipe_escaped_symbol_with_nested_single_escape() {
+    let tree = SyntaxTree::parse(r"|a\|b|").expect("valid");
+    let atom = tree.select_path(&parse_path("0")).expect("atom").view();
+    assert_eq!(atom.text.as_deref(), Some(r"|a\|b|"));
+}
+
+#[test]
+fn rejects_unterminated_pipe_escaped_symbol() {
+    assert_eq!(
+        SyntaxTree::parse("(defun |Foo (x) (+ x 1))").unwrap_err(),
+        ParseError::UnterminatedSymbol(7)
+    );
+}
+
+#[test]
+fn feature_dispatch_scans_separately_from_feature_expression() {
+    // `#+`/`#-` must scan as their own token so `#+sbcl` and
+    // `#+(and sbcl x86-64)` produce the same tree shape: dispatch, feature
+    // expression, guarded datum as three siblings. Otherwise a bare feature
+    // symbol glues onto `#+` into one opaque atom while a compound feature
+    // expression stays a separate list, hiding the feature symbol from
+    // find/rename in the bare spelling only.
+    let simple_input = "(defun f () #+sbcl (declare (optimize speed)) 1)";
+    let simple = SyntaxTree::parse(simple_input).expect("valid");
+    let form = simple.select_path(&parse_path("0")).expect("form").view();
+    assert_eq!(form.children[3].text.as_deref(), Some("#+"));
+    assert_eq!(form.children[4].text.as_deref(), Some("sbcl"));
+    assert_eq!(
+        form.children[5].span.slice(simple_input),
+        "(declare (optimize speed))"
+    );
+
+    let compound_input = "(defun f () #+(and sbcl x86-64) (declare (optimize speed)) 1)";
+    let compound = SyntaxTree::parse(compound_input).expect("valid");
+    let form = compound.select_path(&parse_path("0")).expect("form").view();
+    assert_eq!(form.children[3].text.as_deref(), Some("#+"));
+    assert_eq!(
+        form.children[4].span.slice(compound_input),
+        "(and sbcl x86-64)"
+    );
+    assert_eq!(
+        form.children[5].span.slice(compound_input),
+        "(declare (optimize speed))"
+    );
+}
+
+#[test]
+fn feature_dispatch_negative_variant_scans_separately_too() {
+    let input = "(declare #-sbcl (optimize speed))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let form = tree.select_path(&parse_path("0")).expect("form").view();
+    assert_eq!(form.children[1].text.as_deref(), Some("#-"));
+    assert_eq!(form.children[2].text.as_deref(), Some("sbcl"));
+    assert_eq!(form.children[3].span.slice(input), "(optimize speed)");
 }
 
 #[test]
