@@ -1,6 +1,6 @@
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::{
-    common_lisp_local_callable_form, common_lisp_operator_head_eq,
+    common_lisp_macro_expander_path, common_lisp_operator_head_eq,
     normalize_common_lisp_operator_head,
 };
 use crate::domain::dialect::Dialect;
@@ -27,36 +27,7 @@ pub(crate) fn executable_reader_context_at_path(
         quasiquote_depth = depth;
     }
 
-    Ok(quasiquote_depth == 0 || path_is_in_macro_expander(tree, dialect, &indexes)?)
-}
-
-/// Macro expander templates are syntax templates for executable output, so the
-/// call refactor commands intentionally traverse their quasiquoted forms.
-fn path_is_in_macro_expander(
-    tree: &SyntaxTree,
-    dialect: Dialect,
-    indexes: &[usize],
-) -> anyhow::Result<bool> {
-    for ancestor_end in 1..indexes.len() {
-        let descendant_indexes = &indexes[ancestor_end..];
-        if descendant_indexes.len() < 3
-            || descendant_indexes[0] != 1
-            || descendant_indexes[2] < 2
-        {
-            continue;
-        }
-
-        let ancestor = Path::from_indexes(indexes[..ancestor_end].to_vec());
-        let view = tree.select_path(&ancestor)?.view();
-        let Some(head) = list_head(&view) else {
-            continue;
-        };
-        if common_lisp_local_callable_form(dialect, head).is_some_and(|form| form.is_macro()) {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
+    Ok(quasiquote_depth == 0 || common_lisp_macro_expander_path(tree, dialect, path)?)
 }
 
 pub(crate) fn explicit_reader_form_kind(view: &ExpressionView) -> Option<String> {

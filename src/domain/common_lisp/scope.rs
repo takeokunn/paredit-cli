@@ -14,6 +14,37 @@ pub(crate) fn common_lisp_local_callable_form(
     dialect.common_lisp_local_callable_form_for_head(head)
 }
 
+/// Macro expander templates are syntax templates for executable output, so
+/// quasiquoted forms in their binding bodies remain eligible for refactoring.
+pub(crate) fn common_lisp_macro_expander_path(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    path: &Path,
+) -> Result<bool> {
+    let indexes = path.to_raw_indexes();
+
+    for ancestor_end in 1..indexes.len() {
+        let descendant_indexes = &indexes[ancestor_end..];
+        if descendant_indexes.len() < 3
+            || descendant_indexes[0] != 1
+            || descendant_indexes[2] < 2
+        {
+            continue;
+        }
+
+        let ancestor = Path::from_indexes(indexes[..ancestor_end].to_vec());
+        let view = tree.select_path(&ancestor)?.view();
+        let Some(head) = atom_child(&view, 0) else {
+            continue;
+        };
+        if common_lisp_local_callable_form(dialect, head).is_some_and(|form| form.is_macro()) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
 pub(crate) fn is_macro_callable_form(form: CommonLispLocalCallableForm) -> bool {
     form.is_macro()
 }
