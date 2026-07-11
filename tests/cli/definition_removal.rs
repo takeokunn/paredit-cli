@@ -447,7 +447,9 @@ fn cli_keeps_definition_referenced_inside_a_bare_symbol_let_binding() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"removal_count\": 1"))
-        .stdout(predicate::str::contains("\"name\": \"doclive--query-param\""))
+        .stdout(predicate::str::contains(
+            "\"name\": \"doclive--query-param\"",
+        ))
         .stdout(predicate::str::contains("\"name\": \"doclive--unsafe-p\"").not());
 
     assert_eq!(

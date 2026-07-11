@@ -32,7 +32,10 @@ pub fn build_signature_reports(
             let Some(arity) = definition.parameter_arity else {
                 continue;
             };
-            definitions_by_name.entry(name.clone()).or_default().push(arity);
+            definitions_by_name
+                .entry(name.clone())
+                .or_default()
+                .push(arity);
         }
 
         parsed.push((source.path, source.dialect, definitions, calls));

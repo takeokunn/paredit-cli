@@ -200,10 +200,6 @@ fn cli_reports_let_bindings_across_multiple_files_with_aggregated_policy() {
         .stdout(predicate::str::contains(
             "\"duplicate_evaluation_count\": 1",
         ))
-        .stdout(predicate::str::contains(
-            first_file.display().to_string(),
-        ))
-        .stdout(predicate::str::contains(
-            second_file.display().to_string(),
-        ));
+        .stdout(predicate::str::contains(first_file.display().to_string()))
+        .stdout(predicate::str::contains(second_file.display().to_string()));
 }

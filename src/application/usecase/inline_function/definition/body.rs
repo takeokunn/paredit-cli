@@ -32,6 +32,7 @@ pub(super) fn inline_function_body_view(body_forms: &[ExpressionView]) -> Result
             delimiter: None,
             reader_prefixes: Vec::new(),
             span: ByteSpan::new(first.span.start(), last.span.end()),
+            content_span: ByteSpan::new(first.content_span.start(), last.content_span.end()),
             text: None,
             children: body_forms.to_vec(),
             symbol_offset: 0,

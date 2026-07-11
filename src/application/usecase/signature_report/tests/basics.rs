@@ -93,8 +93,7 @@ fn omitted_required_argument_before_optional_is_still_missing_arguments() {
 #[test]
 fn argument_past_optional_bound_is_still_extra_arguments() {
     let reports =
-        build_signature_reports(vec![source("(defun f (a &optional b) (f 1 2 3))")], None)
-            .unwrap();
+        build_signature_reports(vec![source("(defun f (a &optional b) (f 1 2 3))")], None).unwrap();
 
     assert_eq!(
         reports[0].calls[0].status,
@@ -154,7 +153,10 @@ fn classifies_unqualified_call_against_package_qualified_common_lisp_definition(
     assert_eq!(reports[0].definitions[0].parameter_count, Some(2));
     assert_eq!(reports[0].calls.len(), 1);
     assert_eq!(reports[0].calls[0].call.head, "target");
-    assert_eq!(reports[0].calls[0].expected_parameter_arity, Some((2, Some(2))));
+    assert_eq!(
+        reports[0].calls[0].expected_parameter_arity,
+        Some((2, Some(2)))
+    );
     assert_eq!(reports[0].calls[0].status, SignatureCallStatus::Exact);
 }
 

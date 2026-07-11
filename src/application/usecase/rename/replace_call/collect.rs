@@ -4,8 +4,12 @@ use crate::application::usecase::callable_scope::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope, local_callable_scope_at_path,
 };
+use crate::application::usecase::rename::reader::{
+    apply_reader_prefix_context, executable_reader_context_at_path,
+};
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
+use crate::domain::definition::macro_expander_body_range;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
@@ -29,7 +33,7 @@ pub(super) fn collect_all_replace_call_sites(
     for (index, _) in tree.root_children().iter().enumerate() {
         let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
-        collect_replace_call_sites_from_view(&view, path, &ctx, &[], &mut calls)?;
+        collect_replace_call_sites_from_view(&view, path, &ctx, &[], 0, false, &mut calls)?;
     }
     calls.sort_by_key(|site| site.head_span.start());
     Ok(calls)
@@ -46,6 +50,9 @@ pub(super) fn collect_explicit_replace_call_sites(
     let mut calls = Vec::new();
     for path in paths {
         let view = tree.select_path(path)?.view();
+        if !executable_reader_context_at_path(tree, dialect, path)? {
+            anyhow::bail!("call-path {path} is not in an executable reader context");
+        }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
         if is_local_callable_bound(&local_callables, from.as_str()) {
             anyhow::bail!("call-path {path} is shadowed by a local callable named {from}");
@@ -70,9 +77,30 @@ fn collect_replace_call_sites_from_view(
     path: Path,
     ctx: &ReplaceCallTraversal<'_>,
     local_callables: &[String],
+    quasiquote_depth: usize,
+    in_macro_expander: bool,
     calls: &mut Vec<ReplaceFunctionCallSite>,
 ) -> Result<()> {
-    if let Some(head) = list_head(view) {
+    let Some(quasiquote_depth) = apply_reader_prefix_context(view, quasiquote_depth) else {
+        return Ok(());
+    };
+    if quasiquote_depth > 0 && !in_macro_expander {
+        for (index, child) in view.children.iter().enumerate() {
+            collect_replace_call_sites_from_view(
+                child,
+                path.child(index),
+                ctx,
+                local_callables,
+                quasiquote_depth,
+                in_macro_expander,
+                calls,
+            )?;
+        }
+        return Ok(());
+    }
+
+    let head = list_head(view);
+    if let Some(head) = head {
         if let Some(form) = common_lisp_local_callable_form(ctx.dialect, head) {
             collect_local_callable_replace_call_sites(
                 view,
@@ -80,11 +108,16 @@ fn collect_replace_call_sites_from_view(
                 ctx,
                 local_callables,
                 form,
+                quasiquote_depth,
+                in_macro_expander,
                 calls,
             )?;
             return Ok(());
         }
     }
+
+    let macro_expander_body =
+        head.and_then(|head| macro_expander_body_range(ctx.dialect, view, head));
 
     if !is_local_callable_bound(local_callables, ctx.from.as_str()) {
         if let Some(site) = replace_call_site_from_view(
@@ -105,6 +138,9 @@ fn collect_replace_call_sites_from_view(
             path.child(index),
             ctx,
             local_callables,
+            quasiquote_depth,
+            in_macro_expander
+                || macro_expander_body.is_some_and(|body_range| body_range.contains_child(index)),
             calls,
         )?;
     }
@@ -118,6 +154,8 @@ fn collect_local_callable_replace_call_sites(
     ctx: &ReplaceCallTraversal<'_>,
     local_callables: &[String],
     form: CommonLispLocalCallableForm,
+    quasiquote_depth: usize,
+    in_macro_expander: bool,
     calls: &mut Vec<ReplaceFunctionCallSite>,
 ) -> Result<()> {
     let body_scope = local_callable_body_scope(local_callables, view);
@@ -132,6 +170,8 @@ fn collect_local_callable_replace_call_sites(
                     path.descendant([1, binding_index, child_index]),
                     ctx,
                     binding_body_scope,
+                    quasiquote_depth,
+                    in_macro_expander || form.is_macro(),
                     calls,
                 )?;
             }
@@ -139,7 +179,15 @@ fn collect_local_callable_replace_call_sites(
     }
 
     for (index, child) in view.children.iter().enumerate().skip(2) {
-        collect_replace_call_sites_from_view(child, path.child(index), ctx, &body_scope, calls)?;
+        collect_replace_call_sites_from_view(
+            child,
+            path.child(index),
+            ctx,
+            &body_scope,
+            quasiquote_depth,
+            in_macro_expander,
+            calls,
+        )?;
     }
 
     Ok(())

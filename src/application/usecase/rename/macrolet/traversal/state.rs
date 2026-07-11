@@ -50,8 +50,4 @@ impl TraversalState {
     pub(super) fn allows_active_rename(&self, scope: MacroletRenameScope) -> bool {
         self.quasiquote_depth == 0 && scope.is_target_active() && !scope.is_shadowed()
     }
-
-    pub(super) fn allows_current_scope_rename(&self) -> bool {
-        self.allows_active_rename(self.scope)
-    }
 }

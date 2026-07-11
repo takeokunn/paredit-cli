@@ -14,7 +14,10 @@ fn classifies_common_lisp_setf_place_calls_against_setf_expander_signature() {
     assert_eq!(reports[0].definitions[0].parameter_count, Some(1));
     assert_eq!(reports[0].calls.len(), 1);
     assert_eq!(reports[0].calls[0].call.head, "accessor");
-    assert_eq!(reports[0].calls[0].expected_parameter_arity, Some((1, Some(1))));
+    assert_eq!(
+        reports[0].calls[0].expected_parameter_arity,
+        Some((1, Some(1)))
+    );
     assert_eq!(reports[0].calls[0].status, SignatureCallStatus::Exact);
 }
 
@@ -32,7 +35,10 @@ fn classifies_common_lisp_setf_place_calls_against_defsetf_long_form_signature()
     assert_eq!(reports[0].definitions[0].parameter_count, Some(1));
     assert_eq!(reports[0].calls.len(), 1);
     assert_eq!(reports[0].calls[0].call.head, "accessor");
-    assert_eq!(reports[0].calls[0].expected_parameter_arity, Some((1, Some(1))));
+    assert_eq!(
+        reports[0].calls[0].expected_parameter_arity,
+        Some((1, Some(1)))
+    );
     assert_eq!(reports[0].calls[0].status, SignatureCallStatus::Exact);
 }
 
@@ -54,7 +60,10 @@ fn classifies_common_lisp_macro_definitions_with_signature_arity() {
     assert_eq!(reports[0].definitions[0].parameter_count, Some(2));
     assert_eq!(reports[0].calls.len(), 1);
     assert_eq!(reports[0].calls[0].call.head, "with-pane");
-    assert_eq!(reports[0].calls[0].expected_parameter_arity, Some((2, Some(2))));
+    assert_eq!(
+        reports[0].calls[0].expected_parameter_arity,
+        Some((2, Some(2)))
+    );
     assert_eq!(reports[0].calls[0].status, SignatureCallStatus::Exact);
 }
 
@@ -95,7 +104,10 @@ fn classifies_common_lisp_compiler_macro_definitions_with_signature_arity() {
     assert_eq!(reports[0].definitions[0].parameter_count, Some(2));
     assert_eq!(reports[0].calls.len(), 1);
     assert_eq!(reports[0].calls[0].call.head, "optimize-render");
-    assert_eq!(reports[0].calls[0].expected_parameter_arity, Some((2, Some(2))));
+    assert_eq!(
+        reports[0].calls[0].expected_parameter_arity,
+        Some((2, Some(2)))
+    );
     assert_eq!(reports[0].calls[0].status, SignatureCallStatus::Exact);
 }
 

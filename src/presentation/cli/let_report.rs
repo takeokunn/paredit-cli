@@ -192,31 +192,33 @@ fn policy_json(policy: &LetReportPolicy) -> Value {
 fn let_forms_json(reports: &[LetFormReport]) -> Vec<Value> {
     reports
         .iter()
-        .map(|report| json!({
-            "path": report.path.to_string(),
-            "form": report.form.as_str(),
-            "span": {
-                "start": report.span.start().get(),
-                "end": report.span.end().get(),
-            },
-            "binding_style": report.binding_style,
-            "body_count": report.body_count,
-            "inline_supported_by_inline_let": report.inline_supported_by_inline_let,
-            "bindings": report
-                .bindings
-                .iter()
-                .map(|binding| json!({
-                    "name": binding.name.as_str(),
-                    "value": binding.value.as_str(),
-                    "value_span": {
-                        "start": binding.value_span.start().get(),
-                        "end": binding.value_span.end().get(),
-                    },
-                    "reference_count": binding.reference_count,
-                    "can_inline_without_duplication": binding.can_inline_without_duplication,
-                    "risks": &binding.risks,
-                }))
-                .collect::<Vec<_>>(),
-        }))
+        .map(|report| {
+            json!({
+                "path": report.path.to_string(),
+                "form": report.form.as_str(),
+                "span": {
+                    "start": report.span.start().get(),
+                    "end": report.span.end().get(),
+                },
+                "binding_style": report.binding_style,
+                "body_count": report.body_count,
+                "inline_supported_by_inline_let": report.inline_supported_by_inline_let,
+                "bindings": report
+                    .bindings
+                    .iter()
+                    .map(|binding| json!({
+                        "name": binding.name.as_str(),
+                        "value": binding.value.as_str(),
+                        "value_span": {
+                            "start": binding.value_span.start().get(),
+                            "end": binding.value_span.end().get(),
+                        },
+                        "reference_count": binding.reference_count,
+                        "can_inline_without_duplication": binding.can_inline_without_duplication,
+                        "risks": &binding.risks,
+                    }))
+                    .collect::<Vec<_>>(),
+            })
+        })
         .collect::<Vec<_>>()
 }

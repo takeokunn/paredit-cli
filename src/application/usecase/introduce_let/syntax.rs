@@ -156,7 +156,8 @@ pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> b
 }
 
 pub(super) fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> bool {
-    if atom_text(binding).is_some_and(|binding_name| common_lisp_symbol_reference_eq(binding_name, name))
+    if atom_text(binding)
+        .is_some_and(|binding_name| common_lisp_symbol_reference_eq(binding_name, name))
     {
         return true;
     }

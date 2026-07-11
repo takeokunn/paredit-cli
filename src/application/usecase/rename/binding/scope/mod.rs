@@ -1,7 +1,9 @@
 mod reader;
 mod special_forms;
 
-use crate::domain::common_lisp::{common_lisp_symbol_reference_eq, is_common_lisp_declaration_form};
+use crate::domain::common_lisp::{
+    common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,
+};
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
 
 use reader::{

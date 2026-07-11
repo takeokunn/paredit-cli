@@ -32,6 +32,7 @@ pub(in crate::application::usecase::rename::function) fn collect_local_callable_
                         path: state.path.descendant([1, binding_index, child_index]),
                         local_callables: binding_body_scope,
                         quasiquote_depth: 0,
+                        in_macro_expander: state.in_macro_expander || form.is_macro(),
                         shadowed_depth: state.shadowed_depth,
                     },
                     renames,

@@ -30,7 +30,8 @@ pub(super) fn unwrap_call_site_from_view(
     }
 
     let matching_inner_call = view.children.iter().skip(1).find(|child| {
-        list_head(child).is_some_and(|head| common_lisp_symbol_reference_eq(head, function.as_str()))
+        list_head(child)
+            .is_some_and(|head| common_lisp_symbol_reference_eq(head, function.as_str()))
     });
     let Some(inner_call) = matching_inner_call else {
         return UnwrapCandidate::NotMatched;
@@ -38,8 +39,8 @@ pub(super) fn unwrap_call_site_from_view(
 
     let site = UnwrapFunctionCallSite {
         path,
-        span: view.span,
-        replacement: inner_call.span.slice(input).to_owned(),
+        span: view.content_span,
+        replacement: inner_call.content_span.slice(input).to_owned(),
         text: view.span.slice(input).to_owned(),
     };
     if view.children.len() == 2 {

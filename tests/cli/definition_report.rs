@@ -237,7 +237,9 @@ fn cli_fail_on_unused_ignores_protected_category_candidates() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"candidate_count\": 1"))
-        .stdout(predicate::str::contains("\"actionable_candidate_count\": 0"))
+        .stdout(predicate::str::contains(
+            "\"actionable_candidate_count\": 0",
+        ))
         .stdout(predicate::str::contains("\"passed\": true"))
         .stdout(predicate::str::contains("\"bulk_removable\": false"));
 }
