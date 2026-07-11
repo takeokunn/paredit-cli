@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::application::usecase::package_report::syntax::{
     atom_text, is_package_head, package_option_atoms, package_option_name,
@@ -30,9 +30,13 @@ pub(super) fn analyze_defpackage_form(
         return Ok(None);
     }
 
-    let name = atom_text(&view.children[1])
-        .context("defpackage package name must be an atom")?
-        .to_owned();
+    let Some(name) = atom_text(&view.children[1]) else {
+        // A non-atom package designator (for example a quasiquoted
+        // `(defpackage ,name ...)` template) has no statically resolvable name,
+        // so it is not a real declaration. Skip it instead of failing the report.
+        return Ok(None);
+    };
+    let name = name.to_owned();
     let mut nicknames = Vec::new();
     let mut uses = Vec::new();
     let mut exports = Vec::new();
@@ -94,9 +98,14 @@ pub(super) fn analyze_in_package_form(
         return Ok(None);
     }
 
-    let name = atom_text(&view.children[1])
-        .context("in-package package name must be an atom")?
-        .to_owned();
+    let Some(name) = atom_text(&view.children[1]) else {
+        // A non-atom package designator (for example a quasiquoted
+        // `(in-package ,pkg)` code template emitted into a stream) cannot be
+        // resolved to a static package name and is not a dependency edge. Skip
+        // it instead of failing the whole report.
+        return Ok(None);
+    };
+    let name = name.to_owned();
 
     Ok(Some(InPackageReport {
         path: path.to_string(),

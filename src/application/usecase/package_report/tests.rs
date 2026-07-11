@@ -44,6 +44,31 @@ fn scans_nested_package_forms_for_agent_reports() {
     assert_eq!(report.in_packages[0].path, "0.2");
 }
 
+#[test]
+fn skips_quasiquoted_in_package_template_without_error() {
+    // A backquoted `(in-package ,pkg)` code template (emitted into a stream)
+    // has a non-atom package designator; it must be skipped, not treated as a
+    // declaration that aborts the whole report.
+    let report = report_for(
+        "(in-package #:real)\n(defun emit (package stream)\n  (write `(in-package ,(string-upcase (string package))) :stream stream))\n",
+    );
+
+    assert_eq!(report.in_packages.len(), 1);
+    assert_eq!(report.in_packages[0].name, "#:real");
+}
+
+#[test]
+fn skips_quasiquoted_defpackage_template_without_error() {
+    // A backquoted `(defpackage ,(...) ...)` whose name is a computed list form
+    // has no statically resolvable name and must be skipped, not crash-reported.
+    let report = report_for(
+        "(defmacro define-it (name) `(defpackage ,(intern (string-upcase name)) (:use #:cl)))\n(defpackage #:real (:use #:cl))\n",
+    );
+
+    assert_eq!(report.defpackages.len(), 1);
+    assert_eq!(report.defpackages[0].name, "#:real");
+}
+
 proptest! {
     #[test]
     fn reports_generated_exports(
