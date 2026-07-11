@@ -26,6 +26,28 @@ fn cli_plans_remove_unused_binding_without_writing() {
 }
 
 #[test]
+fn cli_plans_remove_unused_binding_alongside_a_bare_symbol_sibling_binding() {
+    let mut cmd = paredit();
+    cmd.args([
+        "remove-unused-binding",
+        "--path",
+        "0.3",
+        "--name",
+        "unused",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun render () (let ((unused (compute)) kept) kept))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"binding_name\": \"unused\""))
+    .stdout(predicate::str::contains("\"binding_value\": \"(compute)\""))
+    .stdout(predicate::str::contains("\"reference_count\": 0"))
+    .stdout(predicate::str::contains("\"written\": false"))
+    .stdout(predicate::str::contains("(let (kept)\\n  kept)"));
+}
+
+#[test]
 fn cli_plans_remove_all_unused_bindings_without_writing() {
     let mut cmd = paredit();
     cmd.args([
