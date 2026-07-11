@@ -51,6 +51,7 @@ pub(super) fn unthread_expression(args: UnthreadExpressionArgs) -> Result<()> {
     let style = args.style.map(ThreadStyleArg::application_unthread_style);
     let plan = plan_unthread_expression(UnthreadExpressionRequest {
         input: &input.text,
+        tree: &tree,
         dialect,
         path,
         target: selected,

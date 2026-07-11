@@ -1,5 +1,5 @@
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName};
+use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnthreadStyle {
@@ -27,6 +27,7 @@ impl UnthreadStyle {
 #[derive(Debug)]
 pub struct UnthreadExpressionRequest<'a> {
     pub input: &'a str,
+    pub tree: &'a SyntaxTree,
     pub dialect: Dialect,
     pub path: Option<Path>,
     pub target: ExpressionView,

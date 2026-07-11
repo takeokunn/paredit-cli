@@ -3,11 +3,13 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
 use proptest::prelude::*;
 
-fn target(input: &str) -> ExpressionView {
+fn parsed(input: &str) -> (SyntaxTree, ExpressionView) {
     let tree = SyntaxTree::parse(input).expect("parse fixture");
-    tree.select_path(&"0".parse::<Path>().expect("path"))
+    let target = tree
+        .select_path(&"0".parse::<Path>().expect("path"))
         .expect("select fixture")
-        .view()
+        .view();
+    (tree, target)
 }
 
 fn symbol_strategy() -> impl Strategy<Value = String> {
@@ -22,11 +24,13 @@ fn symbol_strategy() -> impl Strategy<Value = String> {
 #[test]
 fn plans_thread_first_pipeline_from_nested_calls() {
     let input = "(render (normalize value mode))";
+    let (tree, target) = parsed(input);
     let plan = plan_thread_expression(ThreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::Clojure,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: ThreadStyle::First,
         operator: SymbolName::new("->").expect("symbol"),
     })
@@ -41,11 +45,13 @@ fn plans_thread_first_pipeline_from_nested_calls() {
 #[test]
 fn plans_thread_last_pipeline_from_nested_calls() {
     let input = "(map f (filter pred rows))";
+    let (tree, target) = parsed(input);
     let plan = plan_thread_expression(ThreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::Clojure,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: ThreadStyle::Last,
         operator: SymbolName::new("->>").expect("symbol"),
     })
@@ -60,17 +66,37 @@ fn plans_thread_last_pipeline_from_nested_calls() {
 #[test]
 fn rejects_package_qualified_already_threaded_expression() {
     let input = "(cl:-> x f)";
+    let (tree, target) = parsed(input);
     let err = plan_thread_expression(ThreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::CommonLisp,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: ThreadStyle::First,
         operator: SymbolName::new("->").expect("symbol"),
     })
     .expect_err("package-qualified thread operator should be rejected");
 
     assert!(err.to_string().contains("already threaded"));
+}
+
+#[test]
+fn rejects_nested_calls_with_an_interior_comment() {
+    let input = "(render\n  ;; note\n  (normalize value mode))";
+    let (tree, target) = parsed(input);
+    let err = plan_thread_expression(ThreadExpressionRequest {
+        input,
+        tree: &tree,
+        dialect: Dialect::Clojure,
+        path: Some("0".parse().expect("path")),
+        target,
+        style: ThreadStyle::First,
+        operator: SymbolName::new("->").expect("symbol"),
+    })
+    .expect_err("a comment inside the nested calls must not be silently discarded");
+
+    assert!(err.to_string().contains("comment"));
 }
 
 proptest! {
@@ -88,11 +114,13 @@ proptest! {
         prop_assume!(inner != outer);
 
         let input = format!("({outer} ({inner} {base} {arg}))");
+        let (tree, target) = parsed(&input);
         let plan = plan_thread_expression(ThreadExpressionRequest {
             input: &input,
+            tree: &tree,
             dialect: Dialect::Clojure,
             path: Some("0".parse().expect("path")),
-            target: target(&input),
+            target,
             style: ThreadStyle::First,
             operator: SymbolName::new("->").expect("symbol"),
         })

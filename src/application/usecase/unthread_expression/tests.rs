@@ -3,11 +3,13 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
 use proptest::prelude::*;
 
-fn target(input: &str) -> ExpressionView {
+fn parsed(input: &str) -> (SyntaxTree, ExpressionView) {
     let tree = SyntaxTree::parse(input).expect("parse fixture");
-    tree.select_path(&"0".parse::<Path>().expect("path"))
+    let target = tree
+        .select_path(&"0".parse::<Path>().expect("path"))
         .expect("select fixture")
-        .view()
+        .view();
+    (tree, target)
 }
 
 fn symbol_strategy() -> impl Strategy<Value = String> {
@@ -22,11 +24,13 @@ fn symbol_strategy() -> impl Strategy<Value = String> {
 #[test]
 fn plans_unthread_first_pipeline_into_nested_call() {
     let input = "(-> value (normalize mode) render)";
+    let (tree, target) = parsed(input);
     let plan = plan_unthread_expression(UnthreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::Clojure,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: None,
         operator: None,
     })
@@ -42,11 +46,13 @@ fn plans_unthread_first_pipeline_into_nested_call() {
 #[test]
 fn plans_unthread_last_pipeline_into_nested_call() {
     let input = "(->> rows (filter pred) (map f))";
+    let (tree, target) = parsed(input);
     let plan = plan_unthread_expression(UnthreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::Clojure,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: None,
         operator: None,
     })
@@ -62,11 +68,13 @@ fn plans_unthread_last_pipeline_into_nested_call() {
 #[test]
 fn rejects_style_alone_on_an_unrecognized_operator() {
     let input = "(+ a b)";
+    let (tree, target) = parsed(input);
     let err = plan_unthread_expression(UnthreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::CommonLisp,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: Some(UnthreadStyle::First),
         operator: None,
     })
@@ -78,17 +86,37 @@ fn rejects_style_alone_on_an_unrecognized_operator() {
 #[test]
 fn accepts_style_with_explicit_operator_confirming_a_custom_pipeline() {
     let input = "(my-pipe value (normalize mode) render)";
+    let (tree, target) = parsed(input);
     let plan = plan_unthread_expression(UnthreadExpressionRequest {
         input,
+        tree: &tree,
         dialect: Dialect::CommonLisp,
         path: Some("0".parse().expect("path")),
-        target: target(input),
+        target,
         style: Some(UnthreadStyle::First),
         operator: Some(SymbolName::new("my-pipe").expect("symbol")),
     })
     .expect("plan");
 
     assert_eq!(plan.replacement, "(render (normalize value mode))");
+}
+
+#[test]
+fn rejects_pipeline_with_an_interior_comment() {
+    let input = "(-> value\n    ;; note\n    (normalize mode)\n    render)";
+    let (tree, target) = parsed(input);
+    let err = plan_unthread_expression(UnthreadExpressionRequest {
+        input,
+        tree: &tree,
+        dialect: Dialect::Clojure,
+        path: Some("0".parse().expect("path")),
+        target,
+        style: None,
+        operator: None,
+    })
+    .expect_err("a comment inside the pipeline must not be silently discarded");
+
+    assert!(err.to_string().contains("comment"));
 }
 
 proptest! {
@@ -106,11 +134,13 @@ proptest! {
         prop_assume!(inner != outer);
 
         let input = format!("(-> {base} ({inner} {arg}) {outer})");
+        let (tree, target) = parsed(&input);
         let plan = plan_unthread_expression(UnthreadExpressionRequest {
             input: &input,
+            tree: &tree,
             dialect: Dialect::Clojure,
             path: Some("0".parse().expect("path")),
-            target: target(&input),
+            target,
             style: None,
             operator: None,
         })

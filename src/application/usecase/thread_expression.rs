@@ -28,6 +28,15 @@ pub fn plan_thread_expression(
             request.operator
         );
     }
+    // Threading rebuilds the nested calls as a flat pipeline from parsed
+    // parts; a comment anywhere inside the selection lives outside the tree
+    // and has no slot in the rebuilt text, so it would be silently dropped.
+    if request.tree.has_comment_in(request.target.span) {
+        anyhow::bail!(
+            "thread-expression target contains a comment, which would be discarded by \
+             flattening into a pipeline; remove or relocate the comment before threading"
+        );
+    }
 
     let parts = thread_expression_parts(request.input, &request.target, request.style)?;
     if parts.steps.is_empty() {

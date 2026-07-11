@@ -55,6 +55,7 @@ pub(super) fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
     };
     let plan = plan_thread_expression(ThreadExpressionRequest {
         input: &input.text,
+        tree: &tree,
         dialect,
         path,
         target: selected,

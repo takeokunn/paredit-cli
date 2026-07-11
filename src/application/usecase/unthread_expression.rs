@@ -64,6 +64,15 @@ pub fn plan_unthread_expression(
     if request.target.children.len() < 3 {
         anyhow::bail!("unthread-expression pipeline must contain a base and at least one step");
     }
+    // Unthreading rebuilds the pipeline as nested calls from parsed steps; a
+    // comment anywhere inside the selection lives outside the tree and has
+    // no slot in the rebuilt text, so it would be silently dropped.
+    if request.tree.has_comment_in(request.target.span) {
+        anyhow::bail!(
+            "unthread-expression target contains a comment, which would be discarded by \
+             re-nesting into calls; remove or relocate the comment before unthreading"
+        );
+    }
 
     let base_view = &request.target.children[1];
     let base = expression_source(request.input, base_view);
