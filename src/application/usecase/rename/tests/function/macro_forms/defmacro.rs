@@ -119,6 +119,23 @@ fn renames_function_calls_generated_by_compiler_macrolet_quasiquote_expanders() 
 }
 
 #[test]
+fn renames_function_designators_generated_by_macrolet_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(defun caller () (macrolet ((local () `(#'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (local)))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 6,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(macrolet ((local () `(#'renamed (function renamed) (macro-function 'renamed) (compiler-macro-function 'renamed) (symbol-function 'renamed) (fdefinition 'renamed)))) (local))"
+        ]
+    };
+}
+
+#[test]
 fn does_not_rename_function_calls_inside_flet_quasiquoted_data() {
     assert_function_rename! {
         input: "(defun helper (value) value)\n(defun caller () (flet ((local (value) `(helper ,value))) (local 1)))",
