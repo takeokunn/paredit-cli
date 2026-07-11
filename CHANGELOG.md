@@ -21,6 +21,56 @@ with no external effect.
   stay glued to the symbol they follow, and the closing delimiters are
   pushed to a fresh line when a commented entry would otherwise absorb
   them. Comment-free export lists reorder exactly as before.
+- Parser: a Common Lisp/Scheme multiple-escape symbol (`|Foo Bar|`) no
+  longer splits into two atoms at an embedded space or delimiter. Every
+  character inside the `|...|` region, including whitespace, is now a
+  literal symbol constituent per CLHS 2.1.4.2, and an unterminated region
+  is a parse error instead of a silent misparse.
+- Parser: `#+feature`/`#-feature` conditional dispatch now scans as its
+  own token instead of gluing onto a bare feature symbol. `#+sbcl (form)`
+  and `#+(and sbcl x86-64) (form)` now produce the same tree shape, so
+  `find-symbol`/`rename-symbol` see the feature symbol in both spellings
+  instead of only the compound one.
+- Parser: Clojure/Fennel-style `#{...}` sets, `#(...)` anonymous
+  functions (and Common Lisp/Scheme `#(...)` vector literals), `^...`
+  metadata, and `#?(...)`/`#?@(...)` reader conditionals now parse as one
+  node instead of a disconnected `#`/`^` atom followed by an unrelated
+  sibling list, so structural edits (`kill`, `wrap`, `slurp`, `barf`,
+  `select --path`) target the whole literal instead of leaving a dangling
+  prefix behind.
+- Parser: Clojure's `#_` discard reader macro is now treated the same
+  way as Scheme/CL `#;` datum comments — it reads and discards exactly
+  one following form instead of leaving both the `#_` marker and the
+  discarded form as live tree nodes, so `find-symbol`/`rename-symbol` no
+  longer see occurrences inside discarded code.
+- `kill`/`slurp-forward`/`slurp-backward`/`barf-forward`/`barf-backward`:
+  whitespace removal around the edited span no longer crosses a line
+  comment's trailing newline. Previously, killing or slurping a form
+  directly after a `;; comment` line could delete that newline and
+  splice the next form onto the comment's line, silently commenting it
+  out.
+- `rename-function`/`rename-macrolet`: a bare `(lambda (params...) ...)`
+  form (not just its `#'(lambda ...)` reader-quoted spelling) now skips
+  its own parameter list during call-site traversal, matching the CLHS
+  3.1.2.1.2.4 equivalence between the two spellings. Previously, a
+  parameter name shadowing a renamed callable inside a bare `lambda`
+  could be misidentified as a call-site reference.
+- `unthread-expression`: an operator that is not `->`/`->>` and was not
+  confirmed via `--operator` is now rejected immediately with a message
+  naming the operator, instead of accepting a bare `--style` and
+  rewriting an ordinary call that merely has an arrow-like head symbol
+  into unrelated nested-call output.
+- `move-definition`/`split-file`: a moved Common Lisp definition now carries
+  an `(in-package ...)` declaration into the destination file whenever the
+  destination's trailing package context does not already match the
+  source's, instead of landing bare and interning into whichever package
+  happens to be current when the file is later loaded.
+- `merge-package-options`: a defpackage option group (`:export`,
+  `:import-from`, ...) that has a comment anywhere in its source is now
+  left unmerged instead of merging, since the merge rebuilds the kept
+  option's text from parsed atoms and blanks the others — a step that
+  previously discarded any interleaved comment and could leave a stray
+  empty line where a removed option used to be.
 
 ## [0.1.2] - 2026-07-11
 
