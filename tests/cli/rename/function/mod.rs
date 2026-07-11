@@ -234,4 +234,5 @@ mod macro_like;
 mod macrolet_scope;
 mod plan;
 mod setf_and_generic;
+mod symbol_macro_scope;
 mod write_basic;
