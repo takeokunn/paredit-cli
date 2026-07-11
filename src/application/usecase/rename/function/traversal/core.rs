@@ -64,6 +64,22 @@ impl<'a> TraversalState<'a> {
     }
 }
 
+pub(in crate::application::usecase::rename::function) fn allows_function_reference_rename(
+    state: &TraversalState<'_>,
+    target_text: &str,
+) -> bool {
+    (!is_local_callable_bound(state.local_callables, target_text) && state.shadowed_depth == 0)
+        || is_package_qualified_callable(target_text)
+}
+
+fn is_package_qualified_callable(target_text: &str) -> bool {
+    let Some((package_name, symbol_name)) = target_text.split_once(':') else {
+        return false;
+    };
+
+    !target_text.starts_with(':') && !package_name.is_empty() && !symbol_name.is_empty()
+}
+
 pub fn collect_function_call_head_renames(
     tree: &SyntaxTree,
     dialect: Dialect,
@@ -152,8 +168,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
             let shape = definition_shape(context.dialect, view, head);
             if common_lisp_symbol_name_eq(head, context.from.as_str())
                 && shape.is_none()
-                && !is_local_callable_bound(state.local_callables, head)
-                && state.shadowed_depth == 0
+                && allows_function_reference_rename(&state, head)
             {
                 if let Some(head_view) = view.children.first() {
                     renames.push(RenameFunctionOccurrence {

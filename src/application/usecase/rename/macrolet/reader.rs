@@ -4,7 +4,9 @@ use crate::application::usecase::rename::function::target::{
 use crate::domain::sexpr::ExpressionView;
 
 use super::RenameFunctionOccurrence;
-use super::scope::{LocalCallableRenameKind, MacroletRenameScope};
+use super::scope::{
+    LocalCallableRenameKind, MacroletRenameScope, allows_function_reference_rename,
+};
 pub(super) use crate::application::usecase::rename::reader::{atom_symbol_span, atom_symbol_text};
 use crate::domain::common_lisp::common_lisp_symbol_name_eq;
 use crate::domain::sexpr::{Path, ReaderPrefix, SymbolName};
@@ -23,16 +25,15 @@ pub(super) fn collect_local_function_designator_renames(
     quasiquote_depth: usize,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
-    if kind != LocalCallableRenameKind::Function
-        || quasiquote_depth > 0
-        || !scope.is_target_active()
-        || scope.is_shadowed()
-    {
+    if kind != LocalCallableRenameKind::Function || quasiquote_depth > 0 {
         return false;
     }
 
     if view.reader_prefixes.contains(&ReaderPrefix::Function) {
         if let Some(target) = callable_name_target(view, path) {
+            if !allows_function_reference_rename(scope, target.text) {
+                return false;
+            }
             return push_callable_target_rename_if_match(target, from, to, renames);
         }
     }

@@ -61,6 +61,21 @@ impl MacroletRenameScope {
     }
 }
 
+pub(super) fn allows_function_reference_rename(
+    scope: MacroletRenameScope,
+    target_text: &str,
+) -> bool {
+    !scope.is_shadowed() || is_package_qualified_callable(target_text)
+}
+
+fn is_package_qualified_callable(target_text: &str) -> bool {
+    let Some((package_name, symbol_name)) = target_text.split_once(':') else {
+        return false;
+    };
+
+    !target_text.starts_with(':') && !package_name.is_empty() && !symbol_name.is_empty()
+}
+
 pub(super) fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {
     scope.enter_active_target()
 }
