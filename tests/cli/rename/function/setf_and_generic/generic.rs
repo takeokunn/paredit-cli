@@ -181,6 +181,52 @@ fn cli_writes_emacs_lisp_generic_function_and_method_rename() {
 }
 
 #[test]
+fn cli_plans_emacs_lisp_generic_function_and_method_rename() {
+    assert_plan_case_with_dialect(
+        PlanCase {
+            fixture_name: "rename-function-emacs-lisp-generic-plan",
+            from: "render",
+            to: "draw",
+            input_files: &[
+                FixtureFile {
+                    path: "generic.el",
+                    contents: "(cl-defgeneric render (node stream))\n(cl-defmethod render ((node widget) stream) (render node stream))\n(cl-defmethod render :around ((node panel) stream) #'render (function render) (render node stream))\n",
+                },
+                FixtureFile {
+                    path: "caller.el",
+                    contents: "(render thing out)\n",
+                },
+            ],
+            stdout_needles: &[
+                "\"definitionCount\": 3",
+                "\"callCount\": 5",
+                "\"dialect\": \"emacs-lisp\"",
+                "\"path\": \"0.1\"",
+                "\"path\": \"1.1\"",
+                "\"path\": \"2.1\"",
+                "\"path\": \"1.3.0\"",
+                "\"path\": \"2.4\"",
+                "\"path\": \"2.5.1\"",
+                "\"path\": \"2.6.0\"",
+                "\"path\": \"0.0\"",
+                "\"replacement\": \"draw\"",
+            ],
+            unchanged_files: &[
+                FixtureFile {
+                    path: "generic.el",
+                    contents: "(cl-defgeneric render (node stream))\n(cl-defmethod render ((node widget) stream) (render node stream))\n(cl-defmethod render :around ((node panel) stream) #'render (function render) (render node stream))\n",
+                },
+                FixtureFile {
+                    path: "caller.el",
+                    contents: "(render thing out)\n",
+                },
+            ],
+        },
+        Some("emacs-lisp"),
+    );
+}
+
+#[test]
 fn cli_writes_common_lisp_setf_generic_function_and_method_rename() {
     assert_write_case(WriteCase {
         fixture_name: "rename-function-common-lisp-setf-generic",
