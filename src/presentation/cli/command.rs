@@ -1,10 +1,22 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
+<<<<<<< HEAD
     dependency_report, duplicate_report, extract_constant, extract_function, form_report,
     function_parameter, impact_report, inline_function, inline_let, introduce_let, let_report,
     package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
     symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
+||||||| parent of 01e907a (feat: expose similarity report CLI)
+    dependency_report, duplicate_report, extract_function, form_report, function_parameter,
+    impact_report, inline_function, inline_let, introduce_let, let_report, package, refactor,
+    remove_unused_binding, rename, replace_forms, signature_report, symbol_report,
+    thread_expression, unthread_expression, unwrap_call, workspace_report,
+=======
+    dependency_report, duplicate_report, extract_function, form_report, function_parameter,
+    impact_report, inline_function, inline_let, introduce_let, let_report, package, refactor,
+    remove_unused_binding, rename, replace_forms, signature_report, similarity_report,
+    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
+>>>>>>> 01e907a (feat: expose similarity report CLI)
 };
 use clap::Subcommand;
 
@@ -102,6 +114,8 @@ pub(super) enum Command {
     MoveForm(definition_movement::args::MoveFormArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     DuplicateReport(duplicate_report::args::DuplicateReportArgs),
+    /// Report structurally similar S-expression forms across explicit files.
+    SimilarityReport(similarity_report::args::SimilarityReportArgs),
     /// Convert duplicate groups into reviewed replace-forms batches.
     ReplacementPlan(duplicate_report::args::ReplacementPlanArgs),
     /// Plan or replace multiple reviewed forms in one file.
