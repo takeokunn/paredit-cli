@@ -14,7 +14,8 @@ fn parses_reader_delimiters() {
 
 #[test]
 fn parses_common_lisp_reader_prefixes() {
-    let tree = SyntaxTree::parse("'value #'call `(list ,item ,@rest)").expect("valid");
+    let input = "'value #'call `(list ,item ,@rest)";
+    let tree = SyntaxTree::parse(input).expect("valid");
     let root = tree.root_children();
     assert_eq!(root.len(), 3);
 
@@ -31,6 +32,10 @@ fn parses_common_lisp_reader_prefixes() {
         .expect("quasiquoted")
         .view();
     assert_eq!(quasiquoted.reader_prefixes, vec![ReaderPrefix::Quasiquote]);
+    assert_eq!(
+        quasiquoted.content_span.slice(input),
+        "(list ,item ,@rest)"
+    );
     assert_eq!(
         quasiquoted.children[1].reader_prefixes,
         vec![ReaderPrefix::Unquote]

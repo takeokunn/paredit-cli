@@ -38,8 +38,8 @@ pub(super) fn unwrap_call_site_from_view(
 
     let site = UnwrapFunctionCallSite {
         path,
-        span: view.span,
-        replacement: inner_call.span.slice(input).to_owned(),
+        span: view.content_span,
+        replacement: inner_call.content_span.slice(input).to_owned(),
         text: view.span.slice(input).to_owned(),
     };
     if view.children.len() == 2 {

@@ -154,6 +154,12 @@ pub struct ExpressionView {
     pub delimiter: Option<Delimiter>,
     pub reader_prefixes: Vec<ReaderPrefix>,
     pub span: ByteSpan,
+    /// The expression span after its reader prefixes and intervening trivia.
+    ///
+    /// For lists this starts at the opening delimiter; for atoms it starts at
+    /// the symbol content. Structural transformations can replace this span
+    /// without detaching reader prefixes from their expression.
+    pub content_span: ByteSpan,
     pub text: Option<String>,
     pub children: Vec<ExpressionView>,
     /// Byte offset from `span.start()` to where an atom's own symbol content
@@ -375,6 +381,16 @@ impl SyntaxTree {
             delimiter: node.delimiter,
             reader_prefixes: node.reader_prefixes.clone(),
             span: node.span,
+            content_span: ByteSpan::new(
+                match node.kind {
+                    NodeKind::List => node.open.unwrap_or(node.span.start()),
+                    NodeKind::Atom => {
+                        ByteOffset::new(node.span.start().get() + node.symbol_offset)
+                    }
+                    NodeKind::Root => node.span.start(),
+                },
+                node.span.end(),
+            ),
             text: node.text.clone(),
             symbol_offset: node.symbol_offset,
             children: node

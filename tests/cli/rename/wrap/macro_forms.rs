@@ -80,7 +80,7 @@ fn cli_writes_wrap_function_calls_inside_cl_user_macrolet_expanders_only() {
 
     assert_eq!(
         fs::read_to_string(lisp_file).expect("read wrapped lisp"),
-        "(defun render () (cl-user:macrolet ((fetch-user (id) (with-cache `(fetch-user ,id)))) (fetch-user user)) (with-cache (fetch-user root)))\n"
+        "(defun render () (cl-user:macrolet ((fetch-user (id) `(with-cache (fetch-user ,id)))) (fetch-user user)) (with-cache (fetch-user root)))\n"
     );
 }
 

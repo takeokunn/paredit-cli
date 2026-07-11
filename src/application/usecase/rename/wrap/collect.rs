@@ -4,6 +4,9 @@ use crate::application::usecase::callable_scope::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope, local_callable_scope_at_path,
 };
+use crate::application::usecase::rename::reader::{
+    apply_reader_prefix_context, executable_reader_context_at_path,
+};
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_name_eq};
 use crate::domain::definition::definition_shape;
@@ -41,7 +44,7 @@ pub(super) fn collect_wrap_all_call_sites(
             candidates: &mut candidates,
             skipped_already_wrapped: &mut skipped_already_wrapped,
         };
-        collect_wrap_call_sites_from_view(&view, path, None, &[], &mut collection);
+        collect_wrap_call_sites_from_view(&view, path, None, &[], 0, false, &mut collection);
     }
 
     let (calls, skipped_nested) = select_outermost_wrap_call_sites(candidates);
@@ -66,6 +69,9 @@ pub(super) fn collect_wrap_explicit_call_sites(
 
     for path in paths {
         let view = tree.select_path(path)?.view();
+        if !executable_reader_context_at_path(tree, path)? {
+            anyhow::bail!("call-path {path} is not in an executable reader context");
+        }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
         if is_local_callable_bound(&local_callables, function.as_str()) {
             anyhow::bail!("call-path {path} is shadowed by a local callable named {function}");
@@ -98,11 +104,39 @@ fn collect_wrap_call_sites_from_view(
     path: Path,
     parent_head: Option<&str>,
     local_callables: &[String],
+    quasiquote_depth: usize,
+    in_macro_expander: bool,
     collection: &mut WrapCallSiteCollection<'_>,
 ) {
+    let Some(quasiquote_depth) = apply_reader_prefix_context(view, quasiquote_depth) else {
+        return;
+    };
+    if quasiquote_depth > 0 && !in_macro_expander {
+        for (index, child) in view.children.iter().enumerate() {
+            collect_wrap_call_sites_from_view(
+                child,
+                path.child(index),
+                None,
+                local_callables,
+                quasiquote_depth,
+                in_macro_expander,
+                collection,
+            );
+        }
+        return;
+    }
+
     if let Some(head) = list_head(view) {
         if let Some(form) = common_lisp_local_callable_form(collection.dialect, head) {
-            collect_local_callable_wrap_call_sites(view, path, local_callables, form, collection);
+            collect_local_callable_wrap_call_sites(
+                view,
+                path,
+                local_callables,
+                form,
+                quasiquote_depth,
+                in_macro_expander,
+                collection,
+            );
             return;
         }
     }
@@ -136,6 +170,8 @@ fn collect_wrap_call_sites_from_view(
             path.child(index),
             current_head,
             local_callables,
+            quasiquote_depth,
+            in_macro_expander,
             collection,
         );
     }
@@ -146,6 +182,8 @@ fn collect_local_callable_wrap_call_sites(
     path: Path,
     local_callables: &[String],
     form: CommonLispLocalCallableForm,
+    quasiquote_depth: usize,
+    in_macro_expander: bool,
     collection: &mut WrapCallSiteCollection<'_>,
 ) {
     let body_scope = local_callable_body_scope(local_callables, view);
@@ -161,6 +199,8 @@ fn collect_local_callable_wrap_call_sites(
                     path.descendant([1, binding_index, child_index]),
                     binding_head,
                     binding_body_scope,
+                    quasiquote_depth,
+                    in_macro_expander || form.is_macro(),
                     collection,
                 );
             }
@@ -174,6 +214,8 @@ fn collect_local_callable_wrap_call_sites(
             path.child(index),
             current_head,
             &body_scope,
+            quasiquote_depth,
+            in_macro_expander,
             collection,
         );
     }

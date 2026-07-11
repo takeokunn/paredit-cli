@@ -106,6 +106,6 @@ fn cli_writes_unwrap_function_calls_inside_cl_user_macrolet_expanders_only() {
 
     assert_eq!(
         fs::read_to_string(lisp_file).expect("read rewritten lisp"),
-        "(defun render () (cl-user:macrolet ((fetch-user (id) (fetch-user ,id))) (with-cache (fetch-user user))) (fetch-user root))\n"
+        "(defun render () (cl-user:macrolet ((fetch-user (id) `(fetch-user ,id))) (with-cache (fetch-user user))) (fetch-user root))\n"
     );
 }
