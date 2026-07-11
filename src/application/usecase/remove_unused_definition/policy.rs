@@ -18,6 +18,17 @@ use crate::domain::definition::DefinitionCategory;
 /// example Emacs Lisp `defun`/`defvar` or Clojure `defn`) that are not
 /// broken out into a more specific category but are still known,
 /// non-generative shapes.
+///
+/// `DefinitionCategory::Struct` (Common Lisp `defstruct`) has the same
+/// derived-symbol problem even though this tool DOES recognize the form:
+/// `defstruct` implicitly derives a constructor (`make-<name>` by default,
+/// or an explicit `(:constructor other-name)` option), a predicate
+/// (`<name>-p`), a copier, and per-slot accessors from the structure name,
+/// none of which textually contain the structure name symbol itself. A
+/// structure whose type-name symbol has zero direct references can still
+/// be load-bearing purely through calls to its constructor/predicate/
+/// accessors, which this tool does not trace back to the `defstruct` form
+/// that defines them.
 pub(super) fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
     matches!(
         category,
@@ -26,7 +37,6 @@ pub(super) fn definition_is_bulk_removable(category: DefinitionCategory) -> bool
             | DefinitionCategory::GenericFunction
             | DefinitionCategory::Method
             | DefinitionCategory::Class
-            | DefinitionCategory::Struct
             | DefinitionCategory::Condition
             | DefinitionCategory::Variable
             | DefinitionCategory::Constant

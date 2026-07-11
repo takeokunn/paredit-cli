@@ -600,14 +600,17 @@ do not carry a useful filename.
    `unused-definition-report`. By default it removes only unreferenced
    non-protected definition categories, preserves definitions exported from
    Common Lisp `defpackage` forms, reports skipped package, system, test,
-   customization, and mode definitions, deletes from the end of each file to
-   avoid offset drift, and reparses before writing. Use `--include-exported`
-   only after explicitly shrinking the public API, and `--include-protected`
-   only after reviewing those protected categories. `--include-protected` is
-   also required for the `unknown-macro` category: an unrecognized
-   `define-*`-prefixed macro invocation whose argument commonly names other
-   symbols the macro derives and exports elsewhere (a strategy, schema, or
-   handler DSL), which this tool cannot verify without macro-expanding it.
+   customization, mode, and struct definitions, deletes from the end of each
+   file to avoid offset drift, and reparses before writing. Use
+   `--include-exported` only after explicitly shrinking the public API, and
+   `--include-protected` only after reviewing those protected categories.
+   `--include-protected` is also required for the `unknown-macro` category
+   (an unrecognized `define-*`-prefixed macro invocation whose argument
+   commonly names other symbols the macro derives and exports elsewhere — a
+   strategy, schema, or handler DSL — which this tool cannot verify without
+   macro-expanding it) and for `defstruct` definitions (which derive a
+   constructor, predicate, copier, and accessors from the type name that
+   this tool cannot verify are all still unreferenced).
 1. Remove a reviewed dead top-level definition with
    `paredit remove-definition --output json` first, then apply with
    `--write`. The command accepts the same top-level `path` reported by
