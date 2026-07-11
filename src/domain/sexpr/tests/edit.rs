@@ -87,3 +87,43 @@ fn barfs_backward() {
         "alpha (beta gamma)"
     );
 }
+
+#[test]
+fn kills_last_child() {
+    let input = "(defun f (x)\n  (* x x))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.3")).expect("selection");
+    assert_eq!(
+        Edit::kill(input, &tree, selection).unwrap(),
+        "(defun f (x))"
+    );
+}
+
+#[test]
+fn kills_last_child_without_swallowing_preceding_comment_newline() {
+    let input = "(defun f (x)\n  ;; important comment\n  (* x x))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.3")).expect("selection");
+    let result = Edit::kill(input, &tree, selection).unwrap();
+    assert_eq!(result, "(defun f (x)\n  ;; important comment\n)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn slurps_forward_without_swallowing_preceding_comment_newline() {
+    let input = "(let ((a 1))\n  (foo a)\n  ;; note\n  (bar a))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.2")).expect("selection");
+    let result = Edit::slurp_forward(input, &tree, selection).unwrap();
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn barfs_forward_without_swallowing_preceding_comment_newline() {
+    let input = "(list a\n  ;; last item\n  b)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    let result = Edit::barf_forward(input, &tree, selection).unwrap();
+    assert_eq!(result, "(list a\n  ;; last item\n) b");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}

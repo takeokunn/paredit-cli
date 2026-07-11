@@ -11,8 +11,8 @@ impl Edit {
         replace_span(input, selection.span(), replacement)
     }
 
-    pub fn kill(input: &str, _tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
-        let span = expand_removal(input, selection.span());
+    pub fn kill(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        let span = expand_removal(input, tree, selection.span());
         Ok(replace_span(input, span, ""))
     }
 
@@ -58,7 +58,7 @@ impl Edit {
             .ok_or_else(|| anyhow!("selected list has no next sibling to slurp"))?;
         let (_, close) = list_delimiter_offsets(node)?;
         let insertion = format!(" {}", tree.node(sibling).span.slice(input));
-        let removal = expand_removal(input, tree.node(sibling).span);
+        let removal = expand_removal(input, tree, tree.node(sibling).span);
         Ok(remove_then_insert(
             input,
             removal,
@@ -79,7 +79,7 @@ impl Edit {
         let (open, _) = list_delimiter_offsets(node)?;
         let open = open + 1;
         let insertion = format!("{} ", tree.node(sibling).span.slice(input));
-        let removal = expand_removal(input, tree.node(sibling).span);
+        let removal = expand_removal(input, tree, tree.node(sibling).span);
         Ok(remove_then_insert(
             input,
             removal,
@@ -102,7 +102,7 @@ impl Edit {
         let (_, close) = list_delimiter_offsets(node)?;
         let child_span = tree.node(child).span;
         let insertion = format!(" {}", child_span.slice(input));
-        let removal = expand_removal(input, child_span);
+        let removal = expand_removal(input, tree, child_span);
         Ok(remove_then_insert(
             input,
             removal,
@@ -127,7 +127,7 @@ impl Edit {
             .ok_or_else(|| anyhow!("selected list is missing an opening delimiter"))?;
         let child_span = tree.node(child).span;
         let insertion = format!("{} ", child_span.slice(input));
-        let removal = expand_removal(input, child_span);
+        let removal = expand_removal(input, tree, child_span);
         Ok(remove_then_insert(input, removal, open, &insertion))
     }
 }
@@ -173,7 +173,7 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
-fn expand_removal(input: &str, span: ByteSpan) -> ByteSpan {
+fn expand_removal(input: &str, tree: &SyntaxTree, span: ByteSpan) -> ByteSpan {
     let bytes = input.as_bytes();
     let mut start = span.start().get();
     let mut end = span.end().get();
@@ -182,7 +182,18 @@ fn expand_removal(input: &str, span: ByteSpan) -> ByteSpan {
             end += 1;
         }
     } else {
-        while start > 0 && bytes[start - 1].is_ascii_whitespace() {
+        // A comment ends right before the newline that terminates it; that
+        // newline is load-bearing — deleting it would splice whatever
+        // follows onto the comment's line, commenting it out. Never absorb
+        // whitespace back past the byte immediately after a comment.
+        let floor = tree
+            .comments
+            .iter()
+            .map(|comment| comment.span.end().get())
+            .filter(|comment_end| *comment_end < start)
+            .max()
+            .map_or(0, |comment_end| comment_end + 1);
+        while start > floor && bytes[start - 1].is_ascii_whitespace() {
             start -= 1;
         }
     }
