@@ -176,6 +176,16 @@ mod tests {
         StructuralTree::from_view(&tree.select_path(&Path::root_child(0)).unwrap().view())
     }
 
+    fn assert_similarity_contract(left: &StructuralTree, right: &StructuralTree) -> f64 {
+        let forward = tree_similarity(left, right);
+        let backward = tree_similarity(right, left);
+
+        assert!(forward.is_finite());
+        assert!((0.0..=1.0).contains(&forward));
+        assert!((forward - backward).abs() < f64::EPSILON);
+        forward
+    }
+
     #[test]
     fn alpha_rename_is_highly_similar() {
         assert!(
@@ -206,9 +216,66 @@ mod tests {
     fn similarity_is_symmetric_and_bounded() {
         let left = form("'(foo a)");
         let right = form("(bar (a))");
-        let forward = tree_similarity(&left, &right);
-        let backward = tree_similarity(&right, &left);
-        assert!((forward - backward).abs() < f64::EPSILON);
-        assert!((0.0..=1.0).contains(&forward));
+        assert_similarity_contract(&left, &right);
+    }
+
+    #[test]
+    fn identical_trees_have_maximum_similarity() {
+        for input in ["atom", "()", "'(foo [bar] {baz})"] {
+            let tree = form(input);
+            assert_eq!(assert_similarity_contract(&tree, &tree), 1.0);
+        }
+    }
+
+    #[test]
+    fn reader_prefixes_are_structurally_significant() {
+        let variants = [
+            form("'value"),
+            form("`value"),
+            form(",value"),
+            form(",@value"),
+            form("#'value"),
+        ];
+
+        for left in 0..variants.len() {
+            for right in (left + 1)..variants.len() {
+                assert!(assert_similarity_contract(&variants[left], &variants[right]) < 1.0);
+            }
+        }
+    }
+
+    #[test]
+    fn delimiters_are_structurally_significant() {
+        let round = form("(value)");
+        let square = form("[value]");
+        let curly = form("{value}");
+
+        assert!(assert_similarity_contract(&round, &square) < 1.0);
+        assert!(assert_similarity_contract(&round, &curly) < 1.0);
+        assert!(assert_similarity_contract(&square, &curly) < 1.0);
+    }
+
+    #[test]
+    fn atom_list_and_empty_list_shapes_are_distinct() {
+        let atom = form("value");
+        let empty = form("()");
+        let populated = form("(value)");
+
+        assert!(assert_similarity_contract(&atom, &empty) < 1.0);
+        assert!(assert_similarity_contract(&atom, &populated) < 1.0);
+        assert!(assert_similarity_contract(&empty, &populated) < 1.0);
+    }
+
+    #[test]
+    fn deep_and_wide_trees_preserve_similarity_contracts() {
+        let deep_left = form(&format!("{}value{}", "(".repeat(64), ")".repeat(64)));
+        let deep_right = form(&format!("{}other{}", "(".repeat(64), ")".repeat(64)));
+        let wide_left = form(&format!("({})", vec!["value"; 128].join(" ")));
+        let wide_right = form(&format!("({})", vec!["other"; 128].join(" ")));
+
+        let deep_similarity = assert_similarity_contract(&deep_left, &deep_right);
+        let wide_similarity = assert_similarity_contract(&wide_left, &wide_right);
+        assert!(deep_similarity < 1.0);
+        assert!(wide_similarity < 1.0);
     }
 }
