@@ -7,7 +7,7 @@ use crate::application::usecase::definition_report::collect_definition_forms;
 use crate::application::usecase::workspace_report::types::WorkspaceFileStatus;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
-use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
+use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;

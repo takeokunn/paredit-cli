@@ -9,7 +9,7 @@ use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::workspace::discover_workspace_refactor_scope;
 
 pub(in crate::presentation::cli::refactor::workflow) use build::{
-    build_refactor_preview, BuildRefactorPreviewRequest,
+    BuildRefactorPreviewRequest, build_refactor_preview,
 };
 pub(in crate::presentation::cli::refactor::workflow) use failure::finish_refactor_preview_failure;
 pub(in crate::presentation::cli::refactor::workflow) use write::write_refactor_preview;

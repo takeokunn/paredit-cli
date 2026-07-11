@@ -3,8 +3,8 @@ use super::super::args::*;
 use super::super::render::print_workspace_refactor_execute;
 use super::super::types::execute::{WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome};
 use super::preview::{
-    build_refactor_preview, finish_refactor_preview_failure, write_refactor_preview,
-    BuildRefactorPreviewRequest,
+    BuildRefactorPreviewRequest, build_refactor_preview, finish_refactor_preview_failure,
+    write_refactor_preview,
 };
 use super::verification::build_refactor_verification;
 use super::workspace::discover_workspace_refactor_scope;

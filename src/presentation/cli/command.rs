@@ -1,22 +1,11 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
-<<<<<<< HEAD
     dependency_report, duplicate_report, extract_constant, extract_function, form_report,
     function_parameter, impact_report, inline_function, inline_let, introduce_let, let_report,
     package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
-    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
-||||||| parent of 01e907a (feat: expose similarity report CLI)
-    dependency_report, duplicate_report, extract_function, form_report, function_parameter,
-    impact_report, inline_function, inline_let, introduce_let, let_report, package, refactor,
-    remove_unused_binding, rename, replace_forms, signature_report, symbol_report,
-    thread_expression, unthread_expression, unwrap_call, workspace_report,
-=======
-    dependency_report, duplicate_report, extract_function, form_report, function_parameter,
-    impact_report, inline_function, inline_let, introduce_let, let_report, package, refactor,
-    remove_unused_binding, rename, replace_forms, signature_report, similarity_report,
-    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
->>>>>>> 01e907a (feat: expose similarity report CLI)
+    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
+    workspace_report,
 };
 use clap::Subcommand;
 
