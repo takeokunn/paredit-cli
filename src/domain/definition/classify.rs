@@ -31,6 +31,7 @@ pub(super) fn classify_definition_head(dialect: Dialect, head: &str) -> Option<D
             }
         }
         "deftest" | "define-test" | "ert-deftest" | "define-ert-test" => DefinitionCategory::Test,
+        "provide" | "require" => DefinitionCategory::Package,
         "defgroup" | "defface" => DefinitionCategory::Customization,
         "define-minor-mode" | "define-derived-mode" | "define-globalized-minor-mode" => {
             DefinitionCategory::Mode

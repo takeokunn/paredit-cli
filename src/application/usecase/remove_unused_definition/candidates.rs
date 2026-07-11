@@ -3,8 +3,13 @@ use anyhow::{Context, Result};
 use crate::application::usecase::remove_unused_definition::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
+use crate::domain::sexpr::reader::{atom_symbol_text, atom_text};
+use crate::domain::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName, SyntaxTree,
+};
 
 #[derive(Debug)]
 pub(super) struct UnusedDefinitionItem {
@@ -58,9 +63,37 @@ pub(super) fn collect_unused_definition_candidates(
                             let (_, other_view) = &parsed_files[other_index];
                             let mut spans = Vec::new();
                             collect_unshadowed_symbol_references(
+                                other.dialect,
                                 other_view,
                                 &symbol,
                                 &other.text,
+                                &mut spans,
+                            );
+                            // Scope-aware reference collection above treats
+                            // `#'name`/`(function name)` as invisible, since
+                            // it also serves callers that check the *value*
+                            // namespace (where a same-named local variable
+                            // must not be confused with an unrelated
+                            // function-namespace reference). That makes it
+                            // blind to callback tables and higher-order call
+                            // sites that only ever reach a definition through
+                            // a function-namespace reference. Supplement it
+                            // with a dedicated, conservative scan: matching
+                            // here proves the definition is used, so a rare
+                            // false positive (an unrelated same-named local
+                            // function shadow) only keeps a definition that
+                            // could otherwise be removed, never removes one
+                            // still in use.
+                            collect_function_quote_references(
+                                other.dialect,
+                                other_view,
+                                &symbol,
+                                &mut spans,
+                            );
+                            collect_quoted_data_references(
+                                other.dialect,
+                                other_view,
+                                &symbol,
                                 &mut spans,
                             );
                             spans
@@ -87,4 +120,152 @@ pub(super) fn collect_unused_definition_candidates(
 
 fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
+}
+
+/// Collects every `#'name` (CLHS `function` reader macro) and explicit
+/// `(function name)` occurrence matching `symbol`, appending their spans to
+/// `output`. Unlike scope-aware value-namespace reference collection, this
+/// does not track `flet`/`labels`/`macrolet` shadowing of the function
+/// namespace: it is intentionally coarse so that it never misses a genuine
+/// function-namespace reference, at the cost of occasionally counting an
+/// unrelated same-named local function shadow too.
+fn collect_function_quote_references(
+    dialect: Dialect,
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+) {
+    if let Some(target) = callable_reference_target(view) {
+        if callable_reference_matches(dialect, target, symbol) {
+            output.push(target.span);
+            return;
+        }
+    }
+
+    for child in &view.children {
+        collect_function_quote_references(dialect, child, symbol, output);
+    }
+}
+
+fn callable_reference_target<'a>(view: &'a ExpressionView) -> Option<&'a ExpressionView> {
+    if view.reader_prefixes.contains(&ReaderPrefix::Function) {
+        return Some(view);
+    }
+
+    let target = callable_accessor_target(view)?;
+    Some(target)
+}
+
+fn callable_accessor_target<'a>(view: &'a ExpressionView) -> Option<&'a ExpressionView> {
+    (view.kind == ExpressionKind::List).then_some(())?;
+    let head = atom_text(view.children.first()?)?;
+    let target = view.children.get(1)?;
+
+    matches!(
+        common_lisp_callable_accessor_kind(head),
+        Some(CallableAccessorKind::Function | CallableAccessorKind::QuotedFunction)
+    )
+    .then_some(target)
+}
+
+fn callable_reference_matches(
+    dialect: Dialect,
+    candidate: &ExpressionView,
+    symbol: &SymbolName,
+) -> bool {
+    atom_symbol_text(candidate)
+        .is_some_and(|text| function_quote_symbol_matches(dialect, text, symbol.as_str()))
+        || setf_callable_name_view(candidate).is_some_and(|name| {
+            atom_symbol_text(name)
+                .is_some_and(|text| function_quote_symbol_matches(dialect, text, symbol.as_str()))
+        })
+}
+
+fn setf_callable_name_view(view: &ExpressionView) -> Option<&ExpressionView> {
+    (view.kind == ExpressionKind::List).then_some(())?;
+    let head = view.children.first().and_then(atom_text)?;
+    common_lisp_operator_head_eq(head, "setf").then_some(())?;
+    view.children
+        .get(1)
+        .filter(|name| name.kind == ExpressionKind::Atom)
+}
+
+fn common_lisp_callable_accessor_kind(head: &str) -> Option<CallableAccessorKind> {
+    if common_lisp_operator_head_eq(head, "function") {
+        return Some(CallableAccessorKind::Function);
+    }
+
+    if matches!(
+        head,
+        "macro-function" | "compiler-macro-function" | "symbol-function" | "fdefinition"
+    ) || common_lisp_operator_head_eq(head, "macro-function")
+        || common_lisp_operator_head_eq(head, "compiler-macro-function")
+        || common_lisp_operator_head_eq(head, "symbol-function")
+        || common_lisp_operator_head_eq(head, "fdefinition")
+    {
+        return Some(CallableAccessorKind::QuotedFunction);
+    }
+
+    None
+}
+
+#[derive(Clone, Copy)]
+enum CallableAccessorKind {
+    Function,
+    QuotedFunction,
+}
+
+fn function_quote_symbol_matches(dialect: Dialect, candidate: &str, symbol: &str) -> bool {
+    match dialect {
+        Dialect::CommonLisp => common_lisp_symbol_name_eq(candidate, symbol),
+        _ => candidate == symbol,
+    }
+}
+
+/// Collects every bare atom matching `symbol` found anywhere inside a
+/// plain-quoted region (a `Quote` reader prefix, e.g. `'((key . command)
+/// ...)` dispatch tables and alists). Scope-aware reference collection
+/// treats `Quote` as fully opaque data and does not look inside it at all,
+/// which makes it blind to the common Lisp idiom of storing a
+/// function/variable name as a bare symbol inside a quoted list literal
+/// (keymap tables, dispatch alists, `featurep`/`fboundp` argument lists).
+/// Unlike scope-aware collection, this needs no shadowing awareness: quoted
+/// data can never introduce a lexical binding, so any bare atom matching
+/// `symbol` inside a quoted region is unambiguous evidence the definition
+/// is reachable, at the cost of occasionally counting an unrelated
+/// same-named symbol that only appears as incidental data.
+fn collect_quoted_data_references(
+    dialect: Dialect,
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+) {
+    if view.reader_prefixes.contains(&ReaderPrefix::Quote) {
+        collect_atoms_in_quoted_region(dialect, view, symbol, output);
+        return;
+    }
+
+    for child in &view.children {
+        collect_quoted_data_references(dialect, child, symbol, output);
+    }
+}
+
+fn collect_atoms_in_quoted_region(
+    dialect: Dialect,
+    view: &ExpressionView,
+    symbol: &SymbolName,
+    output: &mut Vec<ByteSpan>,
+) {
+    if view.kind == ExpressionKind::Atom {
+        if atom_symbol_text(view)
+            .is_some_and(|text| function_quote_symbol_matches(dialect, text, symbol.as_str()))
+        {
+            output.push(view.span);
+        }
+        return;
+    }
+
+    for child in &view.children {
+        collect_atoms_in_quoted_region(dialect, child, symbol, output);
+    }
 }

@@ -14,6 +14,22 @@ with no external effect.
 
 ### Fixed
 
+- `remove-unused-definitions`: Emacs Lisp `require`/`provide` forms are now
+  categorized the same way Common Lisp `require`/`provide`/`defpackage`
+  already were (`DefinitionCategory::Package`, protected by default)
+  instead of falling into the generic, bulk-removable `Other` bucket. A
+  `provide`d feature is definitionally only ever referenced as a quoted
+  symbol argument to `require` in another file, which the reference
+  scanner cannot see, so every `require`/`provide` in an Emacs Lisp
+  workspace was previously flagged as "unused" and would have been
+  deleted by `--write`, breaking that file's module loading.
+- `remove-unused-definitions`: a definition referenced only as a bare atom
+  inside a quoted list literal (dispatch tables, keymap alists like
+  `'((key . command))`, `featurep`/`fboundp` argument lists) is no longer
+  treated as unused. Reference collection previously skipped the entire
+  contents of any plain-quoted form as opaque data, so a function or
+  variable used exclusively through this extremely common Lisp idiom was
+  reported as unreferenced and removable.
 - `sort-package-exports`: a `;; section` comment (or any own-line comment)
   that precedes an export symbol now travels with that symbol when the
   sort reorders the list, instead of staying at a fixed line and
@@ -71,6 +87,54 @@ with no external effect.
   option's text from parsed atoms and blanks the others — a step that
   previously discarded any interleaved comment and could leave a stray
   empty line where a removed option used to be.
+- `sort-definitions`: a leading own-line comment (or blank run) above a
+  top-level definition now travels with that definition when the sort
+  reorders the block, instead of staying at its original line and ending
+  up above whichever definition landed there. A definition that had no
+  leading trivia of its own picks up a plain separator instead of gluing
+  onto the previous definition's closing delimiter when it is reordered
+  away from the front of the block.
+- `sort-package-options`: the same fix as above, applied to `defpackage`
+  option forms (`:use`, `:export`, `:documentation`, ...) reordered by
+  `sort-package-options`.
+- `thread-expression`/`unthread-expression`: a selection containing a
+  comment is now rejected instead of silently discarding that comment.
+  Both commands rebuild their target as new text from parsed parts, and
+  a comment inside the selection lives outside the tree, so it had no
+  slot in the rebuilt pipeline or nested calls and was dropped entirely.
+- `inline-function`: `--remove-definition` is now rejected when the
+  definition body contains a comment, instead of deleting the definition
+  (and the comment along with it) after copying only the parsed body
+  into call sites. Inlining without `--remove-definition` is unaffected,
+  since the definition and its comment stay in place.
+- `swap-function-parameters`/`move-function-parameter`/
+  `reorder-function-parameters`: a parameter list containing a comment is
+  now rejected instead of silently discarding that comment. All three
+  commands share a definition rewrite that rebuilds the parameter list
+  from each parameter's own bare span joined by a single space, so a
+  comment anywhere in the list — and the list's original line layout —
+  had no slot in the rebuilt text and was dropped.
+- `remove-function-parameter`: removing a function's first parameter no
+  longer deletes a comment that describes the *next* parameter. The
+  removal span previously extended from the first parameter to wherever
+  the second parameter's own text started, absorbing any comment in
+  between; it now stops at the first newline after the removed
+  parameter, leaving the next parameter's leading comment in place.
+- `add-export`: a `--symbol` argument without a `#:` or `:` prefix (for
+  example `--symbol foo` instead of `--symbol #:foo`) is now normalized to
+  `#:foo` before insertion instead of being spliced into the `:export` list
+  verbatim. A bare symbol name read back at load time interned an unrelated
+  symbol in whatever package happened to be current at read time, instead of
+  contributing only a name to the package being defined.
+- `split-file`/`move-definition`: a leading own-line comment describing a
+  moved definition now travels with it into the destination file instead of
+  being orphaned above whichever definition happens to remain in its place
+  in the source file. Both commands previously also over-absorbed trailing
+  whitespace after a moved definition, which glued the two definitions that
+  used to surround it directly together when a middle definition was moved;
+  the removed region now stops exactly at the boundary the moved
+  definition's own leading trivia claimed, leaving the original separator
+  between the remaining neighbors intact.
 
 ## [0.1.2] - 2026-07-11
 
