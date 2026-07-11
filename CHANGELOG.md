@@ -12,6 +12,8 @@ with no external effect.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-11
+
 ### Added
 
 - Initial public release of the `paredit` command line tool for safe

@@ -53,9 +53,9 @@ Use the grouped entrypoints `paredit refactor ...` and
 
 ## Stability and Support
 
-- `main` is the active development line. Until the first release tag is cut,
-  behavior on `main` may change as parser, refactor, and policy surfaces are
-  tightened.
+- `main` is the active development line. Behavior on `main` may change
+  between releases as parser, refactor, and policy surfaces are tightened;
+  pin the latest release tag (starting with `v0.1.0`) for stable automation.
 - Machine-facing CLI and JSON compatibility are defined in
   [COMPATIBILITY.md](COMPATIBILITY.md), including how released contracts differ
   from unreleased `main`.
