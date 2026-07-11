@@ -156,14 +156,11 @@ fn collect_named_let_references(
 
     let bindings = generic_binding_groups(binding_form).unwrap_or_default();
     for binding in &bindings {
-        collect_unshadowed_symbol_references_in_context(
-            dialect,
-            &binding.value,
-            symbol,
-            input,
-            output,
-            0,
-        );
+        if let Some(value) = &binding.value {
+            collect_unshadowed_symbol_references_in_context(
+                dialect, value, symbol, input, output, 0,
+            );
+        }
     }
 
     let loop_name_binds = super::super::syntax::atom_text(loop_name)

@@ -8,7 +8,7 @@ use super::patterns::{binding_pattern_names, lambda_list_names};
 #[derive(Debug, Clone)]
 pub(super) struct BindingGroup {
     names: Vec<String>,
-    pub(super) value: ExpressionView,
+    pub(super) value: Option<ExpressionView>,
 }
 
 pub(super) fn generic_binding_groups(binding_form: &ExpressionView) -> Result<Vec<BindingGroup>> {
@@ -39,7 +39,7 @@ fn vector_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bindin
             }
             Ok(BindingGroup {
                 names,
-                value: pair[1].clone(),
+                value: Some(pair[1].clone()),
             })
         })
         .collect()
@@ -56,10 +56,17 @@ fn list_pair_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bin
         .iter()
         .map(|pair| {
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("let binding must be a (name value) pair");
+                if pair.kind != ExpressionKind::Atom {
+                    anyhow::bail!("let binding must be a name, (name), or (name value)");
+                }
+                let names = binding_pattern_names(pair);
+                if names.len() != 1 {
+                    anyhow::bail!("bare let binding must contain one binding name");
+                }
+                return Ok(BindingGroup { names, value: None });
             }
-            if pair.children.len() != 2 {
-                anyhow::bail!("let binding pair must contain a name and value");
+            if pair.children.is_empty() || pair.children.len() > 2 {
+                anyhow::bail!("let binding pair must be (name) or (name value)");
             }
             let names = binding_pattern_names(&pair.children[0]);
             if names.is_empty() {
@@ -67,7 +74,7 @@ fn list_pair_let_binding_groups(binding_form: &ExpressionView) -> Result<Vec<Bin
             }
             Ok(BindingGroup {
                 names,
-                value: pair.children[1].clone(),
+                value: pair.children.get(1).cloned(),
             })
         })
         .collect()

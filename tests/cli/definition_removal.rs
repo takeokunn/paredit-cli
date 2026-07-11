@@ -387,3 +387,33 @@ fn cli_removes_exported_unused_definition_when_requested() {
     assert!(!rewritten.contains("public-entry ()"));
     assert!(!rewritten.contains("stale-private"));
 }
+
+#[test]
+fn cli_keeps_definition_referenced_inside_a_bare_symbol_let_binding() {
+    let dir = fresh_temp_dir("remove-unused-definitions-bare-let-plan");
+    let file = dir.join("core.el");
+    let original = "(defun doclive--unsafe-p (component)\n\
+                    (stringp component))\n\n\
+                    (defun doclive--query-param (pairs)\n\
+                    (let (found)\n\
+                    (dolist (p pairs found)\n\
+                    (when (doclive--unsafe-p p)\n\
+                    (setq found t)))))\n";
+    fs::write(&file, original).expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("remove-unused-definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"removal_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"doclive--query-param\""))
+        .stdout(predicate::str::contains("\"name\": \"doclive--unsafe-p\"").not());
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read unchanged fixture"),
+        original
+    );
+}
