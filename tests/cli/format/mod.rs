@@ -4,6 +4,7 @@ use std::path::Path;
 mod binding_forms;
 mod body_forms;
 mod declaration_forms;
+mod definition_forms;
 
 fn assert_format_output(fixture_name: &str, file_name: &str, input: &str, expected: &str) {
     let dir = fresh_temp_dir(fixture_name);

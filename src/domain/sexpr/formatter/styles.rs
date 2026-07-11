@@ -4,6 +4,7 @@ use crate::domain::common_lisp::{CommonLispOperator, normalize_common_lisp_opera
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ListStyle {
     Definition,
+    SystemDefinition,
     Defmethod,
     DefinitionNameBody,
     Lambda,
@@ -34,6 +35,9 @@ impl Formatter {
                 }
                 CommonLispOperator::Lambda => return ListStyle::Lambda,
                 CommonLispOperator::DefineSymbolMacro => return ListStyle::DefinitionNameBody,
+                operator if operator.is_asdf_system_definition() => {
+                    return ListStyle::SystemDefinition;
+                }
                 operator if operator.definition_category().is_some() => {
                     return ListStyle::Definition;
                 }

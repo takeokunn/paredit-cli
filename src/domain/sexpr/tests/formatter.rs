@@ -243,6 +243,26 @@ fn formats_restart_case_clauses_after_protected_form() {
 }
 
 #[test]
+fn keeps_short_defsystem_forms_on_one_line() {
+    let input = "(defsystem \"foo\"\n  :description \"short\"\n  :version \"0.1.0\"\n  :depends-on (:asdf))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(defsystem \"foo\" :description \"short\" :version \"0.1.0\" :depends-on (:asdf))\n"
+    );
+}
+
+#[test]
+fn breaks_long_defsystem_forms_keeping_option_pairs_together() {
+    let input = "(defsystem \"my-really-quite-long-system-name\" :description \"a considerably longer description string here\" :version \"0.1.0\" :depends-on (:alexandria :bordeaux-threads))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(defsystem \"my-really-quite-long-system-name\"\n  :description \"a considerably longer description string here\"\n  :version \"0.1.0\"\n  :depends-on (:alexandria :bordeaux-threads))\n"
+    );
+}
+
+#[test]
 fn formats_define_compiler_macro_like_a_definition() {
     let input = "(define-compiler-macro fast-add (x y) (list '+ x y))";
     let tree = SyntaxTree::parse(input).expect("valid");
