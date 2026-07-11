@@ -12,6 +12,38 @@ with no external effect.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-11
+
+### Added
+
+- A reusable GitHub composite action (`takeokunn/paredit-cli@<tag>`) that
+  runs structural lint (`mode: lint`), canonical-format verification
+  (`mode: format`), or in-place formatting (`mode: fix`) against any
+  repository, pulling prebuilt binaries from the public
+  `takeokunn-paredit-cli` Cachix cache.
+- `paredit-lint` and `paredit-format` wrapper tools exposed as flake
+  packages and apps (`nix run github:takeokunn/paredit-cli#lint`,
+  `...#format -- --check`), with GitHub error annotations in CI.
+- Flake integration surfaces for other projects: `overlays.default`
+  (providing `paredit-cli`, `paredit-lint`, `paredit-format`, and
+  `paredit-format-files`), `lib.<system>.mkLintCheck` /
+  `lib.<system>.mkFormatCheck` flake-check helpers, and
+  `lib.<system>.treefmtFormatter` for treefmt-nix configurations.
+- treefmt-nix support in this repository itself: `nix fmt` now runs treefmt
+  with rustfmt, nixfmt, and paredit as the Lisp formatter, and
+  `nix flake check` enforces it (test fixtures stay byte-exact).
+- A `lint-format-integration` flake check that exercises the lint failure
+  path, the format `--check` failure path, and format idempotency.
+
+### Changed
+
+- CI now resolves the Cachix cache name from the `CACHIX_CACHE` repository
+  variable instead of a hardcoded workflow value.
+- All direct dependencies updated to the latest versions compatible with the
+  declared 1.85 MSRV (clap 4.6, assert_cmd 2.2, proptest 1.11).
+- Security, compatibility, and README release-stage wording now reference the
+  shipped `v0.1.x` release line instead of a hypothetical first release.
+
 ## [0.1.0] - 2026-07-11
 
 ### Added
