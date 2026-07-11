@@ -64,8 +64,8 @@ fn security_supported_line_and_acknowledgement_policy_match_public_docs() {
     );
     for needle in [
         "| Unreleased `main` | Yes |",
-        "| First tagged release line after publication | Yes, until superseded by a newer supported line |",
-        "| Released versions older than `main` | No |",
+        "| Latest tagged release line (currently `v0.1.x`) | Yes, until superseded by a newer supported line |",
+        "| Released versions older than the latest tagged line | No |",
     ] {
         assert!(
             security.contains(needle),

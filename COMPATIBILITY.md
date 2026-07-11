@@ -6,12 +6,12 @@ copy or incidental text layout.
 
 ## Release Stages
 
-- Unreleased `main` is the active development line. Until a tag is cut, CLI
+- Unreleased `main` is the active development line. Between release tags, CLI
   behavior, JSON fields, and refactor workflows on `main` may change as
   correctness gaps and architecture boundaries are tightened.
-- Once a release is tagged, the documented stable surfaces below become public
-  contracts for that released line unless a security or correctness fix
-  requires a documented break.
+- The first released line is `v0.1.0` (2026-07-11). For every tagged release,
+  the documented stable surfaces below are public contracts for that released
+  line unless a security or correctness fix requires a documented break.
 - Older released lines are unsupported unless maintainers explicitly publish a
   wider support window in [SECURITY.md](SECURITY.md).
 

@@ -8,8 +8,8 @@ supported historical release branch today.
 | Version | Supported |
 | --- | --- |
 | Unreleased `main` | Yes |
-| First tagged release line after publication | Yes, until superseded by a newer supported line |
-| Released versions older than `main` | No |
+| Latest tagged release line (currently `v0.1.x`) | Yes, until superseded by a newer supported line |
+| Released versions older than the latest tagged line | No |
 
 ## Reporting a Vulnerability
 
