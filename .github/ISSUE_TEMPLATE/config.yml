@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage Question or Support Request
+    url: https://github.com/takeokunn/paredit-cli/blob/main/SUPPORT.md
+    about: Check support expectations, reproduction guidance, and the right channel before opening an issue.
+  - name: Security Vulnerability Report
+    url: https://github.com/takeokunn/paredit-cli/blob/main/SECURITY.md
+    about: Use the private reporting path for vulnerabilities or security-sensitive behavior.
+  - name: Roadmap and Scope Review
+    url: https://github.com/takeokunn/paredit-cli/blob/main/ROADMAP.md
+    about: Confirm that large features or refactors match current project priorities before filing them.

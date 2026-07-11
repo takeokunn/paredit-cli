@@ -1,0 +1,85 @@
+name: Bug Report
+description: Report a correctness, safety, CLI contract, or documentation defect.
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for reproducible defects in parser behavior, structural edits,
+        refactor workflows, CLI contracts, packaging, or project documentation.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the bug and why it matters.
+      placeholder: "`paredit-cli refactor workspace execute` reports success even though one target file was not updated."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide exact steps, commands, flags, dialect, whether `--write` was used, and input fixtures.
+      placeholder: |
+        1. Create fixture files ...
+        2. Run `paredit-cli ... --output json`
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: Describe the expected structural edit, verification result, or CLI output.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: Include the exact error, diff, or unexpected JSON output when the command supports `--output json`.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      options:
+        - Parser or reader forms
+        - Structural edit command
+        - Refactor planning
+        - Refactor verification or execute
+        - CLI UX or machine-readable output
+        - Packaging, release, or docs
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, installation path, and the current release version or commit together with the output of `paredit-cli --version` if available.
+      placeholder: |
+        - OS:
+        - Install method:
+        - Current release or commit:
+        - `paredit-cli --version`:
+        - `rustc --version` or `nix --version`:
+    validations:
+      required: true
+  - type: dropdown
+    id: contract_surface
+    attributes:
+      label: Contract Surface
+      description: Indicate whether this report is about a stable contract covered by `COMPATIBILITY.md` or preview/unstable behavior.
+      options:
+        - Stable contract covered by `COMPATIBILITY.md`
+        - Preview or unstable behavior
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Context
+      description: Link related issues, attach minimized fixtures, or mention compatibility risks.

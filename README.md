@@ -11,6 +11,88 @@ parenthesis surgery.
 The core rule is: do not rewrite delimiters by hand. Validate the file, locate
 the exact form or symbol, apply a structural edit, then validate again.
 
+## Installation
+
+Build from a checkout:
+
+```sh
+nix develop -c cargo install --path . --locked
+```
+
+Install directly from GitHub:
+
+```sh
+cargo install --git https://github.com/takeokunn/paredit-cli --locked
+```
+
+The current minimum supported Rust version is `1.85`.
+
+## Quickstart
+
+Start with a read-only inspection pass:
+
+```sh
+paredit check --file source.lisp
+paredit workspace report --output json .
+paredit form-report --file source.lisp --path 0 --include-source --output json
+```
+
+For rename-style refactors, keep the workflow plan-first and write-last:
+
+```sh
+paredit refactor plan --symbol old-name --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp lisp/*.el
+paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --output json src/*.lisp lisp/*.el
+paredit refactor verify --symbol old-name --new-symbol new-name --operation rename --phase post --output json src/*.lisp lisp/*.el
+```
+
+Only add `--write` after reviewing the JSON output and confirming that policy
+gates, parse checks, and target-file scope are all correct.
+
+Use the grouped entrypoints `paredit refactor ...` and
+`paredit workspace ...` as the canonical automation surface.
+
+## Stability and Support
+
+- `main` is the active development line. Until the first release tag is cut,
+  behavior on `main` may change as parser, refactor, and policy surfaces are
+  tightened.
+- Machine-facing CLI and JSON compatibility are defined in
+  [COMPATIBILITY.md](COMPATIBILITY.md), including how released contracts differ
+  from unreleased `main`.
+- User-visible behavior changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+- Security-sensitive reports and the currently supported release line are
+  defined in [SECURITY.md](SECURITY.md).
+- Usage questions, bug reports, and reproduction expectations belong in
+  [SUPPORT.md](SUPPORT.md).
+
+## Verification Model
+
+- Pull requests run `nix flake check`, including workflow linting,
+  formatting, clippy, nextest, package build/tests, and publish dry-run.
+- The declared MSRV is part of the public contract. Until CI grows a dedicated
+  MSRV lane, verify it locally with `cargo +1.85 test --locked` before release
+  or when changing parser, refactor, packaging, or public API surfaces.
+- Use the workflow page for the current CI run history; do not treat the badge
+  alone as release evidence.
+- Treat that automation as a baseline signal, not as complete release proof.
+- Release readiness still requires the broader local verification loop in
+  [CONTRIBUTING.md](CONTRIBUTING.md) and the maintainer checklist in
+  [RELEASE.md](RELEASE.md), including tests, docs, packaging, and smoke
+  checks.
+
+## Project Documents
+
+Pick the document that matches the decision you need to make:
+
+- Users and integrators: [COMPATIBILITY.md](COMPATIBILITY.md),
+  [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md),
+  [SUPPORT.md](SUPPORT.md), [LICENSE](LICENSE),
+  [API docs](https://docs.rs/paredit-cli)
+- Contributors: [CONTRIBUTING.md](CONTRIBUTING.md), [ROADMAP.md](ROADMAP.md),
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SKILLS.md](SKILLS.md)
+- Maintainers and release reviewers: [GOVERNANCE.md](GOVERNANCE.md),
+  [MAINTAINERS.md](MAINTAINERS.md), [RELEASE.md](RELEASE.md)
+
 ## What Agents Get
 
 - Extension-based Lisp dialect detection for Common Lisp, Emacs Lisp, Scheme,
@@ -63,6 +145,75 @@ the exact form or symbol, apply a structural edit, then validate again.
 - DDD-oriented crate layout that separates typed Lisp-domain rules from CLI
   delivery concerns.
 
+### Common Lisp Scope-Aware Rename Semantics
+
+`paredit-cli` is not limited to text-level symbol replacement. Its Common Lisp
+rename commands model lexical scope and callable namespaces so agents can see
+which references are supposed to move and which must stay untouched.
+
+- `rename-binding` follows lexical bindings through `let`-style forms, lambda
+  lists, and destructuring while stopping at shadowing boundaries.
+- `rename-local-function` distinguishes `flet` from `labels`: `labels`
+  references inside local function bodies rename, while `flet` definition
+  bodies keep outer visibility rules.
+- `rename-function` follows Common Lisp callable designators such as
+  `function`, `macro-function`, `compiler-macro-function`, `symbol-function`,
+  `fdefinition`, reader-prefix forms such as `#'`, and `setf` callable names
+  like `(setf accessor)`, while still skipping quoted data and arbitrary
+  values.
+- `rename-function` also keeps `defmacro` and `define-compiler-macro`
+  definitions traversable inside reader-quoted lambda bodies, but treats
+  `macrolet` and `compiler-macrolet` as scope boundaries so expander-local
+  bodies keep their own shadowing rules.
+- `rename-macrolet` renames local `macrolet` and `compiler-macrolet`
+  bindings, including qualified forms such as `cl:macrolet` and
+  `cl-user:compiler-macrolet`, while keeping expander bodies out of scope so
+  only in-form call sites move. Quasiquote, unquote, and unquote-splicing are
+  tracked explicitly so macro-introduced references do not get rewritten as if
+  they were ordinary code.
+- `rename-symbol-macro` and outer-binding renames across `symbol-macrolet`
+  keep expansion references and body references separate, so shadowed body
+  atoms do not move just because an expansion mentions the same symbol.
+- Emacs Lisp support includes semantic handling for `cl-defun`, `cl-defmacro`,
+  `cl-defgeneric`, `cl-defmethod`, and `defsubst` in addition to the usual
+  `defun`-style entry points.
+
+### Common Lisp Support Matrix
+
+`paredit-cli` treats Common Lisp refactors as semantic operations, not raw text
+edits. The current Common Lisp coverage is organized as follows:
+
+- `rename-function`: top-level callable definitions and callable designators
+  for `defun`, `defmacro`, `defgeneric`, `defmethod`,
+  `define-method-combination`, `define-compiler-macro`,
+  `define-setf-expander`, `function`, `macro-function`,
+  `compiler-macro-function`, `symbol-function`, `fdefinition`, `#'`, and
+  `(setf accessor)` forms.
+- `rename-local-function`: lexical callable bindings introduced by `flet` and
+  `labels`.
+- `rename-macrolet`: local macro and compiler-macro bindings introduced by
+  `macrolet` and `compiler-macrolet`.
+- `rename-symbol-macro`: symbol macro bindings introduced by
+  `define-symbol-macro` and `symbol-macrolet`.
+- Scope boundaries: quoted data, arbitrary values, and expander-local bodies
+  stay out of the generic traversal path so the tool can keep shadowing and
+  expansion semantics intact.
+
+```lisp
+;; `labels` local calls rename inside definition bodies and the outer body.
+(labels ((visit (node)
+           (when node
+             (visit (cdr node)))))
+  (visit tree))
+```
+
+```lisp
+;; `symbol-macrolet` expansion references and body references are distinct.
+(let ((value 1))
+  (symbol-macrolet ((current (compute value)))
+    current))
+```
+
 ## Commands
 
 ```sh
@@ -70,8 +221,9 @@ paredit check --file file.lisp
 paredit dialect --file init.el
 paredit stats --file system.asd --output json
 paredit agent-report --file source.lisp --output json
-paredit workspace-report --output json .
-paredit workspace-refactor-plan --symbol render-pane --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json .
+paredit workspace --help
+paredit workspace report --output json .
+paredit refactor workspace-plan --symbol render-pane --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json .
 paredit outline --file source.lisp --output json
 paredit form-report --file source.lisp --path 0 --include-source --output json
 paredit find-symbol --file source.lisp --symbol old-name --output json
@@ -80,17 +232,20 @@ paredit call-report --symbol render-pane --output json src/*.lisp lisp/*.el
 paredit signature-report --symbol render-pane --fail-on-mismatch --require-definitions 1 --require-calls 1 --output json src/*.lisp lisp/*.el
 paredit call-graph --symbol render-pane --fail-on-inbound-callers --require-edges 1 --require-internal-edges 1 --output json src/*.lisp lisp/*.el
 paredit impact-report --symbol render-pane --fail-on-risk-level warning --require-definitions 1 --require-references 1 --require-calls 1 --output json src/*.lisp lisp/*.el
-paredit refactor-plan --symbol render-pane --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp lisp/*.el
-paredit workspace-refactor-preview --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .
-paredit refactor-preview --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --output json src/*.lisp lisp/*.el
-paredit refactor-check --manifest rename.preview.json --root . --output json
-paredit refactor-status --manifest rename.preview.json --root . --output json
-HASH=<manifest.hash from refactor-status JSON>
-paredit refactor-diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
-paredit refactor-apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
-paredit refactor-apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
-paredit refactor-preview --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --write --output json src/*.lisp lisp/*.el
-paredit verify-refactor --symbol render-pane --new-symbol paint-pane --operation rename --phase post --output json src/*.lisp lisp/*.el
+paredit refactor --help
+paredit refactor plan --symbol render-pane --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp lisp/*.el
+paredit refactor workspace-preview --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .
+paredit refactor preview --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --output json src/*.lisp lisp/*.el
+paredit refactor check --manifest rename.preview.json --root . --output json
+paredit refactor status --manifest rename.preview.json --root . --output json
+HASH=<manifest.hash from refactor status JSON>
+paredit refactor diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
+paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
+paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
+paredit refactor workspace-execute --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .
+paredit refactor workspace-execute --from render-pane --to paint-pane --mode function --write --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-changed-files 1 --require-definitions 1 --require-edits 1 --output json .
+paredit refactor preview --from render-pane --to paint-pane --mode function --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict --require-definitions 1 --require-edits 1 --write --output json src/*.lisp lisp/*.el
+paredit refactor verify --symbol render-pane --new-symbol paint-pane --operation rename --phase post --output json src/*.lisp lisp/*.el
 paredit dependency-report --output json system.asd src/*.lisp lisp/*.el
 paredit package-report --output json system.asd src/*.lisp
 paredit definition-report --output json system.asd src/*.lisp lisp/*.el
@@ -114,6 +269,9 @@ paredit replace-forms --file test/suite.lisp --path 0 --path 1 --with "(run-case
 paredit replace-forms --file test/suite.lisp --path 0 --path 1 --with "(run-case)" --require-same-shape --write
 paredit add-export --file src/package.lisp --package demo --symbol #:new-api --output json
 paredit add-export --file src/package.lisp --package demo --symbol #:new-api --write
+paredit sort-package-exports --file src/package.lisp --package demo
+paredit sort-package-options --file src/package.lisp --package demo
+paredit merge-package-options --file src/package.lisp --package demo
 paredit rename-package --from old.pkg --to new.pkg --output json system.asd src/*.lisp
 paredit rename-package --from old.pkg --to new.pkg --write system.asd src/*.lisp
 paredit rename-symbol --file source.lisp --from old-name --to new-name --plan --output json
@@ -124,7 +282,15 @@ paredit rename-binding --file source.lisp --path 0.3 --from old-name --to new-na
 paredit rename-binding --file source.lisp --path 0.3 --from old-name --to new-name --write
 paredit rename-function --from old-name --to new-name --output json src/*.lisp lisp/*.el
 paredit rename-function --from old-name --to new-name --write src/*.lisp lisp/*.el
+paredit rename-local-function --from old-name --to new-name --output json src/*.lisp lisp/*.el
+paredit rename-local-function --from old-name --to new-name --write src/*.lisp lisp/*.el
+paredit rename-macrolet --from old-name --to new-name --output json src/*.lisp lisp/*.el
+paredit rename-macrolet --from old-name --to new-name --write src/*.lisp lisp/*.el
+paredit rename-symbol-macro --from old-name --to new-name --output json src/*.lisp lisp/*.el
+paredit rename-symbol-macro --from old-name --to new-name --write src/*.lisp lisp/*.el
+paredit replace-function-calls --from fetch-user --to load-user --all-calls --output json src/service.lisp
 paredit wrap-function-calls --function fetch-user --wrapper with-cache --all-calls --output json src/*.lisp lisp/*.el
+paredit unwrap-function-calls --function fetch-user --wrapper with-cache --all-calls --output json src/service.lisp
 paredit wrap-function-calls --function fetch-user --wrapper with-cache --call-path 0.4 --write src/service.lisp
 paredit unwrap-call --file source.lisp --path 0.3 --function with-cache --output json
 paredit unwrap-call --file source.lisp --path 0.3 --function with-cache --write
@@ -145,8 +311,11 @@ paredit move-function-parameter --file source.lisp --definition-path 0 --name co
 paredit move-function-parameter --file source.lisp --definition-path 0 --name context --to-index 0 --all-calls --write
 paredit swap-function-parameters --file source.lisp --definition-path 0 --left-name width --right-name height --call-path 1.3 --output json
 paredit swap-function-parameters --file source.lisp --definition-path 0 --left-name width --right-name height --all-calls --write
+paredit reorder-function-parameters --file source.lisp --definition-path 0 --parameter height --parameter width --parameter scale --call-path 1.3 --output json
 paredit remove-function-parameter --file source.lisp --definition-path 0 --name context --call-path 1.3 --output json
 paredit remove-function-parameter --file source.lisp --definition-path 0 --name context --all-calls --write
+paredit sort-definitions --file source.lisp --output json
+paredit sort-definitions --file source.lisp --write --output json
 paredit introduce-let --file source.lisp --path 0.3.1 --name value --output json
 paredit introduce-let --file source.lisp --path 0.3.1 --name value --all-occurrences --output json
 paredit introduce-let --file source.lisp --path 0.3.1 --name value --write
@@ -171,7 +340,14 @@ paredit barf-backward --file source.lisp --path 0
 paredit kill --file source.lisp --path 0.3
 ```
 
-All commands that accept `--file` read stdin when it is omitted.
+The top-level command list above mirrors the canonical public surface exposed by
+`paredit --help`. Use `paredit workspace ...` for repository inventory and
+workspace discovery, and use `paredit refactor ...` for gated refactor plans,
+previews, verification, diffs, and apply flows.
+
+Most single-file structural commands accept stdin when `--file` is omitted.
+Commands that operate on explicit file lists, and package-definition commands
+such as `sort-package-exports`, still require concrete file arguments.
 
 ## Dialect Detection
 
@@ -189,15 +365,15 @@ do not carry a useful filename.
 
 ## Agent Refactoring Workflow
 
-1. Run `paredit workspace-report --output json .` from the repository root to
+1. Run `paredit workspace report --output json .` from the repository root to
    discover Lisp files, dialects, parse errors, definition counts, and call
    counts before choosing a refactor boundary. Review `skipped` counts when
    generated, hidden, or unknown-extension files may be relevant.
-1. Run `paredit workspace-refactor-plan --symbol old --operation rename
+1. Run `paredit refactor workspace-plan --symbol old --operation rename
    --fail-on-blocking-gate --require-definitions 1 --require-references 1
    --output json .` when an agent should discover Lisp files from repository
    roots before producing the gated refactor plan.
-1. Run `paredit workspace-refactor-preview --from old --to new --mode
+1. Run `paredit refactor workspace-preview --from old --to new --mode
    function --fail-on-no-change --fail-on-parse-error
    --fail-on-target-conflict --require-changed-files 1
    --require-definitions 1 --require-edits 1 --output json .` when an agent
@@ -208,6 +384,10 @@ do not carry a useful filename.
 1. Run `paredit check --file target.lisp`.
 1. Run `paredit agent-report --file target.lisp --output json` and cache the
    top-level form paths and spans.
+1. Treat the command snippets below as intent-focused guides. When a snippet
+   omits required file, symbol, package, or path arguments, use the complete
+   examples in [Commands](#commands) or run the same subcommand with `--help`
+   before copying it into automation.
 1. Use `paredit outline --output json` to identify definition-like forms such as
    `defun`, `defmacro`, `defclass`, `defpackage`, `asdf:defsystem`, and
    Emacs Lisp `defcustom` or `define-minor-mode`.
@@ -224,39 +404,39 @@ do not carry a useful filename.
    cleanup, or dependency inversion. Review `asdf-depends-on`,
    `asdf-component`, `require`, `provide`, `load`, `defpackage-*`, and
    `qualified-symbol` entries to decide the safe edit order.
-1. Use `paredit refactor-plan --symbol old --operation rename
+1. Use `paredit refactor plan --symbol old --operation rename
    --fail-on-blocking-gate --require-definitions 1 --require-references 1
    --output json` for an agent-ready preflight that combines impact gates,
    dependency-report reminders, safe-to-automate status, ordered commands, and
    CI-friendly policy failures for rename, remove, move, or signature
    refactors.
-1. Use `paredit refactor-preview --from old --to new --mode function
+1. Use `paredit refactor preview --from old --to new --mode function
    --fail-on-no-change --fail-on-parse-error --fail-on-target-conflict
    --require-definitions 1 --require-edits 1 --output json`
    before write-mode refactors to inspect exact per-file rewrites, byte-span
    edit scripts, stable content hashes, output parse status, replacement-symbol
    conflict counts, and CI-friendly policy failures without modifying files.
-1. Save preview JSON and run `paredit refactor-check --manifest
+1. Save preview JSON and run `paredit refactor check --manifest
    rename.preview.json --root . --output json` when CI or an AI agent needs a
    cheap manifest health gate without rendering a diff. JSON output includes
    `manifest.path`, `manifest.hash`, `manifest_policy_passed`,
    `manifest_outputs_parse`, `summary.can_apply`, per-file hash/parse checks,
    and the `root` audit object.
-1. Save preview JSON and run `paredit refactor-status --manifest
+1. Save preview JSON and run `paredit refactor status --manifest
    rename.preview.json --root . --output json` when an AI coding agent needs a
    non-failing decision response before choosing the next tool call. JSON
    output includes `status`, `next_action`, `blocked_reasons`, `write_plan`,
    `manifest.hash`, `summary.can_apply`, per-file hash/parse checks, and the
-   `root` audit object. Use `refactor-check` for CI gating and
-   `refactor-status` for agent branching.
-1. Save preview JSON and run `paredit refactor-diff --manifest
+   `root` audit object. Use `refactor check` for CI gating and
+   `refactor status` for agent branching.
+1. Save preview JSON and run `paredit refactor diff --manifest
    rename.preview.json --expect-manifest-hash "$HASH" --root . --output json`
    to render a machine-readable unified diff from the same byte-span edits
    while rechecking the pinned manifest hash, input hashes, output hashes, parse
    status, manifest consistency, and workspace-root containment without writing
    files. JSON output includes a `root` audit object showing whether containment
    was enforced and which canonical root was used.
-1. Save preview JSON and run `paredit refactor-apply --manifest
+1. Save preview JSON and run `paredit refactor apply --manifest
    rename.preview.json --expect-manifest-hash "$HASH" --root . --output json`
    for a second dry-run validation pass. Add `--write` only after the manifest
    hash pin, manifest policy, input hashes, output hashes, rewritten parse
@@ -264,14 +444,26 @@ do not carry a useful filename.
    includes a `root` audit object for CI and agent logs. This is the safer
    AI-agent path because stale source files, modified manifests, or out-of-root
    manifest paths cannot be rewritten from an old manifest.
-1. Use `paredit verify-refactor --symbol old --operation rename --phase pre
-   --output json` before edits and `paredit verify-refactor --symbol old
+1. Use `paredit refactor workspace-execute --from old --to new --mode
+   function --output json .` when an agent wants the preview policy checks,
+   optional write step, and post-write verification in one command. Dry-run
+   output includes `preflight_decision`, `execute_decision`, `write_plan`,
+   scheduled verification steps, and the next action to take. Add `--write`
+   only after reviewing the execute decision and changed-file summary.
+1. Use `paredit refactor verify --symbol old --operation rename --phase pre
+   --output json` before edits and `paredit refactor verify --symbol old
    --new-symbol new --operation rename --phase post --output json` after edits
    to produce fixed pass/fail checks for AI coding agents and CI gates.
 1. Use `paredit add-export --output json` to plan a public API export after
    package review. The command updates an existing `:export`, creates one when
    missing, no-ops when the symbol is already exported, and reparses before
    `--write`.
+1. Use `paredit sort-package-exports --output json` after package review to
+   canonicalize one Common Lisp `:export` option without changing the rest of
+   the `defpackage` form. Use `paredit sort-package-options --output json` to
+   normalize option block order, and `paredit merge-package-options --output
+   json` to collapse duplicate `:export`, `:import-from`, and similar option
+   heads before `--write`.
 1. Use `paredit rename-package --output json` after package review when
    renaming a Common Lisp package. Review `defpackage-name`,
    `in-package-name`, `package-option`, and `qualified-prefix` occurrences;
@@ -288,7 +480,8 @@ do not carry a useful filename.
    span, `head`, `argumentCount`, dialect, and `enclosingDefinition` before
    selecting `--call-path` values or applying a multi-file plan.
    Use `paredit signature-report --symbol name --fail-on-mismatch --require-definitions 1 --require-calls 1 --output json`
-   before changing required parameters. It joins callable definitions with
+   before changing positional parameters or adding reviewed new
+   parameters. It joins callable definitions with
    call sites across explicit files and reports each call as `exact`,
    `missing-arguments`, `extra-arguments`, `unknown-definition`, or
    `ambiguous-definition`; the policy flags turn missing/extra argument
@@ -386,14 +579,42 @@ do not carry a useful filename.
    a selected function, macro, `let`, or other local form. Review the scope
    span and occurrence count before applying `--write`.
 1. Use `paredit rename-function --output json` for callable definitions
-   (`defun`, `defmacro`, `defgeneric`, `defmethod`, and dialect equivalents).
-   It rewrites definition names and list-head call sites, but does not rewrite
-   arbitrary value references.
+   (`defun`, `defmacro`, `defgeneric`, `defmethod`, `define-method-combination`,
+   `define-compiler-macro`, `define-setf-expander`, and dialect equivalents).
+   It rewrites definition names, Common Lisp callable designators such as `function`,
+   `macro-function`, `compiler-macro-function`, `symbol-function`,
+   `fdefinition`, and `setf` callable names like `(setf accessor)`, and
+   list-head call sites, but does not rewrite arbitrary value references.
+1. Use `paredit rename-local-function --output json` for local callable
+   bindings such as `flet` and `labels`, including qualified forms like
+   `cl:flet` and `cl-user:labels`. It rewrites the binding name and local call
+   sites, but keeps expansion bodies and non-call references untouched.
+1. Use `paredit rename-macrolet --output json` for `macrolet` and
+   `compiler-macrolet` bindings, including qualified forms such as
+   `cl:macrolet` and `cl-user:compiler-macrolet`. It rewrites the binding name
+   and call sites, but not symbols inside the expander body.
+1. Use `paredit rename-symbol-macro --output json` for
+   `define-symbol-macro` bindings, including qualified forms such as
+   `cl:define-symbol-macro` and `cl-user:define-symbol-macro`. It rewrites the
+   binding name and value references, but respects lexical shadowing.
+1. Refactor plans classify Lisp definition kinds separately so macro-like
+   targets can skip function-signature compatibility gates when that would be a
+   false positive. The JSON `target_kind` field includes `macro`,
+   `compiler_macro`, `setf_expander`, and `symbol_macro` where appropriate.
 1. Use `paredit wrap-function-calls --output json` when a refactor needs to
    introduce a wrapper macro or helper around reviewed call sites. Pass either
    `--all-calls` or repeated `--call-path`; review `calls`,
    `skippedAlreadyWrapped`, `skippedNested`, and policy fields before applying
    `--write`.
+1. Use `paredit replace-function-calls --output json` when only callable
+   list-head names should change while definitions, strings, comments, and
+   value references stay untouched. Pass either `--all-calls` or repeated
+   `--call-path`, then review `callCount`, each targeted `path`, and the
+   rewritten call heads before `--write`.
+1. Use `paredit unwrap-function-calls --output json` when a reviewed wrapper
+   such as `with-cache` should be removed only around matching callable sites.
+   Review `callCount`, `skippedNonUnaryWrapperCount`,
+   `skippedNestedCount`, and the rewritten output before applying `--write`.
 1. Use `paredit unwrap-call --output json` when a selected wrapper call should
    be replaced by one of its arguments. Pass `--function` as a guard whenever
    possible, and review `argumentIndex`, `argumentSpan`, `replacement`, and
@@ -419,24 +640,34 @@ do not carry a useful filename.
    `call_path`, parameter reference counts, and the replacement before
    applying `--write`; pass `--remove-definition` only after confirming no
    remaining callers.
-1. Add required function parameters with
+1. Add function parameters with
    `paredit add-function-parameter --output json` first. Review the selected
    definition, every explicit or discovered `call_paths` entry, and the
-   inserted argument before applying `--write`. Run `signature-report` across
-   the broader explicit file set first when callers can exist outside the
-   single file being rewritten.
-1. Reorder required function parameters with
+   inserted argument before applying `--write`. Use `--parameter-section` when
+   the target belongs in a reviewed `&optional` or `&key` section. Run
+   `signature-report` across the broader explicit file set first when callers
+   can exist outside the single file being rewritten.
+1. Reorder positional function parameters with
    `paredit move-function-parameter --output json` first. Review `from_index`,
    `to_index`, every explicit or discovered `call_paths` entry, and
    `moved_arguments` before applying `--write`.
-1. Swap two required function parameters with
+1. Swap two positional function parameters with
    `paredit swap-function-parameters --output json` first. Review
    `left_index`, `right_index`, every explicit or discovered `call_paths`
    entry, and `swapped_arguments` before applying `--write`.
-1. Remove obsolete required function parameters with
+1. Reorder all positional function parameters with
+   `paredit reorder-function-parameters --output json` first. Pass the full
+   reviewed target order with repeated `--parameter`, then review
+   `old_parameter_order`, `new_parameter_order`, and `reordered_arguments`
+   before applying `--write`.
+1. Remove obsolete positional function parameters with
    `paredit remove-function-parameter --output json` first. Review
    `parameter_index`, each selected or discovered call, and
    `removed_arguments` before applying `--write`.
+1. Use `paredit sort-definitions --output json` to canonicalize contiguous
+   top-level definition blocks inside one file after decomposition or API
+   cleanup. Review `definition_count`, `strategy`, and `changed` before
+   applying `--write`; non-definition barriers are preserved.
 1. Introduce names for complex intermediate expressions with
    `paredit introduce-let --output json` first, then re-run with `--write`
    after reviewing the binding value and enclosing replacement.
@@ -650,15 +881,25 @@ paredit inline-function \
 ```
 
 `inline-function` is intentionally conservative. It requires a supported
-single-expression function definition, exact arity, and simple positional
-parameters. It refuses duplicate argument evaluation and unused arguments by
-default; use `--allow-duplicate-evaluation` or `--allow-drop-arguments` only
-after reviewing the JSON plan. Pass repeated `--call-path` values for reviewed
+single-expression function or macro definition, exact arity, and a reviewed
+call shape. For Common Lisp it supports flat lambda lists including positional
+parameters, `&optional`, `&rest` or `&body`, `&key`, `&allow-other-keys`,
+`&aux`, macro `&whole`, unused macro `&environment` bindings, and `defmacro`
+destructuring parameters built from nested list patterns in required and
+`&optional` or `&key` positions, including inner destructuring `&optional`,
+`&whole`, `&rest`, `&body`, `&key`, and `&allow-other-keys` bindings.
+It still refuses cases that would change semantics, including duplicate
+argument evaluation, unused arguments by default, macro destructuring patterns
+that use unsupported inner lambda-list markers outside this conservative
+subset, and macros that actually reference an `&environment` parameter because
+source-level inlining cannot reconstruct a macro expansion environment. Use
+`--allow-duplicate-evaluation` or `--allow-drop-arguments` only after
+reviewing the JSON plan. Pass repeated `--call-path` values for reviewed
 specific calls, or `--all-calls` to discover every same-file call whose list
 head matches the selected definition. The JSON plan reports both the legacy
 single-call fields and a `calls` array so agents can review each replacement.
 
-Add a required parameter to a reviewed definition and selected call sites:
+Add a parameter to a reviewed definition and selected call sites:
 
 ```sh
 paredit add-function-parameter \
@@ -667,6 +908,14 @@ paredit add-function-parameter \
   --name context \
   --argument '*context*' \
   --call-path 3.2 \
+  --output json
+paredit add-function-parameter \
+  --file src/renderer.lisp \
+  --definition-path 0 \
+  --parameter-section keyword \
+  --name context \
+  --argument ':context *context*' \
+  --all-calls \
   --output json
 paredit add-function-parameter \
   --file src/renderer.lisp \
@@ -682,9 +931,16 @@ reviewed `--call-path` entries, or every same-file call discovered by
 `--all-calls`. It detects supported Lisp function forms from the file extension
 or `--dialect`, verifies each call head against the selected definition,
 reports the final `call_paths`, re-parses the rewritten file, and supports
-`--insert start` for prefix arguments.
+`--insert start` for prefix arguments. By default `--parameter-section auto`
+adds a positional parameter unless the selected Common Lisp lambda list already
+contains `&optional` or `&key`, in which case the new parameter is appended to
+that existing section. Use `--parameter-section positional`, `optional`, or
+`keyword` to force a specific section; explicit `optional` or `keyword`
+requests also create a missing `&optional` or `&key` section when the selected
+Common Lisp lambda list supports that insertion. The JSON/text report returns
+the resolved section as `required`, `optional`, or `keyword`.
 
-Move a required parameter within a reviewed definition and selected call sites:
+Move a positional parameter within a reviewed definition and selected call sites:
 
 ```sh
 paredit move-function-parameter \
@@ -703,14 +959,16 @@ paredit move-function-parameter \
   --write
 ```
 
-`move-function-parameter` reorders only a simple positional parameter in the
-selected definition and moves the same positional argument in each reviewed
-`--call-path` entry, or each same-file call discovered by `--all-calls`. It
-reports `from_index`, `to_index`, `call_paths`, and `moved_arguments`, verifies
-each call head against the selected definition, and re-parses the rewritten
-file.
+`move-function-parameter` reorders a parameter within the selected definition
+and moves the corresponding argument at each reviewed `--call-path` entry, or
+each same-file call discovered by `--all-calls`. In Common Lisp, simple
+positional parameters and lambda-list section members such as `&optional` and
+`&key` are supported, but the command refuses moves across section boundaries.
+It reports `from_index`, `to_index`, `call_paths`, and `moved_arguments`,
+verifies each call head against the selected definition, and re-parses the
+rewritten file.
 
-Swap two required parameters within a reviewed definition and selected call
+Swap two positional parameters within a reviewed definition and selected call
 sites:
 
 ```sh
@@ -730,14 +988,16 @@ paredit swap-function-parameters \
   --write
 ```
 
-`swap-function-parameters` swaps only simple positional parameters in the
-selected definition and swaps the same positional arguments in each reviewed
-`--call-path` entry, or each same-file call discovered by `--all-calls`. It
-reports `left_index`, `right_index`, `call_paths`, and `swapped_arguments`,
+`swap-function-parameters` swaps parameters within the selected definition and
+swaps the corresponding arguments in each reviewed `--call-path` entry, or
+each same-file call discovered by `--all-calls`. In Common Lisp, simple
+positional parameters and lambda-list section members such as `&optional` and
+`&key` are supported, but the command refuses swaps across section boundaries.
+It reports `left_index`, `right_index`, `call_paths`, and `swapped_arguments`,
 verifies each call head against the selected definition, refuses calls missing
 either argument, and re-parses the rewritten file.
 
-Remove an obsolete required parameter from a reviewed definition and selected
+Remove an obsolete positional parameter from a reviewed definition and selected
 call sites:
 
 ```sh
@@ -755,9 +1015,12 @@ paredit remove-function-parameter \
   --write
 ```
 
-`remove-function-parameter` removes only a simple positional parameter from the
-selected definition and the same positional argument from each reviewed
-`--call-path` entry, or each same-file call discovered by `--all-calls`. It
+`remove-function-parameter` removes a parameter from the selected definition
+and the corresponding argument from each reviewed `--call-path` entry, or each
+same-file call discovered by `--all-calls`. In Common Lisp, simple positional
+parameters and lambda-list section members such as `&optional` and `&key` are
+supported when the call shape still remains valid; unsupported tails such as
+entries after `&allow-other-keys` are rejected. It
 verifies each call head against the selected definition, reports
 `parameter_index`, `call_paths`, and `removed_arguments`, refuses missing call
 arguments by default, and re-parses the rewritten file.
@@ -849,7 +1112,7 @@ paredit remove-unused-binding \
 - Newtypes for byte offsets, byte spans, expression paths, node ids, child
   indexes, and symbol names.
 - `thiserror` for parse errors and `anyhow` for CLI boundary errors.
-- Warning-clean `cargo clippy --all-targets -- -D warnings`.
+- Warning-clean `cargo clippy --all-targets --all-features -- -D warnings`.
 - Nix flake verification for reproducible development.
 
 ## Architecture
@@ -874,11 +1137,37 @@ behavior at the `presentation` boundary unless a use case is promoted into
 ```sh
 nix develop
 cargo fmt --all
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
+cargo nextest run --locked
+cargo publish --dry-run --allow-dirty --locked
+cargo doc --no-deps
+cargo package --allow-dirty --no-verify
+cargo package --allow-dirty --list
 nix flake check
 nix build .#
 ```
+
+## Project Policies
+
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release
+  expectations.
+- See [GOVERNANCE.md](GOVERNANCE.md) for decision-making, scope control, and
+  maintainer expansion rules.
+- See [RELEASE.md](RELEASE.md) for maintainer release criteria and execution
+  steps.
+- See [COMPATIBILITY.md](COMPATIBILITY.md) for CLI, JSON, and `--write`
+  stability guarantees.
+- See [MAINTAINERS.md](MAINTAINERS.md) for maintainer responsibilities and
+  response targets.
+- See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for collaboration and community
+  expectations.
+- See [SECURITY.md](SECURITY.md) for vulnerability reporting and response
+  expectations.
+- See [SUPPORT.md](SUPPORT.md) for bug-reporting and usage-support guidance.
+- See [ROADMAP.md](ROADMAP.md) for current priorities, contribution focus, and
+  explicit non-goals.
+- See [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
 
 ## Scope
 
