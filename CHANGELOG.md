@@ -44,6 +44,20 @@ with no external effect.
   Lisp `defun`, Clojure `defn`, ...) that are not broken out into a more
   specific category but are still known, non-generative shapes, and
   remains bulk-removable as before.
+- `remove-unused-definitions`/`unused-definition-report`: a definition
+  named only as the literal head of a quasiquoted code-generation template
+  (`` `(validator-fn ,arg) ``, the pattern a macro uses to assemble a form
+  it later splices into its own expansion) is no longer treated as
+  unused. The quoted-dispatch-data supplemental scan only recognized a
+  plain `Quote` reader prefix; quasiquote (`` ` ``) is now recognized the
+  same way, since it is at least as common an idiom for naming a
+  still-live callee indirectly.
+- `unused-definition-report`: reference counting now uses the same
+  scope-aware scan as `remove-unused-definitions` (previously a flat,
+  scope-blind atom-text scan), so a global definition shadowed only by a
+  same-named local `let`/`flet`/etc. binding elsewhere is no longer
+  miscounted as referenced. The two commands could previously disagree on
+  whether the same definition was unused.
 - `sort-package-exports`: a `;; section` comment (or any own-line comment)
   that precedes an export symbol now travels with that symbol when the
   sort reorders the list, instead of staying at a fixed line and

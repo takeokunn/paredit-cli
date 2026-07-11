@@ -220,6 +220,40 @@ fn cli_keeps_definition_only_referenced_from_quoted_dispatch_data() {
 }
 
 #[test]
+fn cli_keeps_definition_only_referenced_from_a_quasiquoted_code_generation_template() {
+    // A macro helper that assembles generated code via a quasiquote template
+    // (`` `(validator-fn ,arg) ``) names its callee as the literal head of
+    // the template, not through a direct call. This is the same "opaque to
+    // scope-aware scanning" blind spot as quoted dispatch data, just via a
+    // different reader prefix, so it must be kept alive by the same
+    // supplemental scan.
+    let dir = fresh_temp_dir("remove-unused-definitions-quasiquote-plan");
+    let file = dir.join("core.lisp");
+    let original = "(defun ensure-slot-type (value type)\n  (list value type))\n\n\
+                    (defun build-validation-form (slot type)\n  \
+                    `(ensure-slot-type ,slot ',type))\n\n\
+                    (build-validation-form 'x 'string)\n\n\
+                    (defun stale-helper () :stale)\n";
+    fs::write(&file, original).expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("remove-unused-definitions")
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"removal_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"stale-helper\""));
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten fixture");
+    assert!(rewritten.contains("(defun ensure-slot-type (value type)"));
+    assert!(rewritten.contains("`(ensure-slot-type ,slot ',type)"));
+    assert!(!rewritten.contains("stale-helper"));
+}
+
+#[test]
 fn cli_keeps_exported_unused_definition_by_default() {
     let dir = fresh_temp_dir("remove-unused-definitions-exported-plan");
     let file = dir.join("core.lisp");
