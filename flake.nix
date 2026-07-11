@@ -24,7 +24,7 @@
         pkgs:
         pkgs.rustPlatform.buildRustPackage {
           pname = "paredit-cli";
-          version = "0.1.1";
+          version = "0.1.2";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
         };

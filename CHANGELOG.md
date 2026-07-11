@@ -12,6 +12,31 @@ with no external effect.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-11
+
+### Fixed
+
+- Parser: a backslash in an atom now consumes the following character
+  literally (the Lisp single-escape rule), so character literals whose
+  value is a delimiter or whitespace (`#\[`, `#\)`, `#\]`, `#\(`, `#\Space`)
+  and escaped symbol constituents like `\(` no longer split into a stray
+  delimiter and cause a mismatched/unclosed-list error.
+- Formatter: canonical rendering now preserves comments instead of
+  silently dropping them. Leading own-line comments stay above their
+  form, trailing same-line comments stay inline, and forms with interior
+  comments render verbatim; comment-free output is unchanged and format
+  stays idempotent.
+- `package-report`/dependency-report: a `defpackage`/`in-package` form
+  whose package designator is computed or quasiquoted (not a static atom)
+  is now skipped instead of hard-erroring the whole report.
+
+### Changed
+
+- `nix flake check` no longer runs the network-bound `cargo publish
+  --dry-run` check, which requires crates.io registry access unavailable
+  in the sandboxed Linux CI build. The publish dry-run remains a
+  documented local pre-release step in RELEASE.md.
+
 ## [0.1.1] - 2026-07-11
 
 ### Added
