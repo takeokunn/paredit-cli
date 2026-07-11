@@ -230,6 +230,38 @@ fn reports_common_lisp_cl_user_symbol_macrolet_without_counting_expansion_refere
     assert!(!reports[0].bindings[1].can_inline_without_duplication);
 }
 
+#[test]
+fn reports_earmuffed_special_variable_rebind_distinctly_instead_of_unused_binding() {
+    // `(let ((*read-eval* nil)) (read stream))` rebinds a special variable
+    // purely for its dynamic-scope side effect; no lexical reference is
+    // needed or expected. Flagging it "unused-binding" would invite
+    // deleting a binding that can be load-bearing for program behavior (in
+    // this exact shape, a defense against arbitrary code execution via
+    // `#.` during `read`).
+    let reports = reports_for("(let ((*read-eval* nil)) (read stream))", Dialect::CommonLisp);
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].bindings[0].reference_count, 0);
+    assert!(
+        reports[0]
+            .bindings[0]
+            .risks
+            .contains(&"possible-dynamic-variable-rebind")
+    );
+    assert!(!reports[0].bindings[0].risks.contains(&"unused-binding"));
+    assert!(!reports[0].bindings[0].can_inline_without_duplication);
+}
+
+#[test]
+fn reports_unused_binding_for_a_non_earmuffed_zero_reference_name() {
+    // A name that merely starts or ends with `*` (not both) is not the
+    // earmuff convention and must not be exempted.
+    let reports = reports_for("(let ((*unused)) 42)", Dialect::CommonLisp);
+
+    assert_eq!(reports.len(), 1);
+    assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(32))]
 

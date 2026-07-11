@@ -13,7 +13,8 @@ mod table;
 
 pub(crate) use normalize::{
     common_lisp_operator_head_eq, common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
-    is_common_lisp_declaration_form, normalize_common_lisp_operator_head,
+    is_common_lisp_declaration_form, is_common_lisp_earmuffed_special_variable_name,
+    normalize_common_lisp_operator_head,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

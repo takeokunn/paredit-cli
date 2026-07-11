@@ -56,3 +56,22 @@ pub(crate) fn is_common_lisp_declaration_form(head: &str) -> bool {
         || common_lisp_operator_head_eq(head, "declaim")
         || common_lisp_operator_head_eq(head, "proclaim")
 }
+
+/// Returns true for the "earmuffed" naming convention (`*name*`) Common Lisp
+/// programmers use, near-universally, to mark a symbol as a special
+/// (dynamically scoped) variable declared elsewhere via `defvar`/
+/// `defparameter`/`declaim special`.
+///
+/// This matters for `let`-binding analysis: rebinding a special variable
+/// (`(let ((*read-eval* nil)) (read stream))`) is meaningful purely through
+/// its dynamic-scope side effect for the body's dynamic extent — every
+/// nested call that reads the special variable sees the rebound value, with
+/// no textual reference to the binding name required anywhere in the
+/// lexical body. A lexical-scope-only "is this name referenced in the body"
+/// check is the wrong question for such a binding and must not flag it as
+/// dead.
+pub(crate) fn is_common_lisp_earmuffed_special_variable_name(name: &str) -> bool {
+    let name = strip_common_lisp_symbol_qualifiers(name);
+    let bytes = name.as_bytes();
+    bytes.len() > 2 && bytes[0] == b'*' && bytes[bytes.len() - 1] == b'*'
+}

@@ -778,7 +778,12 @@ do not carry a useful filename.
    inlining. Review each form path, binding value span, reference count, and
    risk list. For agent or CI workflows, add `--fail-on-duplicate-evaluation`,
    `--fail-on-unused-binding`, and `--require-inlineable-bindings N` to turn
-   the report into a fixed pass/fail gate while still printing JSON.
+   the report into a fixed pass/fail gate while still printing JSON. A
+   Common Lisp binding named with the earmuff convention (`*name*`) and zero
+   references is reported as `possible-dynamic-variable-rebind`, not
+   `unused-binding`: it very likely rebinds a `defvar`/`defparameter`
+   special variable for its dynamic-scope side effect, which needs no
+   textual reference anywhere in the body.
 1. Remove unnecessary single-binding `let` forms with
    `paredit inline-let --output json` first. The command refuses unused
    bindings and duplicate evaluation by default; pass

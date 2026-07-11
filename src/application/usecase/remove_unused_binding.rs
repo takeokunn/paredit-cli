@@ -2,7 +2,11 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispBindingRefactorForm, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::{
+    CommonLispBindingRefactorForm, common_lisp_symbol_reference_eq,
+    is_common_lisp_earmuffed_special_variable_name,
+};
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Formatter, SymbolName, SyntaxTree,
 };
@@ -130,7 +134,19 @@ fn remove_unused_binding_parts(
                 candidate,
                 &symbol,
             )?;
-            if reference_spans.is_empty() {
+            // An earmuffed (`*name*`) name with zero lexical references is,
+            // by the near-universal Common Lisp convention, very likely a
+            // rebind of a `defvar`/`defparameter`-declared special
+            // variable — meaningful purely through its dynamic-scope side
+            // effect for the body's dynamic extent, e.g. `(let
+            // ((*read-eval* nil)) (read stream))`. `--all-bindings` must
+            // not silently delete that: doing so can change program
+            // behavior instead of removing dead code. Skip it from bulk
+            // selection; `--name` still allows removing it explicitly.
+            if reference_spans.is_empty()
+                && !(dialect == Dialect::CommonLisp
+                    && is_common_lisp_earmuffed_special_variable_name(&candidate.name))
+            {
                 unused.push(RemovedBindingParts {
                     name: candidate.name.clone(),
                     binding_span: candidate.removal_span,

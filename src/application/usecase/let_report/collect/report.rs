@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::domain::common_lisp::is_common_lisp_earmuffed_special_variable_name;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::value_capture;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName};
@@ -79,7 +80,24 @@ pub(super) fn analyze_let_form(
         if symbol.is_err() {
             risks.push("unsupported-binding-name");
         }
-        if reference_count == 0 {
+        // Rebinding an earmuffed (`*name*`) special variable, the
+        // near-universal Common Lisp convention for a `defvar`/
+        // `defparameter`-declared dynamic variable, is meaningful purely
+        // through its dynamic-scope side effect for the rest of the body's
+        // dynamic extent — `(let ((*read-eval* nil)) (read stream))`
+        // legitimately has zero lexical references to `*read-eval*`. A
+        // lexical "is this name referenced" check cannot tell this apart
+        // from genuine dead code, so flag it distinctly instead of as
+        // `unused-binding`: acting on that report (deleting the binding)
+        // can silently change program behavior — in the read-eval example,
+        // reinstating an arbitrary-code-execution risk the binding exists
+        // to close.
+        if reference_count == 0
+            && dialect == Dialect::CommonLisp
+            && is_common_lisp_earmuffed_special_variable_name(&candidate.name)
+        {
+            risks.push("possible-dynamic-variable-rebind");
+        } else if reference_count == 0 {
             risks.push("unused-binding");
         }
         if reference_count > 1 {
@@ -92,9 +110,17 @@ pub(super) fn analyze_let_form(
             risks.push("unsupported-by-inline-let");
         }
 
+        let sliced_value = candidate.value_span.slice(input);
         bindings.push(LetBindingReport {
             name: candidate.name.clone(),
-            value: candidate.value_span.slice(input).to_owned(),
+            // A zero-width value_span means the binding had no explicit
+            // value form (an implicit-nil binding); report its true value
+            // instead of an empty string.
+            value: if sliced_value.is_empty() {
+                "nil".to_owned()
+            } else {
+                sliced_value.to_owned()
+            },
             value_span: candidate.value_span,
             reference_count,
             can_inline_without_duplication: risks.is_empty(),

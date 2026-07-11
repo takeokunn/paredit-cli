@@ -14,6 +14,19 @@ with no external effect.
 
 ### Fixed
 
+- `let-report` and `remove-unused-binding --all-bindings` no longer treat
+  rebinding an earmuffed (`*name*`) Common Lisp special variable with zero
+  lexical references as dead code. `(let ((*read-eval* nil)) (read
+  stream))` is meaningful purely through its dynamic-scope side effect for
+  the body's dynamic extent — no reference to `*read-eval*` is needed or
+  expected anywhere in the body. `let-report` now reports this shape with a
+  distinct `possible-dynamic-variable-rebind` risk instead of
+  `unused-binding`, and `--all-bindings` skips it from bulk removal
+  (`--name` still removes it if explicitly targeted). Previously, trusting
+  either report could delete a binding that changes program behavior —
+  verified against a real target codebase, where this exact shape guards
+  against `#.` read-time code execution while deserializing persisted
+  data.
 - `let-report` no longer analyzes a `let`-shaped form found inside a
   quasiquote code-generation template (e.g. `` `(let ((,x ,val)) ...) ``
   in a with-gensyms-style macro helper) as a real binding. Such a form's
