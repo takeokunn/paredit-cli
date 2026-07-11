@@ -127,8 +127,21 @@ fn collect_explicit_reader_form(
 
     let normalized_head = normalize_common_lisp_operator_head(head);
 
-    if common_lisp_operator_head_eq(normalized_head, "quote")
-        || common_lisp_operator_head_eq(normalized_head, "function")
+    if common_lisp_operator_head_eq(normalized_head, "quote") {
+        return true;
+    }
+
+    // `(function name)` is the explicit spelling of `#'name`: a
+    // function-namespace designator naming exactly one symbol, opaque to
+    // this value-namespace scan. `(function (arg-types...) return-type)` is
+    // the unrelated `FUNCTION` *type specifier* used in `declaim`/`the`/
+    // `check-type` position (e.g. `(declaim (ftype (function (my-word)
+    // my-word) f)))`) — it has the same head but a list, not a symbol, as
+    // its second element, and its contents are ordinary type-position atoms
+    // that must still be scanned normally.
+    if common_lisp_operator_head_eq(normalized_head, "function")
+        && view.children.len() == 2
+        && view.children[1].kind == ExpressionKind::Atom
     {
         return true;
     }

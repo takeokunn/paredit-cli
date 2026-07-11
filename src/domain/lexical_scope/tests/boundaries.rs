@@ -29,6 +29,22 @@ fn declare_forms_in_common_lisp_bodies_are_not_counted_as_references() {
 }
 
 #[test]
+fn function_type_specifier_is_not_treated_as_an_opaque_function_designator() {
+    // `(function name)` is the explicit spelling of `#'name` and is opaque
+    // (see `reader_prefixed_quote_and_function_still_block_references`
+    // above). `(function (arg-types...) return-type)` shares the same head
+    // but is the unrelated FUNCTION *type specifier*, most commonly seen
+    // inside `declaim`/`ftype` for a `deftype`-defined alias — its contents
+    // are ordinary type-position atoms and must still be scanned.
+    let input = "(declaim (ftype (function (my-word) my-word) f))";
+
+    assert_eq!(
+        reference_texts(input, "my-word"),
+        vec!["my-word", "my-word"]
+    );
+}
+
+#[test]
 fn proclamation_forms_in_common_lisp_bodies_are_not_counted_as_references() {
     let input =
         "(list used (locally (declaim (special used)) (proclaim (special used)) used) used)";
