@@ -5,10 +5,10 @@ fn cli_writes_outer_flet_rename_inside_macrolet_expander_only() {
     assert_cli_local_function_write(
         "rename-local-function-macrolet-expander-write",
         "lisp",
-        "(flet ((old-name (x) x)) (macrolet ((old-name () #'old-name (function old-name) (old-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
+        "(flet ((old-name (x) x)) (macrolet ((old-name () #'old-name (function old-name) (macro-function 'old-name) (compiler-macro-function 'old-name) (symbol-function 'old-name) (fdefinition 'old-name) (old-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
         1,
         3,
-        "(flet ((new-name (x) x)) (macrolet ((old-name () #'new-name (function new-name) (new-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
+        "(flet ((new-name (x) x)) (macrolet ((old-name () #'new-name (function new-name) (macro-function 'old-name) (compiler-macro-function 'old-name) (symbol-function 'old-name) (fdefinition 'old-name) (new-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
     );
 }
 
@@ -17,10 +17,10 @@ fn cli_writes_outer_flet_rename_inside_compiler_macrolet_expander_only() {
     assert_cli_local_function_write(
         "rename-local-function-compiler-macrolet-expander-write",
         "lisp",
-        "(flet ((old-name (x) x)) (compiler-macrolet ((old-name () #'old-name (function old-name) (old-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
+        "(flet ((old-name (x) x)) (compiler-macrolet ((old-name () #'old-name (function old-name) (macro-function 'old-name) (compiler-macro-function 'old-name) (symbol-function 'old-name) (fdefinition 'old-name) (old-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
         1,
         3,
-        "(flet ((new-name (x) x)) (compiler-macrolet ((old-name () #'new-name (function new-name) (new-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
+        "(flet ((new-name (x) x)) (compiler-macrolet ((old-name () #'new-name (function new-name) (macro-function 'old-name) (compiler-macro-function 'old-name) (symbol-function 'old-name) (fdefinition 'old-name) (new-name 1))) (old-name) #'old-name (function old-name) (old-name 2)))\n",
     );
 }
 

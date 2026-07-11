@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn plans_outer_flet_rename_inside_macrolet_expander_but_not_shadowed_body() {
     assert_local_function_rename!(
-        input: "(flet ((foo (x) x)) (macrolet ((foo () #'foo (function foo) (foo 1))) (foo) #'foo (function foo) (foo 2)))\n",
+        input: "(flet ((foo (x) x)) (macrolet ((foo () #'foo (function foo) (macro-function 'foo) (compiler-macro-function 'foo) (symbol-function 'foo) (fdefinition 'foo) (foo 1))) (foo) #'foo (function foo) (foo 2)))\n",
         dialect: Dialect::CommonLisp,
         from: "foo",
         to: "bar",
@@ -12,7 +12,7 @@ fn plans_outer_flet_rename_inside_macrolet_expander_but_not_shadowed_body() {
         changed: true,
         rewritten_contains: [
             "(flet ((bar (x) x))",
-            "(macrolet ((foo () #'bar (function bar) (bar 1))) (foo) #'foo (function foo) (foo 2)))"
+            "(macrolet ((foo () #'bar (function bar) (macro-function 'foo) (compiler-macro-function 'foo) (symbol-function 'foo) (fdefinition 'foo) (bar 1))) (foo) #'foo (function foo) (foo 2)))"
         ]
     );
 }
@@ -34,7 +34,7 @@ fn plans_flet_rename_inside_reader_quoted_lambda_bodies() {
 #[test]
 fn plans_outer_flet_rename_inside_compiler_macrolet_expander_but_not_shadowed_body() {
     assert_local_function_rename!(
-        input: "(flet ((foo (x) x)) (compiler-macrolet ((foo () #'foo (function foo) (foo 1))) (foo) #'foo (function foo) (foo 2)))\n",
+        input: "(flet ((foo (x) x)) (compiler-macrolet ((foo () #'foo (function foo) (macro-function 'foo) (compiler-macro-function 'foo) (symbol-function 'foo) (fdefinition 'foo) (foo 1))) (foo) #'foo (function foo) (foo 2)))\n",
         dialect: Dialect::CommonLisp,
         from: "foo",
         to: "bar",
@@ -43,7 +43,7 @@ fn plans_outer_flet_rename_inside_compiler_macrolet_expander_but_not_shadowed_bo
         changed: true,
         rewritten_contains: [
             "(flet ((bar (x) x))",
-            "(compiler-macrolet ((foo () #'bar (function bar) (bar 1))) (foo) #'foo (function foo) (foo 2)))"
+            "(compiler-macrolet ((foo () #'bar (function bar) (macro-function 'foo) (compiler-macro-function 'foo) (symbol-function 'foo) (fdefinition 'foo) (bar 1))) (foo) #'foo (function foo) (foo 2)))"
         ]
     );
 }
