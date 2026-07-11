@@ -12,6 +12,16 @@ with no external effect.
 
 ## [Unreleased]
 
+### Fixed
+
+- `sort-package-exports`: a `;; section` comment (or any own-line comment)
+  that precedes an export symbol now travels with that symbol when the
+  sort reorders the list, instead of staying at a fixed line and
+  mislabeling whichever symbol landed there. Trailing same-line comments
+  stay glued to the symbol they follow, and the closing delimiters are
+  pushed to a fresh line when a commented entry would otherwise absorb
+  them. Comment-free export lists reorder exactly as before.
+
 ## [0.1.2] - 2026-07-11
 
 ### Fixed

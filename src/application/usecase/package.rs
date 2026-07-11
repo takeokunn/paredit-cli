@@ -66,7 +66,8 @@ pub fn plan_sort_package_exports(
     request: SortPackageExportsRequest<'_>,
 ) -> Result<SortPackageExportsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let edits = defpackage_export_sort_edits(&tree, request.dialect, request.package)?;
+    let edits =
+        defpackage_export_sort_edits(request.input, &tree, request.dialect, request.package)?;
     let replacements = edits
         .iter()
         .flat_map(|edit| {

@@ -35,6 +35,58 @@ fn sorted_package_exports_are_idempotent() {
     assert_eq!(plan.exports[0].new_symbols, ["#:a", "#:b", "#:c"]);
 }
 
+#[test]
+fn sort_package_exports_keeps_leading_comments_with_their_symbols() {
+    let input = "\
+(defpackage #:demo
+  (:export
+   ;; group b
+   #:zeta
+   ;; group a
+   #:alpha
+   #:beta))
+";
+    let plan = plan_sort_package_exports(SortPackageExportsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: None,
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    assert_eq!(plan.exports[0].new_symbols, ["#:alpha", "#:beta", "#:zeta"]);
+    let expected = "\
+(defpackage #:demo
+  (:export
+   ;; group a
+   #:alpha
+   #:beta
+   ;; group b
+   #:zeta))
+";
+    assert_eq!(plan.rewritten, expected);
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn sort_package_exports_keeps_trailing_same_line_comment_and_stays_balanced() {
+    let input = "(defpackage #:demo\n  (:export\n   #:zeta ; last one\n   #:alpha))\n";
+    let plan = plan_sort_package_exports(SortPackageExportsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: None,
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    assert_eq!(plan.exports[0].new_symbols, ["#:alpha", "#:zeta"]);
+    // The trailing comment stays glued to #:zeta; the closing delimiters that
+    // followed the region are pushed to a fresh line so they are not commented out.
+    let expected = "(defpackage #:demo\n  (:export\n   #:alpha\n   #:zeta ; last one\n   ))\n";
+    assert_eq!(plan.rewritten, expected);
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
