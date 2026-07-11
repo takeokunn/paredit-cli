@@ -68,7 +68,13 @@ fn matching_common_lisp_symbol_occurrences(
     symbol: &SymbolName,
 ) -> Vec<AtomOccurrence> {
     let mut spans = Vec::new();
-    collect_unshadowed_symbol_references(&tree.root_view(), symbol, "", &mut spans);
+    collect_unshadowed_symbol_references(
+        Dialect::CommonLisp,
+        &tree.root_view(),
+        symbol,
+        "",
+        &mut spans,
+    );
     let matched_spans = spans
         .into_iter()
         .map(|span| (span.start().get(), span.end().get()))

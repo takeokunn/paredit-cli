@@ -66,6 +66,28 @@ fn resolves_unqualified_call_edge_to_package_qualified_common_lisp_definition() 
     );
 }
 
+#[test]
+fn in_package_forms_do_not_count_as_package_definitions() {
+    let report = build_call_graph_report(
+        vec![source(
+            "(defpackage :demo (:use :cl))\n(in-package :demo)\n(defun helper (x) x)\n(in-package :demo)\n",
+        )],
+        false,
+        None,
+    )
+    .unwrap();
+
+    // The package is defined once by defpackage; the two in-package forms are
+    // references, not definitions.
+    let package_node = report
+        .nodes_by_name
+        .get(":demo")
+        .expect("package node present");
+    assert_eq!(package_node.definition_count, 1);
+    // Only defpackage and helper are definitions; in-package is excluded.
+    assert_eq!(report.files[0].definitions.len(), 2);
+}
+
 proptest! {
     #[test]
     fn pbt_internal_edges_preserve_generated_callee_and_arity(

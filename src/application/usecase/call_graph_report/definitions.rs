@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionView, Path, SyntaxTree};
@@ -32,17 +33,24 @@ fn collect_call_graph_definitions_from_view(
         && view.delimiter == Some(Delimiter::Paren)
     {
         if let Some(head) = list_head(view) {
-            if let Some(shape) = definition_shape(dialect, view, head) {
-                let name = shape.name(view).map(str::to_string);
-                let parameter_count = shape.lambda_parameter_count(view).unwrap_or(0);
+            // `in-package` selects the current package; it is a reference, not a
+            // definition. definition-report and impact-report skip it, so the call
+            // graph must too, or the package node's definition_count is inflated.
+            let is_in_package = dialect.common_lisp_package_declaration_form_for_head(head)
+                == Some(CommonLispPackageDeclarationForm::InPackage);
+            if !is_in_package {
+                if let Some(shape) = definition_shape(dialect, view, head) {
+                    let name = shape.name(view).map(str::to_string);
+                    let parameter_count = shape.lambda_parameter_count(view).unwrap_or(0);
 
-                items.push(CallGraphDefinitionItem {
-                    name,
-                    category: shape.category,
-                    path: path.clone(),
-                    span: view.span,
-                    parameter_count,
-                });
+                    items.push(CallGraphDefinitionItem {
+                        name,
+                        category: shape.category,
+                        path: path.clone(),
+                        span: view.span,
+                        parameter_count,
+                    });
+                }
             }
         }
     }

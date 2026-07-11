@@ -17,6 +17,7 @@ use super::candidates::LetBindingRemovalCandidate;
 use super::syntax::{list_head, view_at_span};
 
 struct BindingReferenceContext<'a> {
+    dialect: Dialect,
     input: &'a str,
     target: &'a ExpressionView,
     binding_form: &'a ExpressionView,
@@ -40,6 +41,7 @@ pub(super) fn binding_reference_spans(
     name: &SymbolName,
 ) -> Result<Vec<ByteSpan>> {
     let context = BindingReferenceContext {
+        dialect,
         input,
         target,
         binding_form,
@@ -63,6 +65,7 @@ pub(super) fn binding_reference_spans(
         }
         CommonLispBindingReferenceScope::LocalCallableDefinitions(_) => {
             Ok(body_binding_reference_spans(
+                dialect,
                 context.input,
                 context.target,
                 context.name,
@@ -73,6 +76,7 @@ pub(super) fn binding_reference_spans(
             variable_spec_binding_reference_spans(&context, spec_form, binding_form_kind),
         ),
         CommonLispBindingReferenceScope::BodyOnly => Ok(body_binding_reference_spans(
+            dialect,
             context.input,
             context.target,
             context.name,
@@ -95,6 +99,7 @@ fn name_value_binding_reference_spans(
             let later_value = view_at_span(context.binding_form, later.value_span)
                 .context("failed to resolve later binding value")?;
             collect_unshadowed_symbol_references(
+                context.dialect,
                 later_value,
                 context.name,
                 context.input,
@@ -104,6 +109,7 @@ fn name_value_binding_reference_spans(
     }
     for body in &context.target.children[2..] {
         collect_unshadowed_symbol_references(
+            context.dialect,
             body,
             context.name,
             context.input,
@@ -131,6 +137,7 @@ fn variable_spec_binding_reference_spans(
             };
             if let Some(init_form) = iteration_variable_spec_init_form(later_spec) {
                 collect_unshadowed_symbol_references(
+                    context.dialect,
                     init_form,
                     context.name,
                     context.input,
@@ -144,6 +151,7 @@ fn variable_spec_binding_reference_spans(
         for spec in &context.binding_form.children {
             if let Some(step_form) = variable_spec_step_form(spec) {
                 collect_unshadowed_symbol_references(
+                    context.dialect,
                     step_form,
                     context.name,
                     context.input,
@@ -156,6 +164,7 @@ fn variable_spec_binding_reference_spans(
     if let Some(end_clause_index) = spec_form.end_clause_index() {
         if let Some(end_clause) = context.target.children.get(end_clause_index) {
             collect_unshadowed_symbol_references(
+                context.dialect,
                 end_clause,
                 context.name,
                 context.input,
@@ -170,6 +179,7 @@ fn variable_spec_binding_reference_spans(
         .skip(spec_form.body_start_index())
     {
         collect_unshadowed_symbol_references(
+            context.dialect,
             body,
             context.name,
             context.input,
@@ -181,6 +191,7 @@ fn variable_spec_binding_reference_spans(
 }
 
 fn body_binding_reference_spans(
+    dialect: Dialect,
     input: &str,
     target: &ExpressionView,
     name: &SymbolName,
@@ -188,7 +199,7 @@ fn body_binding_reference_spans(
 ) -> Vec<ByteSpan> {
     let mut reference_spans = Vec::new();
     for body in target.children.iter().skip(body_start_index) {
-        collect_unshadowed_symbol_references(body, name, input, &mut reference_spans);
+        collect_unshadowed_symbol_references(dialect, body, name, input, &mut reference_spans);
     }
     reference_spans
 }

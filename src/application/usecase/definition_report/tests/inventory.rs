@@ -37,3 +37,16 @@ fn builds_definition_inventory_with_package_and_counts() {
     assert_eq!(report.definitions[4].body_form_count, Some(1));
     assert_eq!(report.definitions[4].package.as_deref(), Some("#:demo"));
 }
+
+#[test]
+fn builds_definition_inventory_for_defstruct_with_options_list_name() {
+    let input = "(defstruct (line (:constructor make-line)) start end)\n";
+    let tree = SyntaxTree::parse(input).expect("parse input");
+
+    let report = build_definition_report(PathBuf::from("core.lisp"), Dialect::CommonLisp, &tree)
+        .expect("build report");
+
+    assert_eq!(report.definitions.len(), 1);
+    assert_eq!(report.definitions[0].name.as_deref(), Some("line"));
+    assert_eq!(report.definitions[0].category, DefinitionCategory::Struct);
+}
