@@ -159,7 +159,9 @@ treefmt-nix.lib.evalModule pkgs {
 ## Verification Model
 
 - Pull requests run `nix flake check`, including workflow linting,
-  formatting, clippy, nextest, package build/tests, and publish dry-run.
+  formatting, clippy, nextest, and package build/tests. The `cargo publish
+  --dry-run` step needs network access the Nix sandbox denies on CI, so it
+  stays a local pre-release step (see [RELEASE.md](RELEASE.md)).
 - The declared MSRV is part of the public contract. Until CI grows a dedicated
   MSRV lane, verify it locally with `cargo +1.85 test --locked` before release
   or when changing parser, refactor, packaging, or public API surfaces.

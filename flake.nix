@@ -232,7 +232,7 @@
                 cargo publish --dry-run --allow-dirty --locked
 
               Quick verification:
-                nix flake check  # treefmt + actionlint + clippy + nextest + package build/tests + publish dry-run + lint/format integration
+                nix flake check  # treefmt + actionlint + clippy + nextest + package build/tests + lint/format integration
 
               Build and run:
                 nix build .#              # result/bin/paredit
@@ -317,20 +317,12 @@
               '';
             });
             package = self.packages.${system}.default;
-            publish = (self.packages.${system}.default).overrideAttrs (old: {
-              pname = "paredit-cli-publish";
-              nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cacert ];
-              doCheck = false;
-              buildPhase = ''
-                export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-                export NIX_SSL_CERT_FILE=$SSL_CERT_FILE
-                export CARGO_HTTP_CAINFO=$SSL_CERT_FILE
-                cargo publish --dry-run --allow-dirty --locked --registry crates-io
-              '';
-              installPhase = ''
-                touch $out
-              '';
-            });
+            # NOTE: `cargo publish --dry-run` is intentionally NOT a flake check.
+            # It resolves the crates-io registry index over the network, which
+            # the Nix build sandbox blocks on Linux CI (sandbox = true), making
+            # `nix flake check` fail there even though the crate is fine. The
+            # publish dry-run remains a documented local pre-release step in
+            # RELEASE.md, where network access is available.
           };
         }
       );
