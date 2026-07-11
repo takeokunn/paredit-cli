@@ -73,6 +73,52 @@ fn kind_then_name_groups_categories_before_names() {
     assert!(alpha < current_user);
 }
 
+#[test]
+fn sort_definitions_keeps_leading_comment_with_its_definition() {
+    let input = "(defun zeta () :z)\n\
+                 \n\
+                 ;; alpha helper\n\
+                 (defun alpha () :a)\n\
+                 \n\
+                 (defun beta () :b)\n";
+
+    let plan = plan_sort_definitions(request(input, SortDefinitionsStrategy::Name))
+        .expect("sort plan should be built");
+
+    assert!(plan.changed);
+    assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+    let comment = plan.rewritten.find(";; alpha helper").expect("comment");
+    let alpha = plan.rewritten.find("(defun alpha").expect("alpha");
+    let beta = plan.rewritten.find("(defun beta").expect("beta");
+    let zeta = plan.rewritten.find("(defun zeta").expect("zeta");
+    assert!(
+        comment < alpha && alpha - comment < 30,
+        "comment should sit directly above the definition it describes"
+    );
+    assert!(alpha < beta);
+    assert!(beta < zeta);
+}
+
+#[test]
+fn sort_definitions_relocating_original_first_entry_has_no_stray_gap() {
+    // zeta is the block's original first entry (no leading trivia of its
+    // own) and sorts last by name, so it must pick up a clean separator
+    // instead of gluing onto the previous definition's closing paren.
+    let input = "(defun zeta () :z)\n\
+                 (defun alpha () :a)\n";
+
+    let plan = plan_sort_definitions(request(input, SortDefinitionsStrategy::Name))
+        .expect("sort plan should be built");
+
+    assert!(plan.changed);
+    assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+    assert!(
+        !plan.rewritten.contains(")(defun"),
+        "reordered definitions must not be glued together: {:?}",
+        plan.rewritten
+    );
+}
+
 fn symbol_name() -> impl Strategy<Value = String> {
     "[a-z][a-z0-9-]{0,10}".prop_map(|name| name)
 }

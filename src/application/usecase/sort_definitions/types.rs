@@ -55,12 +55,17 @@ pub(super) struct DefinitionBlock {
     pub(super) start: usize,
     pub(super) end: usize,
     pub(super) entries: Vec<DefinitionEntry>,
-    pub(super) separators: Vec<String>,
 }
 
+/// `form_text` spans from the newline that ends the previous entry's line up
+/// to this entry's own end, so a leading `;;` comment (or blank run) travels
+/// with the definition below it when entries are reordered. The first entry
+/// in the block has no previous entry to inherit trivia from, so its
+/// `form_text` is just its own span and `has_leading_trivia` is `false`.
 pub(super) struct DefinitionEntry {
     pub(super) item: SortDefinitionsItem,
     pub(super) form_text: String,
+    pub(super) has_leading_trivia: bool,
 }
 
 pub(super) struct RawDefinition {

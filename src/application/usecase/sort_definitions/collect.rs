@@ -58,11 +58,14 @@ fn finish_block(input: &str, current: &mut Vec<RawDefinition>, blocks: &mut Vec<
         return;
     }
 
+    let slot_starts = compute_slot_starts(input, current);
     let mut entries = Vec::with_capacity(current.len());
-    let mut separators = Vec::with_capacity(current.len().saturating_sub(1));
     for index in 0..current.len() {
-        let chunk_start = current[index].span.start().get();
-        let chunk_end = current[index].span.end().get();
+        let slot_start = slot_starts[index];
+        let slot_end = match slot_starts.get(index + 1) {
+            Some(&next_start) => next_start,
+            None => current[index].span.end().get(),
+        };
         entries.push(DefinitionEntry {
             item: SortDefinitionsItem {
                 old_path: current[index].path.clone(),
@@ -74,11 +77,9 @@ fn finish_block(input: &str, current: &mut Vec<RawDefinition>, blocks: &mut Vec<
                 source_index: current[index].source_index,
                 target_index: current[index].source_index,
             },
-            form_text: input[chunk_start..chunk_end].to_owned(),
+            form_text: input[slot_start..slot_end].to_owned(),
+            has_leading_trivia: index != 0,
         });
-        if let Some(next) = current.get(index + 1) {
-            separators.push(input[chunk_end..next.span.start().get()].to_owned());
-        }
     }
 
     let Some(first) = current.first() else {
@@ -94,9 +95,34 @@ fn finish_block(input: &str, current: &mut Vec<RawDefinition>, blocks: &mut Vec<
         start: first.span.start().get(),
         end: last.span.end().get(),
         entries,
-        separators,
     });
     current.clear();
+}
+
+/// Computes each definition's slot start. The first entry starts at its own
+/// span, since nothing in the block precedes it. Every later entry starts at
+/// the newline that ends the previous entry's line (or the previous entry's
+/// own end, if the two share a line), so any full-line comments and blank
+/// runs between two definitions become the following definition's leading
+/// trivia and move with it when the block is reordered.
+fn compute_slot_starts(input: &str, current: &[RawDefinition]) -> Vec<usize> {
+    let bytes = input.as_bytes();
+    let mut starts = Vec::with_capacity(current.len());
+    for (index, definition) in current.iter().enumerate() {
+        if index == 0 {
+            starts.push(definition.span.start().get());
+            continue;
+        }
+        let previous_end = current[index - 1].span.end().get();
+        let this_start = definition.span.start().get();
+        let gap = &bytes[previous_end..this_start];
+        let start = match gap.iter().position(|&byte| byte == b'\n') {
+            Some(offset) => previous_end + offset,
+            None => previous_end,
+        };
+        starts.push(start);
+    }
+    starts
 }
 
 fn is_sortable_category(category: DefinitionCategory) -> bool {
