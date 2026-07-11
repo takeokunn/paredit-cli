@@ -55,6 +55,33 @@ fn skips_unrecognized_define_style_macro_invocations_by_default() {
 }
 
 #[test]
+fn skips_defstruct_definitions_by_default() {
+    // A `defstruct` implicitly derives a constructor (`make-<name>` or an
+    // explicit `(:constructor other-name)`), a predicate (`<name>-p`), and
+    // per-slot accessors from the structure name, none of which contain the
+    // structure-name symbol itself. The type name having zero direct
+    // references does not mean the structure is unused: it may still be
+    // constructed and inspected purely through those derived symbols.
+    let text = "(in-package #:app)\n\
+                (defstruct widget a b)\n";
+    let form = "(defstruct widget a b)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(text, form, "widget", DefinitionCategory::Struct)],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 0);
+    assert_eq!(plan.skipped_count, 1);
+    assert_eq!(
+        plan.files[0].skipped[0].reason,
+        SkippedDefinitionRemovalReason::ProtectedDefinitionCategory
+    );
+    assert!(plan.files[0].rewritten.contains(form));
+}
+
+#[test]
 fn other_category_definitions_remain_bulk_removable() {
     // `Other` covers a dialect's own recognized definition forms (Emacs
     // Lisp `defun`, Clojure `defn`, ...) that are not broken out into a

@@ -14,6 +14,16 @@ with no external effect.
 
 ### Fixed
 
+- `remove-unused-definitions`: Common Lisp `defstruct` definitions are now
+  protected by default (require `--include-protected`), like package/
+  system/test/customization/mode definitions. A structure's type-name
+  symbol is only one of several symbols `defstruct` derives: it also
+  implicitly generates a constructor (`make-<name>`, or an explicit
+  `(:constructor other-name)`), a predicate (`<name>-p`), a copier, and
+  per-slot accessors, none of which spell out the type name. A structure
+  used exclusively through those derived names had zero direct references
+  to its type-name symbol and was previously flagged as unused and
+  removed by `--write`, silently breaking every remaining call site.
 - `remove-unused-definitions`: Emacs Lisp `require`/`provide` forms are now
   categorized the same way Common Lisp `require`/`provide`/`defpackage`
   already were (`DefinitionCategory::Package`, protected by default)

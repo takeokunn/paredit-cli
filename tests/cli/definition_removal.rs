@@ -254,6 +254,37 @@ fn cli_keeps_definition_only_referenced_from_a_quasiquoted_code_generation_templ
 }
 
 #[test]
+fn cli_keeps_a_defstruct_referenced_only_through_its_derived_constructor() {
+    // A defstruct's type-name symbol having zero direct references does not
+    // mean the structure is dead: it may still be built and inspected
+    // purely through its implicitly derived constructor/predicate/accessor
+    // symbols, which never spell out the type name itself.
+    let dir = fresh_temp_dir("remove-unused-definitions-defstruct-plan");
+    let file = dir.join("core.lisp");
+    let original = "(defstruct widget a b)\n\n\
+                    (defun build-widget (a b)\n  (make-widget :a a :b b))\n\n\
+                    (build-widget 1 2)\n\n\
+                    (defun stale-helper () :stale)\n";
+    fs::write(&file, original).expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("remove-unused-definitions")
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"removal_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"stale-helper\""));
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten fixture");
+    assert!(rewritten.contains("(defstruct widget a b)"));
+    assert!(rewritten.contains("(make-widget :a a :b b)"));
+    assert!(!rewritten.contains("stale-helper"));
+}
+
+#[test]
 fn cli_keeps_exported_unused_definition_by_default() {
     let dir = fresh_temp_dir("remove-unused-definitions-exported-plan");
     let file = dir.join("core.lisp");
