@@ -45,6 +45,21 @@ fn function_type_specifier_is_not_treated_as_an_opaque_function_designator() {
 }
 
 #[test]
+fn a_quote_wrapping_an_unquote_inside_quasiquote_is_still_a_live_reference() {
+    // `',x` — a quote wrapping an unquote — is the standard idiom for
+    // splicing a computed value as a literal into a macro's generated
+    // code, e.g. `` `(setf (get ',name 'prop) ',computed)) ``. The quote
+    // does not make this opaque: it is only reachable while already inside
+    // an active quasiquote template, so it must keep descending to find
+    // the nested unquote's reference. A top-level (`quasiquote_depth ==
+    // 0`) plain quote is unaffected and stays fully opaque, since `,`/`,@`
+    // have no meaning there and it can never contain a live reference.
+    let input = "(list x `(setf (get 'y 'prop) ',x))";
+
+    assert_eq!(reference_texts(input, "x"), vec!["x", "x"]);
+}
+
+#[test]
 fn proclamation_forms_in_common_lisp_bodies_are_not_counted_as_references() {
     let input =
         "(list used (locally (declaim (special used)) (proclaim (special used)) used) used)";

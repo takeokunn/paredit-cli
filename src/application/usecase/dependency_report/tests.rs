@@ -65,6 +65,55 @@ fn collects_runtime_asdf_and_qualified_symbol_dependencies() {
 }
 
 #[test]
+fn collects_require_provide_and_load_dependencies_in_emacs_lisp() {
+    // `require`/`provide`/`load`/`load-file`/`load-library` are the same
+    // functions with the same load-order semantics in Emacs Lisp as in
+    // Common Lisp, so an Emacs Lisp file's dependency inventory should not
+    // come back empty just because the file isn't Common Lisp.
+    let tree = SyntaxTree::parse(
+        r#"(require 'cl-lib)
+(load "extra.el")
+(load-library "helper")
+(provide 'demo)"#,
+    )
+    .expect("parse fixture");
+    let report =
+        build_dependency_report(&tree, Dialect::EmacsLisp).expect("build dependency report");
+
+    assert!(contains_dependency(&report, DependencyKind::Require, "cl-lib"));
+    assert!(contains_dependency(
+        &report,
+        DependencyKind::Load,
+        "\"extra.el\""
+    ));
+    assert!(contains_dependency(
+        &report,
+        DependencyKind::LoadLibrary,
+        "\"helper\""
+    ));
+    assert!(contains_dependency(&report, DependencyKind::Provide, "demo"));
+}
+
+#[test]
+fn excludes_use_package_and_import_from_emacs_lisp_dependency_report() {
+    // Emacs Lisp's `use-package` macro (declarative package *configuration*)
+    // and `import` (not a standard Emacs Lisp form) are unrelated to Common
+    // Lisp's package-system forms of the same name, so recognizing them
+    // here would misclassify an ordinary Emacs Lisp construct as a
+    // dependency.
+    let tree = SyntaxTree::parse(
+        r#"(use-package magit
+  :config (setq magit-diff-refine-hunk t))
+(import 'not-a-real-emacs-lisp-form)"#,
+    )
+    .expect("parse fixture");
+    let report =
+        build_dependency_report(&tree, Dialect::EmacsLisp).expect("build dependency report");
+
+    assert!(report.dependencies.is_empty());
+}
+
+#[test]
 fn includes_defpackage_dependencies_from_package_report() {
     let report = report(
         r#"(defpackage #:demo.core
@@ -178,13 +227,20 @@ fn reports_unquoted_dependency_candidates_inside_quasiquote() {
         DependencyKind::QualifiedSymbol,
         "cl-user"
     ));
+    // Three distinct qualified-symbol occurrences: `,uiop:ensure-pathname`
+    // and `,@(cl-user:helper value)` are ordinary unquoted/spliced live
+    // code, and `',cl-user:quoted` is a quote wrapping an unquote — the
+    // idiom for splicing a computed value as a literal into generated code
+    // — which is live too (the quote itself does not block traversal once
+    // already inside the quasiquote; only the nested unquote's own
+    // reference matters).
     assert_eq!(
         report
             .dependencies
             .iter()
             .filter(|dependency| dependency.kind == DependencyKind::QualifiedSymbol)
             .count(),
-        2
+        3
     );
 }
 
