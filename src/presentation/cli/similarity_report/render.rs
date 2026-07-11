@@ -7,17 +7,19 @@ use crate::infrastructure::workspace::WorkspaceDiscovery;
 
 use super::super::OutputFormat;
 use super::args::SimilarityReportArgs;
+use super::types::FileProcessingError;
 
-pub(in crate::presentation::cli) fn print_similarity_report(
+pub(super) fn print_similarity_report(
     report: &SimilarityReport,
     discovery: &WorkspaceDiscovery,
+    errors: &[FileProcessingError],
     args: &SimilarityReportArgs,
 ) -> Result<()> {
     match args.output {
-        OutputFormat::Text => print_text(report, discovery, args),
+        OutputFormat::Text => print_text(report, discovery, errors, args),
         OutputFormat::Json => println!(
             "{}",
-            serde_json::to_string_pretty(&json_report(report, discovery, args))?
+            serde_json::to_string_pretty(&json_report(report, discovery, errors, args))?
         ),
     }
     Ok(())
@@ -26,6 +28,7 @@ pub(in crate::presentation::cli) fn print_similarity_report(
 fn print_text(
     report: &SimilarityReport,
     discovery: &WorkspaceDiscovery,
+    errors: &[FileProcessingError],
     args: &SimilarityReportArgs,
 ) {
     let summary = &report.summary;
@@ -38,7 +41,10 @@ fn print_text(
     println!("overlap_policy\t{}", args.overlap_policy.label());
     println!("max_comparisons\t{}", optional_usize(args.max_comparisons));
     println!("max_results\t{}", optional_usize(args.max_results));
+    println!("error_policy\t{}", args.error_policy.label());
     println!("scanned_files\t{}", discovery.files.len());
+    println!("processed_files\t{}", discovery.files.len() - errors.len());
+    println!("skipped_error_files\t{}", errors.len());
     println!("skipped_unknown\t{}", discovery.skipped_unknown_count);
     println!("skipped_hidden\t{}", discovery.skipped_hidden_count);
     println!("skipped_generated\t{}", discovery.skipped_generated_count);
@@ -57,6 +63,15 @@ fn print_text(
     println!("pair_count\t{}", summary.reported_pairs);
     println!("truncated\t{}", summary.truncated);
 
+    for error in errors {
+        println!(
+            "error\t{}\t{}\t{}",
+            error.path.display(),
+            error.stage,
+            error.message
+        );
+    }
+
     for pair in &report.pairs {
         println!(
             "pair\tsimilarity={:.6}\tscore={:.6}",
@@ -70,6 +85,7 @@ fn print_text(
 fn json_report(
     report: &SimilarityReport,
     discovery: &WorkspaceDiscovery,
+    errors: &[FileProcessingError],
     args: &SimilarityReportArgs,
 ) -> serde_json::Value {
     json!({
@@ -86,6 +102,7 @@ fn json_report(
             "overlap_policy": args.overlap_policy.label(),
             "max_comparisons": args.max_comparisons,
             "max_results": args.max_results,
+            "error_policy": args.error_policy.label(),
             "include_unknown": args.include_unknown,
             "include_hidden": args.include_hidden,
             "include_generated": args.include_generated,
@@ -94,6 +111,8 @@ fn json_report(
         },
         "summary": {
             "scanned_files": discovery.files.len(),
+            "processed_files": discovery.files.len() - errors.len(),
+            "skipped_error_files": errors.len(),
             "skipped_unknown": discovery.skipped_unknown_count,
             "skipped_hidden": discovery.skipped_hidden_count,
             "skipped_generated": discovery.skipped_generated_count,
@@ -108,6 +127,11 @@ fn json_report(
             "reported_pairs": report.summary.reported_pairs,
             "truncated": report.summary.truncated,
         },
+        "errors": errors.iter().map(|error| json!({
+            "path": error.path.display().to_string(),
+            "stage": error.stage,
+            "message": error.message,
+        })).collect::<Vec<_>>(),
         "pairs": report.pairs.iter().map(|pair| json!({
             "similarity": pair.similarity,
             "score": pair.score,

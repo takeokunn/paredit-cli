@@ -7,6 +7,7 @@ use crate::application::usecase::similarity_report::{
 };
 
 use super::super::{DialectArg, OutputFormat};
+use super::types::ErrorPolicy;
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct SimilarityReportArgs {
@@ -49,6 +50,9 @@ pub(in crate::presentation::cli) struct SimilarityReportArgs {
     /// Maximum number of tree-edit-distance comparisons to evaluate.
     #[arg(long)]
     pub(super) max_comparisons: Option<usize>,
+    /// Control whether a file processing error stops the report or skips that file.
+    #[arg(long, default_value = "fail")]
+    pub(super) error_policy: ErrorPolicy,
     /// Maximum number of ranked pairs to include in the report.
     #[arg(long)]
     pub(super) max_results: Option<usize>,

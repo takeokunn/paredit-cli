@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::application::usecase::similarity_report::{
     build_similarity_pairs, collect_similarity_candidates, SimilarityReportOptions,
@@ -9,6 +9,7 @@ use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscov
 use super::super::{detect_dialect, read_input};
 use super::args::SimilarityReportArgs;
 use super::render::print_similarity_report;
+use super::types::{ErrorPolicy, FileProcessingError};
 
 pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
     ensure_options(
@@ -28,6 +29,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
     })?;
 
     let mut candidates = Vec::new();
+    let mut errors = Vec::new();
     let options = SimilarityReportOptions {
         threshold: args.threshold,
         min_node_count: args.min_node_count,
@@ -39,23 +41,24 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         max_results: args.max_results,
     };
     for file in &discovery.files {
-        let input = read_input(Some(file.clone()))
-            .with_context(|| format!("failed to read {}", file.display()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        collect_similarity_candidates(
-            &tree,
-            &input.text,
-            file,
-            dialect,
-            &options,
-            &mut candidates,
-        )?;
+        if let Err(error) = process_file(file, args.dialect, &options, &mut candidates) {
+            if args.error_policy == ErrorPolicy::Fail {
+                return Err(error.source.context(format!(
+                    "failed to {} {}",
+                    error.stage,
+                    file.display()
+                )));
+            }
+            errors.push(FileProcessingError {
+                path: file.clone(),
+                stage: error.stage,
+                message: error.source.root_cause().to_string(),
+            });
+        }
     }
 
     let report = build_similarity_pairs(candidates, &options);
-    print_similarity_report(&report, &discovery, &args)?;
+    print_similarity_report(&report, &discovery, &errors, &args)?;
 
     if args.fail_on_duplicates && report.summary.matched_pairs > 0 {
         bail!(
@@ -64,6 +67,43 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         );
     }
 
+    Ok(())
+}
+
+struct ProcessingError {
+    stage: &'static str,
+    source: anyhow::Error,
+}
+
+fn process_file(
+    file: &std::path::Path,
+    dialect: Option<super::super::DialectArg>,
+    options: &SimilarityReportOptions,
+    candidates: &mut Vec<crate::application::usecase::similarity_report::SimilarityCandidate>,
+) -> std::result::Result<(), ProcessingError> {
+    let input = read_input(Some(file.to_path_buf())).map_err(|source| ProcessingError {
+        stage: "read",
+        source,
+    })?;
+    let dialect = detect_dialect(&input, dialect);
+    let tree = SyntaxTree::parse(&input.text).map_err(|source| ProcessingError {
+        stage: "parse",
+        source: source.into(),
+    })?;
+    let mut file_candidates = Vec::new();
+    collect_similarity_candidates(
+        &tree,
+        &input.text,
+        file,
+        dialect,
+        options,
+        &mut file_candidates,
+    )
+    .map_err(|source| ProcessingError {
+        stage: "collect",
+        source,
+    })?;
+    candidates.extend(file_candidates);
     Ok(())
 }
 
