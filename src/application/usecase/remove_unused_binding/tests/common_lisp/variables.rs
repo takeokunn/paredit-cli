@@ -132,6 +132,45 @@ fn plans_all_unused_bindings_by_replacing_form_with_body() {
 }
 
 #[test]
+fn all_bindings_skips_earmuffed_special_variable_rebind_with_zero_references() {
+    // `(let ((*read-eval* nil)) (read stream))` is meaningful purely through
+    // its dynamic-scope side effect for the body's dynamic extent — no
+    // lexical reference to `*read-eval*` is needed or expected. Bulk
+    // `--all-bindings` must not delete it: doing so can silently change
+    // program behavior (in this exact shape, reinstating an
+    // arbitrary-code-execution risk the binding exists to close).
+    let input = "(let ((*read-eval* nil)) (read stream))";
+    let error = common_lisp_error(input, None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_still_removes_a_plain_unused_binding_alongside_a_special_variable_rebind() {
+    let input = "(let ((*read-eval* nil) (unused 1)) (read stream))";
+    let plan = common_lisp_plan(input, None, true, true);
+
+    assert_eq!(plan.bindings.len(), 1);
+    assert_eq!(plan.bindings[0].binding_name, "unused");
+    assert_eq!(
+        plan.replacement,
+        "(let ((*read-eval* nil))\n  (read stream))"
+    );
+}
+
+#[test]
+fn explicit_name_still_removes_an_earmuffed_special_variable_rebind() {
+    // `--all-bindings` is a bulk, unattended operation and must stay
+    // conservative, but an explicit `--name` target is a deliberate,
+    // reviewed choice and should not be second-guessed.
+    let input = "(let ((*read-eval* nil)) (read stream))";
+    let plan = common_lisp_plan(input, Some("*read-eval*"), false, true);
+
+    assert_eq!(plan.binding_name.as_deref(), Some("*read-eval*"));
+    assert_eq!(plan.replacement, "(read stream)");
+}
+
+#[test]
 fn plans_unused_do_binding_without_counting_init_reference() {
     let input = "(do ((unused (compute unused)) (i 0 (1+ i))) ((>= i limit) i) (print i))";
     let plan = common_lisp_plan(input, Some("unused"), false, true);
