@@ -80,7 +80,73 @@ fn cli_writes_wrap_function_calls_inside_cl_user_macrolet_expanders_only() {
 
     assert_eq!(
         fs::read_to_string(lisp_file).expect("read wrapped lisp"),
-        "(defun render () (cl-user:macrolet ((fetch-user (id) (with-cache `(fetch-user ,id)))) (fetch-user user)) (with-cache (fetch-user root)))\n"
+        "(defun render () (cl-user:macrolet ((fetch-user (id) `(with-cache (fetch-user ,id)))) (fetch-user user)) (with-cache (fetch-user root)))\n"
+    );
+}
+
+#[test]
+fn cli_writes_wrap_function_call_at_macrolet_expander_path() {
+    let dir = fresh_temp_dir("wrap-function-calls-macrolet-expander-path");
+    let lisp_file = dir.join("service.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun render () (macrolet ((expand (id) `(fetch-user ,id))) (expand user)))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("wrap-function-calls")
+        .arg(&lisp_file)
+        .arg("--function")
+        .arg("fetch-user")
+        .arg("--wrapper")
+        .arg("with-cache")
+        .arg("--call-path")
+        .arg("0.3.1.0.2")
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"callCount\": 1"))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read wrapped lisp"),
+        "(defun render () (macrolet ((expand (id) `(with-cache (fetch-user ,id)))) (expand user)))\n"
+    );
+}
+
+#[test]
+fn cli_writes_wrap_function_call_at_compiler_macrolet_expander_path() {
+    let dir = fresh_temp_dir("wrap-function-calls-compiler-macrolet-expander-path");
+    let lisp_file = dir.join("service.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun render () (compiler-macrolet ((expand (id) `(fetch-user ,id))) (expand user)))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("wrap-function-calls")
+        .arg(&lisp_file)
+        .arg("--function")
+        .arg("fetch-user")
+        .arg("--wrapper")
+        .arg("with-cache")
+        .arg("--call-path")
+        .arg("0.3.1.0.2")
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"callCount\": 1"))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read wrapped lisp"),
+        "(defun render () (compiler-macrolet ((expand (id) `(with-cache (fetch-user ,id)))) (expand user)))\n"
     );
 }
 

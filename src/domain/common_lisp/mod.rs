@@ -17,8 +17,8 @@ pub(crate) use operator::{
     is_common_lisp_earmuffed_special_variable_name, normalize_common_lisp_operator_head,
 };
 pub(crate) use scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, is_macro_callable_form,
-    local_callable_binding_body_scope, local_callable_body_scope,
+    common_lisp_local_callable_form, common_lisp_macro_expander_path, is_local_callable_bound,
+    is_macro_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
     local_callable_definition_reference_scope, local_callable_names, local_callable_scope_at_path,
 };
 

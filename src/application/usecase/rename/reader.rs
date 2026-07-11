@@ -1,12 +1,34 @@
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::{
-    common_lisp_operator_head_eq, normalize_common_lisp_operator_head,
+    common_lisp_macro_expander_path, common_lisp_operator_head_eq,
+    normalize_common_lisp_operator_head,
 };
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::atom_text;
 pub(crate) use crate::domain::sexpr::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
-use crate::domain::sexpr::{ExpressionKind, ExpressionView};
+use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
+
+pub(crate) fn executable_reader_context_at_path(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+    path: &Path,
+) -> anyhow::Result<bool> {
+    let mut quasiquote_depth = 0;
+    let indexes = path.to_raw_indexes();
+
+    for end in 1..=indexes.len() {
+        let ancestor = Path::from_indexes(indexes[..end].to_vec());
+        let view = tree.select_path(&ancestor)?.view();
+        let Some(depth) = apply_reader_prefix_context(&view, quasiquote_depth) else {
+            return Ok(false);
+        };
+        quasiquote_depth = depth;
+    }
+
+    Ok(quasiquote_depth == 0 || common_lisp_macro_expander_path(tree, dialect, path)?)
+}
 
 pub(crate) fn explicit_reader_form_kind(view: &ExpressionView) -> Option<String> {
     if view.kind != ExpressionKind::List || view.children.len() < 2 {

@@ -1,4 +1,3 @@
-use crate::application::usecase::callable_scope::is_local_callable_bound;
 use crate::application::usecase::rename::reader::{
     bare_lambda_body_children, explicit_reader_form_kind,
     explicit_reader_function_lambda_body_children,
@@ -8,7 +7,10 @@ use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::super::RenameFunctionOccurrence;
 use super::super::target::callable_name_target;
-use super::core::{TraversalContext, TraversalState, collect_function_call_head_renames_from_view};
+use super::core::{
+    TraversalContext, TraversalState, allows_function_reference_rename,
+    collect_function_call_head_renames_from_view,
+};
 
 fn collect_callable_target_rename(
     target_view: &ExpressionView,
@@ -22,8 +24,7 @@ fn collect_callable_target_rename(
     };
 
     if !common_lisp_symbol_reference_eq(target.text, context.from.as_str())
-        || is_local_callable_bound(state.local_callables, target.text)
-        || state.shadowed_depth != 0
+        || !allows_function_reference_rename(state, target.text)
     {
         return false;
     }

@@ -238,13 +238,15 @@ fn reports_earmuffed_special_variable_rebind_distinctly_instead_of_unused_bindin
     // deleting a binding that can be load-bearing for program behavior (in
     // this exact shape, a defense against arbitrary code execution via
     // `#.` during `read`).
-    let reports = reports_for("(let ((*read-eval* nil)) (read stream))", Dialect::CommonLisp);
+    let reports = reports_for(
+        "(let ((*read-eval* nil)) (read stream))",
+        Dialect::CommonLisp,
+    );
 
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].bindings[0].reference_count, 0);
     assert!(
-        reports[0]
-            .bindings[0]
+        reports[0].bindings[0]
             .risks
             .contains(&"possible-dynamic-variable-rebind")
     );

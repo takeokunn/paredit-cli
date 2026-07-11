@@ -84,7 +84,10 @@ pub fn build_impact_reports(
 
             if impact_definition_matches_signature(definition, None) {
                 if let (Some(name), Some(arity)) = (&definition.name, definition.parameter_arity) {
-                    definitions_by_name.entry(name.clone()).or_default().push(arity);
+                    definitions_by_name
+                        .entry(name.clone())
+                        .or_default()
+                        .push(arity);
                 }
             }
         }

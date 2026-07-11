@@ -175,3 +175,31 @@ fn cli_fails_let_report_policy_after_printing_json() {
     .stdout(predicate::str::contains("\"unused_binding_count\": 1"))
     .stderr(predicate::str::contains("let-report policy failed"));
 }
+
+#[test]
+fn cli_reports_let_bindings_across_multiple_files_with_aggregated_policy() {
+    let dir = fresh_temp_dir("let-report-multi-file");
+    let first_file = dir.join("first.lisp");
+    let second_file = dir.join("second.lisp");
+    fs::write(
+        &first_file,
+        "(defun f () (let ((unused 1) (used 2)) used))\n",
+    )
+    .expect("write first let-report fixture");
+    fs::write(&second_file, "(defun g () (let ((x (compute))) (+ x x)))\n")
+        .expect("write second let-report fixture");
+
+    let mut cmd = paredit();
+    cmd.args(["let-report", "--output", "json"])
+        .arg(&first_file)
+        .arg(&second_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 2"))
+        .stdout(predicate::str::contains("\"unused_binding_count\": 1"))
+        .stdout(predicate::str::contains(
+            "\"duplicate_evaluation_count\": 1",
+        ))
+        .stdout(predicate::str::contains(first_file.display().to_string()))
+        .stdout(predicate::str::contains(second_file.display().to_string()));
+}

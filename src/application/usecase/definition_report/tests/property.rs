@@ -8,6 +8,15 @@ proptest! {
         arg_count in 0usize..8,
     ) {
         prop_assume!(function_name != caller_name);
+        // Standard operator names (`do`, `if`, ...) cannot be defun'd in
+        // conforming Common Lisp, and the scope-aware reference collector
+        // rightly reads `(do ...)` as the special form rather than a call.
+        prop_assume!(
+            crate::domain::common_lisp::CommonLispOperator::from_head(&function_name).is_none()
+        );
+        prop_assume!(
+            crate::domain::common_lisp::CommonLispOperator::from_head(&caller_name).is_none()
+        );
         let params = (0..arg_count)
             .map(|index| format!("arg{index}"))
             .collect::<Vec<_>>();

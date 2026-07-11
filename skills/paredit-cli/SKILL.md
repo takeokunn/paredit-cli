@@ -91,7 +91,8 @@ version: 1.0.0
     <command>paredit unthread-expression --file f.clj --path 0 --output json</command>
     <command>paredit introduce-let --file f.lisp --path 0.3.1 --name value --output json</command>
     <command>paredit inline-let --file f.lisp --path 0.3.1 --output json</command>
-    <command>paredit let-report --file f.lisp --output json</command>
+    <command>paredit let-report --output json f.lisp</command>
+    <command>paredit let-report --output json src/*.lisp</command>
   </group>
 
   <group name="structural_primitives">

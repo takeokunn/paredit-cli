@@ -1,0 +1,135 @@
+use super::*;
+
+#[test]
+fn cli_plans_common_lisp_destructuring_bind_rename_without_touching_value_form() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "slot",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(destructuring-bind (value other) (parse value) (list value other))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"destructuring-bind\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(destructuring-bind (slot other) (parse value) (list slot other))",
+    ));
+}
+
+#[test]
+fn cli_plans_common_lisp_multiple_value_bind_rename_without_shadow_capture() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "slot",
+        "--output",
+        "json",
+    ])
+    .write_stdin(
+        "(multiple-value-bind (value other) (compute) (list value (destructuring-bind (value) row value) other value))",
+    )
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"multiple-value-bind\""))
+    .stdout(predicate::str::contains("\"reference_count\": 2"))
+    .stdout(predicate::str::contains("\"shadowed_scope_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(multiple-value-bind (slot other) (compute) (list slot (destructuring-bind (value) row value) other slot))",
+    ));
+}
+
+#[test]
+fn cli_plans_common_lisp_flet_destructured_lambda_list_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "value",
+        "--to",
+        "item",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(flet ((helper ((key value)) (list key value))) (helper pair) value)")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"flet\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(flet ((helper ((key item)) (list key item))) (helper pair) value)",
+    ));
+}
+
+#[test]
+fn cli_plans_common_lisp_handler_case_clause_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "condition",
+        "--to",
+        "err",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(handler-case (risky condition) (error (condition) (recover condition outer)) (:no-error (value) (finish value condition)))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"handler-case\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(handler-case (risky condition) (error (err) (recover err outer)) (:no-error (value) (finish value condition)))",
+    ));
+}
+
+#[test]
+fn cli_plans_common_lisp_restart_case_clause_parameter_rename() {
+    let mut cmd = paredit();
+    cmd.args([
+        "rename-binding",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--from",
+        "condition",
+        "--to",
+        "reason",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(restart-case (risky condition) (retry (condition) (recover condition (handler-case (again) (error (condition) condition)))) (skip () condition))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"form\": \"restart-case\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains("\"shadowed_scope_count\": 1"))
+    .stdout(predicate::str::contains(
+        "(restart-case (risky condition) (retry (reason) (recover reason (handler-case (again) (error (condition) condition)))) (skip () condition))",
+    ));
+}

@@ -69,8 +69,9 @@ fn collect_function_call_paths(
     if view.kind == ExpressionKind::List
         && view.delimiter == Some(Delimiter::Paren)
         && !spans_overlap(context.definition_span, view.span)
-        && list_head(view)
-            .is_some_and(|head| common_lisp_symbol_reference_eq(head, context.function_name.as_str()))
+        && list_head(view).is_some_and(|head| {
+            common_lisp_symbol_reference_eq(head, context.function_name.as_str())
+        })
         && !is_local_callable_bound(local_callables, context.function_name.as_str())
     {
         output.push(path.clone());

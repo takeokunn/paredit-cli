@@ -61,6 +61,21 @@ impl MacroletRenameScope {
     }
 }
 
+pub(super) fn allows_function_reference_rename(
+    scope: MacroletRenameScope,
+    target_text: &str,
+) -> bool {
+    !scope.is_shadowed() || is_package_qualified_callable(target_text)
+}
+
+fn is_package_qualified_callable(target_text: &str) -> bool {
+    let Some((package_name, symbol_name)) = target_text.split_once(':') else {
+        return false;
+    };
+
+    !target_text.starts_with(':') && !package_name.is_empty() && !symbol_name.is_empty()
+}
+
 pub(super) fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {
     scope.enter_active_target()
 }
@@ -153,12 +168,20 @@ pub(super) fn local_callable_binding_body_scope(
         (LocalCallableRenameKind::Function, CommonLispLocalCallableForm::Labels) => {
             scope.enter_shadowed()
         }
-        (
-            LocalCallableRenameKind::Macro | LocalCallableRenameKind::Function,
-            CommonLispLocalCallableForm::Flet
-            | CommonLispLocalCallableForm::Macrolet
-            | CommonLispLocalCallableForm::CompilerMacrolet,
-        ) => scope,
+        (LocalCallableRenameKind::Function, CommonLispLocalCallableForm::Flet)
+        | (
+            LocalCallableRenameKind::Macro,
+            CommonLispLocalCallableForm::Macrolet | CommonLispLocalCallableForm::CompilerMacrolet,
+        ) => shadow_current_target_in_definition_body(scope),
+        _ => scope,
+    }
+}
+
+fn shadow_current_target_in_definition_body(scope: MacroletRenameScope) -> MacroletRenameScope {
+    if scope.is_target_active() || scope.is_shadowed() {
+        scope
+    } else {
+        scope.enter_shadowed()
     }
 }
 
@@ -205,6 +228,32 @@ mod tests {
 
         assert!(next.is_target_active());
         assert!(!next.is_shadowed());
+    }
+
+    #[test]
+    fn flet_binding_bodies_shadow_current_function_target() {
+        let next = local_callable_binding_body_scope(
+            MacroletRenameScope::default(),
+            LocalCallableRenameKind::Function,
+            CommonLispLocalCallableForm::Flet,
+            TargetBindingPresence::Present,
+        );
+
+        assert!(!next.is_target_active());
+        assert!(next.is_shadowed());
+    }
+
+    #[test]
+    fn macrolet_binding_bodies_shadow_current_macro_target() {
+        let next = local_callable_binding_body_scope(
+            MacroletRenameScope::default(),
+            LocalCallableRenameKind::Macro,
+            CommonLispLocalCallableForm::Macrolet,
+            TargetBindingPresence::Present,
+        );
+
+        assert!(!next.is_target_active());
+        assert!(next.is_shadowed());
     }
 
     #[test]

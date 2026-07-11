@@ -80,7 +80,11 @@ fn collects_require_provide_and_load_dependencies_in_emacs_lisp() {
     let report =
         build_dependency_report(&tree, Dialect::EmacsLisp).expect("build dependency report");
 
-    assert!(contains_dependency(&report, DependencyKind::Require, "cl-lib"));
+    assert!(contains_dependency(
+        &report,
+        DependencyKind::Require,
+        "cl-lib"
+    ));
     assert!(contains_dependency(
         &report,
         DependencyKind::Load,
@@ -91,7 +95,11 @@ fn collects_require_provide_and_load_dependencies_in_emacs_lisp() {
         DependencyKind::LoadLibrary,
         "\"helper\""
     ));
-    assert!(contains_dependency(&report, DependencyKind::Provide, "demo"));
+    assert!(contains_dependency(
+        &report,
+        DependencyKind::Provide,
+        "demo"
+    ));
 }
 
 #[test]

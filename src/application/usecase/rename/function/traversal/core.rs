@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::definition::definition_shape;
+use crate::domain::definition::{definition_shape, is_macro_expander_definition};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -32,6 +32,7 @@ pub(in crate::application::usecase::rename::function) struct TraversalState<'a> 
     pub(super) path: Path,
     pub(super) local_callables: &'a [String],
     pub(super) quasiquote_depth: usize,
+    pub(super) in_macro_expander: bool,
     pub(super) shadowed_depth: usize,
 }
 
@@ -41,6 +42,7 @@ impl<'a> TraversalState<'a> {
             path,
             local_callables: self.local_callables,
             quasiquote_depth: self.quasiquote_depth,
+            in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
         }
     }
@@ -50,6 +52,7 @@ impl<'a> TraversalState<'a> {
             path: self.path.clone(),
             local_callables: self.local_callables,
             quasiquote_depth,
+            in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
         }
     }
@@ -59,9 +62,36 @@ impl<'a> TraversalState<'a> {
             path: self.path.clone(),
             local_callables,
             quasiquote_depth: self.quasiquote_depth,
+            in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
         }
     }
+
+    pub(super) fn in_macro_expander(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            local_callables: self.local_callables,
+            quasiquote_depth: self.quasiquote_depth,
+            in_macro_expander: true,
+            shadowed_depth: self.shadowed_depth,
+        }
+    }
+}
+
+pub(in crate::application::usecase::rename::function) fn allows_function_reference_rename(
+    state: &TraversalState<'_>,
+    target_text: &str,
+) -> bool {
+    (!is_local_callable_bound(state.local_callables, target_text) && state.shadowed_depth == 0)
+        || is_package_qualified_callable(target_text)
+}
+
+fn is_package_qualified_callable(target_text: &str) -> bool {
+    let Some((package_name, symbol_name)) = target_text.split_once(':') else {
+        return false;
+    };
+
+    !target_text.starts_with(':') && !package_name.is_empty() && !symbol_name.is_empty()
 }
 
 pub fn collect_function_call_head_renames(
@@ -83,6 +113,7 @@ pub fn collect_function_call_head_renames(
                 path,
                 local_callables: &[],
                 quasiquote_depth: 0,
+                in_macro_expander: false,
                 shadowed_depth: 0,
             },
             &mut renames,
@@ -116,7 +147,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
         return;
     }
 
-    if quasiquote_depth > 0 {
+    if quasiquote_depth > 0 && !state.in_macro_expander {
         collect_children(
             view,
             context,
@@ -127,6 +158,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
     }
 
     let mut definition_body_range = None;
+    let mut macro_expander_body_range = None;
 
     if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
         if let Some(head) = list_head(view) {
@@ -153,8 +185,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
             let shape = definition_shape(context.dialect, view, head);
             if common_lisp_symbol_reference_eq(head, context.from.as_str())
                 && shape.is_none()
-                && !is_local_callable_bound(state.local_callables, head)
-                && state.shadowed_depth == 0
+                && allows_function_reference_rename(&state, head)
             {
                 if let Some(head_view) = view.children.first() {
                     renames.push(RenameFunctionOccurrence {
@@ -167,6 +198,9 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
             }
             if let Some(shape) = shape {
                 definition_body_range = Some(shape.body_range());
+                if is_macro_expander_definition(context.dialect, head) {
+                    macro_expander_body_range = definition_body_range;
+                }
             }
         }
     }
@@ -177,14 +211,16 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
                 continue;
             }
         }
-        collect_function_call_head_renames_from_view(
-            child,
-            context,
-            state
-                .with_quasiquote_depth(0)
-                .with_path(state.path.child(index)),
-            renames,
-        );
+        let child_state = state
+            .with_quasiquote_depth(0)
+            .with_path(state.path.child(index));
+        let child_state =
+            if macro_expander_body_range.is_some_and(|range| range.contains_child(index)) {
+                child_state.in_macro_expander()
+            } else {
+                child_state
+            };
+        collect_function_call_head_renames_from_view(child, context, child_state, renames);
     }
 }
 

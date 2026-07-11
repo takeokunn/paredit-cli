@@ -92,7 +92,8 @@ impl DefinitionShape {
     /// DEFINITION_LAMBDA_PARAMETER_ARITY for why this differs from
     /// LAMBDA_PARAMETER_COUNT's flat total.
     pub fn lambda_parameter_arity(self, view: &ExpressionView) -> Option<(usize, Option<usize>)> {
-        self.lambda_list(view).map(definition_lambda_parameter_arity)
+        self.lambda_list(view)
+            .map(definition_lambda_parameter_arity)
     }
 
     pub fn name_target<'a>(
@@ -247,6 +248,24 @@ pub fn definition_shape(
     })
 }
 
+/// Whether the definition body returns code to be evaluated by a Lisp macro expander.
+pub fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool {
+    classify::is_macro_expander_definition(dialect, head)
+}
+
+/// Returns the child range containing code returned by a macro expander.
+pub fn macro_expander_body_range(
+    dialect: Dialect,
+    view: &ExpressionView,
+    head: &str,
+) -> Option<DefinitionBodyRange> {
+    if !is_macro_expander_definition(dialect, head) {
+        return None;
+    }
+
+    definition_shape(dialect, view, head).map(DefinitionShape::body_range)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,6 +336,85 @@ mod tests {
             classify_definition_head(Dialect::EmacsLisp, "define-minor-mode"),
             Some(DefinitionCategory::Mode)
         );
+    }
+
+    #[test]
+    fn identifies_macro_expander_definition_forms() {
+        assert!(is_macro_expander_definition(
+            Dialect::CommonLisp,
+            "defmacro"
+        ));
+        assert!(is_macro_expander_definition(
+            Dialect::CommonLisp,
+            "cl:define-compiler-macro"
+        ));
+        assert!(is_macro_expander_definition(
+            Dialect::CommonLisp,
+            "cl:define-setf-expander"
+        ));
+        assert!(is_macro_expander_definition(Dialect::CommonLisp, "defsetf"));
+        assert!(is_macro_expander_definition(
+            Dialect::EmacsLisp,
+            "cl-defmacro"
+        ));
+        assert!(!is_macro_expander_definition(Dialect::CommonLisp, "defun"));
+        assert!(!is_macro_expander_definition(
+            Dialect::Scheme,
+            "define-syntax"
+        ));
+        assert!(!is_macro_expander_definition(Dialect::Clojure, "defmacro"));
+    }
+
+    #[test]
+    fn identifies_macro_expander_body_range() {
+        let tree =
+            SyntaxTree::parse("(defmacro render (node) (declare (ignore node)) `(fetch node))")
+                .expect("source parses");
+        let view = tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .expect("macro form exists")
+            .view();
+
+        let range = macro_expander_body_range(Dialect::CommonLisp, &view, "defmacro")
+            .expect("defmacro has a body range");
+
+        assert!(!range.contains_child(2));
+        assert!(range.contains_child(3));
+        assert!(range.contains_child(4));
+    }
+
+    #[test]
+    fn identifies_define_setf_expander_body_range() {
+        let tree = SyntaxTree::parse(
+            "(define-setf-expander slot (place) (values nil nil nil `(writer store) `(reader ,place)))",
+        )
+        .expect("source parses");
+        let view = tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .expect("setf expander form exists")
+            .view();
+
+        let range = macro_expander_body_range(Dialect::CommonLisp, &view, "define-setf-expander")
+            .expect("define-setf-expander has a body range");
+
+        assert!(!range.contains_child(2));
+        assert!(range.contains_child(3));
+    }
+
+    #[test]
+    fn identifies_long_defsetf_body_range() {
+        let tree = SyntaxTree::parse("(defsetf slot (place) (store) `(writer ,place ,store))")
+            .expect("source parses");
+        let view = tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .expect("defsetf form exists")
+            .view();
+
+        let range = macro_expander_body_range(Dialect::CommonLisp, &view, "defsetf")
+            .expect("long defsetf has a body range");
+
+        assert!(!range.contains_child(3));
+        assert!(range.contains_child(4));
     }
 
     #[test]

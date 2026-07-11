@@ -137,9 +137,9 @@ fn cli_writes_function_rename_preserving_unquote_prefixes_inside_quasiquote() {
         }],
         expected_files: &[FixtureFile {
             path: "core.lisp",
-            contents: "(defun renamed (x) x)\n(defmacro build () `(list ,(renamed 1) ,@(renamed 2) (helper 3)))\n",
+            contents: "(defun renamed (x) x)\n(defmacro build () `(list ,(renamed 1) ,@(renamed 2) (renamed 3)))\n",
         }],
         expected_definition_count: 1,
-        expected_call_count: 2,
+        expected_call_count: 3,
     });
 }

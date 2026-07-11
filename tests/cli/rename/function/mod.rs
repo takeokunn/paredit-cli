@@ -125,11 +125,15 @@ fn assert_write_case(case: WriteCase) {
 }
 
 fn assert_plan_case(case: PlanCase) {
+    assert_plan_case_with_dialect(case, None);
+}
+
+fn assert_plan_case_with_dialect(case: PlanCase, dialect: Option<&str>) {
     let dir = fresh_temp_dir(case.fixture_name);
     write_fixture_files(&dir, case.input_files);
     let paths = collect_fixture_paths(&dir, case.input_files);
 
-    let output = run_rename_function(case.from, case.to, None, false, &paths);
+    let output = run_rename_function(case.from, case.to, dialect, false, &paths);
     assert!(
         output.status.success(),
         "stderr={}",
@@ -231,6 +235,7 @@ fn assert_rollback_on_write_failure() {
 
 mod failure;
 mod macro_like;
+mod macro_like_plan;
 mod macrolet_scope;
 mod plan;
 mod plan_macrolet_scope;

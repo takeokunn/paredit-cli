@@ -7,7 +7,7 @@ use super::super::super::reader::{
     atom_symbol_span, atom_symbol_text, collect_local_function_designator_renames,
     push_callable_target_rename_if_match,
 };
-use super::super::super::scope::LocalCallableRenameKind;
+use super::super::super::scope::{LocalCallableRenameKind, allows_function_reference_rename};
 use super::super::core::RenameTraversalMode;
 use super::super::state::{TraversalContext, TraversalState};
 use super::common::{callable_list_head_target, collect_active_atom_rename};
@@ -41,13 +41,15 @@ impl RenameTraversalMode for CallTraversal {
         state: TraversalState,
         renames: &mut Vec<RenameFunctionOccurrence>,
     ) {
-        if context.kind != LocalCallableRenameKind::Function || !state.allows_current_scope_rename()
-        {
+        if context.kind != LocalCallableRenameKind::Function {
             return;
         }
 
         if let Some(target) = view.children.get(1) {
             if let Some(target) = callable_name_target(target, &path.child(1)) {
+                if !allows_function_reference_rename(state.scope, target.text) {
+                    return;
+                }
                 push_callable_target_rename_if_match(target, context.from, context.to, renames);
             }
         }
@@ -61,8 +63,8 @@ impl RenameTraversalMode for CallTraversal {
         renames: &mut Vec<RenameFunctionOccurrence>,
     ) {
         if context.kind == LocalCallableRenameKind::Function
-            && state.allows_current_scope_rename()
             && let Some(target) = callable_list_head_target(view, path)
+            && allows_function_reference_rename(state.scope, target.text)
         {
             push_callable_target_rename_if_match(target, context.from, context.to, renames);
         }
@@ -71,7 +73,7 @@ impl RenameTraversalMode for CallTraversal {
             return;
         };
         if !common_lisp_symbol_reference_eq(head, context.from.as_str())
-            || !state.allows_current_scope_rename()
+            || !allows_function_reference_rename(state.scope, head)
         {
             return;
         }

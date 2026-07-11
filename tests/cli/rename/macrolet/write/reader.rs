@@ -55,6 +55,15 @@ macrolet_write_case!(
 );
 
 macrolet_write_case!(
+    cli_writes_macrolet_rename_only_after_nested_quasiquote_is_fully_unquoted,
+    "rename-macrolet-nested-quasiquote-write",
+    "core.lisp",
+    "(macrolet ((old-name (x) x)) ``(list ,(old-name 1) ,,(old-name 2)))\n",
+    "(macrolet ((new-name (x) x)) ``(list ,(old-name 1) ,,(new-name 2)))\n",
+    1
+);
+
+macrolet_write_case!(
     cli_skips_macrolet_definitions_and_calls_inside_quoted_data,
     "rename-macrolet-quoted-data-write",
     "core.lisp",

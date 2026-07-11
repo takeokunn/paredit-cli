@@ -207,10 +207,9 @@ fn parse_function_parameter_definition(
                 new_parameter
             );
         }
-        if parameters
-            .iter()
-            .any(|parameter| common_lisp_symbol_reference_eq(&parameter.name, new_parameter.as_str()))
-        {
+        if parameters.iter().any(|parameter| {
+            common_lisp_symbol_reference_eq(&parameter.name, new_parameter.as_str())
+        }) {
             anyhow::bail!(
                 "add-function-parameter parameter '{}' already exists in {}",
                 new_parameter,

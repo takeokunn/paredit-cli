@@ -124,7 +124,8 @@ fn collect_symbol_spans_in_context(
         }
 
         if quasiquote_depth == 0
-            && atom_text(view).is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol.as_str()))
+            && atom_text(view)
+                .is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol.as_str()))
         {
             if let Some(span) = atom_symbol_span(view) {
                 output.push(span);
