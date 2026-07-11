@@ -18,7 +18,22 @@ pub(crate) fn apply_reader_prefix_context(
 
     for prefix in &view.reader_prefixes {
         match prefix {
-            ReaderPrefix::Quote => return None,
+            // A top-level quote (`quasiquote_depth == 0`) is genuinely
+            // inert data: `,`/`,@` only have meaning inside an active
+            // quasiquote, so a bare `'x` can never contain a live
+            // reference and stays fully opaque. But `',x` — a quote
+            // wrapping an unquote, the standard idiom for splicing a
+            // computed value as a literal into a macro's generated code,
+            // e.g. `` `(setf (get ',name 'prop) ',computed-value) `` — is
+            // only reachable while already inside a quasiquote template
+            // (`quasiquote_depth > 0`). There, the quote itself does not
+            // block traversal: it must keep descending so the nested
+            // unquote is still found as a live reference.
+            ReaderPrefix::Quote => {
+                if quasiquote_depth == 0 {
+                    return None;
+                }
+            }
             ReaderPrefix::Function => {}
             ReaderPrefix::Quasiquote => quasiquote_depth += 1,
             ReaderPrefix::Unquote | ReaderPrefix::UnquoteSplicing => {

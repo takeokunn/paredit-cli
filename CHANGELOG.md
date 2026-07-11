@@ -14,6 +14,19 @@ with no external effect.
 
 ### Fixed
 
+- Scope-aware reference collection (the shared traversal behind
+  `unused-definition-report`, `remove-unused-definitions`, `let-report`,
+  `dependency-report`, and every rename/refactor command built on it) no
+  longer treats a quote wrapping an unquote (`` ',x ``, inside an active
+  quasiquote) the same as a genuinely inert top-level quote (`` 'x ``).
+  `` ',x `` is the standard idiom for splicing a computed value as a
+  literal into a macro's generated code, e.g. `` `(setf (get ',name
+  'prop) ',computed-value)) `` — the quote does not make this opaque, it
+  is only reachable while already inside the quasiquote, so the nested
+  unquote's reference to `computed-value` is live and must still be
+  found. A plain top-level quote outside any quasiquote is unaffected and
+  stays fully opaque, since `,`/`,@` have no meaning there and it can
+  never contain a live reference.
 - `let-report` and `remove-unused-binding --all-bindings` no longer treat
   rebinding an earmuffed (`*name*`) Common Lisp special variable with zero
   lexical references as dead code. `(let ((*read-eval* nil)) (read

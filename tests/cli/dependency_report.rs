@@ -92,7 +92,15 @@ fn cli_respects_local_callable_scopes_in_common_lisp_dependency_report() {
 }
 
 #[test]
-fn cli_skips_quoted_dependency_candidates_and_reports_quasiquote_unquotes() {
+fn cli_reports_quasiquote_unquotes_and_quote_wrapped_unquotes_as_dependencies() {
+    // `,uiop:ensure-pathname` and `,@(cl-user:helper value)` are ordinary
+    // unquoted/spliced live code. `',cl-user:quoted` — a quote wrapping an
+    // unquote, the idiom for splicing a computed value as a literal into
+    // generated code — is live too: the quote does not block traversal
+    // once already inside the quasiquote, so the nested unquote's
+    // reference to `cl-user:quoted` is still a real dependency. In every
+    // case the reported target is the package prefix (`cl-user`/`uiop`),
+    // never the bare symbol name (`quoted`) after the qualifier.
     let dir = fresh_temp_dir("dependency-report-quasiquote");
     let file = dir.join("quasiquote.lisp");
     fs::write(
@@ -108,7 +116,7 @@ fn cli_skips_quoted_dependency_candidates_and_reports_quasiquote_unquotes() {
         .arg(&file)
         .assert()
         .success()
-        .stdout(predicate::str::contains("\"dependency_count\": 2"))
+        .stdout(predicate::str::contains("\"dependency_count\": 3"))
         .stdout(predicate::str::contains("\"target\": \"uiop\""))
         .stdout(predicate::str::contains("\"target\": \"cl-user\""))
         .stdout(predicate::str::contains("\"target\": \"quoted\"").not());
