@@ -109,3 +109,25 @@ fn cli_infers_extract_function_params_without_clojure_destructuring_lambda_bindi
         Some("(defn compute [scale] (fn [[x y]] (+ x y scale)))"),
     );
 }
+
+#[test]
+fn cli_infers_extract_function_params_without_bare_symbol_let_bindings() {
+    assert_extract_function_inference(
+        &[
+            "--path",
+            "0.3",
+            "--name",
+            "helper",
+            "--infer-params",
+            "--output",
+            "json",
+        ],
+        "(defun caller (x) (let ((y (helper2 x)) found) (dolist (p y found) (setq found t))))",
+        &["x"],
+        &["x"],
+        "(helper x)",
+        Some(
+            "(defun helper (x) (let ((y (helper2 x)) found) (dolist (p y found) (setq found t))))",
+        ),
+    );
+}
