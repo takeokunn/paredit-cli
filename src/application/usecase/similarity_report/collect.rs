@@ -46,7 +46,7 @@ struct CandidateCollection<'a> {
 impl CandidateCollection<'_> {
     fn collect_from_view(&mut self, view: &ExpressionView, path: Path) {
         if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
-            let tree = StructuralTree::from_view(view);
+            let node_count = expression_node_count(view);
             let line_span = view
                 .span
                 .slice(self.input)
@@ -57,7 +57,7 @@ impl CandidateCollection<'_> {
             let in_scope =
                 self.options.form_scope == SimilarityFormScope::All || path.indexes().len() == 1;
             if in_scope
-                && tree.node_count() >= self.options.min_node_count
+                && node_count >= self.options.min_node_count
                 && line_span >= self.options.min_line_span
             {
                 if self
@@ -67,13 +67,14 @@ impl CandidateCollection<'_> {
                 {
                     self.omitted_candidates = self.omitted_candidates.saturating_add(1);
                 } else {
+                    let tree = StructuralTree::from_view(view);
                     self.candidates.push(SimilarityCandidate {
                         form: SimilarityFormReport {
                             path: self.file.to_path_buf(),
                             dialect: self.dialect,
                             form_path: path.to_string(),
                             span: view.span,
-                            node_count: tree.node_count(),
+                            node_count,
                             head: view
                                 .children
                                 .first()
@@ -91,6 +92,14 @@ impl CandidateCollection<'_> {
             self.collect_from_view(child, path.child(index));
         }
     }
+}
+
+fn expression_node_count(view: &ExpressionView) -> usize {
+    1 + view
+        .children
+        .iter()
+        .map(expression_node_count)
+        .sum::<usize>()
 }
 
 fn atom_text(view: &ExpressionView) -> Option<&str> {

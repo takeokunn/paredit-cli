@@ -100,6 +100,53 @@ fn minimum_line_span_uses_inclusive_one_based_length() {
 }
 
 #[test]
+fn candidate_limit_counts_only_eligible_omissions() {
+    let input = "(keep value) (too-small) (omit\n value) (single-line value)";
+    let tree = SyntaxTree::parse(input).unwrap();
+    let mut values = Vec::new();
+    let omitted = collect_similarity_candidates(
+        &tree,
+        input,
+        Path::new("a.lisp"),
+        Dialect::CommonLisp,
+        &SimilarityReportOptions {
+            min_node_count: 3,
+            min_line_span: 2,
+            max_candidates: Some(1),
+            ..SimilarityReportOptions::default()
+        },
+        &mut values,
+    )
+    .unwrap();
+
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].form.text, "(omit\n value)");
+    assert_eq!(omitted, 0);
+
+    let input = "(keep\n value) (too-small) (omit\n value) (single-line value)";
+    let tree = SyntaxTree::parse(input).unwrap();
+    values.clear();
+    let omitted = collect_similarity_candidates(
+        &tree,
+        input,
+        Path::new("a.lisp"),
+        Dialect::CommonLisp,
+        &SimilarityReportOptions {
+            min_node_count: 3,
+            min_line_span: 2,
+            max_candidates: Some(1),
+            ..SimilarityReportOptions::default()
+        },
+        &mut values,
+    )
+    .unwrap();
+
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].form.text, "(keep\n value)");
+    assert_eq!(omitted, 1);
+}
+
+#[test]
 fn comparison_scope_filters_pair_population() {
     let mut values = candidates("a.lisp", "(foo a) (foo b)", 2);
     values.extend(candidates("b.lisp", "(foo c)", 2));
