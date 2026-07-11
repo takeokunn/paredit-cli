@@ -4,45 +4,14 @@ use crate::application::usecase::package_report::PackageDefinitionReport;
 use crate::application::usecase::remove_unused_definition::types::UnusedDefinitionDefinition;
 use crate::domain::definition::DefinitionCategory;
 
-/// `DefinitionCategory::UnknownMacro` covers a `define-*`-prefixed macro
-/// this tool does not recognize, whose expansion is unknown. Such a macro
-/// commonly derives *other* symbol names from its argument via string
-/// concatenation (for example a strategy DSL where `(define-strategy foo
-/// ...)` generates and exports `make-foo-strategy`), so "is the argument
-/// symbol referenced elsewhere" is not a safe proxy for "is this definition
-/// unused": the argument symbol itself may legitimately have zero direct
-/// references while the code it defines is very much in use. Bulk removal
-/// therefore requires the same explicit `--include-protected` opt-in as
-/// other categories this tool cannot fully verify. This is distinct from
-/// `Other`, which covers a dialect's own recognized definition forms (for
-/// example Emacs Lisp `defun`/`defvar` or Clojure `defn`) that are not
-/// broken out into a more specific category but are still known,
-/// non-generative shapes.
-///
-/// `DefinitionCategory::Struct` (Common Lisp `defstruct`) has the same
-/// derived-symbol problem even though this tool DOES recognize the form:
-/// `defstruct` implicitly derives a constructor (`make-<name>` by default,
-/// or an explicit `(:constructor other-name)` option), a predicate
-/// (`<name>-p`), a copier, and per-slot accessors from the structure name,
-/// none of which textually contain the structure name symbol itself. A
-/// structure whose type-name symbol has zero direct references can still
-/// be load-bearing purely through calls to its constructor/predicate/
-/// accessors, which this tool does not trace back to the `defstruct` form
-/// that defines them.
+/// Bulk removal requires the explicit `--include-protected` opt-in for any
+/// category `DefinitionCategory::is_bulk_removable` excludes; see that
+/// method for why each excluded category cannot be verified from direct
+/// references alone. `remove-unused-definitions` and `unused-definition-report`
+/// share this single definition so the two commands never disagree on which
+/// categories "zero direct references" is a trustworthy signal for.
 pub(super) fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
-    matches!(
-        category,
-        DefinitionCategory::Function
-            | DefinitionCategory::Macro
-            | DefinitionCategory::GenericFunction
-            | DefinitionCategory::Method
-            | DefinitionCategory::Class
-            | DefinitionCategory::Condition
-            | DefinitionCategory::Variable
-            | DefinitionCategory::Constant
-            | DefinitionCategory::Parameter
-            | DefinitionCategory::Other
-    )
+    category.is_bulk_removable()
 }
 
 pub(super) fn collect_exported_symbol_index(

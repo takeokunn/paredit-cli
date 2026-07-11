@@ -234,6 +234,45 @@ with no external effect.
   the removed region now stops exactly at the boundary the moved
   definition's own leading trivia claimed, leaving the original separator
   between the remaining neighbors intact.
+- `unused-definition-report --fail-on-unused`/`--require-unused-definitions`
+  now gate on the same bulk-removable-category policy `remove-unused-
+  definitions` already used (`DefinitionCategory::is_bulk_removable`),
+  instead of the raw unreferenced count. `Test` (`ert-deftest`), `Package`
+  (`provide`/`require`), `Struct`, and the other protected categories are
+  normally unreferenced by symbol from other code by design — an ERT test
+  is invoked by name from the test runner, not called from other Lisp
+  forms — so gating on the raw count made `--fail-on-unused` fail on any
+  codebase with an ordinary test suite. The report JSON now also includes
+  `actionable_candidate_count` and a per-candidate `bulk_removable` flag so
+  agents can distinguish real dead code from this expected background
+  noise without hardcoding the category list themselves.
+- `dependency-report` no longer returns an empty dependency list for every
+  Emacs Lisp file. `require`/`provide`/`load`/`load-file`/`load-library`
+  have the same load-order semantics in Emacs Lisp as in Common Lisp, but
+  the dialect gate previously recognized them only for `CommonLisp`/
+  `Unknown`, so an Emacs Lisp project's dependency inventory always came
+  back empty regardless of how many `require` forms it had — verified
+  against a 105-file Emacs Lisp target codebase, where this took
+  `dependency-report`'s output from 7 dependencies (only incidental
+  qualified-symbol matches) to 709. `use-package` (Emacs Lisp's declarative
+  package-*configuration* macro, unrelated to the Common Lisp package-
+  system form of the same name) and `import` (not a standard Emacs Lisp
+  form) are deliberately still excluded for this dialect, since either
+  would misclassify an ordinary Emacs Lisp construct as a dependency.
+- `remove-unused-definitions` no longer aborts the whole command with
+  `symbol contains reader delimiter or whitespace` when a file defines
+  something in a protected category whose reported name isn't a valid bare
+  symbol, such as `(asdf:defsystem "my-system" ...)`'s string-literal
+  system name. `unused-definition-report` already skipped this case
+  gracefully via `SymbolName::new(name).ok()?`; `remove-unused-definitions`
+  instead propagated it as a hard error, so passing an ordinary `.asd` file
+  alongside a project's sources — the exact input the `remove-unused-
+  definitions`/`unused-definition-report` skill examples show — crashed the
+  command before it could report any of the real, bulk-removable
+  candidates in the rest of the file set. A bulk-removable category
+  (`Function`, `Macro`, ...) reporting an invalid name still surfaces the
+  error, since that indicates corrupted upstream metadata rather than an
+  expected non-symbol name.
 
 ## [0.1.2] - 2026-07-11
 

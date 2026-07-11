@@ -118,3 +118,70 @@ fn policy_reports_fail_on_unused_and_required_minimum() {
     assert!(!policy.passed);
     assert_eq!(policy.violations.len(), 2);
 }
+
+#[test]
+fn policy_ignores_protected_category_candidates_for_fail_on_unused() {
+    // `deftest` (category `Test`) is invoked by name from a test runner, not
+    // referenced by symbol from other Lisp forms, so it having zero direct
+    // references is normal and should not itself trip `--fail-on-unused`.
+    // The real dead code here — `stale-helper`, category `Function` — still
+    // should.
+    let input = "(deftest stale-test () (is t))\n\
+                 (defun stale-helper () 1)\n";
+    let tree = SyntaxTree::parse(input).expect("parse input");
+    let parsed = build_parsed_definition_file(
+        PathBuf::from("core.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        input,
+    )
+    .expect("build parsed file");
+    let reports = collect_unused_definition_candidates(&[parsed]);
+
+    assert_eq!(unused_definition_candidate_count(&reports), 2);
+    assert_eq!(unused_definition_actionable_candidate_count(&reports), 1);
+
+    let policy = evaluate_unused_definition_policy(
+        UnusedDefinitionPolicyOptions {
+            fail_on_unused: true,
+            require_unused_definitions: None,
+        },
+        &reports,
+    );
+
+    assert_eq!(policy.candidate_count, 2);
+    assert_eq!(policy.actionable_candidate_count, 1);
+    assert!(!policy.passed);
+    assert_eq!(policy.violations.len(), 1);
+    assert!(policy.violations[0].contains("actionable_candidate_count 1"));
+}
+
+#[test]
+fn policy_passes_fail_on_unused_when_only_protected_category_is_unreferenced() {
+    let input = "(deftest stale-test () (is t))\n";
+    let tree = SyntaxTree::parse(input).expect("parse input");
+    let parsed = build_parsed_definition_file(
+        PathBuf::from("core.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        input,
+    )
+    .expect("build parsed file");
+    let reports = collect_unused_definition_candidates(&[parsed]);
+
+    assert_eq!(unused_definition_candidate_count(&reports), 1);
+    assert_eq!(unused_definition_actionable_candidate_count(&reports), 0);
+
+    let policy = evaluate_unused_definition_policy(
+        UnusedDefinitionPolicyOptions {
+            fail_on_unused: true,
+            require_unused_definitions: None,
+        },
+        &reports,
+    );
+
+    assert_eq!(policy.candidate_count, 1);
+    assert_eq!(policy.actionable_candidate_count, 0);
+    assert!(policy.passed);
+    assert!(policy.violations.is_empty());
+}

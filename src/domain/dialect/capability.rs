@@ -212,10 +212,30 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispRuntimeDependencyForm> {
-        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+        let form = if matches!(self, Self::CommonLisp | Self::Unknown) {
+            common_lisp_operator(head)?.runtime_dependency_form()?
+        } else if self == Self::EmacsLisp {
+            // `require`/`provide`/`load`/`load-file`/`load-library` are the
+            // same functions with the same load-order semantics in Emacs
+            // Lisp, so `dependency-report` should see them there too.
+            // `use-package`/`import` are excluded: Emacs Lisp's `use-package`
+            // macro (declarative package *configuration*, not the Common
+            // Lisp package-system form of the same name) and `import` (not a
+            // standard Emacs Lisp form at all) would misclassify an
+            // unrelated construct as a dependency if allowed through here.
+            match common_lisp_operator(head)?.runtime_dependency_form()? {
+                form @ (CommonLispRuntimeDependencyForm::Require
+                | CommonLispRuntimeDependencyForm::Provide
+                | CommonLispRuntimeDependencyForm::Load
+                | CommonLispRuntimeDependencyForm::LoadFile
+                | CommonLispRuntimeDependencyForm::LoadLibrary) => form,
+                CommonLispRuntimeDependencyForm::UsePackage
+                | CommonLispRuntimeDependencyForm::Import => return None,
+            }
+        } else {
             return None;
-        }
-        common_lisp_operator(head)?.runtime_dependency_form()
+        };
+        Some(form)
     }
 
     pub(crate) fn common_lisp_package_declaration_form_for_head(

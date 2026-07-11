@@ -211,6 +211,40 @@ fn cli_gates_unused_definition_report_for_ci() {
 }
 
 #[test]
+fn cli_fail_on_unused_ignores_protected_category_candidates() {
+    // A `deftest` is invoked by name from a test runner, not referenced by
+    // symbol from other Lisp forms, so it having zero direct references is
+    // its normal, expected state. `--fail-on-unused` must gate on the
+    // actionable (bulk-removable-category) count so an ordinary test suite
+    // does not fail CI on its own.
+    let dir = fresh_temp_dir("unused-definition-report-protected-gate");
+    let file = dir.join("core.lisp");
+    fs::write(
+        &file,
+        "(defun used () :ok)\n\
+         (defun caller () (used))\n\
+         (caller)\n\
+         (deftest stale-test () (is t))\n",
+    )
+    .expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("unused-definition-report")
+        .arg("--fail-on-unused")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"candidate_count\": 1"))
+        .stdout(predicate::str::contains(
+            "\"actionable_candidate_count\": 0",
+        ))
+        .stdout(predicate::str::contains("\"passed\": true"))
+        .stdout(predicate::str::contains("\"bulk_removable\": false"));
+}
+
+#[test]
 fn cli_accepts_unused_definition_requirement_when_satisfied() {
     let dir = fresh_temp_dir("unused-definition-report-requirement");
     let file = dir.join("core.lisp");

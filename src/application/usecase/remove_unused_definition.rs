@@ -16,7 +16,9 @@ use rewrite::{expand_definition_removal, replace_span};
 // Re-exported so `definition_report::references` can share the same
 // callable-reference detection `remove-unused-definitions` uses instead of
 // drifting out of sync with it (see candidates.rs doc comments).
-pub(crate) use candidates::{collect_function_quote_references, collect_quoted_data_references};
+pub(crate) use candidates::{
+    collect_function_quote_references, collect_package_form_spans, collect_quoted_data_references,
+};
 
 pub use types::{
     PlannedDefinitionRemoval, RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsFilePlan,

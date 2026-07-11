@@ -389,6 +389,44 @@ fn cli_removes_exported_unused_definition_when_requested() {
 }
 
 #[test]
+fn cli_does_not_crash_on_an_asdf_defsystem_string_literal_name() {
+    // `(asdf:defsystem "cl-cli" ...)` reports its name as the raw string
+    // atom text `"cl-cli"` (quotes included), which is not a valid bare
+    // symbol. This must be skipped like any other unsearchable name in a
+    // protected category, not turned into a hard `Err` that aborts the
+    // whole command before it can report the real, bulk-removable
+    // candidates in the same file set.
+    let dir = fresh_temp_dir("remove-unused-definitions-asdf-defsystem-plan");
+    let asd = dir.join("demo.asd");
+    let core = dir.join("core.lisp");
+    fs::write(
+        &asd,
+        "(asdf:defsystem \"demo\"\n  :depends-on (\"uiop\")\n  :components ((:file \"core\")))\n",
+    )
+    .expect("write asd fixture");
+    fs::write(
+        &core,
+        "(in-package #:demo)\n\
+         (defun used () :ok)\n\
+         (defun caller () (used))\n\
+         (caller)\n\
+         (defun stale-helper () :stale)\n",
+    )
+    .expect("write core fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("remove-unused-definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&asd)
+        .arg(&core)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"removal_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"stale-helper\""));
+}
+
+#[test]
 fn cli_keeps_definition_referenced_inside_a_bare_symbol_let_binding() {
     let dir = fresh_temp_dir("remove-unused-definitions-bare-let-plan");
     let file = dir.join("core.el");
@@ -409,7 +447,9 @@ fn cli_keeps_definition_referenced_inside_a_bare_symbol_let_binding() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"removal_count\": 1"))
-        .stdout(predicate::str::contains("\"name\": \"doclive--query-param\""))
+        .stdout(predicate::str::contains(
+            "\"name\": \"doclive--query-param\"",
+        ))
         .stdout(predicate::str::contains("\"name\": \"doclive--unsafe-p\"").not());
 
     assert_eq!(

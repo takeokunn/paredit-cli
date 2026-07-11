@@ -163,6 +163,9 @@ fn print_json_report(
                             },
                             "head": item.call.head.as_str(),
                             "argumentCount": item.call.argument_count,
+                            "expectedParameterCount": item
+                                .expected_parameter_arity
+                                .and_then(|(min, max)| (max == Some(min)).then_some(min)),
                             "minParameterCount": item.expected_parameter_arity.map(|(min, _)| min),
                             "maxParameterCount": item.expected_parameter_arity.and_then(|(_, max)| max),
                             "status": item.status.label(),

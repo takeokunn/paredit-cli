@@ -67,6 +67,7 @@ pub struct UnusedDefinitionPolicy {
     pub require_unused_definitions: Option<usize>,
     pub definition_count: usize,
     pub candidate_count: usize,
+    pub actionable_candidate_count: usize,
     pub passed: bool,
     pub violations: Vec<String>,
 }

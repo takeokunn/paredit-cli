@@ -59,6 +59,7 @@ pub(super) fn print_unused_definition_report(
             "file_count": reports.len(),
             "definition_count": policy.definition_count,
             "candidate_count": policy.candidate_count,
+            "actionable_candidate_count": policy.actionable_candidate_count,
             "policy": {
                 "fail_on_unused": policy.fail_on_unused,
                 "require_unused_definitions": policy.require_unused_definitions,
@@ -86,6 +87,7 @@ pub(super) fn print_unused_definition_report(
                                 "head": definition.head.as_str(),
                                 "name": definition.name.as_deref(),
                                 "category": definition.category.label(),
+                                "bulk_removable": definition.category.is_bulk_removable(),
                             })
                         })
                 })
@@ -117,6 +119,7 @@ pub(super) fn print_unused_definition_report(
                                 "package": definition.package.as_deref(),
                                 "reference_count": item.references.len(),
                                 "unused": item.references.is_empty(),
+                                "bulk_removable": definition.category.is_bulk_removable(),
                                 "references": item
                                     .references
                                     .iter()

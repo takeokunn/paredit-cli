@@ -7,8 +7,10 @@ use crate::application::usecase::callable_scope::{
 use crate::application::usecase::remove_unused_definition::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::{
+    CommonLispLocalCallableForm, CommonLispPackageDeclarationForm, common_lisp_operator_head_eq,
+    common_lisp_symbol_reference_eq,
+};
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::reader::{atom_symbol_text, atom_text};
@@ -42,25 +44,50 @@ pub(super) fn collect_unused_definition_candidates(
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let package_form_spans: Vec<Vec<ByteSpan>> = parsed_files
+        .iter()
+        .map(|(file, view)| {
+            let mut spans = Vec::new();
+            collect_package_form_spans(file.dialect, view, &mut spans);
+            spans
+        })
+        .collect();
+
     files
         .iter()
         .enumerate()
         .map(|(file_index, file)| -> Result<_> {
-            let definitions = file
+            let named_definitions = file
                 .definitions
                 .iter()
                 .filter_map(|definition| {
                     let name = definition.name.as_ref()?;
                     Some((definition, name))
                 })
-                .map(|(definition, name)| -> Result<_> {
-                    let symbol = SymbolName::new(name.clone()).with_context(|| {
-                        format!(
-                            "remove-unused-definition found invalid symbol '{}' in {}",
-                            name,
-                            file.path.display()
-                        )
-                    })?;
+                // A category outside `is_bulk_removable` (`System` for
+                // `asdf:defsystem`'s string-literal system name `"cl-cli"`,
+                // ...) is expected to sometimes report a name that isn't a
+                // valid bare symbol, and such a name can never be searched
+                // for as a value/function-namespace reference anyway — skip
+                // it rather than aborting the whole command, matching how
+                // `definition_report::references` (`unused-definition-
+                // report`) already treats the same case via `.ok()?`. A
+                // bulk-removable category (`Function`, `Macro`, ...)
+                // reporting an invalid name instead indicates corrupted
+                // upstream metadata, so that case still surfaces loudly.
+                .filter_map(|(definition, name)| match SymbolName::new(name.clone()) {
+                    Ok(symbol) => Some(Ok((definition, symbol))),
+                    Err(_) if !definition.category.is_bulk_removable() => None,
+                    Err(error) => Some(Err(error.context(format!(
+                        "remove-unused-definition found invalid symbol '{name}' in {}",
+                        file.path.display()
+                    )))),
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            let definitions = named_definitions
+                .into_iter()
+                .map(|(definition, symbol)| {
                     let references = files
                         .iter()
                         .enumerate()
@@ -92,6 +119,12 @@ pub(super) fn collect_unused_definition_candidates(
                                 &symbol,
                                 &mut spans,
                             );
+                            let package_spans = &package_form_spans[other_index];
+                            spans.retain(|span| {
+                                !package_spans
+                                    .iter()
+                                    .any(|package| span_contains(*package, *span))
+                            });
                             spans
                                 .into_iter()
                                 .filter(move |span| {
@@ -102,12 +135,12 @@ pub(super) fn collect_unused_definition_candidates(
                         })
                         .collect();
 
-                    Ok(UnusedDefinitionItem {
+                    UnusedDefinitionItem {
                         definition: definition.clone(),
                         references,
-                    })
+                    }
                 })
-                .collect::<Result<Vec<_>>>()?;
+                .collect::<Vec<_>>();
 
             Ok(UnusedDefinitionFile { definitions })
         })
@@ -116,6 +149,40 @@ pub(super) fn collect_unused_definition_candidates(
 
 fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
+}
+
+/// Collects the span of every `defpackage` form. Symbols named inside one —
+/// the members of its `:export`/`:import-from`/`:shadow` clauses and the
+/// package name itself — are package-system *metadata*, not live value- or
+/// function-namespace references. An occurrence there (`#:name` in an
+/// `:export` clause) must not count as a use that keeps a definition
+/// reachable, otherwise every exported symbol would look referenced and the
+/// `exported-definition` skip could never fire.
+///
+/// `in-package` is deliberately excluded: `(in-package #:demo)` is a genuine
+/// reference to the package `demo`, and counting it keeps the matching
+/// `defpackage` from being flagged as an unused package definition.
+///
+/// `pub(crate)`: also used by `definition_report::references` so
+/// `unused-definition-report` and `remove-unused-definitions` agree on what
+/// counts as a reference instead of drifting apart.
+pub(crate) fn collect_package_form_spans(
+    dialect: Dialect,
+    view: &ExpressionView,
+    output: &mut Vec<ByteSpan>,
+) {
+    if let Some(head) = list_head(view) {
+        if dialect.common_lisp_package_declaration_form_for_head(head)
+            == Some(CommonLispPackageDeclarationForm::Defpackage)
+        {
+            output.push(view.span);
+            return;
+        }
+    }
+
+    for child in &view.children {
+        collect_package_form_spans(dialect, child, output);
+    }
 }
 
 /// Collects every function-namespace designator matching `symbol`,
@@ -290,16 +357,24 @@ fn function_quote_symbol_matches(dialect: Dialect, candidate: &str, symbol: &str
 
 /// Collects every bare atom matching `symbol` found anywhere inside a
 /// plain-quoted region (a `Quote` reader prefix, e.g. `'((key . command)
-/// ...)` dispatch tables and alists). Scope-aware reference collection
-/// treats `Quote` as fully opaque data and does not look inside it at all,
-/// which makes it blind to the common Lisp idiom of storing a
+/// ...)` dispatch tables and alists) or a quasiquoted region (a
+/// `` Quasiquote `` reader prefix, e.g. `` `(,slot-validator ,slot) ``
+/// code-generation templates built by macros). Scope-aware reference
+/// collection treats both as fully opaque data and does not look inside them
+/// at all, which makes it blind to two related idioms: storing a
 /// function/variable name as a bare symbol inside a quoted list literal
-/// (keymap tables, dispatch alists, `featurep`/`fboundp` argument lists).
-/// Unlike scope-aware collection, this needs no shadowing awareness: quoted
-/// data can never introduce a lexical binding, so any bare atom matching
-/// `symbol` inside a quoted region is unambiguous evidence the definition
-/// is reachable, at the cost of occasionally counting an unrelated
-/// same-named symbol that only appears as incidental data.
+/// (keymap tables, dispatch alists, `featurep`/`fboundp` argument lists), and
+/// naming a function as the literal head of a quasiquoted form a macro
+/// builds up to splice into its expansion (a near-universal pattern for
+/// macros that assemble generated code piecemeal, e.g. `(push
+/// `` `(validator-fn ,arg) `` forms)`). A quasiquoted form's unquoted
+/// (`` , ``/`` ,@ ``) sub-expressions are ordinary evaluated references too,
+/// so no distinction is needed between the literal and unquoted portions.
+/// Unlike scope-aware collection, this needs no shadowing awareness: neither
+/// region can introduce a lexical binding, so any bare atom matching
+/// `symbol` inside one is unambiguous evidence the definition is reachable,
+/// at the cost of occasionally counting an unrelated same-named symbol that
+/// only appears as incidental data.
 ///
 /// `pub(crate)`: also used by `definition_report::references` so
 /// `unused-definition-report` and `remove-unused-definitions` agree on what
@@ -310,7 +385,11 @@ pub(crate) fn collect_quoted_data_references(
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
 ) {
-    if view.reader_prefixes.contains(&ReaderPrefix::Quote) {
+    if view
+        .reader_prefixes
+        .iter()
+        .any(|prefix| matches!(prefix, ReaderPrefix::Quote | ReaderPrefix::Quasiquote))
+    {
         collect_atoms_in_quoted_region(dialect, view, symbol, output);
         return;
     }
