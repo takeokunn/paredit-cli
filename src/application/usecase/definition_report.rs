@@ -13,7 +13,6 @@ pub use collect::{
 };
 pub use policy::evaluate_unused_definition_policy;
 pub use references::{collect_unused_definition_candidates, unused_definition_candidate_count};
-pub use syntax::{body_form_count, count_lambda_parameters, definition_name, lambda_list_index};
 pub use types::{
     DefinitionReference, DefinitionReportFile, DefinitionReportItem, ParsedDefinitionFile,
     UnusedDefinitionFile, UnusedDefinitionItem, UnusedDefinitionPolicy,

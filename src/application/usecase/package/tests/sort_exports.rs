@@ -6,6 +6,7 @@ fn sorts_package_exports_without_moving_other_options() {
         "(defpackage #:demo\n  (:use #:cl)\n  (:export #:z #:a #:m)\n  (:import-from #:x #:y))\n";
     let plan = plan_sort_package_exports(SortPackageExportsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: Some(&SymbolName::new("demo").unwrap()),
     })
     .unwrap();
@@ -24,6 +25,7 @@ fn sorted_package_exports_are_idempotent() {
     let input = "(defpackage #:demo (:export #:a #:b #:c))\n";
     let plan = plan_sort_package_exports(SortPackageExportsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: None,
     })
     .unwrap();
@@ -48,6 +50,7 @@ proptest! {
         let input = format!("(defpackage #:{package} (:export {}))\n", reversed.join(" "));
         let plan = plan_sort_package_exports(SortPackageExportsRequest {
             input: &input,
+            dialect: Dialect::CommonLisp,
             package: None,
         }).unwrap();
         let expected = symbols.iter().map(|symbol| format!("#:{symbol}")).collect::<Vec<_>>();

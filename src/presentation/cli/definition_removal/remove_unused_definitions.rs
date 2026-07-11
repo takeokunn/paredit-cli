@@ -1,8 +1,6 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
-use super::super::shared::{detect_dialect, read_input};
+use super::super::shared::{detect_dialect, read_input, write_files_with_rollback};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
 use crate::application::usecase::definition_report::{
@@ -27,7 +25,7 @@ pub(in crate::presentation::cli) fn remove_unused_definitions(
         let tree = SyntaxTree::parse(&input.text)
             .with_context(|| format!("failed to parse {}", file.display()))?;
         let (package, definitions) = collect_definition_forms(&tree, dialect)?;
-        let package_report = build_package_report(&tree)
+        let package_report = build_package_report(&tree, dialect)
             .with_context(|| format!("failed to inspect packages in {}", file.display()))?;
         package_definitions.extend(package_report.defpackages);
 
@@ -53,12 +51,13 @@ pub(in crate::presentation::cli) fn remove_unused_definitions(
 
     let written = args.write && plan.changed;
     if written {
+        let mut written_files = Vec::new();
         for file in &plan.files {
             if file.changed {
-                fs::write(&file.path, &file.rewritten)
-                    .with_context(|| format!("failed to write {}", file.path.display()))?;
+                written_files.push((file.path.clone(), file.rewritten.clone()));
             }
         }
+        write_files_with_rollback(written_files)?;
     }
 
     print_remove_unused_definitions_plan(&plan, written, args.output)

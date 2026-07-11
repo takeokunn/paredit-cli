@@ -9,6 +9,42 @@ use super::{
 use clap::Subcommand;
 
 #[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit refactor plan --symbol old-name src/foo.lisp src/bar.lisp\n  paredit refactor preview --from old-name --to new-name src/foo.lisp src/bar.lisp\n  paredit refactor verify --symbol old-name --new-symbol new-name --phase post src/foo.lisp src/bar.lisp"
+)]
+pub(super) enum RefactorCommand {
+    /// Produce an ordered, gated refactoring plan for AI coding agents.
+    Plan(refactor::args::RefactorPlanArgs),
+    /// Verify pre/post refactoring invariants for AI coding agents and CI gates.
+    Verify(refactor::args::VerifyRefactorArgs),
+    /// Preview exact refactoring rewrites without modifying files.
+    Preview(refactor::args::RefactorPreviewArgs),
+    /// Validate a refactor preview manifest without writing files or rendering diffs.
+    Check(refactor::args::RefactorCheckArgs),
+    /// Summarize a refactor preview manifest into agent-safe next actions.
+    Status(refactor::args::RefactorStatusArgs),
+    /// Apply a previously generated refactor preview manifest with hash guards.
+    Apply(refactor::args::RefactorApplyArgs),
+    /// Render a verified diff from a refactor preview manifest without writing files.
+    Diff(refactor::args::RefactorDiffArgs),
+    /// Discover Lisp sources under roots and build a gated refactor plan.
+    WorkspacePlan(refactor::args::WorkspaceRefactorPlanArgs),
+    /// Discover Lisp sources under roots and preview exact refactoring rewrites.
+    WorkspacePreview(refactor::args::WorkspaceRefactorPreviewArgs),
+    /// Execute a workspace refactor with preview gates and post-write verification.
+    WorkspaceExecute(refactor::args::WorkspaceRefactorExecuteArgs),
+}
+
+#[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit workspace report .\n  paredit refactor workspace-plan --symbol old-name .\n  paredit refactor workspace-execute --from old-name --to new-name --write ."
+)]
+pub(super) enum WorkspaceCommand {
+    /// Discover Lisp sources under roots and report parse/refactor inventory.
+    Report(workspace_report::args::WorkspaceReportArgs),
+}
+
+#[derive(Debug, Subcommand)]
 pub(super) enum Command {
     /// Validate that input is a balanced S-expression document.
     Check(InputArgs),
@@ -18,14 +54,6 @@ pub(super) enum Command {
     Stats(AnalyzeArgs),
     /// Print a complete JSON report for AI coding agent refactor planning.
     AgentReport(AnalyzeArgs),
-    /// Discover Lisp sources under roots and report parse/refactor inventory.
-    WorkspaceReport(workspace_report::args::WorkspaceReportArgs),
-    /// Discover Lisp sources under roots and build a gated refactor plan.
-    WorkspaceRefactorPlan(refactor::args::WorkspaceRefactorPlanArgs),
-    /// Discover Lisp sources under roots and preview exact refactoring rewrites.
-    WorkspaceRefactorPreview(refactor::args::WorkspaceRefactorPreviewArgs),
-    /// Execute a workspace refactor with preview gates and post-write verification.
-    WorkspaceRefactorExecute(refactor::args::WorkspaceRefactorExecuteArgs),
     /// Print top-level forms with paths, spans, and definition hints.
     Outline(AnalyzeArgs),
     /// Report one selected form with local structure for agent refactor planning.
@@ -42,20 +70,16 @@ pub(super) enum Command {
     CallGraph(call_graph_report::args::CallGraphArgs),
     /// Report refactoring impact risks for one symbol across explicit files.
     ImpactReport(impact_report::args::ImpactReportArgs),
-    /// Produce an ordered, gated refactoring plan for AI coding agents.
-    RefactorPlan(refactor::args::RefactorPlanArgs),
-    /// Verify pre/post refactoring invariants for AI coding agents and CI gates.
-    VerifyRefactor(refactor::args::VerifyRefactorArgs),
-    /// Preview exact refactoring rewrites without modifying files.
-    RefactorPreview(refactor::args::RefactorPreviewArgs),
-    /// Validate a refactor preview manifest without writing files or rendering diffs.
-    RefactorCheck(refactor::args::RefactorCheckArgs),
-    /// Summarize a refactor preview manifest into agent-safe next actions.
-    RefactorStatus(refactor::args::RefactorStatusArgs),
-    /// Apply a previously generated refactor preview manifest with hash guards.
-    RefactorApply(refactor::args::RefactorApplyArgs),
-    /// Render a verified diff from a refactor preview manifest without writing files.
-    RefactorDiff(refactor::args::RefactorDiffArgs),
+    /// Public namespace for refactor planning, preview, verification, and apply flows.
+    Refactor {
+        #[command(subcommand)]
+        command: RefactorCommand,
+    },
+    /// Public namespace for workspace inventory and workspace refactor flows.
+    Workspace {
+        #[command(subcommand)]
+        command: WorkspaceCommand,
+    },
     /// Report package, system, load, and qualified-symbol dependencies across explicit files.
     DependencyReport(dependency_report::args::DependencyReportArgs),
     /// Report Common Lisp package declarations across explicit files.
@@ -100,11 +124,18 @@ pub(super) enum Command {
     RenameBinding(rename::args::RenameBindingArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(rename::args::RenameSymbolsArgs),
-    /// Plan or apply a callable definition and call-site rename across explicit files.
+    /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files,
+    /// including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names,
+    /// and definition forms such as define-method-combination.
     RenameFunction(rename::args::RenameFunctionArgs),
-    /// Plan or apply a macrolet/compiler-macrolet binding and call-site rename across explicit files.
+    /// Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename across explicit files,
+    /// while keeping expander bodies out of scope.
     RenameMacrolet(rename::args::RenameMacroletArgs),
-    /// Plan or apply a flet/labels local function binding and call-site rename across explicit files.
+    /// Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename across explicit files,
+    /// while keeping expansion and lexical shadowing boundaries separate.
+    RenameSymbolMacro(rename::args::RenameSymbolMacroArgs),
+    /// Plan or apply a Common Lisp flet/labels local function binding and call-site rename across explicit files,
+    /// preserving the difference between non-recursive flet bodies and recursive labels bodies.
     RenameLocalFunction(rename::args::RenameLocalFunctionArgs),
     /// Plan or replace callable call-site heads across explicit files.
     ReplaceFunctionCalls(rename::args::ReplaceFunctionCallsArgs),
@@ -122,15 +153,15 @@ pub(super) enum Command {
     ExtractFunction(extract_function::ExtractFunctionArgs),
     /// Inline one selected function call using a selected function definition.
     InlineFunction(inline_function::InlineFunctionArgs),
-    /// Add a required parameter to a selected function and explicit call sites.
+    /// Add a parameter to a selected function and explicit call sites.
     AddFunctionParameter(function_parameter::args::AddFunctionParameterArgs),
-    /// Move one required parameter in a selected function and explicit call sites.
+    /// Move one positional parameter in a selected function and explicit call sites.
     MoveFunctionParameter(function_parameter::args::MoveFunctionParameterArgs),
-    /// Swap two required parameters in a selected function and explicit call sites.
+    /// Swap two positional parameters in a selected function and explicit call sites.
     SwapFunctionParameters(function_parameter::args::SwapFunctionParametersArgs),
-    /// Reorder all required parameters in a selected function and explicit call sites.
+    /// Reorder all positional parameters in a selected function and explicit call sites.
     ReorderFunctionParameters(function_parameter::args::ReorderFunctionParametersArgs),
-    /// Remove one required parameter from a selected function and explicit call sites.
+    /// Remove one positional parameter from a selected function and explicit call sites.
     RemoveFunctionParameter(function_parameter::args::RemoveFunctionParameterArgs),
     /// Replace the selected expression with a local binding in the enclosing list.
     IntroduceLet(introduce_let::IntroduceLetArgs),

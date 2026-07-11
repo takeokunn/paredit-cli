@@ -68,6 +68,14 @@ pub(super) fn removal_edit_for_list_item(
     let item = &container.children[item_index];
     let span = if container.children.len() == 1 {
         item.span
+    } else if item_index > 0 && is_dotted_list_separator(&container.children[item_index - 1]) {
+        let Some(previous) = item_index
+            .checked_sub(2)
+            .and_then(|index| container.children.get(index))
+        else {
+            anyhow::bail!("remove-function-parameter dotted tail must follow a parameter binding");
+        };
+        ByteSpan::new(previous.span.end(), item.span.end())
     } else if item_index == 0 {
         let next = &container.children[1];
         ByteSpan::new(item.span.start(), next.span.start())
@@ -77,162 +85,6 @@ pub(super) fn removal_edit_for_list_item(
     };
 
     Ok((span, String::new()))
-}
-
-pub(super) fn move_list_item_edit(
-    input: &str,
-    container: &ExpressionView,
-    from_item_index: usize,
-    protected_prefix_count: usize,
-    to_item_index: usize,
-    operation: &str,
-) -> Result<SpanEdit> {
-    if container.kind != ExpressionKind::List || container.delimiter.is_none() {
-        anyhow::bail!("{operation} move target must be a list");
-    }
-    if container.span.len() < 2 {
-        anyhow::bail!("{operation} move target has an invalid span");
-    }
-    if from_item_index >= container.children.len() {
-        anyhow::bail!(
-            "{operation} source item index {} is out of bounds",
-            from_item_index
-        );
-    }
-    if to_item_index >= container.children.len() {
-        anyhow::bail!(
-            "{operation} target item index {} is out of bounds",
-            to_item_index
-        );
-    }
-    if from_item_index < protected_prefix_count || to_item_index < protected_prefix_count {
-        anyhow::bail!("{operation} cannot move protected list prefix items");
-    }
-
-    let start = container.span.start().get();
-    let end = container.span.end().get();
-    let open = &input[start..start + 1];
-    let close = &input[end - 1..end];
-    let mut protected_items = container.children[..protected_prefix_count]
-        .iter()
-        .map(|child| child.span.slice(input).to_owned())
-        .collect::<Vec<_>>();
-    let mut movable_items = container.children[protected_prefix_count..]
-        .iter()
-        .map(|child| child.span.slice(input).to_owned())
-        .collect::<Vec<_>>();
-    let moved = movable_items.remove(from_item_index - protected_prefix_count);
-    movable_items.insert(to_item_index - protected_prefix_count, moved);
-    protected_items.extend(movable_items);
-
-    let replacement = if protected_items.is_empty() {
-        format!("{open}{close}")
-    } else {
-        format!("{open}{}{close}", protected_items.join(" "))
-    };
-    Ok((container.span, replacement))
-}
-
-pub(super) fn swap_list_item_edit(
-    input: &str,
-    container: &ExpressionView,
-    left_item_index: usize,
-    right_item_index: usize,
-    protected_prefix_count: usize,
-    operation: &str,
-) -> Result<SpanEdit> {
-    if container.kind != ExpressionKind::List || container.delimiter.is_none() {
-        anyhow::bail!("{operation} swap target must be a list");
-    }
-    if left_item_index >= container.children.len() || right_item_index >= container.children.len() {
-        anyhow::bail!(
-            "{operation} swap item index out of bounds: {} and {} for {} items",
-            left_item_index,
-            right_item_index,
-            container.children.len()
-        );
-    }
-    if left_item_index < protected_prefix_count || right_item_index < protected_prefix_count {
-        anyhow::bail!("{operation} cannot swap protected list prefix items");
-    }
-
-    let start = container.span.start().get();
-    let end = container.span.end().get();
-    let open = &input[start..start + 1];
-    let close = &input[end - 1..end];
-    let mut items = container
-        .children
-        .iter()
-        .map(|child| child.span.slice(input).to_owned())
-        .collect::<Vec<_>>();
-    items.swap(left_item_index, right_item_index);
-
-    let replacement = if items.is_empty() {
-        format!("{open}{close}")
-    } else {
-        format!("{open}{}{close}", items.join(" "))
-    };
-    Ok((container.span, replacement))
-}
-
-pub(super) fn reorder_list_items_edit(
-    input: &str,
-    container: &ExpressionView,
-    protected_prefix_count: usize,
-    new_relative_order: &[usize],
-    operation: &str,
-) -> Result<SpanEdit> {
-    if container.kind != ExpressionKind::List || container.delimiter.is_none() {
-        anyhow::bail!("{operation} reorder target must be a list");
-    }
-    if protected_prefix_count > container.children.len() {
-        anyhow::bail!("{operation} protected prefix is out of bounds");
-    }
-
-    let item_count = container.children.len() - protected_prefix_count;
-    if new_relative_order.len() != item_count {
-        anyhow::bail!(
-            "{operation} new order has {} items but target has {} reorderable items",
-            new_relative_order.len(),
-            item_count
-        );
-    }
-
-    let mut seen = vec![false; item_count];
-    for &index in new_relative_order {
-        if index >= item_count {
-            anyhow::bail!("{operation} new order index {index} is out of bounds");
-        }
-        if seen[index] {
-            anyhow::bail!("{operation} new order contains duplicate index {index}");
-        }
-        seen[index] = true;
-    }
-
-    let start = container.span.start().get();
-    let end = container.span.end().get();
-    let open = &input[start..start + 1];
-    let close = &input[end - 1..end];
-    let mut items = container.children[..protected_prefix_count]
-        .iter()
-        .map(|child| child.span.slice(input).to_owned())
-        .collect::<Vec<_>>();
-    let reorderable_items = container.children[protected_prefix_count..]
-        .iter()
-        .map(|child| child.span.slice(input).to_owned())
-        .collect::<Vec<_>>();
-    items.extend(
-        new_relative_order
-            .iter()
-            .map(|&index| reorderable_items[index].clone()),
-    );
-
-    let replacement = if items.is_empty() {
-        format!("{open}{close}")
-    } else {
-        format!("{open}{}{close}", items.join(" "))
-    };
-    Ok((container.span, replacement))
 }
 
 pub(super) fn apply_byte_span_edits(input: &str, mut edits: Vec<SpanEdit>) -> Result<String> {
@@ -282,4 +134,8 @@ pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
         return None;
     }
     atom_child(view, 0)
+}
+
+pub(super) fn is_dotted_list_separator(child: &ExpressionView) -> bool {
+    atom_text(child).is_some_and(|text| text == ".")
 }

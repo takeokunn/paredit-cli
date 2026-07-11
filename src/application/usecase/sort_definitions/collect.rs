@@ -1,10 +1,10 @@
 use anyhow::Result;
 
-use crate::domain::definition::{DefinitionCategory, classify_definition_head};
+use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
-use super::syntax::{definition_name, list_head};
+use super::syntax::list_head;
 use super::types::{DefinitionBlock, DefinitionEntry, RawDefinition, SortDefinitionsItem};
 
 pub(super) fn collect_sortable_blocks(
@@ -16,24 +16,24 @@ pub(super) fn collect_sortable_blocks(
     let mut current = Vec::new();
 
     for index in 0..tree.root_children().len() {
-        let path = Path::from_indexes(vec![index]);
+        let path = Path::root_child(index);
         let selection = tree.select_path(&path)?;
         let view = selection.view();
         let Some(head) = list_head(&view) else {
             finish_block(input, &mut current, &mut blocks);
             continue;
         };
-        let Some(category) = classify_definition_head(dialect, head) else {
+        let Some(shape) = definition_shape(dialect, &view, head) else {
             finish_block(input, &mut current, &mut blocks);
             continue;
         };
 
-        if !is_sortable_category(category) {
+        if !is_sortable_category(shape.category) {
             finish_block(input, &mut current, &mut blocks);
             continue;
         }
 
-        let Some(name) = definition_name(&view, head).map(ToOwned::to_owned) else {
+        let Some(name) = shape.name(&view).map(ToOwned::to_owned) else {
             finish_block(input, &mut current, &mut blocks);
             continue;
         };
@@ -43,7 +43,7 @@ pub(super) fn collect_sortable_blocks(
             span: selection.span(),
             head: head.to_owned(),
             name: Some(name),
-            category,
+            category: shape.category,
             source_index: index,
         });
     }
@@ -81,19 +81,18 @@ fn finish_block(input: &str, current: &mut Vec<RawDefinition>, blocks: &mut Vec<
         }
     }
 
+    let Some(first) = current.first() else {
+        current.clear();
+        return;
+    };
+    let Some(last) = current.last() else {
+        current.clear();
+        return;
+    };
+
     blocks.push(DefinitionBlock {
-        start: current
-            .first()
-            .expect("block has at least two definitions")
-            .span
-            .start()
-            .get(),
-        end: current
-            .last()
-            .expect("block has at least two definitions")
-            .span
-            .end()
-            .get(),
+        start: first.span.start().get(),
+        end: last.span.end().get(),
         entries,
         separators,
     });

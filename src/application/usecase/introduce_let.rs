@@ -24,9 +24,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     let enclosing = request.enclosing_span.slice(request.input);
     let enclosing_tree =
         SyntaxTree::parse(enclosing).context("failed to parse enclosing list for introduce-let")?;
-    let enclosing_view = enclosing_tree
-        .select_path(&Path::from_indexes(vec![0]))?
-        .view();
+    let enclosing_view = enclosing_tree.select_path(&Path::root_child(0))?.view();
 
     let selected_relative_span = ByteSpan::new(
         ByteOffset::new(selected_span.start().get() - request.enclosing_span.start().get()),
@@ -43,6 +41,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     let (occurrence_spans, skipped_shadowed_occurrence_spans) = if request.all_occurrences {
         let mut collection = EquivalentExpressionSpans::default();
         collect_equivalent_expression_spans(
+            request.dialect,
             &enclosing_view,
             &request.target,
             request.name.as_str(),
@@ -58,6 +57,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
         )
     } else {
         if is_span_shadowed_by_binding(
+            request.dialect,
             &enclosing_view,
             selected_relative_span,
             request.name.as_str(),
@@ -123,10 +123,11 @@ fn selected_path_shadowed_by_binding(request: &IntroduceLetRequest<'_>) -> Resul
     let tree =
         SyntaxTree::parse(request.input).context("failed to parse document for introduce-let")?;
     let top_level_view = tree
-        .select_path(&Path::from_indexes(vec![top_level_index.get()]))?
+        .select_path(&Path::root_child(top_level_index.get()))?
         .view();
 
     Ok(is_path_shadowed_by_binding(
+        request.dialect,
         &top_level_view,
         relative_path,
         request.name.as_str(),

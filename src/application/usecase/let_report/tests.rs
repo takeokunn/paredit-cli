@@ -87,7 +87,36 @@ fn reports_symbol_macrolet_without_counting_expansion_reference() {
 }
 
 #[test]
-fn reports_single_symbol_macrolet_as_unsupported_by_inline_let() {
+fn reports_emacs_lisp_cl_symbol_macrolet_without_counting_expansion_reference() {
+    let reports = reports_for(
+        "(cl-symbol-macrolet ((value (compute value)) (used other)) (list used))",
+        Dialect::EmacsLisp,
+    );
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].form, "cl-symbol-macrolet");
+    assert_eq!(reports[0].binding_style, "list-pair");
+    assert!(!reports[0].inline_supported_by_inline_let);
+    assert_eq!(reports[0].bindings[0].name, "value");
+    assert_eq!(reports[0].bindings[0].reference_count, 0);
+    assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+    assert!(
+        reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
+    assert_eq!(reports[0].bindings[1].name, "used");
+    assert_eq!(reports[0].bindings[1].reference_count, 1);
+    assert!(
+        reports[0].bindings[1]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
+    assert!(!reports[0].bindings[1].can_inline_without_duplication);
+}
+
+#[test]
+fn reports_single_symbol_macrolet_as_supported_by_inline_let() {
     let reports = reports_for(
         "(symbol-macrolet ((value (compute value))) (list value))",
         Dialect::CommonLisp,
@@ -95,14 +124,62 @@ fn reports_single_symbol_macrolet_as_unsupported_by_inline_let() {
 
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].form, "symbol-macrolet");
-    assert!(!reports[0].inline_supported_by_inline_let);
+    assert!(reports[0].inline_supported_by_inline_let);
     assert_eq!(reports[0].bindings[0].reference_count, 1);
+    assert!(
+        !reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
+    assert!(reports[0].bindings[0].can_inline_without_duplication);
+}
+
+#[test]
+fn reports_single_common_lisp_cl_user_symbol_macrolet_as_supported_by_inline_let() {
+    let reports = reports_for(
+        "(cl-user:symbol-macrolet ((value (compute value))) (list value))",
+        Dialect::CommonLisp,
+    );
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].form, "cl-user:symbol-macrolet");
+    assert!(reports[0].inline_supported_by_inline_let);
+    assert_eq!(reports[0].bindings[0].reference_count, 1);
+    assert!(
+        !reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
+    assert!(reports[0].bindings[0].can_inline_without_duplication);
+}
+
+#[test]
+fn reports_common_lisp_cl_user_symbol_macrolet_without_counting_expansion_reference() {
+    let reports = reports_for(
+        "(cl-user:symbol-macrolet ((value (compute value)) (used other)) (list used))",
+        Dialect::CommonLisp,
+    );
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].form, "cl-user:symbol-macrolet");
+    assert_eq!(reports[0].binding_style, "list-pair");
+    assert!(!reports[0].inline_supported_by_inline_let);
+    assert_eq!(reports[0].bindings[0].name, "value");
+    assert_eq!(reports[0].bindings[0].reference_count, 0);
+    assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
     assert!(
         reports[0].bindings[0]
             .risks
             .contains(&"unsupported-by-inline-let")
     );
-    assert!(!reports[0].bindings[0].can_inline_without_duplication);
+    assert_eq!(reports[0].bindings[1].name, "used");
+    assert_eq!(reports[0].bindings[1].reference_count, 1);
+    assert!(
+        reports[0].bindings[1]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
+    assert!(!reports[0].bindings[1].can_inline_without_duplication);
 }
 
 proptest! {

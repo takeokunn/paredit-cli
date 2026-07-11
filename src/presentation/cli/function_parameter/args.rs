@@ -37,7 +37,7 @@ pub(in crate::presentation::cli) struct AddFunctionParameterArgs {
     pub(in crate::presentation::cli::function_parameter) definition_path: Path,
     #[arg(long)]
     pub(in crate::presentation::cli::function_parameter) name: SymbolName,
-    #[arg(long)]
+    #[arg(long, allow_hyphen_values = true)]
     pub(in crate::presentation::cli::function_parameter) argument: String,
     #[arg(long = "call-path")]
     pub(in crate::presentation::cli::function_parameter) call_paths: Vec<Path>,
@@ -45,7 +45,12 @@ pub(in crate::presentation::cli) struct AddFunctionParameterArgs {
     pub(in crate::presentation::cli::function_parameter) all_calls: bool,
     #[arg(long, value_enum, default_value_t = ParameterInsert::End)]
     pub(in crate::presentation::cli::function_parameter) insert: ParameterInsert,
-    #[arg(long = "parameter-section", value_enum, default_value_t = ParameterSection::Auto)]
+    #[arg(
+        long = "parameter-section",
+        value_enum,
+        default_value_t = ParameterSection::Auto,
+        help = "Target lambda-list section: auto, positional, optional, or keyword"
+    )]
     pub(in crate::presentation::cli::function_parameter) section: ParameterSection,
     #[arg(long)]
     pub(in crate::presentation::cli::function_parameter) write: bool,

@@ -46,7 +46,7 @@ fn assert_form_report_property(input: String) -> Result<(), TestCaseError> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(12))]
+    #![proptest_config(cli_proptest_config(12))]
 
     #[test]
     fn cli_form_report_preserves_agent_schema_for_generated_forms(depth in 1usize..8) {

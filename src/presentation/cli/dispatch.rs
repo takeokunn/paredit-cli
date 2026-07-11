@@ -6,14 +6,6 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::Dialect(args) => analysis_report::workflow::dialect(args)?,
         Command::Stats(args) => analysis_report::workflow::stats(args)?,
         Command::AgentReport(args) => analysis_report::workflow::agent_report(args)?,
-        Command::WorkspaceReport(args) => workspace_report::workflow::workspace_report(args)?,
-        Command::WorkspaceRefactorPlan(args) => refactor::workflow::workspace_refactor_plan(args)?,
-        Command::WorkspaceRefactorPreview(args) => {
-            refactor::workflow::workspace_refactor_preview(args)?
-        }
-        Command::WorkspaceRefactorExecute(args) => {
-            refactor::workflow::workspace_refactor_execute(args)?
-        }
         Command::Outline(args) => analysis_report::workflow::outline(args)?,
         Command::FormReport(args) => form_report::workflow::form_report(args)?,
         Command::FindSymbol(args) => symbol_report::workflow::find_symbol(args)?,
@@ -22,13 +14,29 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::SignatureReport(args) => signature_report::workflow::signature_report(args)?,
         Command::CallGraph(args) => call_graph_report::workflow::call_graph(args)?,
         Command::ImpactReport(args) => impact_report::workflow::impact_report(args)?,
-        Command::RefactorPlan(args) => refactor::workflow::refactor_plan(args)?,
-        Command::VerifyRefactor(args) => refactor::workflow::verify_refactor(args)?,
-        Command::RefactorPreview(args) => refactor::workflow::refactor_preview(args)?,
-        Command::RefactorCheck(args) => refactor::workflow::refactor_check(args)?,
-        Command::RefactorStatus(args) => refactor::workflow::refactor_status(args)?,
-        Command::RefactorApply(args) => refactor::workflow::refactor_apply(args)?,
-        Command::RefactorDiff(args) => refactor::workflow::refactor_diff(args)?,
+        Command::Refactor { command } => match command {
+            command::RefactorCommand::Plan(args) => refactor::workflow::refactor_plan(args)?,
+            command::RefactorCommand::Verify(args) => refactor::workflow::verify_refactor(args)?,
+            command::RefactorCommand::Preview(args) => refactor::workflow::refactor_preview(args)?,
+            command::RefactorCommand::Check(args) => refactor::workflow::refactor_check(args)?,
+            command::RefactorCommand::Status(args) => refactor::workflow::refactor_status(args)?,
+            command::RefactorCommand::Apply(args) => refactor::workflow::refactor_apply(args)?,
+            command::RefactorCommand::Diff(args) => refactor::workflow::refactor_diff(args)?,
+            command::RefactorCommand::WorkspacePlan(args) => {
+                refactor::workflow::workspace_refactor_plan(args)?
+            }
+            command::RefactorCommand::WorkspacePreview(args) => {
+                refactor::workflow::workspace_refactor_preview(args)?
+            }
+            command::RefactorCommand::WorkspaceExecute(args) => {
+                refactor::workflow::workspace_refactor_execute(args)?
+            }
+        },
+        Command::Workspace { command } => match command {
+            command::WorkspaceCommand::Report(args) => {
+                workspace_report::workflow::workspace_report(args)?
+            }
+        },
         Command::DependencyReport(args) => dependency_report::workflow::dependency_report(args)?,
         Command::PackageReport(args) => package::report::package_report(args)?,
         Command::DefinitionReport(args) => definition_report::workflow::definition_report(args)?,
@@ -63,6 +71,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
         Command::RenameSymbols(args) => rename::rename_symbols::rename_symbols(args)?,
         Command::RenameFunction(args) => rename::rename_function::rename_function(args)?,
         Command::RenameMacrolet(args) => rename::rename_macrolet::rename_macrolet(args)?,
+        Command::RenameSymbolMacro(args) => rename::rename_symbol_macro::rename_symbol_macro(args)?,
         Command::RenameLocalFunction(args) => {
             rename::rename_local_function::rename_local_function(args)?
         }

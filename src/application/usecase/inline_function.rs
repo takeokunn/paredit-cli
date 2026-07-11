@@ -3,10 +3,14 @@
 use anyhow::{Context, Result};
 
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName, SyntaxTree};
+use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
+use crate::domain::sexpr::{
+    ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
+};
 
 mod calls;
 mod definition;
+mod macro_expansion;
 mod rewrite;
 mod substitution;
 mod syntax;
@@ -17,7 +21,11 @@ mod types;
 use calls::{
     bind_inline_function_arguments, parse_inline_function_call, resolve_function_call_paths,
 };
-use definition::parse_inline_function_definition;
+use definition::{
+    InlineDefinition, InlineDefinitionKind, InlineDestructurePattern, InlineParameter,
+    InlineParameterBinding, InlineParameterKind, parse_inline_function_definition,
+};
+use macro_expansion::expand_inline_macro_body;
 use rewrite::{apply_byte_span_edits, expand_definition_removal};
 use substitution::substitute_inline_function_body;
 use syntax::spans_overlap;
@@ -38,8 +46,12 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     let tree = SyntaxTree::parse(request.input)?;
     let definition_selection = tree.select_path(&request.definition_path)?;
     let definition_span = definition_selection.span();
-    let (function_name, _, _) =
-        parse_inline_function_definition(request.dialect, definition_selection.view())?;
+    let definition = parse_inline_function_definition(
+        request.dialect,
+        request.input,
+        definition_selection.view(),
+    )?;
+    let function_name = definition.name.clone();
     let call_paths = resolve_function_call_paths(
         &tree,
         request.dialect,
@@ -121,23 +133,57 @@ fn inline_function_parts(
     allow_duplicate_evaluation: bool,
     allow_drop_arguments: bool,
 ) -> Result<InlineFunctionParts> {
-    let (function_name, params, body) =
-        parse_inline_function_definition(dialect, definition_selection.clone())?;
-    let raw_args = parse_inline_function_call(call_selection.clone(), &function_name, input)?;
-    let args = bind_inline_function_arguments(&params, raw_args, &function_name)?;
-    let param_names = params
-        .iter()
-        .map(|param| param.name.clone())
-        .collect::<Vec<_>>();
-
-    let (replacement, parameters) = substitute_inline_function_body(
-        input,
-        &body,
-        &param_names,
-        &args,
-        allow_duplicate_evaluation,
+    let definition =
+        parse_inline_function_definition(dialect, input, definition_selection.clone())?;
+    validate_macro_environment_parameters(input, &definition)?;
+    let function_name = definition.name.clone();
+    let call = parse_inline_function_call(call_selection.clone(), &function_name, input)?;
+    let bindings = bind_inline_function_arguments(
+        &definition.params,
+        call,
+        &function_name,
+        definition.accepts_other_keys,
         allow_drop_arguments,
     )?;
+    let (replacement, parameters) = match definition.kind {
+        InlineDefinitionKind::Function => {
+            let (body_param_names, body_args): (Vec<_>, Vec<_>) =
+                bindings.body_bindings.into_iter().unzip();
+            let (intermediate_replacement, mut parameters) = substitute_inline_function_body(
+                input,
+                &definition.body,
+                &body_param_names,
+                &body_args,
+                true,
+                true,
+            )?;
+            let (argument_param_names, argument_args): (Vec<_>, Vec<_>) =
+                bindings.argument_bindings.into_iter().unzip();
+            let replacement_tree = SyntaxTree::parse(&intermediate_replacement)?;
+            let replacement_body = replacement_view_for_inline_function(&replacement_tree)?;
+            let (replacement, argument_parameters) = substitute_inline_function_body(
+                &intermediate_replacement,
+                &replacement_body,
+                &argument_param_names,
+                &argument_args,
+                allow_duplicate_evaluation,
+                allow_drop_arguments,
+            )?;
+            parameters.extend(argument_parameters);
+            (
+                wrap_inline_function_sequence(dialect, &definition.body, replacement),
+                parameters,
+            )
+        }
+        InlineDefinitionKind::Macro => expand_inline_macro_body(
+            input,
+            &definition.body,
+            &bindings.body_bindings,
+            &bindings.argument_bindings,
+            allow_duplicate_evaluation,
+            allow_drop_arguments,
+        )?,
+    };
 
     Ok(InlineFunctionParts {
         definition_span: definition_selection.span,
@@ -146,4 +192,136 @@ fn inline_function_parts(
         parameters,
         replacement,
     })
+}
+
+fn replacement_view_for_inline_function(tree: &SyntaxTree) -> Result<ExpressionView> {
+    if tree.root_children().len() == 1 {
+        return Ok(tree.select_path(&Path::root_child(0))?.view());
+    }
+    Ok(tree.root_view())
+}
+
+fn wrap_inline_function_sequence(
+    dialect: Dialect,
+    body: &ExpressionView,
+    replacement: String,
+) -> String {
+    if body.kind != ExpressionKind::Root {
+        return replacement;
+    }
+
+    format!(
+        "({} {})",
+        dialect.inline_function_sequence_head(),
+        replacement.trim()
+    )
+}
+
+fn validate_macro_environment_parameters(input: &str, definition: &InlineDefinition) -> Result<()> {
+    if definition.kind != InlineDefinitionKind::Macro {
+        return Ok(());
+    }
+
+    let mut initialization_expressions = Vec::new();
+    for param in &definition.params {
+        collect_macro_initialization_expressions(param, &mut initialization_expressions);
+    }
+
+    for param in &definition.params {
+        if !matches!(param.kind, InlineParameterKind::Environment) {
+            continue;
+        }
+        let name = param.primary_name().context(
+            "inline-function internal error: &environment parameter must use a simple binding",
+        )?;
+
+        reject_environment_references_in_expression(name, "macro body", input, &definition.body)?;
+
+        for (context, default_value) in &initialization_expressions {
+            let default_tree = SyntaxTree::parse(default_value).with_context(|| {
+                format!("inline-function could not parse {context}: {default_value}")
+            })?;
+            let default_expression = default_tree
+                .select_path(&crate::domain::sexpr::Path::root_child(0))?
+                .view();
+            reject_environment_references_in_expression(
+                name,
+                context,
+                default_value,
+                &default_expression,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_macro_initialization_expressions<'a>(
+    param: &'a InlineParameter,
+    output: &mut Vec<(&'static str, &'a str)>,
+) {
+    if let Some(default_value) = param.default_value.as_deref() {
+        let context = if matches!(param.kind, InlineParameterKind::Aux) {
+            "&aux initializer"
+        } else {
+            "parameter default value"
+        };
+        output.push((context, default_value));
+    }
+
+    if let InlineParameterBinding::Destructure(pattern) = &param.binding {
+        collect_macro_destructure_initialization_expressions(pattern, output);
+    }
+}
+
+fn collect_macro_destructure_initialization_expressions<'a>(
+    pattern: &'a InlineDestructurePattern,
+    output: &mut Vec<(&'static str, &'a str)>,
+) {
+    match pattern {
+        InlineDestructurePattern::Name(_) => {}
+        InlineDestructurePattern::List(items) => {
+            for item in &items.required {
+                collect_macro_destructure_initialization_expressions(item, output);
+            }
+            for item in &items.optional {
+                if let Some(default_value) = item.default_value.as_deref() {
+                    output.push(("nested &optional default value", default_value));
+                }
+                collect_macro_destructure_initialization_expressions(&item.binding, output);
+            }
+            if let Some(rest) = &items.rest {
+                collect_macro_destructure_initialization_expressions(rest, output);
+            }
+            for item in &items.keys {
+                if let Some(default_value) = item.default_value.as_deref() {
+                    output.push(("nested &key default value", default_value));
+                }
+                collect_macro_destructure_initialization_expressions(&item.binding, output);
+            }
+            for item in &items.aux {
+                collect_macro_initialization_expressions(item, output);
+            }
+        }
+    }
+}
+
+fn reject_environment_references_in_expression(
+    parameter_name: &str,
+    context: &str,
+    input: &str,
+    expression: &ExpressionView,
+) -> Result<()> {
+    let symbol = SymbolName::new(parameter_name.to_owned())?;
+    let mut spans = Vec::new();
+    collect_unshadowed_symbol_references(expression, &symbol, input, &mut spans);
+    if spans.is_empty() {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "inline-function cannot inline macros that reference &environment parameter '{}' in the {}; source-level inlining cannot reconstruct macro expansion environments",
+        parameter_name,
+        context
+    );
 }

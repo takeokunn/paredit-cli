@@ -21,6 +21,16 @@ fn formats_binding_forms_with_aligned_bindings() {
 }
 
 #[test]
+fn formats_qualified_common_lisp_binding_heads() {
+    let input = "(cl:let ((x 1) (y (+ x 2))) (list x y))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "(cl:let ((x 1)\n         (y (+ x 2)))\n  (list x y))\n"
+    );
+}
+
+#[test]
 fn formats_bracket_binding_forms_as_name_value_pairs() {
     let input = "(let [x 1 y (+ x 2)] (list x y))";
     let tree = SyntaxTree::parse(input).expect("valid");
@@ -38,6 +48,26 @@ fn formats_handler_bind_like_a_binding_form() {
     assert_eq!(
         Formatter::new(2).format(&tree),
         "(handler-bind ((error #'handle-error)\n               (warning #'muffle-warning))\n  (risky)\n  (recover))\n"
+    );
+}
+
+#[test]
+fn preserves_common_lisp_reader_prefixes() {
+    let input = "'(alpha beta)\n`(list ,item ,@rest)\n#'(lambda (value) value)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n  value)\n"
+    );
+}
+
+#[test]
+fn preserves_common_lisp_reader_eval_forms_verbatim() {
+    let input = "#.(foo (bar baz))\n#.(list 1 2 3)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    assert_eq!(
+        Formatter::new(2).format(&tree),
+        "#.(foo (bar baz))\n\n#.(list 1 2 3)\n"
     );
 }
 

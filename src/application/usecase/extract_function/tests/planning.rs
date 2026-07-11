@@ -60,3 +60,30 @@ fn plans_extract_function_before_anchor() {
     assert!(plan.rewritten.starts_with("(defun sum (x y) (+ x y))\n\n"));
     assert!(plan.anchor_span.is_some());
 }
+
+#[test]
+fn rejects_relative_extract_function_insertion_without_anchor_path() {
+    let input = "(defun render () (+ x y))\n";
+    let tree = SyntaxTree::parse(input).expect("parse fixture");
+    let selection = tree
+        .select_path(&Path::from_indexes(vec![0, 3]))
+        .expect("select fixture");
+
+    let error = plan_extract_function(ExtractFunctionRequest {
+        input,
+        selection,
+        path: Some(Path::from_indexes(vec![0, 3])),
+        dialect: Dialect::CommonLisp,
+        name: SymbolName::new("sum").expect("symbol fixture"),
+        explicit_params: Vec::new(),
+        infer_params: true,
+        insert: ExtractFunctionInsert::Before,
+        anchor_path: None,
+    })
+    .expect_err("missing anchor path should be rejected");
+
+    assert_eq!(
+        error.to_string(),
+        "--insert before/after requires --anchor-path"
+    );
+}

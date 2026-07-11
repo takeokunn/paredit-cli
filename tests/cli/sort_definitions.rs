@@ -158,7 +158,7 @@ fn assert_sort_definitions_property(definition_count: usize) -> Result<(), TestC
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(12))]
+    #![proptest_config(cli_proptest_config(12))]
 
     #[test]
     fn cli_sort_definitions_preserves_parseability_and_name_order(definition_count in 2usize..8) {

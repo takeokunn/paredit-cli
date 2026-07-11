@@ -1,0 +1,81 @@
+use super::*;
+
+#[test]
+fn classifies_common_lisp_definition_categories() {
+    assert_eq!(
+        CommonLispOperator::from_head("cl:defgeneric")
+            .and_then(CommonLispOperator::definition_category),
+        Some(DefinitionCategory::GenericFunction)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("define-method-combination")
+            .and_then(CommonLispOperator::definition_category),
+        Some(DefinitionCategory::Macro)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("define-symbol-macro")
+            .and_then(CommonLispOperator::definition_category),
+        Some(DefinitionCategory::Variable)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("asdf:defsystem")
+            .and_then(CommonLispOperator::definition_category),
+        Some(DefinitionCategory::System)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("let").and_then(CommonLispOperator::definition_category),
+        None
+    );
+}
+
+#[test]
+fn classifies_common_lisp_definition_lambda_list_shapes() {
+    assert_eq!(
+        CommonLispOperator::from_head("cl:defun")
+            .and_then(CommonLispOperator::definition_lambda_list_shape),
+        Some(CommonLispLambdaListShape::ChildAt(2))
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("defmethod")
+            .and_then(CommonLispOperator::definition_lambda_list_shape),
+        Some(CommonLispLambdaListShape::FirstListAtOrAfter(2))
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("define-method-combination")
+            .and_then(CommonLispOperator::definition_lambda_list_shape),
+        Some(CommonLispLambdaListShape::ChildAt(2))
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("defclass")
+            .and_then(CommonLispOperator::definition_lambda_list_shape),
+        None
+    );
+}
+
+#[test]
+fn maps_dependency_and_package_declaration_forms_to_domain_types() {
+    assert_eq!(
+        CommonLispOperator::from_head("cl:require")
+            .and_then(CommonLispOperator::runtime_dependency_form),
+        Some(CommonLispRuntimeDependencyForm::Require)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("load-library")
+            .and_then(CommonLispOperator::runtime_dependency_form),
+        Some(CommonLispRuntimeDependencyForm::LoadLibrary)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("in-package")
+            .and_then(CommonLispOperator::package_declaration_form),
+        Some(CommonLispPackageDeclarationForm::InPackage)
+    );
+    assert!(
+        CommonLispOperator::from_head("asdf:defsystem")
+            .is_some_and(CommonLispOperator::is_asdf_system_definition)
+    );
+    assert_eq!(
+        CommonLispOperator::from_head("defun")
+            .and_then(CommonLispOperator::runtime_dependency_form),
+        None
+    );
+}

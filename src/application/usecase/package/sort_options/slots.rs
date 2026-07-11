@@ -8,7 +8,7 @@ use crate::application::usecase::package::syntax::{atom_text, package_option_nam
 pub(super) fn collect_option_slots(
     input: &str,
     view: &ExpressionView,
-    defpackage_path: &[usize],
+    defpackage_path: &Path,
     order: PackageOptionSortOrder,
 ) -> Result<Vec<OptionSlot>> {
     view.children
@@ -24,22 +24,20 @@ pub(super) fn collect_option_slots(
 fn analyze_option_slot(
     input: &str,
     option: &ExpressionView,
-    defpackage_path: &[usize],
+    defpackage_path: &Path,
     option_index: usize,
     order: PackageOptionSortOrder,
 ) -> Result<OptionSlot> {
     if option.kind != ExpressionKind::List || option.children.is_empty() {
         anyhow::bail!(
             "cannot sort defpackage options at {}; only direct option lists are supported",
-            Path::from_indexes(defpackage_path.to_vec())
+            defpackage_path
         );
     }
     let Some(option_head) = atom_text(&option.children[0]) else {
-        let mut option_path = defpackage_path.to_vec();
-        option_path.push(option_index);
         anyhow::bail!(
             "cannot sort defpackage option at {}; option head must be an atom",
-            Path::from_indexes(option_path)
+            defpackage_path.child(option_index)
         );
     };
 

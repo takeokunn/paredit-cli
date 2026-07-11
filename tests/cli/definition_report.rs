@@ -10,6 +10,9 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
         "(in-package #:demo)\n\
          (defun render-pane (session pane) (list session pane))\n\
          (defmacro with-pane ((pane) &body body) `(progn ,pane ,@body))\n\
+         (defclass renderer () ())\n\
+         (defstruct point x y)\n\
+         (define-modify-macro updatef (place) incf)\n\
          (define-symbol-macro current-user (slot-value *session* 'user))\n\
          (deftest split-window () (is (= 2 (pane-count))))\n",
     )
@@ -17,7 +20,9 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
     fs::write(
         &elisp_file,
         "(defun demo-render (buffer) (message \"%s\" buffer))\n\
-         (define-minor-mode demo-mode \"Demo mode\" :lighter \" Demo\")\n",
+         (define-minor-mode demo-mode \"Demo mode\" :lighter \" Demo\")\n\
+         (cl-defgeneric demo-renderer (buffer))\n\
+         (cl-defmethod demo-renderer ((buffer string)) (message \"%s\" buffer))\n",
     )
     .expect("write elisp fixture");
 
@@ -30,19 +35,28 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"file_count\": 2"))
-        .stdout(predicate::str::contains("\"definition_count\": 6"))
+        .stdout(predicate::str::contains("\"definition_count\": 11"))
         .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
         .stdout(predicate::str::contains("\"dialect\": \"emacs-lisp\""))
         .stdout(predicate::str::contains("\"package\": \"#:demo\""))
         .stdout(predicate::str::contains("\"category\": \"function\""))
         .stdout(predicate::str::contains("\"category\": \"macro\""))
+        .stdout(predicate::str::contains("\"category\": \"class\""))
+        .stdout(predicate::str::contains("\"category\": \"struct\""))
         .stdout(predicate::str::contains("\"category\": \"variable\""))
         .stdout(predicate::str::contains("\"category\": \"test\""))
         .stdout(predicate::str::contains("\"category\": \"mode\""))
+        .stdout(predicate::str::contains(
+            "\"category\": \"generic-function\"",
+        ))
+        .stdout(predicate::str::contains("\"category\": \"method\""))
         .stdout(predicate::str::contains("\"parameter_count\": 2"))
         .stdout(predicate::str::contains("\"name\": \"current-user\""))
         .stdout(predicate::str::contains("\"name\": \"render-pane\""))
-        .stdout(predicate::str::contains("\"name\": \"demo-mode\""));
+        .stdout(predicate::str::contains("\"name\": \"renderer\""))
+        .stdout(predicate::str::contains("\"name\": \"point\""))
+        .stdout(predicate::str::contains("\"name\": \"demo-mode\""))
+        .stdout(predicate::str::contains("\"name\": \"demo-renderer\""));
 }
 
 #[test]
@@ -83,6 +97,29 @@ fn cli_reports_unused_definitions_for_dead_code_planning() {
         .stdout(predicate::str::contains("\"unused\": true"))
         .stdout(predicate::str::contains("\"name\": \"used\""))
         .stdout(predicate::str::contains("\"reference_count\": 1"));
+}
+
+#[test]
+fn cli_reports_package_qualified_common_lisp_definition_as_used_by_unqualified_reference() {
+    let dir = fresh_temp_dir("unused-definition-report-qualified-use");
+    let file = dir.join("core.lisp");
+    fs::write(
+        &file,
+        "(defun cl-user:used () :ok)\n\
+         (defun caller () (used))\n",
+    )
+    .expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("unused-definition-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\": \"cl-user:used\""))
+        .stdout(predicate::str::contains("\"reference_count\": 1"))
+        .stdout(predicate::str::contains("\"unused\": false"));
 }
 
 #[test]

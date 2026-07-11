@@ -1,16 +1,18 @@
 use std::path::PathBuf;
 
-use super::types::{RefactorOperation, RefactorPlanGate, RefactorPlanStep};
+use super::types::{RefactorOperation, RefactorPlanGate, RefactorPlanStep, RefactorPlanTargetKind};
 
 pub fn refactor_plan_steps(
     operation: RefactorOperation,
     symbol: &str,
     files: &[PathBuf],
+    target_kind: RefactorPlanTargetKind,
     gates: &[RefactorPlanGate],
 ) -> Vec<RefactorPlanStep> {
     let file_args = shell_file_args(files);
     let symbol_arg = shell_quote(symbol);
-    let impact_command = gated_impact_report_command(&symbol_arg, &file_args);
+    let impact_command =
+        gated_impact_report_command(operation, target_kind, &symbol_arg, &file_args);
     let verification_command =
         verification_command(operation, &symbol_arg, &file_args, &impact_command);
     let mut steps = vec![
@@ -37,6 +39,20 @@ pub fn refactor_plan_steps(
             "review-rename-scope",
             "Blocking gates were found; inspect exact references before choosing function-only or atom-wide rename.",
             None,
+        ),
+        RefactorOperation::Rename if target_kind == RefactorPlanTargetKind::SymbolMacro => (
+            "apply-symbol-macro-rename",
+            "Target definition is a symbol macro; use the dedicated symbol-macro rename workflow to preserve macro expansion and value references.",
+            Some(format!(
+                "paredit rename-symbol-macro --from {symbol_arg} --to <new-symbol> --output json {file_args}"
+            )),
+        ),
+        RefactorOperation::Rename if target_kind.is_macro_like() => (
+            "apply-macro-rename",
+            "Target definition is macro-like; use the callable rename workflow because it already rewrites the definition and invocation sites.",
+            Some(format!(
+                "paredit rename-function --from {symbol_arg} --to <new-symbol> --output json {file_args}"
+            )),
         ),
         RefactorOperation::Rename if has_non_call_references => (
             "apply-symbol-rename",
@@ -71,6 +87,11 @@ pub fn refactor_plan_steps(
             "apply-move",
             "No blocking move gates were found; move the selected top-level definition with a dry-run plan first.",
             Some("paredit move-definition --from-file <file> --to-file <file> --path <definition-path> --plan --output json".to_owned()),
+        ),
+        RefactorOperation::Signature if target_kind.skips_signature_compatibility() => (
+            "review-signature-scope",
+            "The target kind does not expose callable signatures; review the expansion or binding semantics before editing parameters.",
+            None,
         ),
         RefactorOperation::Signature if blocked => (
             "review-signature-scope",
@@ -109,7 +130,7 @@ fn verification_command(
 ) -> String {
     match operation {
         RefactorOperation::Remove => format!(
-            "paredit verify-refactor --symbol {symbol_arg} --operation remove --phase post --output json {file_args} && paredit dependency-report --output json {file_args}"
+            "paredit refactor verify --symbol {symbol_arg} --operation remove --phase post --output json {file_args} && paredit dependency-report --output json {file_args}"
         ),
         RefactorOperation::Rename | RefactorOperation::Move | RefactorOperation::Signature => {
             format!("{impact_command} && paredit dependency-report --output json {file_args}")
@@ -117,9 +138,20 @@ fn verification_command(
     }
 }
 
-fn gated_impact_report_command(symbol_arg: &str, file_args: &str) -> String {
+fn gated_impact_report_command(
+    operation: RefactorOperation,
+    target_kind: RefactorPlanTargetKind,
+    symbol_arg: &str,
+    file_args: &str,
+) -> String {
+    let require_calls = if target_kind.requires_call_coverage(operation) {
+        " --require-calls 1"
+    } else {
+        ""
+    };
+
     format!(
-        "paredit impact-report --symbol {symbol_arg} --fail-on-risk-level warning --require-definitions 1 --require-references 1 --require-calls 1 --output json {file_args}"
+        "paredit impact-report --symbol {symbol_arg} --fail-on-risk-level warning --require-definitions 1 --require-references 1{require_calls} --output json {file_args}"
     )
 }
 

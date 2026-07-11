@@ -38,12 +38,8 @@ pub(super) fn inline_let(args: InlineLetArgs) -> Result<()> {
 
     let written = args.write && plan.changed;
     if written {
-        let file = input
-            .file
-            .as_ref()
-            .expect("--write was validated to require --file");
-        fs::write(file, &plan.rewritten)
-            .with_context(|| format!("failed to write {}", file.display()))?;
+        let file = require_output_file(input.file.as_ref())?;
+        write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
 
     print_inline_let_plan(&plan, written, args.output)

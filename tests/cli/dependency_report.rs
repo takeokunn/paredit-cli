@@ -45,3 +45,93 @@ fn cli_reports_dependency_inventory_for_agent_planning() {
         .stdout(predicate::str::contains("\"target\": \"alexandria\""))
         .stdout(predicate::str::contains("\"target\": \"uiop\""));
 }
+
+#[test]
+fn cli_excludes_symbol_macrolet_binding_names_and_shadowed_body_references_from_dependencies() {
+    let dir = fresh_temp_dir("dependency-report-symbol-macrolet");
+    let file = dir.join("symbol-macrolet.lisp");
+    fs::write(
+        &file,
+        "(defun caller ()\n  (cl:symbol-macrolet ((cl-user:helper (uiop:ensure-pathname x)))\n    cl-user:helper))\n",
+    )
+    .expect("write symbol-macrolet dependency fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("dependency-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dependency_count\": 2"))
+        .stdout(predicate::str::contains("\"target\": \"cl\""))
+        .stdout(predicate::str::contains("\"target\": \"uiop\""))
+        .stdout(predicate::str::contains("\"target\": \"cl-user\"").not());
+}
+
+#[test]
+fn cli_respects_local_callable_scopes_in_common_lisp_dependency_report() {
+    let dir = fresh_temp_dir("dependency-report-local-callables");
+    let file = dir.join("local-callables.lisp");
+    fs::write(
+        &file,
+        "(defun caller ()\n  (cl:labels ((cl-user:helper (x)\n                (cl-user:helper x)\n                (uiop:ensure-pathname x)))\n    (cl-user:helper value))\n  (cl:flet ((cl-user:helper (x)\n              (cl-user:helper x)\n              (uiop:ensure-pathname x)))\n    (cl-user:helper value))\n  (cl:macrolet ((cl-user:helper (x) (uiop:ensure-pathname x)))\n    (cl-user:helper value)))\n",
+    )
+    .expect("write local-callable dependency fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("dependency-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"target\": \"cl\""))
+        .stdout(predicate::str::contains("\"target\": \"uiop\""))
+        .stdout(predicate::str::contains("\"target\": \"cl-user\""));
+}
+
+#[test]
+fn cli_skips_quoted_dependency_candidates_and_reports_quasiquote_unquotes() {
+    let dir = fresh_temp_dir("dependency-report-quasiquote");
+    let file = dir.join("quasiquote.lisp");
+    fs::write(
+        &file,
+        "(defun caller ()\n  `(list ',cl-user:quoted ,uiop:ensure-pathname ,@(cl-user:helper value)))\n",
+    )
+    .expect("write quasiquote dependency fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("dependency-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dependency_count\": 2"))
+        .stdout(predicate::str::contains("\"target\": \"uiop\""))
+        .stdout(predicate::str::contains("\"target\": \"cl-user\""))
+        .stdout(predicate::str::contains("\"target\": \"quoted\"").not());
+}
+
+#[test]
+fn cli_skips_reader_eval_bodies_in_dependency_analysis() {
+    let dir = fresh_temp_dir("dependency-report-reader-eval");
+    let file = dir.join("reader-eval.lisp");
+    fs::write(
+        &file,
+        "(defun caller () #.(progn (cl-user:helper) (uiop:ensure-pathname value)) (cl-user:helper value))\n",
+    )
+    .expect("write reader-eval dependency fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("dependency-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dependency_count\": 1"))
+        .stdout(predicate::str::contains("\"target\": \"cl-user\""))
+        .stdout(predicate::str::contains("\"target\": \"uiop\"").not());
+}

@@ -2,32 +2,24 @@ use super::super::super::*;
 use super::super::args::*;
 use super::super::render::print_workspace_refactor_execute;
 use super::super::types::execute::{WorkspaceRefactorExecute, WorkspaceRefactorExecuteOutcome};
-use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
 use super::preview::{
     BuildRefactorPreviewRequest, build_refactor_preview, finish_refactor_preview_failure,
     write_refactor_preview,
 };
 use super::verification::build_refactor_verification;
+use super::workspace::discover_workspace_refactor_scope;
 
 pub(in crate::presentation::cli) fn workspace_refactor_execute(
     args: WorkspaceRefactorExecuteArgs,
 ) -> Result<()> {
-    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+    let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown,
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
     })?;
-    let paths = discovery.files;
-    let workspace = WorkspaceRefactorPlanDiscovery {
-        roots: args.roots,
-        discovered_file_count: paths.len(),
-        skipped_unknown_count: discovery.skipped_unknown_count,
-        skipped_hidden_count: discovery.skipped_hidden_count,
-        skipped_generated_count: discovery.skipped_generated_count,
-        skipped_symlink_count: discovery.skipped_symlink_count,
-    };
+    let paths = workspace.paths;
 
     let mut preview = build_refactor_preview(BuildRefactorPreviewRequest {
         paths: &paths,
@@ -45,7 +37,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
             require_definitions: args.require_definitions,
             require_edits: args.require_edits,
         },
-        workspace: Some(workspace),
+        workspace: Some(workspace.workspace),
     })?;
 
     let policy_passed = preview.policy.passed;
@@ -65,6 +57,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
             Some(&args.to),
             args.operation,
             VerificationPhase::Pre,
+            None,
         )?)
     } else {
         None
@@ -83,6 +76,9 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         write_refactor_preview(&mut preview)?;
     }
 
+    let target_kind_hint = pre_verification
+        .as_ref()
+        .map(|verification| verification.target_kind);
     let post_verification = if execute_decision.run_post_verification {
         Some(build_refactor_verification(
             &paths,
@@ -91,6 +87,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
             Some(&args.to),
             args.operation,
             VerificationPhase::Post,
+            target_kind_hint,
         )?)
     } else {
         None
@@ -115,18 +112,18 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
 
     print_workspace_refactor_execute(&execution, args.output)?;
     finish_refactor_preview_failure(
-        "workspace-refactor-execute",
+        "refactor workspace-execute",
         policy_passed,
         &policy_message,
         execute_decision.write_parse_refused,
     )?;
 
     if !pre_passed {
-        anyhow::bail!("workspace-refactor-execute preflight failed");
+        anyhow::bail!("refactor workspace-execute preflight failed");
     }
 
     if !post_passed {
-        anyhow::bail!("workspace-refactor-execute post verification failed");
+        anyhow::bail!("refactor workspace-execute post verification failed");
     }
 
     Ok(())

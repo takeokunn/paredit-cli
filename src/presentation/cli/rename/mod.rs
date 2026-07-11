@@ -5,6 +5,7 @@ pub(in crate::presentation::cli) mod rename_in_form;
 pub(in crate::presentation::cli) mod rename_local_function;
 pub(in crate::presentation::cli) mod rename_macrolet;
 pub(in crate::presentation::cli) mod rename_symbol;
+pub(in crate::presentation::cli) mod rename_symbol_macro;
 pub(in crate::presentation::cli) mod rename_symbols;
 mod render;
 pub(in crate::presentation::cli) mod replace_function_calls;

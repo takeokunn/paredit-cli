@@ -73,6 +73,89 @@ fn cli_writes_definition_move_between_files() {
 }
 
 #[test]
+fn cli_writes_symbol_macro_definition_move_between_files() {
+    let dir = fresh_temp_dir("move-definition-symbol-macro-write");
+    let from_file = dir.join("core.lisp");
+    let to_file = dir.join("session.lisp");
+    fs::write(
+        &from_file,
+        "(in-package #:demo)\n\
+         (define-symbol-macro current-user (slot-value *session* 'user))\n\
+         (defun keep () :ok)\n",
+    )
+    .expect("write source fixture");
+    fs::write(&to_file, "(in-package #:demo.session)\n").expect("write destination fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("move-definition")
+        .arg("--from-file")
+        .arg(&from_file)
+        .arg("--to-file")
+        .arg(&to_file)
+        .arg("--path")
+        .arg("1")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"category\": \"variable\""))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    let source = fs::read_to_string(&from_file).expect("read rewritten source");
+    let destination = fs::read_to_string(&to_file).expect("read rewritten destination");
+    assert!(source.contains("(defun keep () :ok)"));
+    assert!(!source.contains("define-symbol-macro current-user"));
+    assert!(destination.contains("(in-package #:demo.session)"));
+    assert!(
+        destination.contains("(define-symbol-macro current-user (slot-value *session* 'user))")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_rolls_back_definition_move_when_later_file_write_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = fresh_temp_dir("move-definition-rollback");
+    let from_file = dir.join("core.lisp");
+    let nested_dir = dir.join("nested");
+    let to_file = nested_dir.join("render.lisp");
+    let original_from =
+        "(in-package #:demo)\n(defun keep () :ok)\n(defun render-pane () :render)\n";
+    fs::write(&from_file, original_from).expect("write source fixture");
+    fs::create_dir_all(&nested_dir).expect("create nested dir");
+    let original_permissions = fs::metadata(&nested_dir)
+        .expect("read nested dir metadata")
+        .permissions();
+    fs::set_permissions(&nested_dir, PermissionsExt::from_mode(0o555))
+        .expect("make nested dir read only");
+
+    let assert_result = paredit()
+        .arg("move-definition")
+        .arg("--from-file")
+        .arg(&from_file)
+        .arg("--to-file")
+        .arg(&to_file)
+        .arg("--path")
+        .arg("2")
+        .arg("--write")
+        .assert();
+
+    fs::set_permissions(&nested_dir, original_permissions).expect("restore nested dir permissions");
+
+    assert_result
+        .failure()
+        .stderr(predicate::str::contains("Permission denied"));
+    assert_eq!(
+        fs::read_to_string(&from_file).expect("read rolled back source"),
+        original_from
+    );
+    assert!(
+        !to_file.exists(),
+        "destination should not exist after rollback"
+    );
+}
+
+#[test]
 fn cli_plans_top_level_form_move_without_writing() {
     let dir = fresh_temp_dir("move-form-plan");
     let from_file = dir.join("core.lisp");

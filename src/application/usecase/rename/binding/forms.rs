@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
@@ -45,7 +46,7 @@ pub(super) fn parameter_name_spans(
     Ok(lambda_list_name_spans(parameter_form, input))
 }
 
-pub(super) fn parameter_form_binds(
+pub(in crate::application::usecase::rename) fn parameter_form_binds(
     parameter_form: &ExpressionView,
     symbol: &SymbolName,
     input: &str,
@@ -53,7 +54,7 @@ pub(super) fn parameter_form_binds(
     parameter_form.kind == ExpressionKind::List
         && lambda_list_name_spans(parameter_form, input)
             .iter()
-            .any(|name| name.name == symbol.as_str())
+            .any(|name| common_lisp_symbol_name_eq(&name.name, symbol.as_str()))
 }
 
 pub(super) fn specialized_parameter_name_spans(
@@ -75,14 +76,14 @@ pub(super) fn specialized_parameter_form_binds(
     parameter_form.kind == ExpressionKind::List
         && specialized_lambda_list_name_spans(parameter_form, input)
             .iter()
-            .any(|name| name.name == symbol.as_str())
+            .any(|name| common_lisp_symbol_name_eq(&name.name, symbol.as_str()))
 }
 
 pub(super) fn binding_binds(binding: &BindingGroup, symbol: &SymbolName) -> bool {
     binding
         .names
         .iter()
-        .any(|name| name.name == symbol.as_str())
+        .any(|name| common_lisp_symbol_name_eq(&name.name, symbol.as_str()))
 }
 
 fn vector_let_binding_groups(

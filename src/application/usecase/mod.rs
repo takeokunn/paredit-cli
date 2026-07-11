@@ -1,4 +1,7 @@
-//! Application use cases.
+//! Application use cases for Lisp-aware analysis, reporting, and refactor planning.
+//!
+//! These services orchestrate typed domain operations into agent-facing plans,
+//! reports, and workspace workflows without coupling to the CLI shell.
 
 pub mod call_graph_report;
 pub mod call_report;

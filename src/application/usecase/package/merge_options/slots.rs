@@ -7,7 +7,7 @@ use crate::application::usecase::package::syntax::{atom_text, package_option_nam
 
 pub(super) fn collect_option_slots(
     view: &ExpressionView,
-    defpackage_path: &[usize],
+    defpackage_path: &Path,
 ) -> Result<Vec<OptionSlot>> {
     view.children
         .iter()
@@ -20,21 +20,19 @@ pub(super) fn collect_option_slots(
 
 fn analyze_option_slot(
     option: &ExpressionView,
-    defpackage_path: &[usize],
+    defpackage_path: &Path,
     option_index: usize,
 ) -> Result<Option<OptionSlot>> {
     if option.kind != ExpressionKind::List || option.children.is_empty() {
         anyhow::bail!(
             "cannot merge defpackage options at {}; only direct option lists are supported",
-            Path::from_indexes(defpackage_path.to_vec())
+            defpackage_path
         );
     }
     let Some(option_head) = atom_text(&option.children[0]) else {
-        let mut option_path = defpackage_path.to_vec();
-        option_path.push(option_index);
         anyhow::bail!(
             "cannot merge defpackage option at {}; option head must be an atom",
-            Path::from_indexes(option_path)
+            defpackage_path.child(option_index)
         );
     };
 
@@ -45,11 +43,9 @@ fn analyze_option_slot(
         .skip(1)
         .map(|child| {
             atom_text(child).map(str::to_owned).with_context(|| {
-                let mut option_path = defpackage_path.to_vec();
-                option_path.push(option_index);
                 format!(
                     "cannot merge defpackage option at {}; option payload must contain atoms only",
-                    Path::from_indexes(option_path)
+                    defpackage_path.child(option_index)
                 )
             })
         })
@@ -59,11 +55,8 @@ fn analyze_option_slot(
         return Ok(None);
     };
 
-    let mut option_path = defpackage_path.to_vec();
-    option_path.push(option_index);
-
     Ok(Some(OptionSlot {
-        path: Path::from_indexes(option_path).to_string(),
+        path: defpackage_path.child(option_index).to_string(),
         span: option.span,
         head_text: option_head.to_owned(),
         name,

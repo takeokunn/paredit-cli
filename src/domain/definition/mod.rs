@@ -1,0 +1,385 @@
+//! Domain knowledge for Lisp-family definition forms.
+
+mod classify;
+mod lambda_list;
+mod name;
+
+use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::{ByteSpan, ExpressionView, Path};
+
+use classify::classify_definition_head;
+use lambda_list::{
+    definition_body_start_child_index, definition_lambda_list_child_index,
+    definition_lambda_parameter_count,
+};
+use name::{definition_name_target, definition_name_text};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DefinitionCategory {
+    Function,
+    Macro,
+    GenericFunction,
+    Method,
+    Class,
+    Struct,
+    Condition,
+    Variable,
+    Constant,
+    Parameter,
+    Package,
+    System,
+    Test,
+    Customization,
+    Mode,
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DefinitionShape {
+    pub category: DefinitionCategory,
+    name_child_index: Option<usize>,
+    lambda_list_child_index: Option<usize>,
+    body_start_child_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DefinitionNameTarget<'a> {
+    pub path: Path,
+    pub span: ByteSpan,
+    pub text: &'a str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DefinitionBodyRange {
+    start_child_index: usize,
+}
+
+impl DefinitionShape {
+    pub fn name(self, view: &ExpressionView) -> Option<&str> {
+        self.name_child_index
+            .and_then(|index| view.children.get(index))
+            .and_then(definition_name_text)
+    }
+
+    pub fn body_form_count(self, view: &ExpressionView) -> usize {
+        view.children
+            .len()
+            .saturating_sub(self.body_start_child_index)
+    }
+
+    pub fn body_forms(self, view: &ExpressionView) -> &[ExpressionView] {
+        let start = self.body_start_child_index.min(view.children.len());
+        &view.children[start..]
+    }
+
+    pub fn lambda_list(self, view: &ExpressionView) -> Option<&ExpressionView> {
+        self.lambda_list_child_index
+            .and_then(|index| view.children.get(index))
+    }
+
+    pub fn lambda_parameter_count(self, view: &ExpressionView) -> Option<usize> {
+        self.lambda_list(view)
+            .map(definition_lambda_parameter_count)
+    }
+
+    pub fn name_target<'a>(
+        self,
+        view: &'a ExpressionView,
+        parent_path: &Path,
+    ) -> Option<DefinitionNameTarget<'a>> {
+        let index = self.name_child_index?;
+        let name = view.children.get(index)?;
+        definition_name_target(name, &parent_path.child(index))
+    }
+
+    pub fn body_range(self) -> DefinitionBodyRange {
+        DefinitionBodyRange {
+            start_child_index: self.body_start_child_index,
+        }
+    }
+}
+
+impl DefinitionBodyRange {
+    pub fn contains_child(self, child_index: usize) -> bool {
+        child_index >= self.start_child_index
+    }
+
+    pub fn child_path(self, parent_path: &Path, child_index: usize) -> Option<Path> {
+        self.contains_child(child_index)
+            .then(|| parent_path.child(child_index))
+    }
+}
+
+impl DefinitionCategory {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Function => "function",
+            Self::Macro => "macro",
+            Self::GenericFunction => "generic-function",
+            Self::Method => "method",
+            Self::Class => "class",
+            Self::Struct => "struct",
+            Self::Condition => "condition",
+            Self::Variable => "variable",
+            Self::Constant => "constant",
+            Self::Parameter => "parameter",
+            Self::Package => "package",
+            Self::System => "system",
+            Self::Test => "test",
+            Self::Customization => "customization",
+            Self::Mode => "mode",
+            Self::Other => "other",
+        }
+    }
+
+    pub fn from_label(label: &str) -> Option<Self> {
+        match label {
+            "function" => Some(Self::Function),
+            "macro" => Some(Self::Macro),
+            "generic-function" => Some(Self::GenericFunction),
+            "method" => Some(Self::Method),
+            "class" => Some(Self::Class),
+            "struct" => Some(Self::Struct),
+            "condition" => Some(Self::Condition),
+            "variable" => Some(Self::Variable),
+            "constant" => Some(Self::Constant),
+            "parameter" => Some(Self::Parameter),
+            "package" => Some(Self::Package),
+            "system" => Some(Self::System),
+            "test" => Some(Self::Test),
+            "customization" => Some(Self::Customization),
+            "mode" => Some(Self::Mode),
+            "other" => Some(Self::Other),
+            _ => None,
+        }
+    }
+
+    pub fn is_callable(self) -> bool {
+        matches!(
+            self,
+            Self::Function | Self::Macro | Self::GenericFunction | Self::Method
+        )
+    }
+}
+
+fn definition_name_child_index(_head: &str) -> Option<usize> {
+    Some(1)
+}
+
+pub fn definition_shape(
+    dialect: Dialect,
+    view: &ExpressionView,
+    head: &str,
+) -> Option<DefinitionShape> {
+    let category = classify_definition_head(dialect, head)?;
+    let lambda_list_child_index = definition_lambda_list_child_index(view, head);
+    let body_start_child_index =
+        definition_body_start_child_index(view, head, Some(category), lambda_list_child_index);
+
+    Some(DefinitionShape {
+        category,
+        name_child_index: definition_name_child_index(head),
+        lambda_list_child_index,
+        body_start_child_index,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::domain::sexpr::{Path, SyntaxTree};
+
+    #[test]
+    fn labels_round_trip_to_categories() {
+        let categories = [
+            DefinitionCategory::Function,
+            DefinitionCategory::Macro,
+            DefinitionCategory::GenericFunction,
+            DefinitionCategory::Method,
+            DefinitionCategory::Class,
+            DefinitionCategory::Struct,
+            DefinitionCategory::Condition,
+            DefinitionCategory::Variable,
+            DefinitionCategory::Constant,
+            DefinitionCategory::Parameter,
+            DefinitionCategory::Package,
+            DefinitionCategory::System,
+            DefinitionCategory::Test,
+            DefinitionCategory::Customization,
+            DefinitionCategory::Mode,
+            DefinitionCategory::Other,
+        ];
+
+        for category in categories {
+            assert_eq!(
+                DefinitionCategory::from_label(category.label()),
+                Some(category)
+            );
+        }
+        assert_eq!(DefinitionCategory::from_label("unknown"), None);
+    }
+
+    #[test]
+    fn classifies_common_lisp_and_emacs_definition_heads() {
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "defun"),
+            Some(DefinitionCategory::Function)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "cl:defmacro"),
+            Some(DefinitionCategory::Macro)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "cl:defgeneric"),
+            Some(DefinitionCategory::GenericFunction)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "define-setf-expander"),
+            Some(DefinitionCategory::Macro)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "define-symbol-macro"),
+            Some(DefinitionCategory::Variable)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::CommonLisp, "asdf:defsystem"),
+            Some(DefinitionCategory::System)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::EmacsLisp, "defcustom"),
+            Some(DefinitionCategory::Customization)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::EmacsLisp, "define-minor-mode"),
+            Some(DefinitionCategory::Mode)
+        );
+    }
+
+    #[test]
+    fn classifies_clojure_and_custom_define_heads() {
+        assert_eq!(
+            classify_definition_head(Dialect::Clojure, "defn-"),
+            Some(DefinitionCategory::Function)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::Clojure, "defrecord"),
+            Some(DefinitionCategory::Struct)
+        );
+        assert_eq!(
+            classify_definition_head(Dialect::Unknown, "define-widget"),
+            Some(DefinitionCategory::Other)
+        );
+        assert_eq!(classify_definition_head(Dialect::Unknown, "let"), None);
+    }
+
+    #[test]
+    fn callable_categories_are_limited_to_invokable_definition_kinds() {
+        assert!(DefinitionCategory::Function.is_callable());
+        assert!(DefinitionCategory::Macro.is_callable());
+        assert!(DefinitionCategory::GenericFunction.is_callable());
+        assert!(DefinitionCategory::Method.is_callable());
+        assert!(!DefinitionCategory::Class.is_callable());
+        assert!(!DefinitionCategory::Variable.is_callable());
+    }
+
+    #[test]
+    fn finds_common_lisp_lambda_list_shapes() {
+        let source = "(defmethod render :around ((node widget) stream) (draw node stream))";
+        let tree = SyntaxTree::parse(source).unwrap();
+        let view = tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .unwrap()
+            .view();
+
+        assert_eq!(
+            definition_lambda_list_child_index(&view, "defmethod"),
+            Some(3)
+        );
+        assert_eq!(
+            definition_shape(Dialect::CommonLisp, &view, "defmethod").map(|shape| shape.category),
+            Some(DefinitionCategory::Method)
+        );
+        let shape = definition_shape(Dialect::CommonLisp, &view, "defmethod").unwrap();
+        assert_eq!(shape.name(&view), Some("render"));
+        assert_eq!(
+            shape
+                .lambda_list(&view)
+                .map(|lambda_list| lambda_list.span.slice(source)),
+            Some("((node widget) stream)")
+        );
+        assert_eq!(shape.body_form_count(&view), 1);
+        assert_eq!(
+            definition_body_start_child_index(
+                &view,
+                "defmethod",
+                Some(DefinitionCategory::Method),
+                definition_lambda_list_child_index(&view, "defmethod")
+            ),
+            4
+        );
+
+        let qualified_tree =
+            SyntaxTree::parse("(cl:defmacro with-panel ((panel) &body body) `(progn ,@body))")
+                .unwrap();
+        let qualified = qualified_tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .unwrap()
+            .view();
+
+        assert_eq!(
+            definition_lambda_list_child_index(&qualified, "cl:defmacro"),
+            Some(2)
+        );
+
+        let defsetf_source = "(defsetf accessor (item) (value) (list item value))";
+        let defsetf_tree = SyntaxTree::parse(defsetf_source).unwrap();
+        let defsetf_view = defsetf_tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .unwrap()
+            .view();
+        let defsetf_shape =
+            definition_shape(Dialect::CommonLisp, &defsetf_view, "defsetf").unwrap();
+        assert_eq!(defsetf_shape.lambda_parameter_count(&defsetf_view), Some(1));
+        assert_eq!(defsetf_shape.body_form_count(&defsetf_view), 1);
+        assert_eq!(
+            defsetf_shape
+                .body_forms(&defsetf_view)
+                .first()
+                .map(|body| body.span.slice(defsetf_source)),
+            Some("(list item value)")
+        );
+    }
+
+    #[test]
+    fn exposes_path_aware_definition_name_and_body_range() {
+        let tree = SyntaxTree::parse("(defun render (node) (draw node) (finish node))").unwrap();
+        let view = tree
+            .select_path(&Path::from_indexes(vec![0]))
+            .unwrap()
+            .view();
+        let shape = definition_shape(Dialect::CommonLisp, &view, "defun").unwrap();
+
+        let parent_path = Path::from_indexes(vec![0]);
+        let target = shape.name_target(&view, &parent_path).unwrap();
+        assert_eq!(target.path, Path::from_indexes(vec![0, 1]));
+        assert_eq!(target.text, "render");
+        assert_eq!(
+            target
+                .span
+                .slice("(defun render (node) (draw node) (finish node))"),
+            "render"
+        );
+
+        let body = shape.body_range();
+        assert!(!body.contains_child(2));
+        assert_eq!(
+            body.child_path(&parent_path, 3),
+            Some(Path::from_indexes(vec![0, 3]))
+        );
+        assert_eq!(
+            body.child_path(&parent_path, 4),
+            Some(Path::from_indexes(vec![0, 4]))
+        );
+    }
+}

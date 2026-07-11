@@ -160,6 +160,39 @@ fn cli_keeps_exported_unused_definition_by_default() {
 }
 
 #[test]
+fn cli_keeps_exported_unused_definition_when_in_package_uses_nickname() {
+    let dir = fresh_temp_dir("remove-unused-definitions-exported-nickname-plan");
+    let file = dir.join("core.lisp");
+    let original = concat!(
+        "(defpackage #:demo.core\n",
+        "  (:nicknames #:core)\n",
+        "  (:use #:cl)\n",
+        "  (:export #:public-entry))\n",
+        "(in-package #:core)\n",
+        "(defun public-entry () :api)\n",
+        "(defun stale-private () :private)\n",
+    );
+    fs::write(&file, original).expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("remove-unused-definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"removal_count\": 1"))
+        .stdout(predicate::str::contains("\"skipped_count\": 2"))
+        .stdout(predicate::str::contains("\"name\": \"public-entry\""))
+        .stdout(predicate::str::contains("exported-definition"));
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read unchanged fixture"),
+        original
+    );
+}
+
+#[test]
 fn cli_removes_exported_unused_definition_when_requested() {
     let dir = fresh_temp_dir("remove-unused-definitions-exported-write");
     let file = dir.join("core.lisp");

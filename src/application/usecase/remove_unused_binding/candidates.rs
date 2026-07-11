@@ -1,5 +1,9 @@
 use anyhow::{Context, Result};
 
+use crate::domain::common_lisp::{
+    CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispLocalCallableForm,
+    CommonLispSlotBindingForm, CommonLispVariableSpecForm,
+};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView};
 
@@ -13,89 +17,31 @@ pub(super) struct LetBindingRemovalCandidate {
     pub(super) removal_span: ByteSpan,
 }
 
-pub(super) fn let_binding_removal_candidates(
+pub(super) fn binding_removal_candidates(
     dialect: Dialect,
+    refactor_form: CommonLispBindingRefactorForm,
     binding_form: &ExpressionView,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::Clojure | Dialect::Janet | Dialect::Fennel => {
-            vector_let_binding_removal_candidates(binding_form)
-        }
-        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
+    if matches!(dialect, Dialect::Clojure | Dialect::Janet | Dialect::Fennel) {
+        return vector_let_binding_removal_candidates(binding_form);
+    }
+
+    let Some(shape) = refactor_form.binding_list_shape() else {
+        anyhow::bail!("remove-unused-binding does not support this Common Lisp binding form");
+    };
+    match shape {
+        CommonLispBindingListShape::NameValuePairs => {
             list_pair_let_binding_removal_candidates(binding_form)
         }
-    }
-}
-
-pub(super) fn macrolet_binding_removal_candidates(
-    dialect: Dialect,
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::CommonLisp | Dialect::EmacsLisp | Dialect::Scheme | Dialect::Unknown => {
-            list_pair_macrolet_binding_removal_candidates(binding_form)
+        CommonLispBindingListShape::LocalCallableDefinitions(form) => {
+            list_pair_local_callable_binding_removal_candidates(binding_form, form)
         }
-        _ => anyhow::bail!("remove-unused-binding only supports macrolet in Common Lisp"),
-    }
-}
-
-pub(super) fn local_callable_binding_removal_candidates(
-    dialect: Dialect,
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::CommonLisp | Dialect::Unknown => {
-            list_pair_local_callable_binding_removal_candidates(binding_form)
+        CommonLispBindingListShape::VariableSpecs(form) => {
+            list_pair_iteration_binding_removal_candidates(binding_form, form)
         }
-        _ => anyhow::bail!("remove-unused-binding only supports flet and labels in Common Lisp"),
-    }
-}
-
-pub(super) fn with_slots_binding_removal_candidates(
-    dialect: Dialect,
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::CommonLisp | Dialect::Unknown => {
-            list_pair_with_slots_binding_removal_candidates(binding_form)
+        CommonLispBindingListShape::SlotBindings(form) => {
+            list_pair_slot_binding_removal_candidates(binding_form, form)
         }
-        _ => anyhow::bail!("remove-unused-binding only supports with-slots in Common Lisp"),
-    }
-}
-
-pub(super) fn with_accessors_binding_removal_candidates(
-    dialect: Dialect,
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::CommonLisp | Dialect::Unknown => {
-            list_pair_with_accessors_binding_removal_candidates(binding_form)
-        }
-        _ => anyhow::bail!("remove-unused-binding only supports with-accessors in Common Lisp"),
-    }
-}
-
-pub(super) fn do_binding_removal_candidates(
-    dialect: Dialect,
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::CommonLisp | Dialect::Unknown => {
-            list_pair_iteration_binding_removal_candidates(binding_form, "do", 3)
-        }
-        _ => anyhow::bail!("remove-unused-binding only supports do and do* in Common Lisp"),
-    }
-}
-
-pub(super) fn prog_binding_removal_candidates(
-    dialect: Dialect,
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    match dialect {
-        Dialect::CommonLisp | Dialect::Unknown => {
-            list_pair_iteration_binding_removal_candidates(binding_form, "prog", 2)
-        }
-        _ => anyhow::bail!("remove-unused-binding only supports prog and prog* in Common Lisp"),
     }
 }
 
@@ -131,11 +77,11 @@ fn vector_let_binding_removal_candidates(
 
 fn list_pair_iteration_binding_removal_candidates(
     binding_form: &ExpressionView,
-    form_name: &str,
-    max_children: usize,
+    form: CommonLispVariableSpecForm,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
+        let form_name = form.form_name();
         anyhow::bail!("dialect expects {form_name} bindings: (variable-spec ...)");
     }
 
@@ -144,8 +90,7 @@ fn list_pair_iteration_binding_removal_candidates(
         .iter()
         .enumerate()
         .map(|(index, spec)| {
-            let (name, value_span) =
-                iteration_variable_spec_name_and_value_span(spec, form_name, max_children)?;
+            let (name, value_span) = iteration_variable_spec_name_and_value_span(spec, form)?;
             Ok(LetBindingRemovalCandidate {
                 index,
                 name: name.to_owned(),
@@ -156,20 +101,21 @@ fn list_pair_iteration_binding_removal_candidates(
         .collect()
 }
 
-fn iteration_variable_spec_name_and_value_span<'a>(
-    spec: &'a ExpressionView,
-    form_name: &str,
-    max_children: usize,
-) -> Result<(&'a str, ByteSpan)> {
+fn iteration_variable_spec_name_and_value_span(
+    spec: &ExpressionView,
+    form: CommonLispVariableSpecForm,
+) -> Result<(&str, ByteSpan)> {
     if spec.kind == ExpressionKind::Atom {
         let name = atom_text(spec).context("iteration binding name must be an atom")?;
         return Ok((name, spec.span));
     }
 
     if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+        let form_name = form.form_name();
         anyhow::bail!("{form_name} binding must be a symbol or variable spec list");
     }
-    if spec.children.is_empty() || spec.children.len() > max_children {
+    if spec.children.is_empty() || spec.children.len() > form.max_children() {
+        let form_name = form.form_name();
         anyhow::bail!("{form_name} variable spec has an unsupported arity");
     }
 
@@ -181,79 +127,86 @@ fn iteration_variable_spec_name_and_value_span<'a>(
     Ok((name, value_span))
 }
 
-fn list_pair_with_slots_binding_removal_candidates(
+fn list_pair_slot_binding_removal_candidates(
     binding_form: &ExpressionView,
+    form: CommonLispSlotBindingForm,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
-        anyhow::bail!("dialect expects with-slots bindings: (slot-or-pair ...)");
+        match form {
+            CommonLispSlotBindingForm::WithSlots => {
+                anyhow::bail!("dialect expects with-slots bindings: (slot-or-pair ...)");
+            }
+            CommonLispSlotBindingForm::WithAccessors => {
+                anyhow::bail!("dialect expects with-accessors bindings: ((name accessor) ...)");
+            }
+        }
     }
 
     binding_form
         .children
         .iter()
         .enumerate()
-        .map(|(index, spec)| {
-            if spec.kind == ExpressionKind::Atom {
-                let name = atom_text(spec)
-                    .context("with-slots bare binding name must be an atom")?
-                    .to_owned();
-                return Ok(LetBindingRemovalCandidate {
-                    index,
-                    name,
-                    value_span: spec.span,
-                    removal_span: spec.span,
-                });
+        .map(|(index, spec)| match form {
+            CommonLispSlotBindingForm::WithSlots => slot_binding_removal_candidate(index, spec),
+            CommonLispSlotBindingForm::WithAccessors => {
+                accessor_binding_removal_candidate(index, spec)
             }
-            if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("with-slots binding must be a slot name or (name slot-name) pair");
-            }
-            if spec.children.len() != 2 {
-                anyhow::bail!("with-slots binding pair must contain a name and slot name");
-            }
-            let name = atom_text(&spec.children[0])
-                .context("with-slots binding name must be an atom")?
-                .to_owned();
-            Ok(LetBindingRemovalCandidate {
-                index,
-                name,
-                value_span: spec.children[1].span,
-                removal_span: spec.span,
-            })
         })
         .collect()
 }
 
-fn list_pair_with_accessors_binding_removal_candidates(
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
-    {
-        anyhow::bail!("dialect expects with-accessors bindings: ((name accessor) ...)");
+fn slot_binding_removal_candidate(
+    index: usize,
+    spec: &ExpressionView,
+) -> Result<LetBindingRemovalCandidate> {
+    if spec.kind == ExpressionKind::Atom {
+        let name = atom_text(spec)
+            .context("with-slots bare binding name must be an atom")?
+            .to_owned();
+        return Ok(LetBindingRemovalCandidate {
+            index,
+            name,
+            value_span: spec.span,
+            removal_span: spec.span,
+        });
     }
+    if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+        anyhow::bail!("with-slots binding must be a slot name or (name slot-name) pair");
+    }
+    if spec.children.len() != 2 {
+        anyhow::bail!("with-slots binding pair must contain a name and slot name");
+    }
+    let name = atom_text(&spec.children[0])
+        .context("with-slots binding name must be an atom")?
+        .to_owned();
+    Ok(LetBindingRemovalCandidate {
+        index,
+        name,
+        value_span: spec.children[1].span,
+        removal_span: spec.span,
+    })
+}
 
-    binding_form
-        .children
-        .iter()
-        .enumerate()
-        .map(|(index, spec)| {
-            if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("with-accessors binding must be a (name accessor) pair");
-            }
-            if spec.children.len() != 2 {
-                anyhow::bail!("with-accessors binding pair must contain a name and accessor");
-            }
-            let name = atom_text(&spec.children[0])
-                .context("with-accessors binding name must be an atom")?
-                .to_owned();
-            Ok(LetBindingRemovalCandidate {
-                index,
-                name,
-                value_span: spec.children[1].span,
-                removal_span: spec.span,
-            })
-        })
-        .collect()
+fn accessor_binding_removal_candidate(
+    index: usize,
+    spec: &ExpressionView,
+) -> Result<LetBindingRemovalCandidate> {
+    if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
+        anyhow::bail!("with-accessors binding must be a (name accessor) pair");
+    }
+    if spec.children.len() != 2 {
+        anyhow::bail!("with-accessors binding pair must contain a name and accessor");
+    }
+    let name = atom_text(&spec.children[0])
+        .context("with-accessors binding name must be an atom")?
+        .to_owned();
+    Ok(LetBindingRemovalCandidate {
+        index,
+        name,
+        value_span: spec.children[1].span,
+        removal_span: spec.span,
+    })
 }
 
 fn list_pair_let_binding_removal_candidates(
@@ -288,56 +241,22 @@ fn list_pair_let_binding_removal_candidates(
         .collect()
 }
 
-fn list_pair_macrolet_binding_removal_candidates(
-    binding_form: &ExpressionView,
-) -> Result<Vec<LetBindingRemovalCandidate>> {
-    if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
-    {
-        anyhow::bail!(
-            "dialect expects list-pair macrolet bindings: ((name lambda-list form*) ...)"
-        );
-    }
-
-    binding_form
-        .children
-        .iter()
-        .enumerate()
-        .map(|(index, pair)| {
-            if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("macrolet binding must be a (name lambda-list form*) list");
-            }
-            if pair.children.len() < 2 {
-                anyhow::bail!("macrolet binding must contain a name and macro expander body");
-            }
-            let name = atom_text(&pair.children[0])
-                .context("macrolet binding name must be an atom")?
-                .to_owned();
-            let value_start = pair.children[1].span.start();
-            let value_end = pair
-                .children
-                .last()
-                .expect("validated macrolet binding has at least two children")
-                .span
-                .end();
-            Ok(LetBindingRemovalCandidate {
-                index,
-                name,
-                value_span: ByteSpan::new(value_start, value_end),
-                removal_span: pair.span,
-            })
-        })
-        .collect()
-}
-
 fn list_pair_local_callable_binding_removal_candidates(
     binding_form: &ExpressionView,
+    form: CommonLispLocalCallableForm,
 ) -> Result<Vec<LetBindingRemovalCandidate>> {
     if binding_form.kind != ExpressionKind::List || binding_form.delimiter != Some(Delimiter::Paren)
     {
         anyhow::bail!(
-            "dialect expects list-pair local callable bindings: ((name lambda-list form*) ...)"
+            "dialect expects list-pair {} bindings: ((name lambda-list form*) ...)",
+            form.operator_name()
         );
     }
+    let body_label = if form.is_macro() {
+        "macro expander body"
+    } else {
+        "lambda list, and body"
+    };
 
     binding_form
         .children
@@ -345,19 +264,32 @@ fn list_pair_local_callable_binding_removal_candidates(
         .enumerate()
         .map(|(index, pair)| {
             if pair.kind != ExpressionKind::List || pair.delimiter != Some(Delimiter::Paren) {
-                anyhow::bail!("local callable binding must be a (name lambda-list form*) list");
+                anyhow::bail!(
+                    "{} binding must be a (name lambda-list form*) list",
+                    form.operator_name()
+                );
             }
             if pair.children.len() < 2 {
-                anyhow::bail!("local callable binding must contain a name, lambda list, and body");
+                anyhow::bail!(
+                    "{} binding must contain a name and {}",
+                    form.operator_name(),
+                    body_label
+                );
             }
             let name = atom_text(&pair.children[0])
-                .context("local callable binding name must be an atom")?
+                .with_context(|| format!("{} binding name must be an atom", form.operator_name()))?
                 .to_owned();
             let value_start = pair.children[1].span.start();
             let value_end = pair
                 .children
                 .last()
-                .expect("validated local callable binding has at least two children")
+                .with_context(|| {
+                    format!(
+                        "{} binding must contain a name and {}",
+                        form.operator_name(),
+                        body_label
+                    )
+                })?
                 .span
                 .end();
             Ok(LetBindingRemovalCandidate {

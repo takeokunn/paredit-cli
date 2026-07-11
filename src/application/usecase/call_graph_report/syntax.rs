@@ -6,18 +6,6 @@ pub(super) fn list_child(view: &ExpressionView, index: usize) -> Option<&Express
         .and_then(|_| view.children.get(index))
 }
 
-pub(super) fn count_lambda_parameters(lambda_list: &ExpressionView) -> usize {
-    lambda_list
-        .children
-        .iter()
-        .filter(|child| match child.kind {
-            ExpressionKind::Atom => atom_text(child).is_some_and(|text| !text.starts_with('&')),
-            ExpressionKind::List => true,
-            ExpressionKind::Root => false,
-        })
-        .count()
-}
-
 pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
     atom_child(view, 0)
 }

@@ -77,3 +77,21 @@ fn cli_rejects_already_threaded_expression() {
         .failure()
         .stderr(predicate::str::contains("already threaded"));
 }
+
+#[test]
+fn cli_rejects_package_qualified_already_threaded_expression() {
+    let mut cmd = paredit();
+    cmd.args([
+        "thread-expression",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0",
+        "--style",
+        "first",
+    ])
+    .write_stdin("(cl:-> x f)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("already threaded"));
+}

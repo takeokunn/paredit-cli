@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 
-use crate::domain::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
+use crate::domain::{
+    common_lisp::CommonLispPackageDeclarationForm,
+    dialect::Dialect,
+    sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree},
 };
 
 use super::syntax::{atom_text, is_package_head, package_atoms_match, package_option_name};
@@ -26,18 +28,19 @@ pub(super) struct ExportSymbolReplacement {
 
 pub(super) fn defpackage_export_sort_edits(
     tree: &SyntaxTree,
+    dialect: Dialect,
     package: Option<&SymbolName>,
 ) -> Result<Vec<ExportSortEdit>> {
     let mut edits = Vec::new();
     let mut matched_defpackages = 0usize;
 
     for index in 0..tree.root_children().len() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
         collect_export_sort_edits(
             &view,
-            path_indexes,
+            path.clone(),
+            dialect,
             package,
             &mut matched_defpackages,
             &mut edits,
@@ -45,10 +48,10 @@ pub(super) fn defpackage_export_sort_edits(
         .with_context(|| format!("failed to inspect package form at {path}"))?;
     }
 
-    if matched_defpackages == 0
-        && let Some(target) = package
-    {
-        anyhow::bail!("no matching defpackage form found for {target}");
+    if matched_defpackages == 0 {
+        if let Some(target) = package {
+            anyhow::bail!("no matching defpackage form found for {target}");
+        }
     }
 
     Ok(edits)
@@ -56,17 +59,23 @@ pub(super) fn defpackage_export_sort_edits(
 
 fn collect_export_sort_edits(
     view: &ExpressionView,
-    path_indexes: Vec<usize>,
+    path: Path,
+    dialect: Dialect,
     package: Option<&SymbolName>,
     matched_defpackages: &mut usize,
     edits: &mut Vec<ExportSortEdit>,
 ) -> Result<()> {
-    analyze_defpackage_exports(view, &path_indexes, package, matched_defpackages, edits)?;
+    analyze_defpackage_exports(view, &path, dialect, package, matched_defpackages, edits)?;
 
     for (index, child) in view.children.iter().enumerate() {
-        let mut child_path = path_indexes.clone();
-        child_path.push(index);
-        collect_export_sort_edits(child, child_path, package, matched_defpackages, edits)?;
+        collect_export_sort_edits(
+            child,
+            path.child(index),
+            dialect,
+            package,
+            matched_defpackages,
+            edits,
+        )?;
     }
 
     Ok(())
@@ -74,7 +83,8 @@ fn collect_export_sort_edits(
 
 fn analyze_defpackage_exports(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    path: &Path,
+    dialect: Dialect,
     package: Option<&SymbolName>,
     matched_defpackages: &mut usize,
     edits: &mut Vec<ExportSortEdit>,
@@ -88,7 +98,7 @@ fn analyze_defpackage_exports(
     let Some(head) = atom_text(&view.children[0]) else {
         return Ok(());
     };
-    if !is_package_head(head, "defpackage") {
+    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::Defpackage) {
         return Ok(());
     }
 
@@ -111,12 +121,10 @@ fn analyze_defpackage_exports(
             continue;
         }
 
-        let mut option_path = path_indexes.to_vec();
-        option_path.push(option_index);
         edits.push(analyze_export_option(
             option,
-            path_indexes,
-            &option_path,
+            path,
+            &path.child(option_index),
             package_name,
             view.span,
         )?);
@@ -127,8 +135,8 @@ fn analyze_defpackage_exports(
 
 fn analyze_export_option(
     option: &ExpressionView,
-    defpackage_path: &[usize],
-    option_path: &[usize],
+    defpackage_path: &Path,
+    option_path: &Path,
     package_name: &str,
     defpackage_span: ByteSpan,
 ) -> Result<ExportSortEdit> {
@@ -138,7 +146,7 @@ fn analyze_export_option(
         let Some(symbol) = atom_text(child) else {
             anyhow::bail!(
                 "cannot sort :export option at {}; only atom symbol designators are supported",
-                Path::from_indexes(option_path.to_vec())
+                option_path
             );
         };
         symbol_slots.push((child.span, symbol.to_owned()));
@@ -167,10 +175,10 @@ fn analyze_export_option(
         .collect();
 
     Ok(ExportSortEdit {
-        defpackage_path: Path::from_indexes(defpackage_path.to_vec()).to_string(),
+        defpackage_path: defpackage_path.to_string(),
         defpackage_span,
         package_name: package_name.to_owned(),
-        export_path: Path::from_indexes(option_path.to_vec()).to_string(),
+        export_path: option_path.to_string(),
         export_span: option.span,
         old_symbols,
         new_symbols,

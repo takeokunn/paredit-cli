@@ -17,7 +17,7 @@ pub(super) fn print_workspace_refactor_execute_json(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
-            "command": "workspace-refactor-execute",
+            "command": "refactor workspace-execute",
             "mode": execution.preview.mode.label(),
             "from": execution.preview.from.as_str(),
             "to": execution.preview.to.as_str(),
@@ -109,6 +109,7 @@ fn refactor_verification_json(verification: &RefactorVerification) -> Value {
     json!({
         "operation": verification.operation.label(),
         "phase": verification.phase.label(),
+        "target_kind": verification.target_kind.label(),
         "symbol": verification.symbol.as_str(),
         "new_symbol": verification.new_symbol.as_deref(),
         "passed": verification.passed,

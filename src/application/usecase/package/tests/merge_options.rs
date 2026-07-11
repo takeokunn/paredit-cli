@@ -5,6 +5,7 @@ fn merges_duplicate_package_export_options() {
     let input = "(defpackage #:demo\n  (:use #:cl)\n  (:export #:b #:a)\n  (:export #:a #:c))\n";
     let plan = plan_merge_package_options(MergePackageOptionsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: Some(&SymbolName::new("demo").unwrap()),
     })
     .unwrap();
@@ -23,6 +24,7 @@ fn merges_import_from_options_only_by_source_package() {
     let input = "(defpackage #:demo\n  (:import-from #:dep #:a)\n  (:import-from #:other #:b)\n  (:import-from #:dep #:a #:c))\n";
     let plan = plan_merge_package_options(MergePackageOptionsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: None,
     })
     .unwrap();
@@ -42,6 +44,7 @@ fn merged_package_options_are_idempotent() {
     let input = "(defpackage #:demo (:use #:cl) (:export #:a #:b))\n";
     let plan = plan_merge_package_options(MergePackageOptionsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: None,
     })
     .unwrap();
@@ -71,6 +74,7 @@ proptest! {
         );
         let plan = plan_merge_package_options(MergePackageOptionsRequest {
             input: &input,
+            dialect: Dialect::CommonLisp,
             package: None,
         }).unwrap();
         let expected = left;

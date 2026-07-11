@@ -20,10 +20,9 @@ pub fn build_let_report(
 ) -> Result<Vec<LetFormReport>> {
     let mut reports = Vec::new();
     for index in 0..tree.root_children().len() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
-        collect::collect_let_reports_from_view(dialect, input, &view, path_indexes, &mut reports)?;
+        collect::collect_let_reports_from_view(dialect, input, &view, path, &mut reports)?;
     }
     Ok(reports)
 }

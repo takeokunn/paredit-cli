@@ -51,3 +51,47 @@ fn renames_symbols_without_touching_strings_or_comments() {
     );
     assert_eq!(output, "(message \"foo\") ; foo\n(bar bar)");
 }
+
+#[test]
+fn renames_unqualified_occurrences_of_package_qualified_symbol() {
+    let input = "(defun cl-user:foo () foo)\n(foo cl-user:foo)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = tree.rename_symbol(
+        input,
+        &SymbolName::new("cl-user:foo").unwrap(),
+        &SymbolName::new("bar").unwrap(),
+    );
+    assert_eq!(output, "(defun bar () bar)\n(bar bar)");
+}
+
+#[test]
+fn treats_reader_prefix_as_part_of_selection_span() {
+    let input = "'(alpha beta)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_at(0).expect("selection");
+    assert_eq!(selection.text(input), "'(alpha beta)");
+}
+
+#[test]
+fn does_not_rename_quoted_atom_occurrences() {
+    let input = "'foo foo #'foo";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = tree.rename_symbol(
+        input,
+        &SymbolName::new("foo").unwrap(),
+        &SymbolName::new("bar").unwrap(),
+    );
+    assert_eq!(output, "'foo bar #'foo");
+}
+
+#[test]
+fn does_not_rename_atoms_inside_reader_eval_forms() {
+    let input = "#.(foo (bar foo)) foo";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let output = tree.rename_symbol(
+        input,
+        &SymbolName::new("foo").unwrap(),
+        &SymbolName::new("bar").unwrap(),
+    );
+    assert_eq!(output, "#.(foo (bar foo)) bar");
+}

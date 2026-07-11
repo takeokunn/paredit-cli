@@ -83,6 +83,115 @@ fn evaluates_policy_failures() {
     assert_eq!(policy.violations.len(), 4);
 }
 
+#[test]
+fn counts_common_lisp_setf_place_calls_and_edges() {
+    let symbol = SymbolName::new("accessor").unwrap();
+    let reports = build_impact_reports(
+        vec![source(
+            "src/core.lisp",
+            "(define-setf-expander accessor (place) (values nil nil '(store) '(writer store) '(reader place)))\n(defun render (item) (setf (accessor item) 1) accessor)\n(defun wrapper (item) (setf (accessor item) 2))",
+        )],
+        &symbol,
+    )
+    .unwrap();
+
+    let summary = summarize_impact_reports(&reports);
+
+    assert_eq!(summary.definition_count, 1);
+    assert_eq!(summary.call_count, 2);
+    assert_eq!(summary.inbound_edge_count, 2);
+    assert_eq!(summary.non_call_reference_count, 1);
+    assert_eq!(reports[0].calls.len(), 2);
+    assert!(
+        reports[0]
+            .calls
+            .iter()
+            .all(|call| call.status == SignatureCallStatus::Exact)
+    );
+}
+
+#[test]
+fn tracks_common_lisp_symbol_macro_without_signature_mismatch() {
+    let symbol = SymbolName::new("current-user").unwrap();
+    let reports = build_impact_reports(
+        vec![source(
+            "src/session.lisp",
+            "(define-symbol-macro current-user (slot-value *session* 'user))\n(defun render () current-user)",
+        )],
+        &symbol,
+    )
+    .unwrap();
+
+    let summary = summarize_impact_reports(&reports);
+    let by_status = impact_status_counts(&reports);
+
+    assert_eq!(summary.definition_count, 1);
+    assert_eq!(summary.reference_count, 2);
+    assert_eq!(summary.call_count, 0);
+    assert_eq!(summary.inbound_edge_count, 0);
+    assert_eq!(summary.non_call_reference_count, 1);
+    assert!(by_status.is_empty());
+    assert_eq!(reports[0].definitions.len(), 1);
+    assert_eq!(
+        reports[0].definitions[0].category,
+        crate::domain::definition::DefinitionCategory::Variable
+    );
+    assert_eq!(reports[0].definitions[0].parameter_count, None);
+}
+
+#[test]
+fn excludes_symbol_macrolet_binding_names_and_shadowed_body_references_from_impact() {
+    let symbol = SymbolName::new("helper").unwrap();
+    let reports = build_impact_reports(
+        vec![source(
+            "src/core.lisp",
+            "(in-package #:app)\n(defun helper () 1)\n(defun caller ()\n  (cl:symbol-macrolet ((helper (helper)))\n    helper))",
+        )],
+        &symbol,
+    )
+    .unwrap();
+
+    let summary = summarize_impact_reports(&reports);
+
+    assert_eq!(summary.definition_count, 1);
+    assert_eq!(summary.reference_count, 1);
+    assert_eq!(summary.call_count, 1);
+    assert_eq!(summary.inbound_edge_count, 1);
+    assert_eq!(summary.non_call_reference_count, 0);
+    assert_eq!(reports[0].calls.len(), 1);
+    assert_eq!(reports[0].calls[0].call.head, "helper");
+}
+
+#[test]
+fn matches_unqualified_references_and_calls_to_package_qualified_common_lisp_definition() {
+    let symbol = SymbolName::new("target").unwrap();
+    let reports = build_impact_reports(
+        vec![source(
+            "src/core.lisp",
+            "(defun cl-user:target (x) target)\n(defun caller () (target 1) target)",
+        )],
+        &symbol,
+    )
+    .unwrap();
+
+    let summary = summarize_impact_reports(&reports);
+    let by_status = impact_status_counts(&reports);
+
+    assert_eq!(summary.definition_count, 1);
+    assert_eq!(summary.call_count, 1);
+    assert_eq!(summary.inbound_edge_count, 1);
+    assert_eq!(summary.non_call_reference_count, 1);
+    assert_eq!(by_status.get(&SignatureCallStatus::Exact), Some(&1));
+    assert_eq!(reports[0].definitions.len(), 1);
+    assert_eq!(
+        reports[0].definitions[0].name.as_deref(),
+        Some("cl-user:target")
+    );
+    assert_eq!(reports[0].calls.len(), 1);
+    assert_eq!(reports[0].calls[0].call.head, "target");
+    assert_eq!(reports[0].calls[0].status, SignatureCallStatus::Exact);
+}
+
 proptest! {
     #[test]
     fn classifies_generated_call_arity(parameter_count in 0usize..6, argument_count in 0usize..6) {

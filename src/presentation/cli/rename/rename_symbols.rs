@@ -1,8 +1,6 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input};
+use super::super::{detect_dialect, read_input, write_files_with_rollback};
 use super::args::RenameSymbolsArgs;
 use super::render::symbols::print_rename_symbols_report;
 use super::types::RenameFileReport;
@@ -11,6 +9,7 @@ use crate::presentation::cli::shared::{apply_byte_span_edits, matching_symbol_oc
 
 pub(in crate::presentation::cli) fn rename_symbols(args: RenameSymbolsArgs) -> Result<()> {
     let mut reports = Vec::with_capacity(args.files.len());
+    let mut written_files = Vec::new();
     for file in &args.files {
         let input = read_input(Some(file.clone()))?;
         let dialect = detect_dialect(&input, args.dialect);
@@ -28,8 +27,7 @@ pub(in crate::presentation::cli) fn rename_symbols(args: RenameSymbolsArgs) -> R
         let changed = rewritten != input.text;
         let written = args.write && changed;
         if written {
-            fs::write(file, &rewritten)
-                .with_context(|| format!("failed to write {}", file.display()))?;
+            written_files.push((file.clone(), rewritten.clone()));
         }
         reports.push(RenameFileReport {
             path: file.clone(),
@@ -39,6 +37,10 @@ pub(in crate::presentation::cli) fn rename_symbols(args: RenameSymbolsArgs) -> R
             written,
             rewritten,
         });
+    }
+
+    if !written_files.is_empty() {
+        write_files_with_rollback(written_files)?;
     }
 
     print_rename_symbols_report(&reports, &args.from, &args.to, args.write, args.output)

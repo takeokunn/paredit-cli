@@ -7,6 +7,9 @@ use crate::domain::sexpr::SymbolName;
 use super::super::super::{DialectArg, OutputFormat};
 
 #[derive(Debug, Args)]
+#[command(
+    after_help = "Examples:\n  paredit refactor workspace-preview --from old-name --to new-name .\n  paredit refactor workspace-execute --from old-name --to new-name --write ."
+)]
 pub(in crate::presentation::cli) struct WorkspaceRefactorPreviewArgs {
     /// Files or directories to scan recursively.
     #[arg(required = true)]
@@ -62,6 +65,9 @@ pub(in crate::presentation::cli) struct WorkspaceRefactorPreviewArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(
+    after_help = "Examples:\n  paredit refactor preview --from old-name --to new-name src/foo.lisp src/bar.lisp"
+)]
 pub(in crate::presentation::cli) struct RefactorPreviewArgs {
     /// Files to scan.
     #[arg(required = true)]

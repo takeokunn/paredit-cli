@@ -128,10 +128,10 @@ fn print_json_report(
                     "definition_count": report.definitions.len(),
                     "call_count": report.calls.len(),
                     "definitions": report
-                        .definitions
-                        .iter()
-                        .map(|definition| json!({
-                            "path": definition.path.as_str(),
+                    .definitions
+                    .iter()
+                    .map(|definition| json!({
+                            "path": definition.path.to_string(),
                             "span": {
                                 "start": definition.span.start().get(),
                                 "end": definition.span.end().get(),

@@ -6,11 +6,16 @@ use crate::application::usecase::package_report::syntax::{
 use crate::application::usecase::package_report::types::{
     InPackageReport, PackageDefinitionReport, PackageImportReport,
 };
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};
+use crate::domain::{
+    common_lisp::CommonLispPackageDeclarationForm,
+    dialect::Dialect,
+    sexpr::{Delimiter, ExpressionKind, ExpressionView, Path},
+};
 
 pub(super) fn analyze_defpackage_form(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    dialect: Dialect,
+    path: &Path,
 ) -> Result<Option<PackageDefinitionReport>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
@@ -21,7 +26,7 @@ pub(super) fn analyze_defpackage_form(
     let Some(head) = atom_text(&view.children[0]) else {
         return Ok(None);
     };
-    if !is_package_head(head, "defpackage") {
+    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::Defpackage) {
         return Ok(None);
     }
 
@@ -60,7 +65,7 @@ pub(super) fn analyze_defpackage_form(
     }
 
     Ok(Some(PackageDefinitionReport {
-        path: Path::from_indexes(path_indexes.to_vec()).to_string(),
+        path: path.to_string(),
         span: view.span,
         name,
         nicknames,
@@ -73,7 +78,8 @@ pub(super) fn analyze_defpackage_form(
 
 pub(super) fn analyze_in_package_form(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    dialect: Dialect,
+    path: &Path,
 ) -> Result<Option<InPackageReport>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
@@ -84,7 +90,7 @@ pub(super) fn analyze_in_package_form(
     let Some(head) = atom_text(&view.children[0]) else {
         return Ok(None);
     };
-    if !is_package_head(head, "in-package") {
+    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::InPackage) {
         return Ok(None);
     }
 
@@ -93,7 +99,7 @@ pub(super) fn analyze_in_package_form(
         .to_owned();
 
     Ok(Some(InPackageReport {
-        path: Path::from_indexes(path_indexes.to_vec()).to_string(),
+        path: path.to_string(),
         span: view.span,
         name,
     }))

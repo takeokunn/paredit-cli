@@ -57,6 +57,22 @@ fn plans_thread_last_pipeline_from_nested_calls() {
     assert!(plan.changed);
 }
 
+#[test]
+fn rejects_package_qualified_already_threaded_expression() {
+    let input = "(cl:-> x f)";
+    let err = plan_thread_expression(ThreadExpressionRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        path: Some("0".parse().expect("path")),
+        target: target(input),
+        style: ThreadStyle::First,
+        operator: SymbolName::new("->").expect("symbol"),
+    })
+    .expect_err("package-qualified thread operator should be rejected");
+
+    assert!(err.to_string().contains("already threaded"));
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 

@@ -45,7 +45,7 @@ pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<Sort
             let target_index = block.entries[target_offset].item.source_index;
             let mut item = entry.item.clone();
             item.target_index = target_index;
-            item.new_path = Path::from_indexes(vec![target_index]);
+            item.new_path = Path::root_child(target_index);
             items.push(item);
         }
 

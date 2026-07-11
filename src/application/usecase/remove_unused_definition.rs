@@ -23,75 +23,16 @@ pub fn plan_remove_unused_definitions(
     request: RemoveUnusedDefinitionsRequest,
 ) -> Result<RemoveUnusedDefinitionsPlan> {
     let exported_symbols = collect_exported_symbol_index(&request.package_definitions);
-    let unused_reports = collect_unused_definition_candidates(&request.files);
+    let unused_reports = collect_unused_definition_candidates(&request.files)?;
     let mut files = Vec::with_capacity(request.files.len());
 
     for (file, report) in request.files.iter().zip(&unused_reports) {
-        let mut removals = Vec::new();
-        let mut skipped = Vec::new();
-
-        for item in report
-            .definitions
-            .iter()
-            .filter(|item| item.references.is_empty())
-        {
-            if !request.include_exported
-                && definition_is_exported(&item.definition, &exported_symbols)
-            {
-                skipped.push(SkippedDefinitionRemoval {
-                    definition: item.definition.clone(),
-                    reason: SkippedDefinitionRemovalReason::ExportedDefinition,
-                });
-            } else if request.include_protected
-                || definition_is_bulk_removable(item.definition.category)
-            {
-                let definition_text = item.definition.span.slice(&file.text).to_owned();
-                removals.push(PlannedDefinitionRemoval {
-                    definition: item.definition.clone(),
-                    definition_text,
-                    removal_span: item.definition.span,
-                });
-            } else {
-                skipped.push(SkippedDefinitionRemoval {
-                    definition: item.definition.clone(),
-                    reason: SkippedDefinitionRemovalReason::ProtectedDefinitionCategory,
-                });
-            }
-        }
-
-        removals.sort_by(|left, right| {
-            right
-                .definition
-                .span
-                .start()
-                .get()
-                .cmp(&left.definition.span.start().get())
-        });
-
-        let mut rewritten = file.text.clone();
-        for removal in &mut removals {
-            let expanded = expand_definition_removal(&rewritten, removal.definition.span);
-            removal.removal_span = expanded;
-            rewritten = replace_span(&rewritten, expanded, "");
-        }
-
-        SyntaxTree::parse(&rewritten).with_context(|| {
-            format!(
-                "file would become invalid after removing unused definitions: {}",
-                file.path.display()
-            )
-        })?;
-
-        let changed = rewritten != file.text;
-        files.push(RemoveUnusedDefinitionsFilePlan {
-            path: file.path.clone(),
-            dialect: file.dialect,
-            package: file.package.clone(),
-            rewritten,
-            changed,
-            removals,
-            skipped,
-        });
+        files.push(plan_file_removals(
+            file,
+            report,
+            &request,
+            &exported_symbols,
+        )?);
     }
 
     let candidate_count = unused_reports
@@ -110,4 +51,100 @@ pub fn plan_remove_unused_definitions(
         skipped_count,
         changed,
     })
+}
+
+fn plan_file_removals(
+    file: &RemoveUnusedDefinitionInputFile,
+    report: &candidates::UnusedDefinitionFile,
+    request: &RemoveUnusedDefinitionsRequest,
+    exported_symbols: &std::collections::HashMap<String, std::collections::HashSet<String>>,
+) -> Result<RemoveUnusedDefinitionsFilePlan> {
+    let mut removals = Vec::new();
+    let mut skipped = Vec::new();
+
+    for item in report
+        .definitions
+        .iter()
+        .filter(|item| item.references.is_empty())
+    {
+        match classify_definition_action(file, item, request, exported_symbols) {
+            DefinitionAction::Remove(removal) => removals.push(removal),
+            DefinitionAction::Skip(skipped_removal) => skipped.push(skipped_removal),
+        }
+    }
+
+    let rewritten = rewrite_file_without_unused_definitions(file, &mut removals)?;
+    let changed = rewritten != file.text;
+
+    Ok(RemoveUnusedDefinitionsFilePlan {
+        path: file.path.clone(),
+        dialect: file.dialect,
+        package: file.package.clone(),
+        rewritten,
+        changed,
+        removals,
+        skipped,
+    })
+}
+
+enum DefinitionAction {
+    Remove(PlannedDefinitionRemoval),
+    Skip(SkippedDefinitionRemoval),
+}
+
+fn classify_definition_action(
+    file: &RemoveUnusedDefinitionInputFile,
+    item: &candidates::UnusedDefinitionItem,
+    request: &RemoveUnusedDefinitionsRequest,
+    exported_symbols: &std::collections::HashMap<String, std::collections::HashSet<String>>,
+) -> DefinitionAction {
+    if !request.include_exported && definition_is_exported(&item.definition, exported_symbols) {
+        return DefinitionAction::Skip(SkippedDefinitionRemoval {
+            definition: item.definition.clone(),
+            reason: SkippedDefinitionRemovalReason::ExportedDefinition,
+        });
+    }
+
+    if request.include_protected || definition_is_bulk_removable(item.definition.category) {
+        return DefinitionAction::Remove(PlannedDefinitionRemoval {
+            definition: item.definition.clone(),
+            definition_text: item.definition.span.slice(&file.text).to_owned(),
+            removal_span: item.definition.span,
+        });
+    }
+
+    DefinitionAction::Skip(SkippedDefinitionRemoval {
+        definition: item.definition.clone(),
+        reason: SkippedDefinitionRemovalReason::ProtectedDefinitionCategory,
+    })
+}
+
+fn rewrite_file_without_unused_definitions(
+    file: &RemoveUnusedDefinitionInputFile,
+    removals: &mut [PlannedDefinitionRemoval],
+) -> Result<String> {
+    removals.sort_by(|left, right| {
+        right
+            .definition
+            .span
+            .start()
+            .get()
+            .cmp(&left.definition.span.start().get())
+    });
+
+    let mut rewritten = file.text.clone();
+    for removal in removals {
+        let expanded = expand_definition_removal(&rewritten, removal.definition.span);
+        removal.removal_span = expanded;
+        rewritten = replace_span(&rewritten, expanded, "");
+    }
+
+    SyntaxTree::parse(&rewritten).with_context(|| {
+        format!(
+            "file would become invalid after removing unused definitions: {}",
+            file.path.display()
+        )
+    })?;
+
+    Ok(rewritten)
 }

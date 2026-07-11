@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::dialect::Dialect;
 
 #[test]
 fn infers_free_variables_from_selected_expression() {
@@ -41,9 +42,42 @@ fn treats_symbol_macrolet_body_names_as_local() {
 }
 
 #[test]
+fn treats_cl_user_symbol_macrolet_body_names_as_local() {
+    let params = infer_at(
+        "(cl-user:symbol-macrolet ((local (compute outer))) (list local outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer"]);
+}
+
+#[test]
+fn treats_package_qualified_symbol_macrolet_body_names_as_local() {
+    let params = infer_at(
+        "(symbol-macrolet ((cl:product (compute outer))) (list product outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer"]);
+}
+
+#[test]
 fn treats_destructuring_bind_names_as_local_to_body() {
     let params = infer_at(
         "(destructuring-bind (local other) row (list local other outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["row", "outer"]);
+}
+
+#[test]
+fn treats_qualified_destructuring_bind_names_as_local_to_body() {
+    let params = infer_at(
+        "(cl:destructuring-bind (local other) row (list local other outer))",
         &[0],
         &[],
     );
@@ -66,6 +100,17 @@ fn treats_multiple_value_bind_names_as_local_to_body() {
 fn treats_handler_case_clause_lambda_lists_as_local() {
     let params = infer_at(
         "(handler-case (risky input) (error (condition) (recover condition outer)) (:no-error (value) (finish value done)))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["input", "outer", "done"]);
+}
+
+#[test]
+fn treats_qualified_handler_case_clause_lambda_lists_as_local() {
+    let params = infer_at(
+        "(cl:handler-case (risky input) (error (condition) (recover condition outer)) (:no-error (value) (finish value done)))",
         &[0],
         &[],
     );
@@ -195,6 +240,17 @@ fn treats_with_accessors_names_as_local_to_body() {
 }
 
 #[test]
+fn skips_common_lisp_declaration_forms_in_body_scans() {
+    let params = infer_at(
+        "(locally (declare (special target)) (+ target outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["target", "outer"]);
+}
+
+#[test]
 fn treats_flet_lambda_list_as_local_to_function_body() {
     let params = infer_at(
         "(flet ((helper (local) (+ local outer))) (helper input))",
@@ -228,6 +284,97 @@ fn treats_macrolet_lambda_list_as_local_to_expander_body() {
 }
 
 #[test]
+fn treats_cl_user_macrolet_lambda_list_as_local_to_expander_body() {
+    let params = infer_at(
+        "(cl-user:macrolet ((with-local (local) (list local outer))) (with-local input))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "input"]);
+}
+
+#[test]
+fn treats_common_lisp_macrolet_lambda_list_as_local_to_expander_body() {
+    let params = infer_at(
+        "(cl:macrolet ((with-local (local) (list local outer))) (with-local input))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "input"]);
+}
+
+#[test]
+fn treats_compiler_macrolet_lambda_list_as_local_to_expander_body() {
+    let params = infer_at(
+        "(compiler-macrolet ((with-local (local) (list local outer))) (with-local input))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "input"]);
+}
+
+#[test]
+fn treats_cl_user_compiler_macrolet_lambda_list_as_local_to_expander_body() {
+    let params = infer_at(
+        "(cl-user:compiler-macrolet ((with-local (local) (list local outer))) (with-local input))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "input"]);
+}
+
+#[test]
+fn treats_common_lisp_compiler_macrolet_lambda_list_as_local_to_expander_body() {
+    let params = infer_at(
+        "(cl:compiler-macrolet ((with-local (local) (list local outer))) (with-local input))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "input"]);
+}
+
+#[test]
+fn treats_emacs_lisp_let_bindings_as_local_to_body() {
+    let params = infer_at_dialect(
+        Dialect::EmacsLisp,
+        "(let ((local input)) (+ local outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["input", "outer"]);
+}
+
+#[test]
+fn treats_emacs_lisp_symbol_macrolet_bindings_as_local_to_body() {
+    let params = infer_at_dialect(
+        Dialect::EmacsLisp,
+        "(cl-symbol-macrolet ((local (compute outer))) (list local outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer"]);
+}
+
+#[test]
+fn treats_emacs_lisp_flet_lambda_list_as_local_to_function_body() {
+    let params = infer_at_dialect(
+        Dialect::EmacsLisp,
+        "(cl-flet ((helper (local) (+ local outer))) (helper input))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "input"]);
+}
+
+#[test]
 fn treats_define_setf_expander_macro_lambda_list_as_local_to_expander_body() {
     let params = infer_at(
         "(define-setf-expander slot (&whole whole &environment env target) (list whole env target outer))",
@@ -242,6 +389,17 @@ fn treats_define_setf_expander_macro_lambda_list_as_local_to_expander_body() {
 fn treats_define_compiler_macro_lambda_list_as_local_to_expander_body() {
     let params = infer_at(
         "(define-compiler-macro render (&whole whole &environment env target) (list whole env target outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer"]);
+}
+
+#[test]
+fn treats_package_qualified_compiler_macro_lambda_list_bindings_as_local() {
+    let params = infer_at(
+        "(define-compiler-macro render (&whole whole &environment env cl:target) (list whole env target outer))",
         &[0],
         &[],
     );

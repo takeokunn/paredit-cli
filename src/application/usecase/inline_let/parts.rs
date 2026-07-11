@@ -28,7 +28,8 @@ pub(super) fn inline_let_parts(
         anyhow::bail!("inline-let requires one binding and at least one body expression");
     }
     let head = atom_text(&target.children[0]).context("inline-let form must start with an atom")?;
-    if head != "let" {
+    let is_supported_let = dialect.supports_inline_let_refactor_head(head);
+    if !is_supported_let {
         anyhow::bail!("inline-let selection must start with let");
     }
 
@@ -49,7 +50,7 @@ pub(super) fn inline_let_parts(
     let last_body = target
         .children
         .last()
-        .expect("inline-let body count was validated");
+        .context("inline-let expected at least one body expression after validation")?;
     let body_span = ByteSpan::new(first_body.span.start(), last_body.span.end());
 
     Ok(InlineLetParts {

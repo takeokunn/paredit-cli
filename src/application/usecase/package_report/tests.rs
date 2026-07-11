@@ -1,11 +1,11 @@
 use proptest::prelude::*;
 
 use super::*;
-use crate::domain::sexpr::SyntaxTree;
+use crate::domain::{dialect::Dialect, sexpr::SyntaxTree};
 
 fn report_for(input: &str) -> PackageReport {
     let tree = SyntaxTree::parse(input).expect("input should parse");
-    build_package_report(&tree).expect("package report should build")
+    build_package_report(&tree, Dialect::CommonLisp).expect("package report should build")
 }
 
 #[test]

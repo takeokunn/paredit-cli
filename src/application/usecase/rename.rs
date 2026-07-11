@@ -3,8 +3,10 @@
 mod binding;
 mod function;
 mod macrolet;
+mod reader;
 mod replace_call;
 mod selection;
+mod symbol_macro;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -27,10 +29,14 @@ pub use replace_call::{
     ReplaceFunctionCallSite, ReplaceFunctionCallsPlan, ReplaceFunctionCallsRequest,
     ReplaceFunctionCallsScope, plan_replace_function_calls,
 };
+pub use symbol_macro::{
+    collect_define_symbol_macro_definition_renames, collect_define_symbol_macro_reference_renames,
+};
 pub use types::{
     RenameBindingPlan, RenameBindingRequest, RenameFunctionOccurrence, RenameFunctionPlan,
     RenameFunctionRequest, RenameInFormPlan, RenameInFormRequest, RenameLocalFunctionPlan,
-    RenameLocalFunctionRequest, RenameMacroletPlan, RenameMacroletRequest, RenameTarget,
+    RenameLocalFunctionRequest, RenameMacroletPlan, RenameMacroletRequest, RenameSymbolMacroPlan,
+    RenameSymbolMacroRequest, RenameTarget,
 };
 pub use unwrap::{
     UnwrapFunctionCallSite, UnwrapFunctionCallsPlan, UnwrapFunctionCallsRequest,
@@ -87,18 +93,51 @@ pub fn plan_rename_macrolet(request: RenameMacroletRequest<'_>) -> Result<Rename
     })
 }
 
-pub fn plan_rename_local_function(
-    request: RenameLocalFunctionRequest<'_>,
-) -> Result<RenameLocalFunctionPlan> {
+pub fn plan_rename_symbol_macro(
+    request: RenameSymbolMacroRequest<'_>,
+) -> Result<RenameSymbolMacroPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let definitions = collect_local_function_binding_renames(
+    let definitions = collect_define_symbol_macro_definition_renames(
         &tree,
         request.dialect,
         &request.from,
         &request.to,
     )?;
-    let calls =
-        collect_local_function_call_head_renames(&tree, request.dialect, &request.from, &request.to)?;
+    let references = collect_define_symbol_macro_reference_renames(
+        &tree,
+        request.dialect,
+        &request.from,
+        &request.to,
+    )?;
+    let edits = definitions
+        .iter()
+        .chain(references.iter())
+        .map(|occurrence| (occurrence.span, occurrence.replacement.clone()))
+        .collect::<Vec<_>>();
+    let rewritten = apply_byte_span_edits(request.input, edits)?;
+    SyntaxTree::parse(&rewritten).context("renamed output is not a valid S-expression document")?;
+
+    Ok(RenameSymbolMacroPlan {
+        dialect: request.dialect,
+        definitions,
+        references,
+        changed: rewritten != request.input,
+        rewritten,
+    })
+}
+
+pub fn plan_rename_local_function(
+    request: RenameLocalFunctionRequest<'_>,
+) -> Result<RenameLocalFunctionPlan> {
+    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    let definitions =
+        collect_local_function_binding_renames(&tree, request.dialect, &request.from, &request.to)?;
+    let calls = collect_local_function_call_head_renames(
+        &tree,
+        request.dialect,
+        &request.from,
+        &request.to,
+    )?;
     let edits = definitions
         .iter()
         .chain(calls.iter())

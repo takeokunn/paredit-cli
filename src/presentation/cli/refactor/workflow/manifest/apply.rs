@@ -10,6 +10,7 @@ use super::super::super::types::apply::{
 };
 use super::super::super::types::manifest::RefactorApplyManifestHeader;
 use super::super::super::types::root::{RefactorRootGuard, RefactorRootReport};
+use crate::presentation::cli::shared::write_files_with_rollback;
 
 pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> Result<()> {
     let loaded_manifest =
@@ -82,10 +83,19 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
         && manifest_flag_mismatch_count == 0;
 
     if args.write && can_apply {
+        let mut written_outputs = Vec::new();
+        let mut written_indexes = Vec::new();
         for (index, (resolved_path, rewritten)) in rewritten_outputs.iter().enumerate() {
-            if let Some(file) = files.get_mut(index).filter(|file| file.changed) {
-                fs::write(resolved_path, rewritten)
-                    .with_context(|| format!("failed to write {}", resolved_path.display()))?;
+            if files.get(index).is_some_and(|file| file.changed) {
+                written_outputs.push((resolved_path.clone(), rewritten.clone()));
+                written_indexes.push(index);
+            }
+        }
+
+        write_files_with_rollback(written_outputs)?;
+
+        for index in written_indexes {
+            if let Some(file) = files.get_mut(index) {
                 file.written = true;
             }
         }
@@ -128,7 +138,7 @@ pub(in crate::presentation::cli) fn refactor_apply(args: RefactorApplyArgs) -> R
 
     if !can_apply {
         anyhow::bail!(
-            "refactor-apply validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
+            "refactor apply validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
             result.manifest_policy_passed,
             result.manifest_outputs_parse,
             result.summary.stale_file_count,

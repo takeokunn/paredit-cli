@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::application::usecase::call_report::CallReportItem;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug)]
 pub struct SignatureReportSource {
@@ -22,7 +22,7 @@ pub struct SignatureReportFile {
 
 #[derive(Debug, Clone)]
 pub struct SignatureDefinitionItem {
-    pub path: String,
+    pub path: Path,
     pub span: ByteSpan,
     pub head: String,
     pub name: Option<String>,

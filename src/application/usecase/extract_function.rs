@@ -25,7 +25,9 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
         Vec::new()
     };
     for param in &inferred_params {
-        if !params.iter().any(|existing| existing == param) {
+        if !params.iter().any(|existing| {
+            inference::extract_function_param_name_eq(request.dialect, existing, param)
+        }) {
             params.push(param.clone());
         }
     }

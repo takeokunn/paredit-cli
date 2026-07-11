@@ -23,6 +23,7 @@ proptest! {
                 phase: VerificationPhase::Pre,
                 symbol: "old-name",
                 new_symbol: Some("new-name"),
+                target_kind: RefactorPlanTargetKind::Callable,
                 before,
                 after: None,
             },
@@ -67,6 +68,7 @@ proptest! {
                 phase: VerificationPhase::Post,
                 symbol: "old-name",
                 new_symbol: Some("new-name"),
+                target_kind: RefactorPlanTargetKind::Callable,
                 before,
                 after: Some(after),
             },
@@ -115,7 +117,13 @@ proptest! {
     ) {
         let gates = gates(blocking_gate_count, nonblocking_gate_count);
         let files = vec![PathBuf::from("src/core.lisp")];
-        let steps = refactor_plan_steps(RefactorOperation::Remove, "stale-helper", &files, &gates);
+        let steps = refactor_plan_steps(
+            RefactorOperation::Remove,
+            "stale-helper",
+            &files,
+            RefactorPlanTargetKind::Unknown,
+            &gates,
+        );
         let apply = steps
             .iter()
             .find(|step| step.order == 3)

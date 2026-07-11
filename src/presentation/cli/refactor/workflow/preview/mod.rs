@@ -6,6 +6,7 @@ use super::super::super::*;
 use super::super::args::*;
 use super::super::render::print_refactor_preview;
 use super::super::types::plan::WorkspaceRefactorPlanDiscovery;
+use super::workspace::discover_workspace_refactor_scope;
 
 pub(in crate::presentation::cli::refactor::workflow) use build::{
     BuildRefactorPreviewRequest, build_refactor_preview,
@@ -32,31 +33,23 @@ pub(in crate::presentation::cli) fn refactor_preview(args: RefactorPreviewArgs) 
         },
         workspace: None,
         output: args.output,
-        failure_label: "refactor-preview",
+        failure_label: "refactor preview",
     })
 }
 
 pub(in crate::presentation::cli) fn workspace_refactor_preview(
     args: WorkspaceRefactorPreviewArgs,
 ) -> Result<()> {
-    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+    let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown,
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
     })?;
-    let workspace = WorkspaceRefactorPlanDiscovery {
-        roots: args.roots,
-        discovered_file_count: discovery.files.len(),
-        skipped_unknown_count: discovery.skipped_unknown_count,
-        skipped_hidden_count: discovery.skipped_hidden_count,
-        skipped_generated_count: discovery.skipped_generated_count,
-        skipped_symlink_count: discovery.skipped_symlink_count,
-    };
 
     emit_refactor_preview(RefactorPreviewEmission {
-        paths: &discovery.files,
+        paths: &workspace.paths,
         dialect: None,
         from: &args.from,
         to: &args.to,
@@ -71,9 +64,9 @@ pub(in crate::presentation::cli) fn workspace_refactor_preview(
             require_definitions: args.require_definitions,
             require_edits: args.require_edits,
         },
-        workspace: Some(workspace),
+        workspace: Some(workspace.workspace),
         output: args.output,
-        failure_label: "workspace-refactor-preview",
+        failure_label: "refactor workspace-preview",
     })
 }
 

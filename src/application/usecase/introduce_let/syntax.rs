@@ -1,41 +1,49 @@
+use crate::domain::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_name_eq};
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionView};
 
-pub(super) fn binding_form_binds_name(view: &ExpressionView, name: &str) -> bool {
+pub(super) fn binding_form_binds_name(dialect: Dialect, view: &ExpressionView, name: &str) -> bool {
     let Some(head) = list_head(view) else {
         return false;
     };
 
-    match head {
-        "let" | "let*" | "symbol-macrolet" => view
+    let form = dialect.common_lisp_value_scope_form_for_head(head);
+
+    match form {
+        Some(CommonLispValueScopeForm::Let(_)) => view
             .children
             .get(1)
             .is_some_and(|bindings| binding_pairs_contain_name(bindings, name)),
-        "lambda" => view
+        Some(CommonLispValueScopeForm::Lambda) => view
             .children
             .get(1)
             .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
-        "fn" => view
+        Some(CommonLispValueScopeForm::FunctionLiteral) => view
             .children
             .get(1)
             .filter(|parameters| parameters.delimiter == Some(Delimiter::Bracket))
             .is_some_and(|parameters| pattern_contains_name(parameters, name)),
-        "defun" | "defmacro" | "defn" | "define-setf-expander" | "define-compiler-macro" => view
+        Some(CommonLispValueScopeForm::Definition) => view
             .children
             .get(2)
             .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
-        "destructuring-bind" | "multiple-value-bind" => view
+        None if head == "defn" => view
+            .children
+            .get(2)
+            .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
+        Some(CommonLispValueScopeForm::Value) => view
             .children
             .get(1)
             .is_some_and(|parameters| lambda_list_contains_name(parameters, name)),
-        "dolist" | "dotimes" => view
+        Some(CommonLispValueScopeForm::Iteration) => view
             .children
             .get(1)
             .is_some_and(|binding_form| iteration_binding_binds_name(binding_form, name)),
-        "do" | "do*" | "prog" | "prog*" => view
+        Some(CommonLispValueScopeForm::Variable(_)) => view
             .children
             .get(1)
             .is_some_and(|bindings| variable_specs_bind_name(bindings, name)),
-        "with-slots" | "with-accessors" => view
+        Some(CommonLispValueScopeForm::Slot) => view
             .children
             .get(1)
             .is_some_and(|slot_specs| slot_specs_bind_name(slot_specs, name)),
@@ -44,6 +52,7 @@ pub(super) fn binding_form_binds_name(view: &ExpressionView, name: &str) -> bool
 }
 
 pub(super) fn child_shadowed_by_binding(
+    dialect: Dialect,
     view: &ExpressionView,
     name: &str,
     child_index: usize,
@@ -52,52 +61,96 @@ pub(super) fn child_shadowed_by_binding(
         return false;
     };
 
-    match head {
-        "let" | "let*" | "symbol-macrolet" => {
-            child_index >= 2 && binding_form_binds_name(view, name)
+    let form = dialect.common_lisp_value_scope_form_for_head(head);
+
+    match form {
+        Some(CommonLispValueScopeForm::Let(_)) => {
+            child_index >= 2 && binding_form_binds_name(dialect, view, name)
         }
-        "lambda" => child_index >= 2 && binding_form_binds_name(view, name),
-        "fn" => child_index >= 2 && binding_form_binds_name(view, name),
-        "defun" | "defmacro" | "defn" | "define-setf-expander" | "define-compiler-macro" => {
-            child_index >= 3 && binding_form_binds_name(view, name)
+        Some(CommonLispValueScopeForm::Lambda | CommonLispValueScopeForm::FunctionLiteral) => {
+            child_index >= 2 && binding_form_binds_name(dialect, view, name)
         }
-        "destructuring-bind" | "multiple-value-bind" => {
-            child_index >= 3 && binding_form_binds_name(view, name)
+        Some(CommonLispValueScopeForm::Definition) => {
+            child_index >= 3 && binding_form_binds_name(dialect, view, name)
         }
-        "handler-case" | "restart-case" => view
+        None if head == "defn" => child_index >= 3 && binding_form_binds_name(dialect, view, name),
+        Some(CommonLispValueScopeForm::Value) => {
+            child_index >= 3 && binding_form_binds_name(dialect, view, name)
+        }
+        Some(CommonLispValueScopeForm::Clause) => view
             .children
             .get(child_index)
             .is_some_and(|clause| child_index >= 2 && clause_binds_name(clause, name)),
-        "dolist" | "dotimes" => child_index >= 2 && binding_form_binds_name(view, name),
-        "do" | "do*" | "prog" | "prog*" => child_index >= 2 && binding_form_binds_name(view, name),
-        "with-slots" | "with-accessors" => child_index >= 3 && binding_form_binds_name(view, name),
+        Some(CommonLispValueScopeForm::Iteration) => {
+            child_index >= 2 && binding_form_binds_name(dialect, view, name)
+        }
+        Some(CommonLispValueScopeForm::Variable(_)) => {
+            child_index >= 2 && binding_form_binds_name(dialect, view, name)
+        }
+        Some(CommonLispValueScopeForm::Slot) => {
+            child_index >= 3 && binding_form_binds_name(dialect, view, name)
+        }
         _ => false,
     }
 }
 
-pub(super) fn local_callable_bindings_child_index(view: &ExpressionView) -> Option<usize> {
-    let head = list_head(view)?;
-    matches!(head, "flet" | "labels" | "macrolet" | "compiler-macrolet").then_some(1)
+pub(super) fn local_callable_bindings_child_index(
+    dialect: Dialect,
+    view: &ExpressionView,
+) -> Option<usize> {
+    matches!(
+        dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
+        Some(CommonLispValueScopeForm::LocalCallable(_))
+    )
+    .then_some(1)
 }
 
-pub(super) fn let_star_bindings_child_index(view: &ExpressionView) -> Option<usize> {
-    matches!(list_head(view)?, "let*").then_some(1)
+pub(super) fn let_star_bindings_child_index(
+    dialect: Dialect,
+    view: &ExpressionView,
+) -> Option<usize> {
+    matches!(
+        dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
+        Some(CommonLispValueScopeForm::Let(form)) if form.is_sequential()
+    )
+    .then_some(1)
 }
 
-pub(super) fn iteration_bindings_child_index(view: &ExpressionView) -> Option<usize> {
-    matches!(list_head(view)?, "dolist" | "dotimes").then_some(1)
+pub(super) fn iteration_bindings_child_index(
+    dialect: Dialect,
+    view: &ExpressionView,
+) -> Option<usize> {
+    matches!(
+        dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
+        Some(CommonLispValueScopeForm::Iteration)
+    )
+    .then_some(1)
 }
 
-pub(super) fn variable_bindings_child_index(view: &ExpressionView) -> Option<usize> {
-    matches!(list_head(view)?, "do" | "do*" | "prog" | "prog*").then_some(1)
+pub(super) fn variable_bindings_child_index(
+    dialect: Dialect,
+    view: &ExpressionView,
+) -> Option<usize> {
+    matches!(
+        dialect.common_lisp_value_scope_form_for_head(list_head(view)?),
+        Some(CommonLispValueScopeForm::Variable(_))
+    )
+    .then_some(1)
 }
 
-pub(super) fn variable_binding_form_is_sequential(view: &ExpressionView) -> bool {
-    matches!(list_head(view), Some("do*" | "prog*"))
+pub(super) fn variable_binding_form_is_sequential(dialect: Dialect, view: &ExpressionView) -> bool {
+    matches!(
+        list_head(view).and_then(|head| dialect.common_lisp_value_scope_form_for_head(head)),
+        Some(CommonLispValueScopeForm::Variable(form)) if form.is_sequential()
+    )
 }
 
-pub(super) fn variable_binding_form_has_step_forms(view: &ExpressionView) -> bool {
-    matches!(list_head(view), Some("do" | "do*"))
+pub(super) fn variable_binding_form_has_step_forms(
+    dialect: Dialect,
+    view: &ExpressionView,
+) -> bool {
+    list_head(view)
+        .is_some_and(|head| dialect.common_lisp_variable_binding_has_step_forms_for_head(head))
 }
 
 pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> bool {
@@ -108,7 +161,8 @@ pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> b
 }
 
 pub(super) fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> bool {
-    if atom_text(binding).is_some_and(|binding_name| binding_name == name) {
+    if atom_text(binding).is_some_and(|binding_name| common_lisp_symbol_name_eq(binding_name, name))
+    {
         return true;
     }
 
@@ -167,7 +221,7 @@ fn iteration_binding_binds_name(binding_form: &ExpressionView, name: &str) -> bo
         .children
         .first()
         .and_then(atom_text)
-        .is_some_and(|binding_name| binding_name == name)
+        .is_some_and(|binding_name| common_lisp_symbol_name_eq(binding_name, name))
 }
 
 fn variable_specs_bind_name(bindings: &ExpressionView, name: &str) -> bool {
@@ -181,7 +235,7 @@ fn slot_specs_bind_name(slot_specs: &ExpressionView, name: &str) -> bool {
     slot_specs.children.iter().any(|slot_spec| {
         atom_text(slot_spec)
             .or_else(|| slot_spec.children.first().and_then(atom_text))
-            .is_some_and(|binding_name| binding_name == name)
+            .is_some_and(|binding_name| common_lisp_symbol_name_eq(binding_name, name))
     })
 }
 
@@ -295,11 +349,13 @@ fn supplied_p_contains_name(spec: &ExpressionView, name: &str) -> bool {
 }
 
 fn pattern_contains_name(view: &ExpressionView, name: &str) -> bool {
-    atom_text(view).map(|text| text == name).unwrap_or_else(|| {
-        view.children
-            .iter()
-            .any(|child| pattern_contains_name(child, name))
-    })
+    atom_text(view)
+        .map(|text| common_lisp_symbol_name_eq(text, name))
+        .unwrap_or_else(|| {
+            view.children
+                .iter()
+                .any(|child| pattern_contains_name(child, name))
+        })
 }
 
 fn list_head(view: &ExpressionView) -> Option<&str> {

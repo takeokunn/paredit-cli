@@ -1,11 +1,11 @@
-use std::fs;
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::application::usecase::function_parameter::{
-    RemoveFunctionParameterRequest, plan_remove_function_parameter,
+    MissingArgumentPolicy, RemoveFunctionParameterRequest, plan_remove_function_parameter,
 };
-use crate::presentation::cli::{detect_dialect, read_input};
+use crate::presentation::cli::{
+    detect_dialect, read_input, require_output_file, write_file_with_rollback,
+};
 
 use super::args::RemoveFunctionParameterArgs;
 use super::render::remove::print_remove_function_parameter_plan;
@@ -26,17 +26,17 @@ pub(in crate::presentation::cli) fn remove_function_parameter(
         name: args.name,
         call_paths: args.call_paths,
         all_calls: args.all_calls,
-        allow_missing_argument: args.allow_missing_argument,
+        missing_argument_policy: if args.allow_missing_argument {
+            MissingArgumentPolicy::Ignore
+        } else {
+            MissingArgumentPolicy::Reject
+        },
     })?;
 
     let written = args.write && plan.changed;
     if written {
-        let file = input
-            .file
-            .as_ref()
-            .expect("--write was validated to require --file");
-        fs::write(file, &plan.rewritten)
-            .with_context(|| format!("failed to write {}", file.display()))?;
+        let file = require_output_file(input.file.as_ref())?;
+        write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
 
     print_remove_function_parameter_plan(&plan, written, args.output)

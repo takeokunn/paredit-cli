@@ -117,7 +117,7 @@ fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseErro
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(12))]
+    #![proptest_config(cli_proptest_config(12))]
 
     #[test]
     fn cli_thread_expression_preserves_parseability_for_generated_chains(depth in 1usize..8) {

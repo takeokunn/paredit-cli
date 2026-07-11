@@ -1,8 +1,6 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input};
+use super::super::{detect_dialect, read_input, write_file_with_rollback};
 use super::args::RenameInFormArgs;
 use super::render::scoped_form::print_rename_in_form_plan;
 use super::shared::rename_target;
@@ -25,8 +23,7 @@ pub(in crate::presentation::cli) fn rename_in_form(args: RenameInFormArgs) -> Re
     let written = args.write && plan.changed;
     if written {
         let file = args.file.as_ref().context("--write requires --file")?;
-        fs::write(file, &plan.rewritten)
-            .with_context(|| format!("failed to write {}", file.display()))?;
+        write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
 
     print_rename_in_form_plan(&plan, written, args.output)

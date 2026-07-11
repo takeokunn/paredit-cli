@@ -4,6 +4,8 @@ use super::super::render::print_refactor_plan;
 use super::super::types::plan::{
     RefactorPlan, RefactorPlanPolicyOptions, WorkspaceRefactorPlanDiscovery,
 };
+use super::shared::derive_refactor_target_kind;
+use super::workspace::discover_workspace_refactor_scope;
 
 pub(in crate::presentation::cli) fn refactor_plan(args: RefactorPlanArgs) -> Result<()> {
     emit_refactor_plan(RefactorPlanEmission {
@@ -18,31 +20,23 @@ pub(in crate::presentation::cli) fn refactor_plan(args: RefactorPlanArgs) -> Res
         },
         workspace: None,
         output: args.output,
-        failure_label: "refactor-plan",
+        failure_label: "refactor plan",
     })
 }
 
 pub(in crate::presentation::cli) fn workspace_refactor_plan(
     args: WorkspaceRefactorPlanArgs,
 ) -> Result<()> {
-    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+    let workspace = discover_workspace_refactor_scope(WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown,
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
     })?;
-    let workspace = WorkspaceRefactorPlanDiscovery {
-        roots: args.roots,
-        discovered_file_count: discovery.files.len(),
-        skipped_unknown_count: discovery.skipped_unknown_count,
-        skipped_hidden_count: discovery.skipped_hidden_count,
-        skipped_generated_count: discovery.skipped_generated_count,
-        skipped_symlink_count: discovery.skipped_symlink_count,
-    };
 
     emit_refactor_plan(RefactorPlanEmission {
-        paths: &discovery.files,
+        paths: &workspace.paths,
         dialect: None,
         symbol: &args.symbol,
         operation: args.operation,
@@ -51,9 +45,9 @@ pub(in crate::presentation::cli) fn workspace_refactor_plan(
             require_definitions: args.require_definitions,
             require_references: args.require_references,
         },
-        workspace: Some(workspace),
+        workspace: Some(workspace.workspace),
         output: args.output,
-        failure_label: "workspace-refactor-plan",
+        failure_label: "refactor workspace-plan",
     })
 }
 
@@ -80,12 +74,14 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
         failure_label,
     } = request;
     let files = impact_report::workflow::collect_impact_reports(paths, dialect, symbol)?;
+    let target_kind = derive_refactor_target_kind(&files, symbol.as_str());
     let summary = summarize_impact_reports(&files);
     let operation = ApplicationRefactorOperation::from(operation);
     let decision = build_refactor_plan_decision(RefactorPlanRequest {
         operation,
         symbol: symbol.as_str(),
         files: paths,
+        target_kind,
         summary,
         policy: RefactorPlanPolicyRequest {
             fail_on_blocking_gate: policy_options.fail_on_blocking_gate,
@@ -101,6 +97,7 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
     let plan = RefactorPlan {
         operation,
         symbol: symbol.as_str().to_owned(),
+        target_kind,
         workspace,
         files,
         gates: decision.gates,

@@ -163,3 +163,29 @@ fn cli_filters_replacement_plan_by_per_file_group_size() {
         .stdout(predicate::str::contains("\"batch_count\": 0"))
         .stdout(predicate::str::contains("\"form_count\": 0"));
 }
+
+#[test]
+fn cli_uses_review_placeholder_for_default_replacement_plan_output() {
+    let dir = fresh_temp_dir("replacement-plan-default-placeholder");
+    let lisp_file = dir.join("suite.lisp");
+    fs::write(
+        &lisp_file,
+        "(deftest split-a () (is (= 1 (pane-count))))\n\
+         (deftest split-b () (is (= 2 (pane-count))))\n",
+    )
+    .expect("write duplicate fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("replacement-plan")
+        .arg("--min-node-count")
+        .arg("8")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"replacement\": \"(__review_replacement__)\"",
+        ))
+        .stdout(predicate::str::contains("(__review_replacement__)"));
+}

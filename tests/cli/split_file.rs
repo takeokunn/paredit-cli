@@ -138,6 +138,52 @@ fn cli_plans_file_split_by_name_and_kind() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn cli_rolls_back_split_file_when_later_file_write_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = fresh_temp_dir("split-file-rollback");
+    let from_file = dir.join("core.lisp");
+    let nested_dir = dir.join("features");
+    let to_file = nested_dir.join("render.lisp");
+    let original_from = "(in-package #:demo)\n\
+                         (defun keep () :ok)\n\
+                         (defun render-pane () :render)\n";
+    fs::write(&from_file, original_from).expect("write source fixture");
+    fs::create_dir_all(&nested_dir).expect("create nested dir");
+    let original_permissions = fs::metadata(&nested_dir)
+        .expect("read nested dir metadata")
+        .permissions();
+    fs::set_permissions(&nested_dir, PermissionsExt::from_mode(0o555))
+        .expect("make nested dir read only");
+
+    let assert_result = paredit()
+        .arg("split-file")
+        .arg("--from-file")
+        .arg(&from_file)
+        .arg("--to-file")
+        .arg(&to_file)
+        .arg("--path")
+        .arg("2")
+        .arg("--write")
+        .assert();
+
+    fs::set_permissions(&nested_dir, original_permissions).expect("restore nested dir permissions");
+
+    assert_result
+        .failure()
+        .stderr(predicate::str::contains("Permission denied"));
+    assert_eq!(
+        fs::read_to_string(&from_file).expect("read rolled back source"),
+        original_from
+    );
+    assert!(
+        !to_file.exists(),
+        "destination should not exist after rollback"
+    );
+}
+
 fn assert_split_file_property(definition_count: usize) -> Result<(), TestCaseError> {
     let dir = fresh_temp_dir(&format!("split-file-pbt-{definition_count}"));
     let from_file = dir.join("core.lisp");
@@ -211,7 +257,7 @@ fn assert_split_file_property(definition_count: usize) -> Result<(), TestCaseErr
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(12))]
+    #![proptest_config(cli_proptest_config(12))]
 
     #[test]
     fn cli_split_file_preserves_order_and_parseability(definition_count in 1usize..6) {

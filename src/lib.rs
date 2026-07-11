@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 pub mod application;
 pub mod domain;
 pub mod infrastructure;

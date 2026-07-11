@@ -1,11 +1,11 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
 use crate::domain::sexpr::{Edit, SyntaxTree};
 
 use super::super::MoveInsert;
-use super::super::shared::{detect_dialect, list_head, read_file_or_empty, read_input};
+use super::super::shared::{
+    detect_dialect, list_head, read_file_or_empty, read_input, write_files_with_rollback,
+};
 use super::args::MoveFormArgs;
 use super::render::move_form::print_move_form_plan;
 use super::shared::{insert_top_level_form, same_file_path, top_level_path_index};
@@ -72,10 +72,10 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
     let changed = from_rewritten != from_input.text || to_rewritten != to_input.text;
     let written = args.write && changed;
     if written {
-        fs::write(&args.from_file, &from_rewritten)
-            .with_context(|| format!("failed to write {}", args.from_file.display()))?;
-        fs::write(&args.to_file, &to_rewritten)
-            .with_context(|| format!("failed to write {}", args.to_file.display()))?;
+        write_files_with_rollback([
+            (args.from_file.clone(), from_rewritten.clone()),
+            (args.to_file.clone(), to_rewritten.clone()),
+        ])?;
     }
 
     let plan = MoveFormPlan {

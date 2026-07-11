@@ -49,6 +49,7 @@ fn automation_decision_prefers_policy_failure_over_manual_review() {
         RefactorOperation::Rename,
         "render-pane",
         &[std::path::PathBuf::from("core.lisp")],
+        RefactorPlanTargetKind::Callable,
         &gates(1, 0),
     );
     let policy = RefactorPlanPolicy {
@@ -104,6 +105,7 @@ fn automation_decision_tracks_ready_and_manual_review_states() {
         RefactorOperation::Rename,
         "render-pane",
         &[std::path::PathBuf::from("core.lisp")],
+        RefactorPlanTargetKind::Callable,
         &[],
     );
 
@@ -139,6 +141,7 @@ fn automation_decision_tracks_ready_and_manual_review_states() {
         RefactorOperation::Rename,
         "render-pane",
         &[std::path::PathBuf::from("core.lisp")],
+        RefactorPlanTargetKind::Callable,
         &gates(1, 0),
     );
 
@@ -165,4 +168,53 @@ fn automation_decision_tracks_ready_and_manual_review_states() {
             },
         ]
     );
+
+    let symbol_macro_policy = RefactorPlanPolicy {
+        fail_on_blocking_gate: false,
+        require_definitions: None,
+        require_references: None,
+        blocking_gate_count: 0,
+        definition_count: 1,
+        reference_count: 3,
+        passed: true,
+        violations: Vec::new(),
+    };
+    for target_kind in [
+        RefactorPlanTargetKind::Macro,
+        RefactorPlanTargetKind::CompilerMacro,
+        RefactorPlanTargetKind::SetfExpander,
+        RefactorPlanTargetKind::SymbolMacro,
+    ] {
+        let steps = refactor_plan_steps(
+            RefactorOperation::Signature,
+            "current-user",
+            &[std::path::PathBuf::from("core.lisp")],
+            target_kind,
+            &[],
+        );
+        let manual = refactor_plan_automation_decision(&symbol_macro_policy, &steps);
+
+        assert_eq!(manual.status, RefactorPlanAutomationStatus::ManualReview);
+        assert_eq!(manual.next_action, "review-signature-scope");
+        assert!(!manual.safe_to_automate);
+        assert!(manual.policy_passed);
+        assert_eq!(manual.blocking_gate_count, 0);
+        assert_eq!(
+            manual.steps(),
+            [
+                RefactorPlanAutomationStep {
+                    name: "plan-policy",
+                    status: RefactorPlanAutomationStepStatus::Passed,
+                },
+                RefactorPlanAutomationStep {
+                    name: "manual-review-gates",
+                    status: RefactorPlanAutomationStepStatus::Scheduled,
+                },
+                RefactorPlanAutomationStep {
+                    name: "apply-plan",
+                    status: RefactorPlanAutomationStepStatus::Skipped,
+                },
+            ]
+        );
+    }
 }

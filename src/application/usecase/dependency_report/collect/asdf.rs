@@ -1,3 +1,4 @@
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};
 
 use crate::application::usecase::dependency_report::syntax::{
@@ -7,13 +8,14 @@ use crate::application::usecase::dependency_report::types::{DependencyKind, Depe
 
 pub(super) fn collect_system_dependency_items(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    dialect: Dialect,
+    path: &Path,
     dependencies: &mut Vec<DependencyReportItem>,
 ) {
-    if list_head(view)
-        .and_then(|head| head.rsplit(':').next())
-        .is_none_or(|head| head != "defsystem")
-    {
+    let Some(head) = list_head(view) else {
+        return;
+    };
+    if !dialect.is_common_lisp_asdf_system_definition_head(head) {
         return;
     }
 
@@ -21,8 +23,7 @@ pub(super) fn collect_system_dependency_items(
         let Some(option) = atom_text(&view.children[index]) else {
             continue;
         };
-        let mut option_value_path = path_indexes.to_vec();
-        option_value_path.push(index + 1);
+        let option_value_path = path.child(index + 1);
 
         match option.to_ascii_lowercase().as_str() {
             ":depends-on" => collect_dependency_designators(
@@ -42,7 +43,7 @@ pub(super) fn collect_system_dependency_items(
 
 fn collect_dependency_designators(
     view: &ExpressionView,
-    path_indexes: Vec<usize>,
+    path: Path,
     kind: DependencyKind,
     source: Option<String>,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -52,7 +53,7 @@ fn collect_dependency_designators(
             dependencies.push(DependencyReportItem {
                 kind,
                 target,
-                path: Path::from_indexes(path_indexes.clone()).to_string(),
+                path: path.to_string(),
                 span: view.span,
                 source,
             });
@@ -61,36 +62,35 @@ fn collect_dependency_designators(
     }
 
     for (index, child) in view.children.iter().enumerate() {
-        let mut child_path = path_indexes.clone();
-        child_path.push(index);
+        let child_path = path.child(index);
         collect_dependency_designators(child, child_path, kind, source.clone(), dependencies);
     }
 }
 
 fn collect_component_items(
     view: &ExpressionView,
-    path_indexes: Vec<usize>,
+    path: Path,
     dependencies: &mut Vec<DependencyReportItem>,
 ) {
     if view.kind == ExpressionKind::List
         && view.delimiter == Some(Delimiter::Paren)
         && view.children.len() >= 2
         && atom_child(view, 0).is_some_and(|kind| kind.starts_with(':'))
-        && let Some(name) = atom_child(view, 1)
     {
-        let component_kind = atom_child(view, 0).unwrap_or(":component");
-        dependencies.push(DependencyReportItem {
-            kind: DependencyKind::AsdfComponent,
-            target: format!("{component_kind} {name}"),
-            path: Path::from_indexes(path_indexes.clone()).to_string(),
-            span: view.span,
-            source: Some(":components".to_owned()),
-        });
+        if let Some(name) = atom_child(view, 1) {
+            let component_kind = atom_child(view, 0).unwrap_or(":component");
+            dependencies.push(DependencyReportItem {
+                kind: DependencyKind::AsdfComponent,
+                target: format!("{component_kind} {name}"),
+                path: path.to_string(),
+                span: view.span,
+                source: Some(":components".to_owned()),
+            });
+        }
     }
 
     for (index, child) in view.children.iter().enumerate() {
-        let mut child_path = path_indexes.clone();
-        child_path.push(index);
+        let child_path = path.child(index);
         collect_component_items(child, child_path, dependencies);
     }
 }

@@ -33,19 +33,19 @@ pub fn evaluate_signature_report_policy(
             "--fail-on-mismatch found {mismatch_count} incompatible call(s)"
         ));
     }
-    if let Some(required) = require_definitions
-        && definition_count < required
-    {
-        violations.push(format!(
-            "--require-definitions expected at least {required}, found {definition_count}"
-        ));
+    if let Some(required) = require_definitions {
+        if definition_count < required {
+            violations.push(format!(
+                "--require-definitions expected at least {required}, found {definition_count}"
+            ));
+        }
     }
-    if let Some(required) = require_calls
-        && call_count < required
-    {
-        violations.push(format!(
-            "--require-calls expected at least {required}, found {call_count}"
-        ));
+    if let Some(required) = require_calls {
+        if call_count < required {
+            violations.push(format!(
+                "--require-calls expected at least {required}, found {call_count}"
+            ));
+        }
     }
 
     SignatureReportPolicy {

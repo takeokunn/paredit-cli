@@ -23,7 +23,7 @@ fn cli_reports_refactor_impact_across_dialects() {
         .stdout(predicate::str::contains("\"symbol\": \"area\""))
         .stdout(predicate::str::contains("\"riskLevel\": \"warning\""))
         .stdout(predicate::str::contains("\"definition_count\": 1"))
-        .stdout(predicate::str::contains("\"reference_count\": 4"))
+        .stdout(predicate::str::contains("\"reference_count\": 3"))
         .stdout(predicate::str::contains("\"call_count\": 2"))
         .stdout(predicate::str::contains("\"inbound_edge_count\": 2"))
         .stdout(predicate::str::contains("\"non_call_reference_count\": 1"))
@@ -84,7 +84,7 @@ fn cli_gates_refactor_impact_policy_for_ci() {
             "--require-definitions expected at least 2, found 1",
         ))
         .stdout(predicate::str::contains(
-            "--require-references expected at least 5, found 4",
+            "--require-references expected at least 5, found 3",
         ))
         .stdout(predicate::str::contains(
             "--require-calls expected at least 3, found 2",
@@ -111,7 +111,7 @@ fn cli_accepts_refactor_impact_policy_when_thresholds_pass() {
         .arg("--require-definitions")
         .arg("1")
         .arg("--require-references")
-        .arg("2")
+        .arg("1")
         .arg("--require-calls")
         .arg("1")
         .arg("--output")
@@ -122,4 +122,52 @@ fn cli_accepts_refactor_impact_policy_when_thresholds_pass() {
         .stdout(predicate::str::contains("risk_level\twarning"))
         .stdout(predicate::str::contains("signature_mismatch_count\t0"))
         .stdout(predicate::str::contains("policy_passed\ttrue"));
+}
+
+#[test]
+fn cli_reports_common_lisp_setf_callable_impact() {
+    let dir = fresh_temp_dir("impact-report-common-lisp-setf");
+    let file = dir.join("setf.lisp");
+    fs::write(
+        &file,
+        "(define-setf-expander accessor (place) (values nil nil '(store) '(writer store) '(reader place)))\n(defun render (item) (setf (accessor item) 1) accessor)\n(defun wrapper (item) (setf (accessor item) 2))\n",
+    )
+    .expect("write setf impact fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("impact-report")
+        .arg("--symbol")
+        .arg("accessor")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"definition_count\": 1"))
+        .stdout(predicate::str::contains("\"reference_count\": 3"))
+        .stdout(predicate::str::contains("\"call_count\": 2"))
+        .stdout(predicate::str::contains("\"inbound_edge_count\": 2"))
+        .stdout(predicate::str::contains("\"non_call_reference_count\": 1"))
+        .stdout(predicate::str::contains("\"status\": \"exact\""));
+}
+
+#[test]
+fn cli_excludes_symbol_macrolet_binding_names_and_shadowed_body_references_from_impact() {
+    let dir = fresh_temp_dir("impact-report-symbol-macrolet");
+    let file = dir.join("symbol-macrolet.lisp");
+    fs::write(
+        &file,
+        "(in-package #:app)\n(defun helper () 1)\n(defun caller ()\n  (cl:symbol-macrolet ((helper (helper)))\n    helper))\n",
+    )
+    .expect("write symbol-macrolet impact fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("impact-report")
+        .arg("--symbol")
+        .arg("helper")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"reference_count\": 1"))
+        .stdout(predicate::str::contains("\"call_count\": 1"))
+        .stdout(predicate::str::contains("\"inbound_edge_count\": 1"))
+        .stdout(predicate::str::contains("\"non_call_reference_count\": 0"));
 }

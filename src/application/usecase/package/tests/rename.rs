@@ -12,6 +12,7 @@ fn rename_package_updates_designators_and_qualified_prefixes() {
                      \"old.pkg:string\"\n";
     let plan = plan_rename_package(RenamePackageRequest {
         input,
+        dialect: Dialect::CommonLisp,
         from: &SymbolName::new("old.pkg").unwrap(),
         to: &SymbolName::new("new.pkg").unwrap(),
     })
@@ -51,6 +52,7 @@ proptest! {
         let to_package = SymbolName::new(to.clone()).unwrap();
         let plan = plan_rename_package(RenamePackageRequest {
             input: &input,
+            dialect: Dialect::CommonLisp,
             from: &from_package,
             to: &to_package,
         }).unwrap();

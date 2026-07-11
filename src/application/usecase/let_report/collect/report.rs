@@ -12,7 +12,7 @@ pub(super) fn analyze_let_form(
     dialect: Dialect,
     input: &str,
     view: &ExpressionView,
-    path_indexes: &[usize],
+    path: &Path,
 ) -> Result<Option<LetFormReport>> {
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return Ok(None);
@@ -23,7 +23,9 @@ pub(super) fn analyze_let_form(
     let Some(head) = atom_text(&view.children[0]) else {
         return Ok(None);
     };
-    if !matches!(head, "let" | "let*" | "symbol-macrolet") {
+    if dialect.let_binding_form_for_head(head).is_none()
+        && !dialect.supports_inline_let_refactor_head(head)
+    {
         return Ok(None);
     }
 
@@ -32,13 +34,14 @@ pub(super) fn analyze_let_form(
     let body_count = view.children.len().saturating_sub(2);
     let single_binding = candidates.len() == 1;
     let inline_supported_by_inline_let =
-        matches!(head, "let" | "let*") && single_binding && body_count > 0;
+        dialect.supports_inline_let_refactor_head(head) && single_binding && body_count > 0;
     let mut bindings = Vec::with_capacity(candidates.len());
 
     for candidate in &candidates {
         let symbol = SymbolName::new(candidate.name.clone());
         let reference_count = match &symbol {
             Ok(symbol) => let_binding_reference_count(
+                dialect,
                 input,
                 view,
                 binding_form,
@@ -79,7 +82,7 @@ pub(super) fn analyze_let_form(
     }
 
     Ok(Some(LetFormReport {
-        path: Path::from_indexes(path_indexes.to_vec()),
+        path: path.clone(),
         form: head.to_owned(),
         span: view.span,
         binding_style,

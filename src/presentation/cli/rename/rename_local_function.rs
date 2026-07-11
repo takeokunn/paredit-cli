@@ -1,8 +1,6 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input};
+use super::super::{detect_dialect, read_input, write_files_with_rollback};
 use super::args::RenameLocalFunctionArgs;
 use super::render::local_function::print_rename_local_function_report;
 use super::types::{PendingRenameLocalFunctionFile, RenameLocalFunctionFileReport};
@@ -46,17 +44,22 @@ pub(in crate::presentation::cli) fn rename_local_function(
 
     if definition_count == 0 {
         anyhow::bail!(
-            "rename-local-function requires at least one matching flet or labels definition"
+            "rename-local-function requires at least one matching local function definition"
         );
+    }
+
+    let written_files = pending
+        .iter()
+        .filter(|file| args.write && file.changed)
+        .map(|file| (file.path.clone(), file.rewritten.clone()))
+        .collect::<Vec<_>>();
+    if !written_files.is_empty() {
+        write_files_with_rollback(written_files)?;
     }
 
     let mut reports = Vec::with_capacity(pending.len());
     for file in pending {
         let written = args.write && file.changed;
-        if written {
-            fs::write(&file.path, &file.rewritten)
-                .with_context(|| format!("failed to write {}", file.path.display()))?;
-        }
         reports.push(RenameLocalFunctionFileReport {
             path: file.path,
             dialect: file.dialect,

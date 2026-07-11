@@ -5,6 +5,7 @@ fn adds_export_to_existing_option() {
     let input = "(defpackage #:demo\n  (:use #:cl)\n  (:export #:old))\n";
     let plan = plan_add_export(AddExportRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: Some(&SymbolName::new("demo").unwrap()),
         symbol: &SymbolName::new("#:new").unwrap(),
     })
@@ -22,6 +23,7 @@ fn add_export_is_idempotent_for_existing_symbol() {
     let input = "(defpackage #:demo (:export #:main))\n";
     let plan = plan_add_export(AddExportRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: Some(&SymbolName::new(":demo").unwrap()),
         symbol: &SymbolName::new("main").unwrap(),
     })
@@ -43,6 +45,7 @@ proptest! {
         let export_symbol = SymbolName::new(export.clone()).unwrap();
         let plan = plan_add_export(AddExportRequest {
             input: &input,
+            dialect: Dialect::CommonLisp,
             package: Some(&package_name),
             symbol: &export_symbol,
         }).unwrap();

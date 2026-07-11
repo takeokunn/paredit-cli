@@ -1,3 +1,4 @@
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::ExpressionView;
 
 use super::super::syntax::atom_text;
@@ -131,7 +132,9 @@ fn collect_supplied_p_name(spec: &ExpressionView, names: &mut Vec<String>) {
 fn push_extract_function_pattern_name(text: &str, names: &mut Vec<String>) {
     if text != "_"
         && is_extract_function_param_candidate(text)
-        && !names.iter().any(|name| name == text)
+        && !names
+            .iter()
+            .any(|name| super::extract_function_param_name_eq(Dialect::CommonLisp, name, text))
     {
         names.push(text.to_owned());
     }

@@ -35,3 +35,27 @@ fn cli_reports_common_lisp_package_declarations() {
         .stdout(predicate::str::contains("\"exports\""))
         .stdout(predicate::str::contains("\"#:main\""));
 }
+
+#[test]
+fn cli_reports_nested_common_lisp_package_forms() {
+    let dir = fresh_temp_dir("package-report-nested");
+    let package_file = dir.join("nested-package.lisp");
+    fs::write(
+        &package_file,
+        "(progn\n  (cl:defpackage #:nested.demo (:export #:run))\n  (in-package #:nested.demo))\n",
+    )
+    .expect("write nested package fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("package-report")
+        .arg(&package_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 1"))
+        .stdout(predicate::str::contains("\"defpackage_count\": 1"))
+        .stdout(predicate::str::contains("\"in_package_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"#:nested.demo\""))
+        .stdout(predicate::str::contains("\"path\": \"0.1\""))
+        .stdout(predicate::str::contains("\"path\": \"0.2\""))
+        .stdout(predicate::str::contains("\"#:run\""));
+}

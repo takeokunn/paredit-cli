@@ -54,7 +54,19 @@ pub struct RemoveFunctionParameterRequest<'a> {
     pub name: SymbolName,
     pub call_paths: Vec<Path>,
     pub all_calls: bool,
-    pub allow_missing_argument: bool,
+    pub missing_argument_policy: MissingArgumentPolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MissingArgumentPolicy {
+    Reject,
+    Ignore,
+}
+
+impl MissingArgumentPolicy {
+    pub fn allows_missing_argument(self) -> bool {
+        matches!(self, Self::Ignore)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,7 +96,7 @@ impl FunctionParameterSection {
     pub fn label(self) -> &'static str {
         match self {
             Self::Auto => "auto",
-            Self::Positional => "positional",
+            Self::Positional => "required",
             Self::Optional => "optional",
             Self::Keyword => "keyword",
         }

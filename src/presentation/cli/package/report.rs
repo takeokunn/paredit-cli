@@ -17,7 +17,7 @@ pub(in crate::presentation::cli) fn package_report(args: PackageReportArgs) -> R
         let dialect = detect_dialect(&input, args.dialect);
         let tree = SyntaxTree::parse(&input.text)
             .with_context(|| format!("failed to parse {}", file.display()))?;
-        let report = build_package_report(&tree)
+        let report = build_package_report(&tree, dialect)
             .with_context(|| format!("failed to inspect packages in {}", file.display()))?;
 
         reports.push(PackageReportFile {

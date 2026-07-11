@@ -1,12 +1,44 @@
 use anyhow::Result;
 
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
-use crate::domain::sexpr::{ExpressionView, SymbolName};
+use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::InlineFunctionParameterPlan;
 use super::rewrite::apply_relative_body_edits;
 
 pub(super) fn substitute_inline_function_body(
+    input: &str,
+    body: &ExpressionView,
+    params: &[String],
+    args: &[String],
+    allow_duplicate_evaluation: bool,
+    allow_drop_arguments: bool,
+) -> Result<(String, Vec<InlineFunctionParameterPlan>)> {
+    substitute_references(
+        input,
+        body,
+        params,
+        args,
+        allow_duplicate_evaluation,
+        allow_drop_arguments,
+    )
+}
+
+pub(super) fn substitute_expression(
+    input: &str,
+    params: &[String],
+    args: &[String],
+) -> Result<String> {
+    let tree = SyntaxTree::parse(input)?;
+    if tree.root_children().len() != 1 {
+        anyhow::bail!("inline-function default value must be a single S-expression");
+    }
+    let expression = tree.select_path(&Path::root_child(0))?.view();
+    let (rewritten, _) = substitute_references(input, &expression, params, args, true, true)?;
+    Ok(rewritten)
+}
+
+fn substitute_references(
     input: &str,
     body: &ExpressionView,
     params: &[String],

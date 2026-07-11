@@ -7,6 +7,15 @@ mod pbt;
 mod planning;
 
 fn infer_at(input: &str, path: &[usize], explicit: &[&str]) -> Vec<String> {
+    infer_at_dialect(Dialect::CommonLisp, input, path, explicit)
+}
+
+fn infer_at_dialect(
+    dialect: Dialect,
+    input: &str,
+    path: &[usize],
+    explicit: &[&str],
+) -> Vec<String> {
     let tree = SyntaxTree::parse(input).expect("parse fixture");
     let selection = tree
         .select_path(&Path::from_indexes(path.to_vec()))
@@ -16,7 +25,7 @@ fn infer_at(input: &str, path: &[usize], explicit: &[&str]) -> Vec<String> {
         .map(|param| (*param).to_owned())
         .collect::<Vec<_>>();
 
-    infer_extract_function_params(Dialect::CommonLisp, &selection.view(), &explicit)
+    infer_extract_function_params(dialect, &selection.view(), &explicit)
 }
 
 fn plan_at(

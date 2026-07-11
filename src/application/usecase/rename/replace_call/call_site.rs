@@ -1,5 +1,6 @@
 use crate::application::usecase::rename::selection::list_head;
-use crate::domain::definition::classify_definition_head;
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, SymbolName};
 
@@ -14,7 +15,9 @@ pub(super) fn replace_call_site_from_view(
     to: &SymbolName,
 ) -> Option<ReplaceFunctionCallSite> {
     let head = list_head(view)?;
-    if head != from.as_str() || classify_definition_head(dialect, head).is_some() {
+    if !common_lisp_symbol_name_eq(head, from.as_str())
+        || definition_shape(dialect, view, head).is_some()
+    {
         return None;
     }
     let head_span = view.children.first().map(|child| child.span)?;

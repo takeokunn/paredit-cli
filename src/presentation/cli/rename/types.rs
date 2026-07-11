@@ -39,6 +39,17 @@ pub(super) struct RenameMacroletFileReport {
 }
 
 #[derive(Debug)]
+pub(super) struct RenameSymbolMacroFileReport {
+    pub(super) path: PathBuf,
+    pub(super) dialect: Dialect,
+    pub(super) definitions: Vec<RenameFunctionOccurrence>,
+    pub(super) references: Vec<RenameFunctionOccurrence>,
+    pub(super) changed: bool,
+    pub(super) written: bool,
+    pub(super) rewritten: String,
+}
+
+#[derive(Debug)]
 pub(super) struct RenameLocalFunctionFileReport {
     pub(super) path: PathBuf,
     pub(super) dialect: Dialect,
@@ -55,6 +66,16 @@ pub(super) struct PendingRenameMacroletFile {
     pub(super) dialect: Dialect,
     pub(super) definitions: Vec<RenameFunctionOccurrence>,
     pub(super) calls: Vec<RenameFunctionOccurrence>,
+    pub(super) rewritten: String,
+    pub(super) changed: bool,
+}
+
+#[derive(Debug)]
+pub(super) struct PendingRenameSymbolMacroFile {
+    pub(super) path: PathBuf,
+    pub(super) dialect: Dialect,
+    pub(super) definitions: Vec<RenameFunctionOccurrence>,
+    pub(super) references: Vec<RenameFunctionOccurrence>,
     pub(super) rewritten: String,
     pub(super) changed: bool,
 }

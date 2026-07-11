@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::definition::classify_definition_head;
+use crate::domain::definition::definition_shape;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 mod item;
@@ -17,7 +17,7 @@ use rewrite::{
     append_top_level_definitions, ensure_non_overlapping_spans, expand_definition_removal,
     replace_byte_span,
 };
-use syntax::{definition_name, list_head};
+use syntax::list_head;
 pub use types::{SplitFileDefinition, SplitFileItem, SplitFilePlan, SplitFileRequest};
 
 pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
@@ -62,28 +62,28 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
 
     if !requested_names.is_empty() || !requested_categories.is_empty() {
         for target_index in 0..from_tree.root_children().len() {
-            let path = Path::from_indexes(vec![target_index]);
+            let path = Path::root_child(target_index);
             let selection = from_tree.select_path(&path)?;
             let view = selection.view();
             let Some(head) = list_head(&view) else {
                 continue;
             };
-            let Some(category) = classify_definition_head(request.from_dialect, head) else {
+            let Some(shape) = definition_shape(request.from_dialect, &view, head) else {
                 continue;
             };
-            let name = definition_name(&view, head);
+            let name = shape.name(&view);
             let name_matches = name
                 .map(|name| requested_names.contains(name))
                 .unwrap_or(false);
-            let category_matches = requested_categories.contains(&category);
+            let category_matches = requested_categories.contains(&shape.category);
 
             if name_matches || category_matches {
                 selected_paths.entry(target_index).or_insert(path);
                 if let Some(name) = name.filter(|name| requested_names.contains(*name)) {
                     matched_names.insert(name.to_owned());
                 }
-                if requested_categories.contains(&category) {
-                    matched_categories.insert(category);
+                if requested_categories.contains(&shape.category) {
+                    matched_categories.insert(shape.category);
                 }
             }
         }

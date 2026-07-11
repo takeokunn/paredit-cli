@@ -1,5 +1,6 @@
 use super::super::super::super::*;
 use super::super::super::types::preview::RefactorPreview;
+use crate::presentation::cli::shared::write_files_with_rollback;
 
 pub(in crate::presentation::cli::refactor::workflow) fn write_refactor_preview(
     preview: &mut RefactorPreview,
@@ -18,11 +19,17 @@ pub(in crate::presentation::cli::refactor::workflow) fn write_refactor_preview(
         }
     }
 
+    let mut written_files = Vec::with_capacity(write_plan.writable_indexes.len());
+    for index in write_plan.writable_indexes.iter().copied() {
+        let file = &preview.files[index];
+        written_files.push((file.path.clone(), file.rewritten.clone()));
+    }
+    write_files_with_rollback(written_files)?;
+
     for index in write_plan.writable_indexes {
-        let file = &mut preview.files[index];
-        fs::write(&file.path, &file.rewritten)
-            .with_context(|| format!("failed to write {}", file.path.display()))?;
-        file.written = true;
+        if let Some(file) = preview.files.get_mut(index) {
+            file.written = true;
+        }
     }
     preview.summary.written_file_count = preview.files.iter().filter(|file| file.written).count();
 

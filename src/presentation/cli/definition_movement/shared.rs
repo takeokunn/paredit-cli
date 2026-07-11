@@ -41,22 +41,18 @@ pub(super) fn insert_top_level_form(
     match insert {
         MoveInsert::Append => Ok((append_top_level_form(input, form), None)),
         MoveInsert::Before | MoveInsert::After => {
-            let anchor_path = anchor_path.expect("validated by caller");
+            let anchor_path = anchor_path
+                .ok_or_else(|| anyhow::anyhow!("--insert before/after requires --anchor-path"))?;
             let anchor_index = top_level_path_index(anchor_path, "move-form --anchor-path")?;
             if anchor_index >= tree.root_children().len() {
                 anyhow::bail!("anchor top-level path {anchor_path} is out of range");
             }
             let anchor = tree.select_path(anchor_path)?;
             let anchor_span = anchor.span();
-            let offset = match insert {
-                MoveInsert::Before => anchor_span.start().get(),
-                MoveInsert::After => anchor_span.end().get(),
-                MoveInsert::Append => unreachable!("append handled above"),
-            };
-            let inserted = match insert {
-                MoveInsert::Before => format!("{}\n\n", form.trim()),
-                MoveInsert::After => format!("\n\n{}", form.trim()),
-                MoveInsert::Append => unreachable!("append handled above"),
+            let (offset, inserted) = match insert {
+                MoveInsert::Before => (anchor_span.start().get(), format!("{}\n\n", form.trim())),
+                MoveInsert::After => (anchor_span.end().get(), format!("\n\n{}", form.trim())),
+                MoveInsert::Append => return Ok((append_top_level_form(input, form), None)),
             };
             let mut output = String::with_capacity(input.len() + inserted.len());
             output.push_str(&input[..offset]);
@@ -64,5 +60,29 @@ pub(super) fn insert_top_level_form(
             output.push_str(&input[offset..]);
             Ok((output, Some(anchor_span)))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_missing_anchor_path_for_relative_insertions() {
+        let input = "(in-package #:demo)\n(defun boot () :boot)\n";
+        let tree = SyntaxTree::parse(input).expect("parse fixture");
+        let error = insert_top_level_form(
+            input,
+            &tree,
+            "(defparameter *feature* t)",
+            MoveInsert::Before,
+            None,
+        )
+        .expect_err("missing anchor path should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            "--insert before/after requires --anchor-path"
+        );
     }
 }

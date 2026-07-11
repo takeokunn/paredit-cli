@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use crate::domain::common_lisp::{CommonLispBindingRefactorForm, common_lisp_symbol_name_eq};
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Formatter, SymbolName, SyntaxTree,
 };
@@ -14,16 +15,8 @@ mod syntax;
 mod tests;
 mod types;
 
-use candidates::{
-    do_binding_removal_candidates, let_binding_removal_candidates,
-    local_callable_binding_removal_candidates, macrolet_binding_removal_candidates,
-    prog_binding_removal_candidates, with_accessors_binding_removal_candidates,
-    with_slots_binding_removal_candidates,
-};
-use references::{
-    body_binding_reference_spans, do_binding_reference_spans, let_binding_reference_spans,
-    local_callable_binding_reference_spans, prog_binding_reference_spans,
-};
+use candidates::binding_removal_candidates;
+use references::binding_reference_spans;
 use rewrite::{apply_nested_span_edits, replace_span};
 use syntax::atom_text;
 use types::{RemoveUnusedBindingParts, RemovedBindingParts};
@@ -98,94 +91,45 @@ fn remove_unused_binding_parts(
     }
     let head = atom_text(&target.children[0])
         .context("remove-unused-binding form must start with an atom")?;
-    if !matches!(
-        head,
-        "let"
-            | "let*"
-            | "symbol-macrolet"
-            | "flet"
-            | "labels"
-            | "macrolet"
-            | "compiler-macrolet"
-            | "with-slots"
-            | "with-accessors"
-            | "do"
-            | "do*"
-            | "prog"
-            | "prog*"
-    ) {
+    let Some(refactor_form) = dialect.common_lisp_binding_refactor_form_for_head(head) else {
+        anyhow::bail!(
+            "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog*"
+        );
+    };
+    if !refactor_form.supports_remove_unused_binding() {
         anyhow::bail!(
             "remove-unused-binding selection must start with let, let*, symbol-macrolet, flet, labels, macrolet, compiler-macrolet, with-slots, with-accessors, do, do*, prog, or prog*"
         );
     }
-    if matches!(head, "with-slots" | "with-accessors") && target.children.len() < 4 {
+    if matches!(refactor_form, CommonLispBindingRefactorForm::Slot(_)) && target.children.len() < 4
+    {
         anyhow::bail!(
             "remove-unused-binding requires a with-slots or with-accessors form with bindings, an instance expression, and a body"
         );
     }
-    if matches!(head, "do" | "do*") && target.children.len() < 3 {
+    if matches!(refactor_form, CommonLispBindingRefactorForm::Do(_)) && target.children.len() < 3 {
         anyhow::bail!(
             "remove-unused-binding requires a do or do* form with bindings and an end clause"
         );
     }
+    ensure_variable_binding_form_consistency(dialect, head, refactor_form)?;
 
     let binding_form = &target.children[1];
-    let candidates = if matches!(head, "macrolet" | "compiler-macrolet") {
-        macrolet_binding_removal_candidates(dialect, binding_form)?
-    } else if matches!(head, "flet" | "labels") {
-        local_callable_binding_removal_candidates(dialect, binding_form)?
-    } else if head == "with-slots" {
-        with_slots_binding_removal_candidates(dialect, binding_form)?
-    } else if head == "with-accessors" {
-        with_accessors_binding_removal_candidates(dialect, binding_form)?
-    } else if matches!(head, "do" | "do*") {
-        do_binding_removal_candidates(dialect, binding_form)?
-    } else if matches!(head, "prog" | "prog*") {
-        prog_binding_removal_candidates(dialect, binding_form)?
-    } else {
-        let_binding_removal_candidates(dialect, binding_form)?
-    };
-    let body_start_index = if matches!(head, "with-slots" | "with-accessors" | "do" | "do*") {
-        3
-    } else {
-        2
-    };
+    let candidates = binding_removal_candidates(dialect, refactor_form, binding_form)?;
     let selected = if all_bindings {
         let mut unused = Vec::new();
         for candidate in &candidates {
             let symbol = SymbolName::new(candidate.name.clone())?;
-            let reference_spans = if matches!(head, "flet" | "labels") {
-                local_callable_binding_reference_spans(dialect, target, &symbol)?
-            } else if matches!(head, "with-slots" | "with-accessors") {
-                body_binding_reference_spans(input, target, &symbol, body_start_index)
-            } else if matches!(head, "do" | "do*") {
-                do_binding_reference_spans(
-                    input,
-                    target,
-                    binding_form,
-                    &candidates,
-                    candidate,
-                    &symbol,
-                )
-            } else if matches!(head, "prog" | "prog*") {
-                prog_binding_reference_spans(
-                    input,
-                    target,
-                    binding_form,
-                    &candidates,
-                    candidate,
-                    &symbol,
-                )
-            } else {
-                let_binding_reference_spans(
-                    input,
-                    target,
-                    binding_form,
-                    &candidates,
-                    candidate,
-                    &symbol,
-                )?
-            };
+            let reference_spans = binding_reference_spans(
+                dialect,
+                input,
+                target,
+                refactor_form,
+                binding_form,
+                &candidates,
+                candidate,
+                &symbol,
+            )?;
             if reference_spans.is_empty() {
                 unused.push(RemovedBindingParts {
                     name: candidate.name.clone(),
@@ -200,27 +144,28 @@ fn remove_unused_binding_parts(
         }
         unused
     } else {
-        let name = name.expect("validated by caller");
+        let name = name.ok_or_else(|| {
+            anyhow::anyhow!("remove-unused-binding requires --name or --all-bindings")
+        })?;
         let candidate = candidates
             .iter()
-            .find(|candidate| candidate.name == name.as_str())
+            .find(|candidate| common_lisp_symbol_name_eq(&candidate.name, name.as_str()))
             .with_context(|| {
                 format!(
                     "binding {} was not found in selected binding form",
                     name.as_str()
                 )
             })?;
-        let reference_spans = if matches!(head, "flet" | "labels") {
-            local_callable_binding_reference_spans(dialect, target, name)?
-        } else if matches!(head, "with-slots" | "with-accessors") {
-            body_binding_reference_spans(input, target, name, body_start_index)
-        } else if matches!(head, "do" | "do*") {
-            do_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)
-        } else if matches!(head, "prog" | "prog*") {
-            prog_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)
-        } else {
-            let_binding_reference_spans(input, target, binding_form, &candidates, candidate, name)?
-        };
+        let reference_spans = binding_reference_spans(
+            dialect,
+            input,
+            target,
+            refactor_form,
+            binding_form,
+            &candidates,
+            candidate,
+            name,
+        )?;
         let reference_count = reference_spans.len();
         if reference_count != 0 {
             anyhow::bail!(
@@ -235,13 +180,13 @@ fn remove_unused_binding_parts(
         }]
     };
 
-    let preserve_binding_form_when_empty = matches!(head, "do" | "do*" | "prog" | "prog*");
+    let preserve_binding_form_when_empty = refactor_form.preserves_binding_form_when_empty();
+    let body_start_index = refactor_form.remove_unused_body_start_index();
     let replacement = if selected.len() == candidates.len() && !preserve_binding_form_when_empty {
         let first_body = &target.children[body_start_index];
-        let last_body = target
-            .children
-            .last()
-            .expect("validated let form has at least one body expression");
+        let last_body = target.children.last().context(
+            "remove-unused-binding expected at least one body expression after validation",
+        )?;
         crate::domain::sexpr::ByteSpan::new(first_body.span.start(), last_body.span.end())
             .slice(input)
             .to_owned()
@@ -263,6 +208,25 @@ fn remove_unused_binding_parts(
         bindings: selected,
         replacement,
     })
+}
+
+fn ensure_variable_binding_form_consistency(
+    dialect: crate::domain::dialect::Dialect,
+    head: &str,
+    refactor_form: CommonLispBindingRefactorForm,
+) -> Result<()> {
+    let expected = match refactor_form {
+        CommonLispBindingRefactorForm::Do(form) | CommonLispBindingRefactorForm::Prog(form) => form,
+        _ => return Ok(()),
+    };
+
+    let Some(actual) = dialect.variable_binding_form_for_head(head) else {
+        anyhow::bail!("remove-unused-binding could not classify variable binding form");
+    };
+    if actual != expected {
+        anyhow::bail!("remove-unused-binding variable binding classification mismatch");
+    }
+    Ok(())
 }
 
 fn format_single_replacement_form(input: &str) -> Result<String> {

@@ -1,7 +1,8 @@
+use crate::domain::sexpr::reader::atom_symbol_text;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 pub(super) fn dependency_designator_text(view: &ExpressionView) -> Option<String> {
-    atom_text(view).map(ToOwned::to_owned)
+    atom_symbol_text(view).map(ToOwned::to_owned)
 }
 
 pub(super) fn package_qualified_dependency_target(atom: &str) -> Option<String> {

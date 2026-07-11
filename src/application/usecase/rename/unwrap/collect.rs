@@ -1,5 +1,11 @@
 use anyhow::Result;
 
+use crate::application::usecase::callable_scope::{
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope, local_callable_scope_at_path,
+};
+use crate::application::usecase::rename::selection::list_head;
+use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
@@ -21,10 +27,9 @@ pub(super) fn collect_unwrap_all_call_sites(
     let mut collection = UnwrapCollection::new(dialect, input, function, wrapper);
 
     for (index, _) in tree.root_children().iter().enumerate() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
-        collection.collect_from_view(&view, path_indexes);
+        collection.collect_from_view(&view, path);
     }
 
     let (calls, skipped_nested) = select_outermost_unwrap_call_sites(collection.candidates);
@@ -48,6 +53,10 @@ pub(super) fn collect_unwrap_explicit_call_sites(
 
     for path in paths {
         let view = tree.select_path(path)?.view();
+        let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
+        if is_local_callable_bound(&local_callables, function.as_str()) {
+            anyhow::bail!("call-path {path} is shadowed by a local callable named {function}");
+        }
         match unwrap_call_site_from_view(&view, dialect, input, path.to_string(), function, wrapper)
         {
             UnwrapCandidate::Selected(site) => calls.push(site),
@@ -87,25 +96,70 @@ impl<'a> UnwrapCollection<'a> {
         }
     }
 
-    fn collect_from_view(&mut self, view: &ExpressionView, path_indexes: Vec<usize>) {
-        let path = Path::from_indexes(path_indexes.clone()).to_string();
-        match unwrap_call_site_from_view(
-            view,
-            self.dialect,
-            self.input,
-            path,
-            self.function,
-            self.wrapper,
-        ) {
-            UnwrapCandidate::Selected(site) => self.candidates.push(site),
-            UnwrapCandidate::NonUnaryWrapper(site) => self.skipped_non_unary_wrapper.push(site),
-            UnwrapCandidate::NotMatched => {}
+    fn collect_from_view(&mut self, view: &ExpressionView, path: Path) {
+        self.collect_from_view_with_scope(view, path, &[]);
+    }
+
+    fn collect_from_view_with_scope(
+        &mut self,
+        view: &ExpressionView,
+        path: Path,
+        local_callables: &[String],
+    ) {
+        if let Some(head) = list_head(view) {
+            if let Some(form) = common_lisp_local_callable_form(self.dialect, head) {
+                self.collect_local_callable_from_view(view, path, local_callables, form);
+                return;
+            }
+        }
+
+        if !is_local_callable_bound(local_callables, self.function.as_str()) {
+            match unwrap_call_site_from_view(
+                view,
+                self.dialect,
+                self.input,
+                path.to_string(),
+                self.function,
+                self.wrapper,
+            ) {
+                UnwrapCandidate::Selected(site) => self.candidates.push(site),
+                UnwrapCandidate::NonUnaryWrapper(site) => {
+                    self.skipped_non_unary_wrapper.push(site);
+                }
+                UnwrapCandidate::NotMatched => {}
+            }
         }
 
         for (index, child) in view.children.iter().enumerate() {
-            let mut child_path = path_indexes.clone();
-            child_path.push(index);
-            self.collect_from_view(child, child_path);
+            self.collect_from_view_with_scope(child, path.child(index), local_callables);
+        }
+    }
+
+    fn collect_local_callable_from_view(
+        &mut self,
+        view: &ExpressionView,
+        path: Path,
+        local_callables: &[String],
+        form: CommonLispLocalCallableForm,
+    ) {
+        let body_scope = local_callable_body_scope(local_callables, view);
+
+        if let Some(bindings) = view.children.get(1) {
+            let binding_body_scope =
+                local_callable_binding_body_scope(form, local_callables, &body_scope);
+            for (binding_index, binding) in bindings.children.iter().enumerate() {
+                for (child_index, child) in binding.children.iter().enumerate().skip(2) {
+                    self.collect_from_view_with_scope(
+                        child,
+                        path.descendant([1, binding_index, child_index]),
+                        binding_body_scope,
+                    );
+                }
+            }
+        }
+
+        for (index, child) in view.children.iter().enumerate().skip(2) {
+            self.collect_from_view_with_scope(child, path.child(index), &body_scope);
         }
     }
 }

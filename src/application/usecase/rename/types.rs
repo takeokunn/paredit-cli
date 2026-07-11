@@ -44,6 +44,23 @@ pub struct RenameMacroletPlan {
 }
 
 #[derive(Debug, Clone)]
+pub struct RenameSymbolMacroRequest<'a> {
+    pub input: &'a str,
+    pub dialect: Dialect,
+    pub from: SymbolName,
+    pub to: SymbolName,
+}
+
+#[derive(Debug, Clone)]
+pub struct RenameSymbolMacroPlan {
+    pub dialect: Dialect,
+    pub definitions: Vec<RenameFunctionOccurrence>,
+    pub references: Vec<RenameFunctionOccurrence>,
+    pub rewritten: String,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct RenameLocalFunctionRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,

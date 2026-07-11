@@ -2,7 +2,9 @@ mod execute;
 mod manifest;
 mod plan;
 mod preview;
+mod shared;
 mod verification;
+mod workspace;
 
 pub(in crate::presentation::cli) use execute::workspace_refactor_execute;
 pub(in crate::presentation::cli) use manifest::apply::refactor_apply;

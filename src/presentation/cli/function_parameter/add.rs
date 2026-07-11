@@ -1,11 +1,11 @@
-use std::fs;
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::application::usecase::function_parameter::{
     AddFunctionParameterRequest, plan_add_function_parameter,
 };
-use crate::presentation::cli::{detect_dialect, read_input};
+use crate::presentation::cli::{
+    detect_dialect, read_input, require_output_file, write_file_with_rollback,
+};
 
 use super::args::AddFunctionParameterArgs;
 use super::render::add::print_add_function_parameter_plan;
@@ -33,12 +33,8 @@ pub(in crate::presentation::cli) fn add_function_parameter(
 
     let written = args.write && plan.changed;
     if written {
-        let file = input
-            .file
-            .as_ref()
-            .expect("--write was validated to require --file");
-        fs::write(file, &plan.rewritten)
-            .with_context(|| format!("failed to write {}", file.display()))?;
+        let file = require_output_file(input.file.as_ref())?;
+        write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
 
     print_add_function_parameter_plan(&plan, written, args.output)

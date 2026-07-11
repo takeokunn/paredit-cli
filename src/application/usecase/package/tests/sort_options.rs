@@ -5,6 +5,7 @@ fn sorts_package_options_in_canonical_order_without_reformatting_bodies() {
     let input = "(defpackage #:demo\n  (:export #:z #:a)\n  (:import-from #:dep #:b #:a)\n  (:use #:cl)\n  (:local-nicknames (#:json #:jonathan)))\n";
     let plan = plan_sort_package_options(SortPackageOptionsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: Some(&SymbolName::new("demo").unwrap()),
         order: PackageOptionSortOrder::Canonical,
     })
@@ -49,6 +50,7 @@ fn sorts_package_options_by_name_when_requested() {
         "(defpackage #:demo\n  (:use #:cl)\n  (:export #:main)\n  (:documentation \"demo\"))\n";
     let plan = plan_sort_package_options(SortPackageOptionsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: None,
         order: PackageOptionSortOrder::Name,
     })
@@ -70,6 +72,7 @@ fn sorted_package_options_are_idempotent() {
     let input = "(defpackage #:demo (:use #:cl) (:import-from #:dep #:x) (:export #:main))\n";
     let plan = plan_sort_package_options(SortPackageOptionsRequest {
         input,
+        dialect: Dialect::CommonLisp,
         package: None,
         order: PackageOptionSortOrder::Canonical,
     })
@@ -94,6 +97,7 @@ proptest! {
         let input = format!("(defpackage #:{package} {})\n", reversed_options.join(" "));
         let plan = plan_sort_package_options(SortPackageOptionsRequest {
             input: &input,
+            dialect: Dialect::CommonLisp,
             package: None,
             order: PackageOptionSortOrder::Canonical,
         }).unwrap();

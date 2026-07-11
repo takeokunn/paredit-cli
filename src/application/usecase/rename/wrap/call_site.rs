@@ -1,3 +1,4 @@
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
 use crate::domain::sexpr::{ExpressionView, SymbolName};
 
 use super::{WrapFunctionCallSite, WrapFunctionCallTemplate};
@@ -12,7 +13,7 @@ pub(super) fn wrap_call_site_from_view(
     template: Option<&WrapFunctionCallTemplate>,
 ) -> Option<WrapFunctionCallSite> {
     let head = list_head(view)?;
-    if head != function.as_str() {
+    if !common_lisp_symbol_name_eq(head, function.as_str()) {
         return None;
     }
     let text = view.span.slice(input).to_owned();

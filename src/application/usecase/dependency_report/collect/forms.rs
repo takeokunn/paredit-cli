@@ -1,3 +1,5 @@
+use crate::domain::common_lisp::CommonLispRuntimeDependencyForm;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path};
 
 use crate::application::usecase::dependency_report::syntax::{
@@ -7,44 +9,37 @@ use crate::application::usecase::dependency_report::types::{DependencyKind, Depe
 
 pub(super) fn collect_list_dependency_items(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    dialect: Dialect,
+    path: &Path,
     dependencies: &mut Vec<DependencyReportItem>,
 ) {
     let Some(head) = list_head(view) else {
         return;
     };
-    let normalized_head = head.rsplit(':').next().unwrap_or(head);
 
-    let Some(kind) = runtime_dependency_kind(normalized_head) else {
+    let Some(form) = dialect.common_lisp_runtime_dependency_form_for_head(head) else {
         return;
     };
+    let kind = runtime_dependency_kind(form);
 
-    push_dependency_from_child(
-        view,
-        path_indexes,
-        1,
-        kind,
-        Some(head.to_owned()),
-        dependencies,
-    );
+    push_dependency_from_child(view, path, 1, kind, Some(head.to_owned()), dependencies);
 }
 
-fn runtime_dependency_kind(head: &str) -> Option<DependencyKind> {
-    match head {
-        "require" => Some(DependencyKind::Require),
-        "provide" => Some(DependencyKind::Provide),
-        "load" => Some(DependencyKind::Load),
-        "load-file" => Some(DependencyKind::LoadFile),
-        "load-library" => Some(DependencyKind::LoadLibrary),
-        "use-package" => Some(DependencyKind::UsePackage),
-        "import" => Some(DependencyKind::Import),
-        _ => None,
+fn runtime_dependency_kind(form: CommonLispRuntimeDependencyForm) -> DependencyKind {
+    match form {
+        CommonLispRuntimeDependencyForm::Require => DependencyKind::Require,
+        CommonLispRuntimeDependencyForm::Provide => DependencyKind::Provide,
+        CommonLispRuntimeDependencyForm::Load => DependencyKind::Load,
+        CommonLispRuntimeDependencyForm::LoadFile => DependencyKind::LoadFile,
+        CommonLispRuntimeDependencyForm::LoadLibrary => DependencyKind::LoadLibrary,
+        CommonLispRuntimeDependencyForm::UsePackage => DependencyKind::UsePackage,
+        CommonLispRuntimeDependencyForm::Import => DependencyKind::Import,
     }
 }
 
 fn push_dependency_from_child(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    path: &Path,
     child_index: usize,
     kind: DependencyKind,
     source: Option<String>,
@@ -57,12 +52,10 @@ fn push_dependency_from_child(
         return;
     };
 
-    let mut child_path = path_indexes.to_vec();
-    child_path.push(child_index);
     dependencies.push(DependencyReportItem {
         kind,
         target,
-        path: Path::from_indexes(child_path).to_string(),
+        path: path.child(child_index).to_string(),
         span: child.span,
         source,
     });

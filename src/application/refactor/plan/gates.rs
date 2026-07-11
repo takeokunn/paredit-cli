@@ -1,9 +1,11 @@
 use super::types::{
-    RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanSummary, RefactorRiskLevel,
+    RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanSummary,
+    RefactorPlanTargetKind, RefactorRiskLevel,
 };
 
 pub fn refactor_plan_gates(
     operation: RefactorOperation,
+    target_kind: RefactorPlanTargetKind,
     summary: &RefactorPlanSummary,
     risks: Vec<RawRefactorRisk>,
 ) -> Vec<RefactorPlanGate> {
@@ -11,22 +13,26 @@ pub fn refactor_plan_gates(
         .into_iter()
         .map(|risk| {
             let blocks_automation = risk.level == RefactorRiskLevel::Error
-                || matches!(
-                    (operation, risk.code),
-                    (
-                        RefactorOperation::Rename,
-                        "signature-mismatch" | "ambiguous-definition"
-                    ) | (
-                        RefactorOperation::Remove | RefactorOperation::Move,
-                        "inbound-callers" | "ambiguous-definition",
-                    ) | (
-                        RefactorOperation::Signature,
-                        "inbound-callers"
-                            | "non-call-references"
-                            | "signature-mismatch"
-                            | "ambiguous-definition",
-                    )
-                );
+                || match operation {
+                    RefactorOperation::Rename => match risk.code {
+                        "ambiguous-definition" => true,
+                        "signature-mismatch" => !target_kind.skips_signature_compatibility(),
+                        _ => false,
+                    },
+                    RefactorOperation::Remove | RefactorOperation::Move => {
+                        matches!(risk.code, "inbound-callers" | "ambiguous-definition")
+                    }
+                    RefactorOperation::Signature => {
+                        matches!(
+                            risk.code,
+                            "inbound-callers"
+                                | "non-call-references"
+                                | "signature-mismatch"
+                                | "ambiguous-definition"
+                        ) && !(risk.code == "signature-mismatch"
+                            && target_kind.skips_signature_compatibility())
+                    }
+                };
             RefactorPlanGate {
                 level: risk.level,
                 code: risk.code,

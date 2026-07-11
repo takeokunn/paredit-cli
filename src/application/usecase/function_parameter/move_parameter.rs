@@ -2,10 +2,18 @@ use anyhow::{Context, Result};
 
 use crate::domain::sexpr::SyntaxTree;
 
-use super::calls::{move_function_parameter_call_edit, resolve_function_call_paths};
+use super::calls::{
+    FunctionCallPathRequest, reorder_function_parameter_call_edit, resolve_function_call_paths,
+};
 use super::definition::{find_unique_parameter_location, parse_move_function_parameter_definition};
 use super::list_edit::{
-    apply_byte_span_edits, ensure_non_overlapping_spans, move_list_item_edit, spans_overlap,
+    SpanEdit, apply_byte_span_edits, ensure_non_overlapping_spans, spans_overlap,
+};
+use super::reorder::call_argument::argument_for_parameter;
+use super::reorder::{
+    build_new_relative_order, ensure_parameter_is_reorderable,
+    ensure_reorder_stays_within_parameter_groups, reorder_function_definition_edit,
+    reorderable_parameters,
 };
 use super::types::{MoveFunctionParameterPlan, MoveFunctionParameterRequest};
 
@@ -13,48 +21,56 @@ pub fn plan_move_function_parameter(
     request: MoveFunctionParameterRequest<'_>,
 ) -> Result<MoveFunctionParameterPlan> {
     let tree = SyntaxTree::parse(request.input)?;
-    let definition_selection = tree.select_path(&request.definition_path)?;
     let target =
-        parse_move_function_parameter_definition(request.dialect, definition_selection.view())?;
-    if target.has_lambda_list_marker {
-        anyhow::bail!(
-            "move-function-parameter currently supports only flat positional parameter lists"
-        );
-    }
+        parse_move_function_parameter_definition(request.dialect, &tree, &request.definition_path)?;
     let parameter =
         find_unique_parameter_location(&target, &request.name, "move-function-parameter")?;
-    let parameter_item_index = parameter.item_index;
-    let from_index = parameter.call_index.expect("flat positional parameter");
-    let parameter_count = target
-        .parameter_container
-        .children
-        .len()
-        .saturating_sub(target.protected_prefix_count);
+    let reorderable_parameters =
+        reorderable_parameters(&target.parameters, "move-function-parameter")?;
+    let old_parameter_order = reorderable_parameters
+        .iter()
+        .map(|parameter| parameter.name.clone())
+        .collect::<Vec<_>>();
+    let from_index = ensure_parameter_is_reorderable(
+        &reorderable_parameters,
+        parameter.item_index,
+        &request.name,
+        "move-function-parameter",
+    )?;
+    let parameter_count = reorderable_parameters.len();
     if request.to_index >= parameter_count {
         anyhow::bail!(
-            "move-function-parameter target index {} is out of bounds for {} required parameters",
+            "move-function-parameter target index {} is out of bounds for {} parameters",
             request.to_index,
             parameter_count
         );
     }
-    let call_paths = resolve_function_call_paths(
-        &tree,
-        request.dialect,
-        request.call_paths,
-        request.all_calls,
-        target.definition_span,
-        &target.function_name,
-        "move-function-parameter",
-    )?;
+    let mut new_parameter_order = old_parameter_order
+        .iter()
+        .map(Clone::clone)
+        .collect::<Vec<_>>();
+    let moved = new_parameter_order.remove(from_index);
+    new_parameter_order.insert(request.to_index, moved);
+    let new_relative_order = build_new_relative_order(&old_parameter_order, &new_parameter_order)?;
+    ensure_reorder_stays_within_parameter_groups(&reorderable_parameters, &new_relative_order)?;
+    let call_paths = resolve_function_call_paths(FunctionCallPathRequest {
+        tree: &tree,
+        dialect: request.dialect,
+        explicit_call_paths: request.call_paths,
+        all_calls: request.all_calls,
+        definition_span: target.definition_span,
+        definition_scope: target.definition_scope,
+        function_name: &target.function_name,
+        command: "move-function-parameter",
+    })?;
 
-    let mut edits = Vec::with_capacity(call_paths.len() + 1);
+    let mut edits = Vec::<SpanEdit>::with_capacity(call_paths.len() + 1);
     if from_index != request.to_index {
-        edits.push(move_list_item_edit(
+        edits.push(reorder_function_definition_edit(
             request.input,
             &target.parameter_container,
-            parameter_item_index,
-            target.protected_prefix_count,
-            target.protected_prefix_count + request.to_index,
+            &reorderable_parameters,
+            &new_relative_order,
             "move-function-parameter",
         )?);
     }
@@ -63,18 +79,28 @@ pub fn plan_move_function_parameter(
     let mut moved_arguments = Vec::with_capacity(call_paths.len());
     for call_path in &call_paths {
         let call_selection = tree.select_path(call_path)?;
+        let call_view = call_selection.view();
         if spans_overlap(target.definition_span, call_selection.span()) {
             anyhow::bail!(
                 "move-function-parameter call path {} overlaps the selected definition",
                 call_path
             );
         }
-        let (call_span, moved_argument, edit) = move_function_parameter_call_edit(
+        let moved_argument = argument_for_parameter(
             request.input,
-            call_selection.view(),
+            &call_view,
             &target.function_name,
-            from_index,
-            request.to_index,
+            target.call_argument_offset,
+            &reorderable_parameters[from_index],
+            "move-function-parameter",
+        )?;
+        let (call_span, _reordered_arguments, edit) = reorder_function_parameter_call_edit(
+            request.input,
+            &call_view,
+            &target.function_name,
+            target.call_argument_offset,
+            &reorderable_parameters,
+            &new_relative_order,
         )?;
         call_spans.push(call_span);
         moved_arguments.push(moved_argument);

@@ -1,18 +1,14 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
 use super::super::shared::{
     detect_dialect, list_head, package_context_before_top_level, read_input,
+    write_file_with_rollback,
 };
 use super::args::RemoveDefinitionArgs;
 use super::render::print_remove_definition_plan;
 use super::types::RemoveDefinitionPlan;
-use crate::application::usecase::definition_report::{
-    DefinitionReportItem, body_form_count, count_lambda_parameters, definition_name,
-    lambda_list_index,
-};
-use crate::domain::definition::classify_definition_head;
+use crate::application::usecase::definition_report::DefinitionReportItem;
+use crate::domain::definition::definition_shape;
 use crate::domain::sexpr::{Edit, SyntaxTree};
 
 pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs) -> Result<()> {
@@ -37,20 +33,19 @@ pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs
     let Some(head) = list_head(&view) else {
         anyhow::bail!("selected top-level form is not a list definition");
     };
-    let Some(category) = classify_definition_head(dialect, head) else {
+    let Some(shape) = definition_shape(dialect, &view, head) else {
         anyhow::bail!("selected top-level form is not recognized as a definition: {head}");
     };
 
     let definition_text = selection.text(&input.text).to_owned();
-    let lambda_index = lambda_list_index(&view, head);
     let definition = DefinitionReportItem {
         path: args.path.to_string(),
         span,
         head: head.to_owned(),
-        name: definition_name(&view, head).map(ToOwned::to_owned),
-        category,
-        parameter_count: lambda_index.map(|index| count_lambda_parameters(&view.children[index])),
-        body_form_count: body_form_count(&view, lambda_index),
+        name: shape.name(&view).map(ToOwned::to_owned),
+        category: shape.category,
+        parameter_count: shape.lambda_parameter_count(&view),
+        body_form_count: Some(shape.body_form_count(&view)),
         package: package_context_before_top_level(&tree, target_index)?,
     };
     let rewritten = Edit::kill(&input.text, &tree, selection)?;
@@ -65,8 +60,7 @@ pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs
     let changed = rewritten != input.text;
     let written = args.write && changed;
     if written {
-        fs::write(&args.file, &rewritten)
-            .with_context(|| format!("failed to write {}", args.file.display()))?;
+        write_file_with_rollback(args.file.clone(), rewritten.clone())?;
     }
 
     let plan = RemoveDefinitionPlan {

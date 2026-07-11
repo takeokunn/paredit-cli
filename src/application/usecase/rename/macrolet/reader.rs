@@ -1,0 +1,61 @@
+use crate::domain::sexpr::ExpressionView;
+
+use super::RenameFunctionOccurrence;
+use super::scope::{LocalCallableRenameKind, MacroletRenameScope};
+pub(super) use crate::application::usecase::rename::reader::{atom_symbol_span, atom_symbol_text};
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::sexpr::{Path, ReaderPrefix, SymbolName};
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "reader designator handling needs rename kind, scope, and accumulator state"
+)]
+pub(super) fn collect_local_function_designator_renames(
+    view: &ExpressionView,
+    path: &Path,
+    from: &SymbolName,
+    to: &SymbolName,
+    kind: LocalCallableRenameKind,
+    scope: MacroletRenameScope,
+    quasiquote_depth: usize,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) -> bool {
+    if kind != LocalCallableRenameKind::Function
+        || quasiquote_depth > 0
+        || !scope.is_target_active()
+        || scope.is_shadowed()
+    {
+        return false;
+    }
+
+    if view.reader_prefixes.contains(&ReaderPrefix::Function)
+        && push_atom_rename_if_match(view, path, from, to, renames)
+    {
+        return true;
+    }
+
+    false
+}
+
+pub(super) fn push_atom_rename_if_match(
+    view: &ExpressionView,
+    path: &Path,
+    from: &SymbolName,
+    to: &SymbolName,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+) -> bool {
+    let Some(text) = atom_symbol_text(view) else {
+        return false;
+    };
+    if !common_lisp_symbol_name_eq(text, from.as_str()) {
+        return false;
+    }
+
+    renames.push(RenameFunctionOccurrence {
+        path: path.to_string(),
+        span: atom_symbol_span(view).unwrap_or(view.span),
+        text: text.to_owned(),
+        replacement: to.as_str().to_owned(),
+    });
+    true
+}

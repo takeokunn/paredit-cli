@@ -67,7 +67,12 @@ use command::Command;
 use shared::*;
 
 #[derive(Debug, Parser)]
-#[command(version, about, long_about = None)]
+#[command(
+    version,
+    about,
+    long_about = None,
+    after_help = "Workflow namespaces:\n  Use `paredit refactor ...` for file-scoped refactoring workflows.\n  Use `paredit workspace ...` for workspace discovery and workspace-scoped refactoring workflows."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

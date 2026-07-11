@@ -120,7 +120,7 @@ pub(in crate::presentation::cli) fn refactor_diff(args: RefactorDiffArgs) -> Res
 
     if !can_apply {
         anyhow::bail!(
-            "refactor-diff validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
+            "refactor diff validation failed: manifest_policy_passed={}, manifest_outputs_parse={}, stale_files={}, output_hash_mismatches={}, parse_errors={}, manifest_flag_mismatches={}",
             result.manifest_policy_passed,
             result.manifest_outputs_parse,
             result.summary.stale_file_count,

@@ -6,7 +6,7 @@ use super::super::super::OutputFormat;
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct RefactorApplyArgs {
-    /// JSON manifest emitted by refactor-preview or workspace-refactor-preview.
+    /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
     pub(in crate::presentation::cli) manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
@@ -25,7 +25,7 @@ pub(in crate::presentation::cli) struct RefactorApplyArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct RefactorCheckArgs {
-    /// JSON manifest emitted by refactor-preview or workspace-refactor-preview.
+    /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
     pub(in crate::presentation::cli) manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
@@ -41,7 +41,7 @@ pub(in crate::presentation::cli) struct RefactorCheckArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct RefactorDiffArgs {
-    /// JSON manifest emitted by refactor-preview or workspace-refactor-preview.
+    /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
     pub(in crate::presentation::cli) manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.
@@ -57,7 +57,7 @@ pub(in crate::presentation::cli) struct RefactorDiffArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct RefactorStatusArgs {
-    /// JSON manifest emitted by refactor-preview or workspace-refactor-preview.
+    /// JSON manifest emitted by refactor preview or workspace refactor preview.
     #[arg(long)]
     pub(in crate::presentation::cli) manifest: PathBuf,
     /// Refuse to read a manifest whose stable hash differs from this value.

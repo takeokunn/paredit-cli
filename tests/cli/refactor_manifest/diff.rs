@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn cli_prints_refactor_diff_from_manifest_without_writing() {
-    let dir = fresh_temp_dir("refactor-diff");
+    let dir = fresh_temp_dir("refactor diff");
     let lisp_file = dir.join("core.lisp");
     let manifest_file = dir.join("rename.preview.json");
     let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
@@ -11,7 +11,7 @@ fn cli_prints_refactor_diff_from_manifest_without_writing() {
 
     let mut preview = paredit();
     let preview_output = preview
-        .arg("refactor-preview")
+        .args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -35,7 +35,7 @@ fn cli_prints_refactor_diff_from_manifest_without_writing() {
     fs::write(&manifest_file, preview_output).expect("write refactor manifest");
 
     let mut diff = paredit();
-    diff.arg("refactor-diff")
+    diff.args(["refactor", "diff"])
         .arg("--manifest")
         .arg(&manifest_file)
         .arg("--root")
@@ -84,7 +84,7 @@ fn cli_prints_refactor_diff_from_manifest_without_writing() {
 
 #[test]
 fn cli_refactor_diff_rejects_unexpected_manifest_hash_without_writing() {
-    let dir = fresh_temp_dir("refactor-diff-manifest-hash");
+    let dir = fresh_temp_dir("refactor diff-manifest-hash");
     let lisp_file = dir.join("core.lisp");
     let manifest_file = dir.join("rename.preview.json");
     let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
@@ -92,7 +92,7 @@ fn cli_refactor_diff_rejects_unexpected_manifest_hash_without_writing() {
 
     let mut preview = paredit();
     let preview_output = preview
-        .arg("refactor-preview")
+        .args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -112,7 +112,7 @@ fn cli_refactor_diff_rejects_unexpected_manifest_hash_without_writing() {
     fs::write(&manifest_file, preview_output).expect("write refactor manifest");
 
     let mut diff = paredit();
-    diff.arg("refactor-diff")
+    diff.args(["refactor", "diff"])
         .arg("--manifest")
         .arg(&manifest_file)
         .arg("--expect-manifest-hash")
@@ -137,7 +137,7 @@ fn cli_refactor_diff_rejects_unexpected_manifest_hash_without_writing() {
 
 #[test]
 fn cli_refactor_diff_rejects_manifest_paths_outside_root_without_writing() {
-    let dir = fresh_temp_dir("refactor-diff-root-guard");
+    let dir = fresh_temp_dir("refactor diff-root-guard");
     let root = dir.join("workspace");
     let outside_file = dir.join("outside.lisp");
     let manifest_file = dir.join("rename.preview.json");
@@ -147,7 +147,7 @@ fn cli_refactor_diff_rejects_manifest_paths_outside_root_without_writing() {
 
     let mut preview = paredit();
     let preview_output = preview
-        .arg("refactor-preview")
+        .args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -167,7 +167,7 @@ fn cli_refactor_diff_rejects_manifest_paths_outside_root_without_writing() {
     fs::write(&manifest_file, preview_output).expect("write refactor manifest");
 
     let mut diff = paredit();
-    diff.arg("refactor-diff")
+    diff.args(["refactor", "diff"])
         .arg("--manifest")
         .arg(&manifest_file)
         .arg("--root")
@@ -186,15 +186,16 @@ fn cli_refactor_diff_rejects_manifest_paths_outside_root_without_writing() {
 
 #[test]
 fn cli_refactor_diff_reports_stale_manifest_without_writing() {
-    let dir = fresh_temp_dir("refactor-diff-stale");
+    let dir = fresh_temp_dir("refactor diff-stale");
     let lisp_file = dir.join("core.lisp");
     let manifest_file = dir.join("rename.preview.json");
     let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
+    let canonical_root = fs::canonicalize(&dir).expect("canonicalize refactor root");
 
     let mut preview = paredit();
     let preview_output = preview
-        .arg("refactor-preview")
+        .args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -221,7 +222,144 @@ fn cli_refactor_diff_reports_stale_manifest_without_writing() {
     fs::write(&lisp_file, stale).expect("mutate lisp fixture after preview");
 
     let mut diff = paredit();
-    diff.arg("refactor-diff")
+    diff.args(["refactor", "diff"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--root")
+        .arg(&dir)
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"root\": {"))
+        .stdout(predicate::str::contains("\"enforced\": true"))
+        .stdout(predicate::str::contains(
+            canonical_root.display().to_string(),
+        ))
+        .stdout(predicate::str::contains("\"status\": \"blocked\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"regenerate_refactor_preview\"",
+        ))
+        .stdout(predicate::str::contains("\"stale_files\""))
+        .stdout(predicate::str::contains("\"can_apply\": false"))
+        .stdout(predicate::str::contains("\"stale_file_count\": 1"))
+        .stdout(predicate::str::contains("\"stale\": true"))
+        .stderr(predicate::str::contains("refactor diff validation failed"));
+
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read stale fixture"),
+        stale
+    );
+}
+
+#[test]
+fn cli_reports_output_hash_mismatch_refactor_diff_manifest_without_writing() {
+    let dir = fresh_temp_dir("refactor diff-output-hash-mismatch");
+    let lisp_file = dir.join("core.lisp");
+    let manifest_file = dir.join("rename.preview.json");
+    let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
+    fs::write(&lisp_file, original).expect("write lisp fixture");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--fail-on-no-change")
+        .arg("--fail-on-parse-error")
+        .arg("--require-definitions")
+        .arg("1")
+        .arg("--require-edits")
+        .arg("2")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&preview_output).expect("preview output parses");
+    manifest["files"][0]["output_hash"] = serde_json::Value::String("fnv1a64:deadbeef".into());
+    fs::write(
+        &manifest_file,
+        serde_json::to_vec_pretty(&manifest).expect("serialize mismatched manifest"),
+    )
+    .expect("write mismatched manifest");
+
+    let mut diff = paredit();
+    diff.args(["refactor", "diff"])
+        .arg("--manifest")
+        .arg(&manifest_file)
+        .arg("--output")
+        .arg("json")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\": \"blocked\""))
+        .stdout(predicate::str::contains(
+            "\"next_action\": \"fix_manifest_or_parser\"",
+        ))
+        .stdout(predicate::str::contains("\"output_hash_mismatches\""))
+        .stdout(predicate::str::contains(
+            "\"output_hash_mismatch_count\": 1",
+        ))
+        .stdout(predicate::str::contains("\"output_hash_matches\": false"))
+        .stdout(predicate::str::contains("\"can_apply\": false"))
+        .stderr(predicate::str::contains("output_hash_mismatches=1"));
+
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read unchanged hash mismatch fixture"),
+        original
+    );
+}
+
+#[test]
+fn cli_reports_manifest_flag_mismatch_refactor_diff_manifest_without_writing() {
+    let dir = fresh_temp_dir("refactor diff-manifest-flag-mismatch");
+    let lisp_file = dir.join("core.lisp");
+    let manifest_file = dir.join("rename.preview.json");
+    let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
+    fs::write(&lisp_file, original).expect("write lisp fixture");
+
+    let mut preview = paredit();
+    let preview_output = preview
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--fail-on-no-change")
+        .arg("--fail-on-parse-error")
+        .arg("--require-definitions")
+        .arg("1")
+        .arg("--require-edits")
+        .arg("2")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&preview_output).expect("preview output parses");
+    manifest["files"][0]["changed"] = serde_json::Value::Bool(false);
+    fs::write(
+        &manifest_file,
+        serde_json::to_vec_pretty(&manifest).expect("serialize manifest flag mismatch"),
+    )
+    .expect("write manifest flag mismatch");
+
+    let mut diff = paredit();
+    diff.args(["refactor", "diff"])
         .arg("--manifest")
         .arg(&manifest_file)
         .arg("--output")
@@ -232,21 +370,23 @@ fn cli_refactor_diff_reports_stale_manifest_without_writing() {
         .stdout(predicate::str::contains(
             "\"next_action\": \"regenerate_refactor_preview\"",
         ))
-        .stdout(predicate::str::contains("\"stale_files\""))
+        .stdout(predicate::str::contains("\"manifest_flag_mismatches\""))
+        .stdout(predicate::str::contains(
+            "\"manifest_flag_mismatch_count\": 1",
+        ))
+        .stdout(predicate::str::contains("\"manifest_flags_match\": false"))
         .stdout(predicate::str::contains("\"can_apply\": false"))
-        .stdout(predicate::str::contains("\"stale_file_count\": 1"))
-        .stdout(predicate::str::contains("\"stale\": true"))
-        .stderr(predicate::str::contains("refactor-diff validation failed"));
+        .stderr(predicate::str::contains("manifest_flag_mismatches=1"));
 
     assert_eq!(
-        fs::read_to_string(&lisp_file).expect("read stale fixture"),
-        stale
+        fs::read_to_string(&lisp_file).expect("read unchanged manifest flag fixture"),
+        original
     );
 }
 
 #[test]
 fn cli_refactor_diff_reports_policy_failed_manifest_before_refusing() {
-    let dir = fresh_temp_dir("refactor-diff-policy-failed");
+    let dir = fresh_temp_dir("refactor diff-policy-failed");
     let lisp_file = dir.join("core.lisp");
     let manifest_file = dir.join("rename.preview.json");
     let original = "(defun old-name (x) x)\n";
@@ -254,7 +394,7 @@ fn cli_refactor_diff_reports_policy_failed_manifest_before_refusing() {
 
     let mut preview = paredit();
     let preview_output = preview
-        .arg("refactor-preview")
+        .args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -275,7 +415,7 @@ fn cli_refactor_diff_reports_policy_failed_manifest_before_refusing() {
     fs::write(&manifest_file, manifest_text).expect("write failed refactor manifest");
 
     let mut diff = paredit();
-    diff.arg("refactor-diff")
+    diff.args(["refactor", "diff"])
         .arg("--manifest")
         .arg(&manifest_file)
         .arg("--output")
@@ -302,7 +442,7 @@ fn cli_refactor_diff_reports_policy_failed_manifest_before_refusing() {
 
 #[test]
 fn cli_refactor_diff_reports_unparseable_manifest_outputs_before_refusing() {
-    let dir = fresh_temp_dir("refactor-diff-unparseable-outputs");
+    let dir = fresh_temp_dir("refactor diff-unparseable-outputs");
     let lisp_file = dir.join("core.lisp");
     let manifest_file = dir.join("rename.preview.json");
     let original = "(defun old-name (x) x)\n";
@@ -310,7 +450,7 @@ fn cli_refactor_diff_reports_unparseable_manifest_outputs_before_refusing() {
 
     let mut preview = paredit();
     let preview_output = preview
-        .arg("refactor-preview")
+        .args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -334,7 +474,7 @@ fn cli_refactor_diff_reports_unparseable_manifest_outputs_before_refusing() {
     fs::write(&manifest_file, manifest_text).expect("write unparseable-output manifest");
 
     let mut diff = paredit();
-    diff.arg("refactor-diff")
+    diff.args(["refactor", "diff"])
         .arg("--manifest")
         .arg(&manifest_file)
         .arg("--output")

@@ -12,6 +12,7 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
         OutputFormat::Text => {
             println!("operation\t{}", plan.operation.label());
             println!("symbol\t{}", plan.symbol);
+            println!("target_kind\t{}", plan.target_kind.label());
             if let Some(workspace) = &plan.workspace {
                 println!(
                     "workspace_roots\t{}",
@@ -124,6 +125,7 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
             serde_json::to_string_pretty(&json!({
                 "operation": plan.operation.label(),
                 "symbol": plan.symbol.as_str(),
+                "target_kind": plan.target_kind.label(),
                 "workspace": plan.workspace.as_ref().map(|workspace| json!({
                     "roots": workspace
                         .roots

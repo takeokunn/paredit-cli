@@ -33,8 +33,8 @@ pub(in crate::presentation::cli) struct ReplacementPlanArgs {
     /// Minimum expression node count for a candidate form.
     #[arg(long, default_value_t = 4)]
     pub(super) min_node_count: usize,
-    /// Placeholder replacement form for generated replace-forms commands.
-    #[arg(long, default_value = "(TODO-refactor)")]
+    /// Placeholder replacement form for generated replace-forms commands; review before applying.
+    #[arg(long, default_value = "(__review_replacement__)")]
     pub(super) replacement: String,
     /// Keep the first matching form as the canonical sample and replace only later duplicates.
     #[arg(long)]

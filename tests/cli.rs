@@ -1,12 +1,15 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use proptest::prelude::*;
+use proptest::test_runner::{Config as ProptestConfig, FileFailurePersistence};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
-#[path = "cli/call_graph_report.rs"]
+#[path = "cli/call_graph_report/mod.rs"]
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
 mod call_report;
@@ -24,18 +27,26 @@ mod duplicate_report;
 mod extract_function;
 #[path = "cli/form_report.rs"]
 mod form_report;
-#[path = "cli/format.rs"]
+#[path = "cli/format/mod.rs"]
 mod format;
 #[path = "cli/function_parameter/mod.rs"]
 mod function_parameter;
+#[path = "cli/help_contract.rs"]
+mod help_contract;
 #[path = "cli/impact_report.rs"]
 mod impact_report;
-#[path = "cli/inline_function.rs"]
+#[path = "cli/inline_function/mod.rs"]
 mod inline_function;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
 #[path = "cli/package/mod.rs"]
 mod package;
+#[path = "cli/public_api_docs_contract.rs"]
+mod public_api_docs_contract;
+#[path = "cli/public_module_docs_contract.rs"]
+mod public_module_docs_contract;
+#[path = "cli/refactor_entrypoint_contract.rs"]
+mod refactor_entrypoint_contract;
 #[path = "cli/refactor_manifest/mod.rs"]
 mod refactor_manifest;
 #[path = "cli/refactor_preview.rs"]
@@ -60,11 +71,19 @@ mod symbol_report;
 mod thread_expression;
 #[path = "cli/unwrap_call.rs"]
 mod unwrap_call;
+#[path = "cli/workspace_entrypoint_contract.rs"]
+mod workspace_entrypoint_contract;
 #[path = "cli/workspace_report.rs"]
 mod workspace_report;
 
 fn paredit() -> Command {
     Command::cargo_bin("paredit").expect("binary")
+}
+
+fn cli_proptest_config(cases: u32) -> ProptestConfig {
+    let mut config = ProptestConfig::with_cases(cases);
+    config.failure_persistence = Some(Box::new(FileFailurePersistence::Off));
+    config
 }
 
 fn stable_manifest_hash(text: &str) -> String {
@@ -77,8 +96,14 @@ fn stable_manifest_hash(text: &str) -> String {
 }
 
 fn fresh_temp_dir(name: &str) -> PathBuf {
+    static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+    let unique = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock before unix epoch")
+        .as_nanos();
     let dir = std::env::temp_dir().join(format!(
-        "paredit-cli-{name}-{}-{}",
+        "paredit-cli-{name}-{}-{}-{timestamp}-{unique}",
         std::process::id(),
         std::thread::current().name().unwrap_or("test")
     ));

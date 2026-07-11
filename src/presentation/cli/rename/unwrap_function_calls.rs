@@ -1,8 +1,6 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input};
+use super::super::{detect_dialect, read_input, write_files_with_rollback};
 use super::args::UnwrapFunctionCallsArgs;
 use super::render::unwrap::print_unwrap_function_calls_report;
 use super::types::{
@@ -61,13 +59,18 @@ pub(in crate::presentation::cli) fn unwrap_function_calls(
         );
     }
 
+    let written_files = pending
+        .iter()
+        .filter(|file| args.write && file.changed)
+        .map(|file| (file.path.clone(), file.rewritten.clone()))
+        .collect::<Vec<_>>();
+    if !written_files.is_empty() {
+        write_files_with_rollback(written_files)?;
+    }
+
     let mut reports = Vec::with_capacity(pending.len());
     for file in pending {
         let written = args.write && file.changed;
-        if written {
-            fs::write(&file.path, &file.rewritten)
-                .with_context(|| format!("failed to write {}", file.path.display()))?;
-        }
         reports.push(UnwrapFunctionCallsFileReport {
             path: file.path,
             dialect: file.dialect,

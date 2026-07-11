@@ -18,15 +18,14 @@ pub fn collect_duplicate_candidates(
     grouped: &mut DuplicateCandidateGroups,
 ) -> Result<()> {
     for index in 0..tree.root_children().len() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
         collect_duplicate_candidates_from_view(
             &view,
             input,
             file,
             dialect,
-            path_indexes,
+            path,
             min_node_count,
             grouped,
         );
@@ -40,7 +39,7 @@ fn collect_duplicate_candidates_from_view(
     input: &str,
     file: &FsPath,
     dialect: Dialect,
-    path_indexes: Vec<usize>,
+    path: Path,
     min_node_count: usize,
     grouped: &mut DuplicateCandidateGroups,
 ) {
@@ -51,7 +50,7 @@ fn collect_duplicate_candidates_from_view(
             grouped.entry(shape).or_default().push(DuplicateFormReport {
                 path: file.to_path_buf(),
                 dialect,
-                form_path: Path::from_indexes(path_indexes.clone()).to_string(),
+                form_path: path.to_string(),
                 span: view.span,
                 node_count,
                 head: view
@@ -65,8 +64,7 @@ fn collect_duplicate_candidates_from_view(
     }
 
     for (index, child) in view.children.iter().enumerate() {
-        let mut child_path = path_indexes.clone();
-        child_path.push(index);
+        let child_path = path.child(index);
         collect_duplicate_candidates_from_view(
             child,
             input,

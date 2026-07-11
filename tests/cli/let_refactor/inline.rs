@@ -1,10 +1,39 @@
 use super::*;
 
 #[test]
+fn cli_requires_file_for_inline_let_writes() {
+    let mut cmd = paredit();
+    cmd.args(["inline-let", "--path", "0", "--write"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--write requires --file"));
+}
+
+#[test]
 fn cli_plans_inline_let_for_common_lisp() {
     let mut cmd = paredit();
     cmd.args(["inline-let", "--path", "0.3", "--output", "json"])
         .write_stdin("(defun render () (let ((product (* width height))) (+ product margin)))")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
+        .stdout(predicate::str::contains("\"binding_name\": \"product\""))
+        .stdout(predicate::str::contains(
+            "\"binding_value\": \"(* width height)\"",
+        ))
+        .stdout(predicate::str::contains("\"reference_count\": 1"))
+        .stdout(predicate::str::contains(
+            "(defun render () (+ (* width height) margin))",
+        ));
+}
+
+#[test]
+fn cli_plans_inline_let_for_common_lisp_symbol_macrolet() {
+    let mut cmd = paredit();
+    cmd.args(["inline-let", "--path", "0.3", "--output", "json"])
+        .write_stdin(
+            "(defun render () (symbol-macrolet ((product (* width height))) (+ product margin)))",
+        )
         .assert()
         .success()
         .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
@@ -48,6 +77,34 @@ fn cli_writes_inline_let_for_emacs_lisp_file() {
     fs::write(
         &elisp_file,
         "(defun render () (let ((product (* width height))) (+ product margin)))\n",
+    )
+    .expect("write elisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("inline-let")
+        .arg("--file")
+        .arg(&elisp_file)
+        .arg("--path")
+        .arg("0.3")
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dialect\": \"emacs-lisp\""))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(elisp_file).expect("read inline let elisp"),
+        "(defun render () (+ (* width height) margin))\n"
+    );
+}
+
+#[test]
+fn cli_writes_inline_let_for_emacs_lisp_cl_symbol_macrolet_file() {
+    let dir = fresh_temp_dir("inline-let");
+    let elisp_file = dir.join("render.el");
+    fs::write(
+        &elisp_file,
+        "(defun render () (cl-symbol-macrolet ((product (* width height))) (+ product margin)))\n",
     )
     .expect("write elisp fixture");
 

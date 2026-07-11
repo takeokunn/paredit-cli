@@ -1,10 +1,13 @@
 use super::super::super::*;
-use crate::application::refactor::plan::{RefactorPlanAutomationDecision, RefactorPlanRiskSummary};
+use crate::application::refactor::plan::{
+    RefactorPlanAutomationDecision, RefactorPlanRiskSummary, RefactorPlanTargetKind,
+};
 
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct RefactorPlan {
     pub(in crate::presentation::cli) operation: ApplicationRefactorOperation,
     pub(in crate::presentation::cli) symbol: String,
+    pub(in crate::presentation::cli) target_kind: RefactorPlanTargetKind,
     pub(in crate::presentation::cli) workspace: Option<WorkspaceRefactorPlanDiscovery>,
     pub(in crate::presentation::cli) files: Vec<ImpactReportFile>,
     pub(in crate::presentation::cli) gates: Vec<RefactorPlanGate>,

@@ -1,7 +1,12 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{
-    ByteOffset, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
+use crate::domain::{
+    common_lisp::CommonLispPackageDeclarationForm,
+    dialect::Dialect,
+    sexpr::{
+        ByteOffset, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName,
+        SyntaxTree,
+    },
 };
 
 use super::syntax::{
@@ -21,16 +26,16 @@ pub(super) struct DefpackageExportEdit {
 
 pub(super) fn find_defpackage_export_edit(
     tree: &SyntaxTree,
+    dialect: Dialect,
     package: Option<&SymbolName>,
     symbol: &SymbolName,
 ) -> Result<DefpackageExportEdit> {
     let mut matches = Vec::new();
 
     for index in 0..tree.root_children().len() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
-        collect_defpackage_export_edits(&view, path_indexes, package, symbol, &mut matches);
+        collect_defpackage_export_edits(&view, path, dialect, package, symbol, &mut matches);
     }
 
     if matches.is_empty() {
@@ -48,25 +53,32 @@ pub(super) fn find_defpackage_export_edit(
 
 fn collect_defpackage_export_edits(
     view: &ExpressionView,
-    path_indexes: Vec<usize>,
+    path: Path,
+    dialect: Dialect,
     package: Option<&SymbolName>,
     symbol: &SymbolName,
     matches: &mut Vec<DefpackageExportEdit>,
 ) {
-    if let Some(edit) = analyze_defpackage_export_edit(view, &path_indexes, package, symbol) {
+    if let Some(edit) = analyze_defpackage_export_edit(view, &path, dialect, package, symbol) {
         matches.push(edit);
     }
 
     for (index, child) in view.children.iter().enumerate() {
-        let mut child_path = path_indexes.clone();
-        child_path.push(index);
-        collect_defpackage_export_edits(child, child_path, package, symbol, matches);
+        collect_defpackage_export_edits(
+            child,
+            path.child(index),
+            dialect,
+            package,
+            symbol,
+            matches,
+        );
     }
 }
 
 fn analyze_defpackage_export_edit(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    path: &Path,
+    dialect: Dialect,
     package: Option<&SymbolName>,
     symbol: &SymbolName,
 ) -> Option<DefpackageExportEdit> {
@@ -77,7 +89,7 @@ fn analyze_defpackage_export_edit(
         return None;
     }
     let head = atom_text(&view.children[0])?;
-    if !is_package_head(head, "defpackage") {
+    if !is_package_head(dialect, head, CommonLispPackageDeclarationForm::Defpackage) {
         return None;
     }
 
@@ -128,7 +140,7 @@ fn analyze_defpackage_export_edit(
     );
 
     Some(DefpackageExportEdit {
-        defpackage_path: Path::from_indexes(path_indexes.to_vec()).to_string(),
+        defpackage_path: path.to_string(),
         defpackage_span: view.span,
         package_name,
         export_span,

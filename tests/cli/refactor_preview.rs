@@ -2,13 +2,13 @@ use super::*;
 
 #[test]
 fn cli_previews_function_refactor_without_writing_files() {
-    let dir = fresh_temp_dir("refactor-preview");
+    let dir = fresh_temp_dir("refactor preview");
     let lisp_file = dir.join("core.lisp");
     let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("refactor-preview")
+    cmd.args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -71,13 +71,13 @@ fn cli_previews_function_refactor_without_writing_files() {
 
 #[test]
 fn cli_writes_refactor_preview_after_policy_and_parse_gates() {
-    let dir = fresh_temp_dir("refactor-preview-write");
+    let dir = fresh_temp_dir("refactor preview-write");
     let lisp_file = dir.join("core.lisp");
     let original = "(defun old-name (x) x)\n(defun caller () (old-name 1) old-name)\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("refactor-preview")
+    cmd.args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -130,13 +130,13 @@ fn cli_writes_refactor_preview_after_policy_and_parse_gates() {
 
 #[test]
 fn cli_refuses_refactor_preview_write_when_policy_fails() {
-    let dir = fresh_temp_dir("refactor-preview-write-policy");
+    let dir = fresh_temp_dir("refactor preview-write-policy");
     let lisp_file = dir.join("core.lisp");
     let original = "(defun old-name (x) x)\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("refactor-preview")
+    cmd.args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -174,7 +174,7 @@ fn cli_refuses_refactor_preview_write_when_policy_fails() {
         .stdout(predicate::str::contains(
             "\"next_action\": \"review-policy-violations\"",
         ))
-        .stderr(predicate::str::contains("refactor-preview policy failed"));
+        .stderr(predicate::str::contains("refactor preview policy failed"));
 
     assert_eq!(
         fs::read_to_string(&lisp_file).expect("read unchanged fixture"),
@@ -184,13 +184,13 @@ fn cli_refuses_refactor_preview_write_when_policy_fails() {
 
 #[test]
 fn cli_fails_refactor_preview_definition_policy_after_printing_json() {
-    let dir = fresh_temp_dir("refactor-preview-definition-policy");
+    let dir = fresh_temp_dir("refactor preview-definition-policy");
     let lisp_file = dir.join("core.lisp");
     let original = "(defun old-name (x) x)\n(defun old-name (y) y)\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("refactor-preview")
+    cmd.args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -208,7 +208,7 @@ fn cli_fails_refactor_preview_definition_policy_after_printing_json() {
         .stdout(predicate::str::contains(
             "--require-definitions expected exactly 1, found 2",
         ))
-        .stderr(predicate::str::contains("refactor-preview policy failed"));
+        .stderr(predicate::str::contains("refactor preview policy failed"));
 
     assert_eq!(
         fs::read_to_string(&lisp_file).expect("read unchanged fixture"),
@@ -218,13 +218,13 @@ fn cli_fails_refactor_preview_definition_policy_after_printing_json() {
 
 #[test]
 fn cli_fails_refactor_preview_policy_after_printing_json() {
-    let dir = fresh_temp_dir("refactor-preview-policy");
+    let dir = fresh_temp_dir("refactor preview-policy");
     let lisp_file = dir.join("core.lisp");
     let original = "(defun old-name (x) x)\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("refactor-preview")
+    cmd.args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -242,7 +242,7 @@ fn cli_fails_refactor_preview_policy_after_printing_json() {
         .stdout(predicate::str::contains(
             "--require-edits expected at least 3, found 1",
         ))
-        .stderr(predicate::str::contains("refactor-preview policy failed"));
+        .stderr(predicate::str::contains("refactor preview policy failed"));
 
     assert_eq!(
         fs::read_to_string(&lisp_file).expect("read unchanged fixture"),
@@ -252,13 +252,13 @@ fn cli_fails_refactor_preview_policy_after_printing_json() {
 
 #[test]
 fn cli_fails_refactor_preview_when_target_symbol_already_exists() {
-    let dir = fresh_temp_dir("refactor-preview-target-conflict");
+    let dir = fresh_temp_dir("refactor preview-target-conflict");
     let lisp_file = dir.join("core.lisp");
     let original = "(defun old-name (x) (new-name x))\n";
     fs::write(&lisp_file, original).expect("write lisp fixture");
 
     let mut cmd = paredit();
-    cmd.arg("refactor-preview")
+    cmd.args(["refactor", "preview"])
         .arg("--from")
         .arg("old-name")
         .arg("--to")
@@ -279,11 +279,58 @@ fn cli_fails_refactor_preview_when_target_symbol_already_exists() {
         .stdout(predicate::str::contains(
             "--fail-on-target-conflict found 1 existing replacement symbol occurrence(s)",
         ))
-        .stderr(predicate::str::contains("refactor-preview policy failed"))
+        .stderr(predicate::str::contains("refactor preview policy failed"))
         .stderr(predicate::str::contains("--fail-on-target-conflict"));
 
     assert_eq!(
         fs::read_to_string(&lisp_file).expect("read unchanged fixture"),
         original
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_rolls_back_refactor_preview_when_later_file_write_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = fresh_temp_dir("refactor preview-rollback");
+    let writable_file = dir.join("core.lisp");
+    let readonly_dir = dir.join("readonly");
+    let blocked_file = readonly_dir.join("other.lisp");
+    let writable_original = "(defun old-name (x) x)\n";
+    let blocked_original = "(defun caller () (old-name 1))\n";
+    fs::write(&writable_file, writable_original).expect("write writable fixture");
+    fs::create_dir_all(&readonly_dir).expect("create readonly dir");
+    fs::write(&blocked_file, blocked_original).expect("write blocked fixture");
+    fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o555))
+        .expect("chmod readonly dir");
+
+    let mut cmd = paredit();
+    let assert = cmd
+        .args(["refactor", "preview"])
+        .arg("--from")
+        .arg("old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--mode")
+        .arg("function")
+        .arg("--write")
+        .arg(&writable_file)
+        .arg(&blocked_file)
+        .assert();
+
+    fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o755))
+        .expect("restore readonly dir permissions");
+
+    assert
+        .failure()
+        .stderr(predicate::str::contains("Permission denied"));
+    assert_eq!(
+        fs::read_to_string(&writable_file).expect("read rolled back writable fixture"),
+        writable_original
+    );
+    assert_eq!(
+        fs::read_to_string(&blocked_file).expect("read blocked fixture"),
+        blocked_original
     );
 }

@@ -149,12 +149,11 @@ fn collect_specialized_required_parameter_name_span(
     spec: &ExpressionView,
     output: &mut Vec<ParameterNameSpan>,
 ) {
-    if spec.kind == ExpressionKind::List
-        && spec.delimiter == Some(Delimiter::Paren)
-        && let Some(parameter) = spec.children.first()
-    {
-        collect_binding_pattern_name_spans(parameter, output);
-        return;
+    if spec.kind == ExpressionKind::List && spec.delimiter == Some(Delimiter::Paren) {
+        if let Some(parameter) = spec.children.first() {
+            collect_binding_pattern_name_spans(parameter, output);
+            return;
+        }
     }
 
     collect_binding_pattern_name_spans(spec, output);

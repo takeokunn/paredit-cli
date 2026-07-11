@@ -1,6 +1,22 @@
 use super::*;
 
 #[test]
+fn cli_requires_file_for_remove_unused_binding_writes() {
+    let mut cmd = paredit();
+    cmd.args([
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "unused",
+        "--write",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("--write requires --file"));
+}
+
+#[test]
 fn cli_requires_drop_value_permission_for_remove_unused_binding_writes() {
     let dir = fresh_temp_dir("remove-unused-binding-permission");
     let lisp_file = dir.join("render.lisp");

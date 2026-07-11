@@ -25,7 +25,8 @@ pub use types::*;
 
 pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let edit = find_defpackage_export_edit(&tree, request.package, request.symbol)?;
+    let edit =
+        find_defpackage_export_edit(&tree, request.dialect, request.package, request.symbol)?;
     let rewritten = if edit.already_exported {
         request.input.to_owned()
     } else {
@@ -49,7 +50,7 @@ pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
 
 pub fn plan_rename_package(request: RenamePackageRequest<'_>) -> Result<RenamePackagePlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let occurrences = package_rename_occurrences(&tree, request.from, request.to)?;
+    let occurrences = package_rename_occurrences(&tree, request.dialect, request.from, request.to)?;
     let rewritten = rewrite_package_occurrences(request.input, &occurrences);
     SyntaxTree::parse(&rewritten)
         .context("rename-package output is not a valid S-expression document")?;
@@ -65,7 +66,7 @@ pub fn plan_sort_package_exports(
     request: SortPackageExportsRequest<'_>,
 ) -> Result<SortPackageExportsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let edits = defpackage_export_sort_edits(&tree, request.package)?;
+    let edits = defpackage_export_sort_edits(&tree, request.dialect, request.package)?;
     let replacements = edits
         .iter()
         .flat_map(|edit| {
@@ -104,7 +105,13 @@ pub fn plan_sort_package_options(
     request: SortPackageOptionsRequest<'_>,
 ) -> Result<SortPackageOptionsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let edits = defpackage_option_sort_edits(request.input, &tree, request.package, request.order)?;
+    let edits = defpackage_option_sort_edits(
+        request.input,
+        &tree,
+        request.dialect,
+        request.package,
+        request.order,
+    )?;
     let replacements = edits
         .iter()
         .flat_map(|edit| {
@@ -141,7 +148,8 @@ pub fn plan_merge_package_options(
     request: MergePackageOptionsRequest<'_>,
 ) -> Result<MergePackageOptionsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
-    let edits = defpackage_option_merge_edits(request.input, &tree, request.package)?;
+    let edits =
+        defpackage_option_merge_edits(request.input, &tree, request.dialect, request.package)?;
     let replacements = edits
         .iter()
         .flat_map(|edit| {

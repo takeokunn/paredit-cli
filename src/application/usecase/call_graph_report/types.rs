@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug)]
 pub struct CallGraphReportSource {
@@ -30,7 +30,7 @@ pub struct CallGraphFile {
 pub struct CallGraphDefinitionItem {
     pub name: Option<String>,
     pub category: DefinitionCategory,
-    pub path: Vec<usize>,
+    pub path: Path,
     pub span: ByteSpan,
     pub parameter_count: usize,
 }

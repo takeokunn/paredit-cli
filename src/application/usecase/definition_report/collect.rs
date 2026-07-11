@@ -2,14 +2,12 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::domain::definition::classify_definition_head;
+use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
+use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
-use super::syntax::{
-    atom_child, body_form_count, count_lambda_parameters, definition_name, lambda_list_index,
-    list_head,
-};
+use super::syntax::{atom_child, list_head};
 use super::types::{DefinitionReportFile, DefinitionReportItem, ParsedDefinitionFile};
 
 pub fn build_definition_report(
@@ -51,34 +49,33 @@ pub fn collect_definition_forms(
     let mut definitions = Vec::new();
 
     for index in 0..tree.root_children().len() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
         let Some(head) = list_head(&view) else {
             continue;
         };
 
-        if head.eq_ignore_ascii_case("in-package") {
+        if dialect.common_lisp_package_declaration_form_for_head(head)
+            == Some(CommonLispPackageDeclarationForm::InPackage)
+        {
             if let Some(package_name) = atom_child(&view, 1) {
                 current_package = Some(package_name.to_owned());
             }
             continue;
         }
 
-        let Some(category) = classify_definition_head(dialect, head) else {
+        let Some(shape) = definition_shape(dialect, &view, head) else {
             continue;
         };
-        let lambda_index = lambda_list_index(&view, head);
 
         definitions.push(DefinitionReportItem {
-            path: Path::from_indexes(path_indexes).to_string(),
+            path: path.to_string(),
             span: view.span,
             head: head.to_owned(),
-            name: definition_name(&view, head).map(ToOwned::to_owned),
-            category,
-            parameter_count: lambda_index
-                .map(|index| count_lambda_parameters(&view.children[index])),
-            body_form_count: body_form_count(&view, lambda_index),
+            name: shape.name(&view).map(ToOwned::to_owned),
+            category: shape.category,
+            parameter_count: shape.lambda_parameter_count(&view),
+            body_form_count: Some(shape.body_form_count(&view)),
             package: current_package.clone(),
         });
     }

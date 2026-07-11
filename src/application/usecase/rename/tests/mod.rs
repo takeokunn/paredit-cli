@@ -4,6 +4,7 @@ mod local_function;
 mod macrolet;
 mod replace_call;
 mod scoped_form;
+mod symbol_macro;
 mod unwrap;
 mod wrap;
 

@@ -76,6 +76,60 @@ fn cli_rejects_unwrap_call_function_mismatch() {
     .stderr(predicate::str::contains("expected function"));
 }
 
+#[cfg(unix)]
+#[test]
+fn cli_keeps_unwrap_call_input_unchanged_when_write_fails() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = fresh_temp_dir("unwrap-call-write-failure");
+    let readonly_dir = dir.join("readonly");
+    let blocked_file = readonly_dir.join("wrapper.el");
+    let original = "(with-current-buffer buf (message \"ready\"))\n";
+    fs::create_dir_all(&readonly_dir).expect("create readonly dir");
+    fs::write(&blocked_file, original).expect("write blocked fixture");
+
+    fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o555))
+        .expect("chmod readonly dir");
+
+    let mut cmd = paredit();
+    let assert = cmd
+        .arg("unwrap-call")
+        .arg("--file")
+        .arg(&blocked_file)
+        .arg("--path")
+        .arg("0")
+        .arg("--function")
+        .arg("with-current-buffer")
+        .arg("--argument-index")
+        .arg("1")
+        .arg("--write")
+        .arg("--output")
+        .arg("json")
+        .assert();
+
+    fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o755))
+        .expect("restore readonly dir permissions");
+
+    assert
+        .failure()
+        .stderr(predicate::str::contains("Permission denied"));
+    assert_eq!(
+        fs::read_to_string(&blocked_file).expect("read blocked fixture"),
+        original
+    );
+
+    let leftovers = fs::read_dir(&readonly_dir)
+        .expect("list readonly dir")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.contains(".paredit-"))
+        .collect::<Vec<_>>();
+    assert!(
+        leftovers.is_empty(),
+        "unexpected staged files: {leftovers:?}"
+    );
+}
+
 fn generated_unwrap_call_input(depth: usize) -> String {
     let mut expression = "seed".to_owned();
     for index in 0..depth {
@@ -128,7 +182,7 @@ fn assert_unwrap_call_property(input: String) -> Result<(), TestCaseError> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(12))]
+    #![proptest_config(cli_proptest_config(12))]
 
     #[test]
     fn cli_unwrap_call_preserves_parseability_for_generated_wrappers(depth in 1usize..8) {

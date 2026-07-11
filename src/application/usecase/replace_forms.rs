@@ -22,9 +22,7 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
         replacement_tree.root_children().len() == 1,
         "--with must contain exactly one top-level S-expression"
     );
-    let replacement_view = replacement_tree
-        .select_path(&Path::from_indexes(vec![0]))?
-        .view();
+    let replacement_view = replacement_tree.select_path(&Path::root_child(0))?.view();
     let replacement_shape = duplicate_shape(&replacement_view, true);
 
     let targets = collect_replace_targets(request.input, request.tree, &request.paths)?;

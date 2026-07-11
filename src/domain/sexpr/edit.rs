@@ -27,8 +27,7 @@ impl Edit {
     pub fn splice(input: &str, _tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
         let node = selection.node();
         ensure_list(node)?;
-        let open = node.open.expect("list has open byte").get();
-        let close = node.close.expect("list has close byte").get();
+        let (open, close) = list_delimiter_offsets(node)?;
         let mut output = String::with_capacity(input.len().saturating_sub(2));
         output.push_str(&input[..open]);
         output.push_str(&input[open + 1..close]);
@@ -57,7 +56,7 @@ impl Edit {
         ensure_list(node)?;
         let sibling = next_sibling(tree, selection.node_id)
             .ok_or_else(|| anyhow!("selected list has no next sibling to slurp"))?;
-        let close = node.close.expect("list has close byte").get();
+        let (_, close) = list_delimiter_offsets(node)?;
         let insertion = format!(" {}", tree.node(sibling).span.slice(input));
         let removal = expand_removal(input, tree.node(sibling).span);
         Ok(remove_then_insert(
@@ -77,7 +76,8 @@ impl Edit {
         ensure_list(node)?;
         let sibling = previous_sibling(tree, selection.node_id)
             .ok_or_else(|| anyhow!("selected list has no previous sibling to slurp"))?;
-        let open = node.open.expect("list has open byte").get() + 1;
+        let (open, _) = list_delimiter_offsets(node)?;
+        let open = open + 1;
         let insertion = format!("{} ", tree.node(sibling).span.slice(input));
         let removal = expand_removal(input, tree.node(sibling).span);
         Ok(remove_then_insert(
@@ -99,7 +99,7 @@ impl Edit {
             .children
             .last()
             .ok_or_else(|| anyhow!("cannot barf from an empty list"))?;
-        let close = node.close.expect("list has close byte").get();
+        let (_, close) = list_delimiter_offsets(node)?;
         let child_span = tree.node(child).span;
         let insertion = format!(" {}", child_span.slice(input));
         let removal = expand_removal(input, child_span);
@@ -122,7 +122,9 @@ impl Edit {
             .children
             .first()
             .ok_or_else(|| anyhow!("cannot barf from an empty list"))?;
-        let open = node.open.expect("list has open byte");
+        let open = node
+            .open
+            .ok_or_else(|| anyhow!("selected list is missing an opening delimiter"))?;
         let child_span = tree.node(child).span;
         let insertion = format!("{} ", child_span.slice(input));
         let removal = expand_removal(input, child_span);
@@ -135,6 +137,16 @@ fn ensure_list(node: &Node) -> Result<()> {
         anyhow::bail!("operation requires a list expression");
     }
     Ok(())
+}
+
+fn list_delimiter_offsets(node: &Node) -> Result<(usize, usize)> {
+    let open = node
+        .open
+        .ok_or_else(|| anyhow!("selected list is missing an opening delimiter"))?;
+    let close = node
+        .close
+        .ok_or_else(|| anyhow!("selected list is missing a closing delimiter"))?;
+    Ok((open.get(), close.get()))
 }
 
 fn next_sibling(tree: &SyntaxTree, node_id: NodeId) -> Option<NodeId> {

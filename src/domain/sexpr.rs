@@ -1,6 +1,10 @@
+//! Typed S-expression parsing, tree navigation, spans, and balanced edit
+//! primitives that back both the CLI and downstream Rust automation.
+
 mod edit;
 mod formatter;
 mod parser;
+pub mod reader;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;
@@ -11,7 +15,8 @@ pub use edit::Edit;
 pub use formatter::Formatter;
 pub use parser::ParseError;
 pub use tree::{
-    AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, Selection, SyntaxTree,
+    AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, ReaderPrefix, Selection,
+    SyntaxTree,
 };
 pub use types::{
     ByteOffset, ByteSpan, ChildIndex, Delimiter, ExpressionPath, NodeId, Path, SymbolName,

@@ -17,7 +17,7 @@ pub(in crate::presentation::cli) fn dependency_report(args: DependencyReportArgs
         let tree = SyntaxTree::parse(&input.text)
             .with_context(|| format!("failed to parse {}", file.display()))?;
         let (package, _) = collect_definition_forms(&tree, dialect)?;
-        let dependency_report = build_dependency_report(&tree)?;
+        let dependency_report = build_dependency_report(&tree, dialect)?;
 
         reports.push(DependencyReportFile {
             path: file.clone(),

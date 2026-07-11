@@ -5,7 +5,9 @@ use anyhow::{Context, Result};
 
 use crate::application::usecase::split_file::{SplitFileRequest, plan_split_file};
 
-use super::super::shared::{detect_dialect, read_file_or_empty, read_input};
+use super::super::shared::{
+    detect_dialect, read_file_or_empty, read_input, write_files_with_rollback,
+};
 use super::args::SplitFileArgs;
 use super::render::split_file::print_split_file_plan;
 use super::shared::same_file_path;
@@ -50,10 +52,10 @@ pub(in crate::presentation::cli) fn split_file(args: SplitFileArgs) -> Result<()
             fs::create_dir_all(parent)
                 .with_context(|| format!("failed to create {}", parent.display()))?;
         }
-        fs::write(&args.from_file, &plan.from_rewritten)
-            .with_context(|| format!("failed to write {}", args.from_file.display()))?;
-        fs::write(&args.to_file, &plan.to_rewritten)
-            .with_context(|| format!("failed to write {}", args.to_file.display()))?;
+        write_files_with_rollback([
+            (args.from_file.clone(), plan.from_rewritten.clone()),
+            (args.to_file.clone(), plan.to_rewritten.clone()),
+        ])?;
     }
 
     print_split_file_plan(&plan, args.output)

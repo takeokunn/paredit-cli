@@ -5,6 +5,7 @@ use super::*;
 fn rename_plan_blocks_ambiguous_definitions() {
     let gates = refactor_plan_gates(
         RefactorOperation::Rename,
+        RefactorPlanTargetKind::Callable,
         &summary(),
         vec![RawRefactorRisk {
             level: RefactorRiskLevel::Warning,
@@ -29,6 +30,91 @@ fn rename_plan_blocks_ambiguous_definitions() {
         &gates,
     );
     assert!(!policy.passed);
+}
+
+#[test]
+fn rename_plan_does_not_block_signature_mismatch_for_macro_targets() {
+    let gates = refactor_plan_gates(
+        RefactorOperation::Rename,
+        RefactorPlanTargetKind::Macro,
+        &summary(),
+        vec![RawRefactorRisk {
+            level: RefactorRiskLevel::Warning,
+            code: "signature-mismatch",
+            message: "macro-like definition".to_owned(),
+            count: 1,
+        }],
+    );
+
+    assert!(
+        gates
+            .iter()
+            .any(|gate| gate.code == "signature-mismatch" && !gate.blocks_automation)
+    );
+}
+
+#[test]
+fn rename_plan_does_not_block_signature_mismatch_for_macro_like_targets() {
+    for target_kind in [
+        RefactorPlanTargetKind::CompilerMacro,
+        RefactorPlanTargetKind::SetfExpander,
+        RefactorPlanTargetKind::SymbolMacro,
+    ] {
+        let gates = refactor_plan_gates(
+            RefactorOperation::Rename,
+            target_kind,
+            &summary(),
+            vec![RawRefactorRisk {
+                level: RefactorRiskLevel::Warning,
+                code: "signature-mismatch",
+                message: "macro-like definition".to_owned(),
+                count: 1,
+            }],
+        );
+
+        assert!(
+            gates
+                .iter()
+                .any(|gate| gate.code == "signature-mismatch" && !gate.blocks_automation)
+        );
+    }
+}
+
+#[test]
+fn symbol_macro_target_kind_is_treated_as_macro_like_for_signature_compatibility() {
+    assert!(RefactorPlanTargetKind::SymbolMacro.is_macro_like());
+    assert!(RefactorPlanTargetKind::SymbolMacro.skips_signature_compatibility());
+}
+
+#[test]
+fn symbol_macro_target_kind_skips_call_coverage_for_non_signature_operations() {
+    assert!(!RefactorPlanTargetKind::SymbolMacro.requires_call_coverage(RefactorOperation::Rename));
+    assert!(!RefactorPlanTargetKind::SymbolMacro.requires_call_coverage(RefactorOperation::Move));
+    assert!(RefactorPlanTargetKind::SymbolMacro.requires_call_coverage(RefactorOperation::Remove));
+    assert!(
+        !RefactorPlanTargetKind::SymbolMacro.requires_call_coverage(RefactorOperation::Signature)
+    );
+}
+
+#[test]
+fn rename_plan_still_blocks_signature_mismatch_for_callable_targets() {
+    let gates = refactor_plan_gates(
+        RefactorOperation::Rename,
+        RefactorPlanTargetKind::Callable,
+        &summary(),
+        vec![RawRefactorRisk {
+            level: RefactorRiskLevel::Warning,
+            code: "signature-mismatch",
+            message: "callable signature changed".to_owned(),
+            count: 1,
+        }],
+    );
+
+    assert!(
+        gates
+            .iter()
+            .any(|gate| gate.code == "signature-mismatch" && gate.blocks_automation)
+    );
 }
 
 #[test]

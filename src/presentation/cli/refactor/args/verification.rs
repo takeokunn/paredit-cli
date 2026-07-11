@@ -9,6 +9,9 @@ use super::super::super::{DialectArg, OutputFormat};
 use super::plan::RefactorOperation;
 
 #[derive(Debug, Args)]
+#[command(
+    after_help = "Examples:\n  paredit refactor verify --symbol old-name src/foo.lisp src/bar.lisp\n  paredit refactor verify --symbol old-name --new-symbol new-name --phase post src/foo.lisp src/bar.lisp"
+)]
 pub(in crate::presentation::cli) struct VerifyRefactorArgs {
     /// Files to scan.
     #[arg(required = true)]

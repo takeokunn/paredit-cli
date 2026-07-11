@@ -1,7 +1,7 @@
 use super::*;
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(24))]
+    #![proptest_config(cli_proptest_config(24))]
 
     #[test]
     fn pbt_cli_sort_package_exports_output_remains_parseable_and_ordered(

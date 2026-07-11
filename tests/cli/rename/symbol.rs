@@ -84,3 +84,32 @@ fn cli_writes_multi_file_symbol_rename_without_string_or_comment_matches() {
         "(defun new-name () (message \"old-name\") new-name) ; old-name"
     );
 }
+
+#[test]
+fn cli_renames_unqualified_occurrences_of_package_qualified_common_lisp_symbol() {
+    let dir = fresh_temp_dir("rename-qualified-common-lisp-symbol");
+    let lisp_file = dir.join("core.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun cl-user:old-name () old-name)\n(old-name cl-user:old-name)",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("rename-symbols")
+        .arg("--from")
+        .arg("cl-user:old-name")
+        .arg("--to")
+        .arg("new-name")
+        .arg("--write")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"count\": 4"))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(lisp_file).expect("read rewritten lisp"),
+        "(defun new-name () new-name)\n(new-name new-name)"
+    );
+}

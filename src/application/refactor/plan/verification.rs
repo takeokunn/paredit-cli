@@ -56,12 +56,18 @@ pub fn refactor_verification_checks(
                 checks.push(RefactorVerificationCheck {
                     code: "moved-symbol-present",
                     level: RefactorRiskLevel::Error,
-                    passed: request.before.definition_count > 0,
+                    passed: request
+                        .after
+                        .map(|after| after.definition_count > 0)
+                        .unwrap_or(false),
                     message: format!(
                         "Moved symbol `{}` must still have a discovered definition after the move.",
                         request.symbol
                     ),
-                    count: request.before.definition_count,
+                    count: request
+                        .after
+                        .map(|after| after.definition_count)
+                        .unwrap_or(0),
                 });
             }
 
@@ -77,15 +83,16 @@ pub fn refactor_verification_checks(
                             ),
                             count: after.reference_count + after.definition_count,
                         });
-                        checks.push(RefactorVerificationCheck {
-                            code: "new-symbol-signature-compatible",
-                            level: RefactorRiskLevel::Error,
-                            passed: after.signature_mismatch_count == 0,
-                            message:
-                                "New symbol call sites must match discovered callable definitions."
+                        if !request.target_kind.skips_signature_compatibility() {
+                            checks.push(RefactorVerificationCheck {
+                                code: "new-symbol-signature-compatible",
+                                level: RefactorRiskLevel::Error,
+                                passed: after.signature_mismatch_count == 0,
+                                message: "New symbol call sites must match discovered callable definitions."
                                     .to_owned(),
-                            count: after.signature_mismatch_count,
-                        });
+                                count: after.signature_mismatch_count,
+                            });
+                        }
                     }
                     _ => checks.push(RefactorVerificationCheck {
                         code: "new-symbol-required",
@@ -99,7 +106,9 @@ pub fn refactor_verification_checks(
                 }
             }
 
-            if request.operation == RefactorOperation::Signature {
+            if request.operation == RefactorOperation::Signature
+                && !request.target_kind.skips_signature_compatibility()
+            {
                 checks.push(RefactorVerificationCheck {
                     code: "signature-compatible",
                     level: RefactorRiskLevel::Error,

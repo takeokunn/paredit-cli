@@ -4,13 +4,13 @@ use anyhow::Result;
 
 use crate::application::usecase::call_report::build_call_report;
 use crate::application::usecase::signature_report::calls::classify_signature_call;
-use crate::application::usecase::signature_report::syntax::{
-    count_lambda_parameters, definition_name, lambda_list_index, list_head,
-};
+use crate::application::usecase::signature_report::syntax::list_head;
 use crate::application::usecase::signature_report::types::{
     SignatureCallItem, SignatureDefinitionItem, SignatureReportFile, SignatureReportSource,
 };
-use crate::domain::definition::classify_definition_head;
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::definition::DefinitionCategory;
+use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
 
@@ -71,37 +71,44 @@ pub(super) fn collect_signature_definitions(
     let mut definitions = Vec::new();
 
     for index in 0..tree.root_children().len() {
-        let path_indexes = vec![index];
-        let path = Path::from_indexes(path_indexes.clone());
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
         let Some(head) = list_head(&view) else {
             continue;
         };
-        let Some(category) = classify_definition_head(dialect, head) else {
+        let Some(shape) = definition_shape(dialect, &view, head) else {
             continue;
         };
-        if !category.is_callable() {
+        let is_symbol_macro_definition = shape.category == DefinitionCategory::Variable
+            && common_lisp_operator_head_eq(head, "define-symbol-macro");
+
+        if !shape.category.is_callable() && !is_symbol_macro_definition {
             continue;
         }
 
-        let Some(lambda_index) = lambda_list_index(&view, head) else {
-            continue;
-        };
-        let name = definition_name(&view, head).map(ToOwned::to_owned);
-        if name
-            .as_deref()
-            .is_none_or(|name| symbol.is_some_and(|target| name != target.as_str()))
-        {
+        let name = shape.name(&view).map(ToOwned::to_owned);
+        if name.as_deref().is_none_or(|name| {
+            symbol.is_some_and(|target| !common_lisp_symbol_name_eq(name, target.as_str()))
+        }) {
             continue;
         }
+
+        let parameter_count = if is_symbol_macro_definition {
+            None
+        } else {
+            let Some(parameter_count) = shape.lambda_parameter_count(&view) else {
+                continue;
+            };
+            Some(parameter_count)
+        };
 
         definitions.push(SignatureDefinitionItem {
-            path: Path::from_indexes(path_indexes).to_string(),
+            path: path.clone(),
             span: view.span,
             head: head.to_owned(),
             name,
-            category,
-            parameter_count: Some(count_lambda_parameters(&view.children[lambda_index])),
+            category: shape.category,
+            parameter_count,
         });
     }
 

@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::domain::sexpr::SymbolName;
+use crate::domain::{dialect::Dialect, sexpr::SymbolName};
 use proptest::prelude::*;
 
 mod add_export;

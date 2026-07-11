@@ -1,3 +1,4 @@
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
 use crate::domain::sexpr::ByteSpan;
 
 use super::types::{
@@ -26,7 +27,9 @@ pub fn collect_unused_definition_candidates(
                             other
                                 .atoms
                                 .iter()
-                                .filter(move |occurrence| occurrence.text == *name)
+                                .filter(move |occurrence| {
+                                    common_lisp_symbol_name_eq(&occurrence.text, name)
+                                })
                                 .filter(move |occurrence| {
                                     !(other_index == file_index
                                         && span_contains(definition.span, occurrence.span))

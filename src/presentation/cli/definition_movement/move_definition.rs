@@ -2,15 +2,13 @@ use std::fs;
 
 use anyhow::{Context, Result};
 
-use crate::application::usecase::definition_report::{
-    DefinitionReportItem, body_form_count, count_lambda_parameters, definition_name,
-    lambda_list_index,
-};
-use crate::domain::definition::classify_definition_head;
+use crate::application::usecase::definition_report::DefinitionReportItem;
+use crate::domain::definition::definition_shape;
 use crate::domain::sexpr::{Edit, SyntaxTree};
 
 use super::super::shared::{
     detect_dialect, list_head, package_context_before_top_level, read_file_or_empty, read_input,
+    write_files_with_rollback,
 };
 use super::args::MoveDefinitionArgs;
 use super::render::move_definition::print_move_definition_plan;
@@ -57,20 +55,19 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
     let Some(head) = list_head(&view) else {
         anyhow::bail!("selected top-level form is not a list definition");
     };
-    let Some(category) = classify_definition_head(from_dialect, head) else {
+    let Some(shape) = definition_shape(from_dialect, &view, head) else {
         anyhow::bail!("selected top-level form is not recognized as a definition: {head}");
     };
 
     let definition_text = selection.text(&from_input.text).to_owned();
-    let lambda_index = lambda_list_index(&view, head);
     let definition = DefinitionReportItem {
         path: args.path.to_string(),
         span,
         head: head.to_owned(),
-        name: definition_name(&view, head).map(ToOwned::to_owned),
-        category,
-        parameter_count: lambda_index.map(|index| count_lambda_parameters(&view.children[index])),
-        body_form_count: body_form_count(&view, lambda_index),
+        name: shape.name(&view).map(ToOwned::to_owned),
+        category: shape.category,
+        parameter_count: shape.lambda_parameter_count(&view),
+        body_form_count: Some(shape.body_form_count(&view)),
         package: package_context_before_top_level(&from_tree, target_index)?,
     };
     let from_rewritten = Edit::kill(&from_input.text, &from_tree, selection)?;
@@ -92,10 +89,10 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
     let changed = from_rewritten != from_input.text || to_rewritten != to_input.text;
     let written = args.write && changed;
     if written {
-        fs::write(&args.from_file, &from_rewritten)
-            .with_context(|| format!("failed to write {}", args.from_file.display()))?;
-        fs::write(&args.to_file, &to_rewritten)
-            .with_context(|| format!("failed to write {}", args.to_file.display()))?;
+        write_files_with_rollback([
+            (args.from_file.clone(), from_rewritten.clone()),
+            (args.to_file.clone(), to_rewritten.clone()),
+        ])?;
     }
 
     let plan = MoveDefinitionPlan {

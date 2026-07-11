@@ -12,7 +12,7 @@ pub(super) fn print_workspace_refactor_execute_text(
     let write_plan = preview.write_plan();
     let writable_files = preview.writable_paths_for_write_plan(&write_plan);
     let refused_files = preview.refused_paths_for_write_plan(&write_plan);
-    println!("command\tworkspace-refactor-execute");
+    println!("command\trefactor workspace-execute");
     println!("mode\t{}", preview.mode.label());
     println!("from\t{}", preview.from);
     println!("to\t{}", preview.to);

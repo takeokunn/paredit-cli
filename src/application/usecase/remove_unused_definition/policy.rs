@@ -27,15 +27,16 @@ pub(super) fn collect_exported_symbol_index(
     let mut exported = HashMap::new();
 
     for package in packages {
-        let symbols = exported
-            .entry(normalize_package_key(&package.name))
-            .or_insert_with(HashSet::new);
-        symbols.extend(
-            package
-                .exports
-                .iter()
-                .map(|symbol| normalize_symbol_key(symbol)),
-        );
+        let normalized_exports: Vec<String> = package
+            .exports
+            .iter()
+            .map(|symbol| normalize_symbol_key(symbol))
+            .collect();
+
+        for package_key in package_export_keys(package) {
+            let symbols = exported.entry(package_key).or_insert_with(HashSet::new);
+            symbols.extend(normalized_exports.iter().cloned());
+        }
     }
 
     exported
@@ -56,6 +57,20 @@ pub(super) fn definition_is_exported(
 
 fn normalize_package_key(value: &str) -> String {
     normalize_keyword_prefix(value).to_ascii_lowercase()
+}
+
+fn package_export_keys(package: &PackageDefinitionReport) -> Vec<String> {
+    let mut keys = Vec::with_capacity(1 + package.nicknames.len());
+    keys.push(normalize_package_key(&package.name));
+    keys.extend(
+        package
+            .nicknames
+            .iter()
+            .map(|nickname| normalize_package_key(nickname)),
+    );
+    keys.sort();
+    keys.dedup();
+    keys
 }
 
 fn normalize_symbol_key(value: &str) -> String {

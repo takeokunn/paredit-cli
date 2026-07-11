@@ -1,10 +1,8 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
 use crate::application::usecase::package as package_usecase;
 
-use super::super::{detect_dialect, read_input};
+use super::super::{detect_dialect, read_input, write_file_with_rollback};
 use super::{
     render::print_rename_package_plan,
     types::{RenamePackageArgs, RenamePackageFilePlan},
@@ -19,6 +17,7 @@ pub(in crate::presentation::cli) fn rename_package(args: RenamePackageArgs) -> R
         let usecase_plan =
             package_usecase::plan_rename_package(package_usecase::RenamePackageRequest {
                 input: &input.text,
+                dialect,
                 from: &args.from,
                 to: &args.to,
             })
@@ -27,8 +26,7 @@ pub(in crate::presentation::cli) fn rename_package(args: RenamePackageArgs) -> R
         let written = args.write && changed;
 
         if written {
-            fs::write(file, &usecase_plan.rewritten)
-                .with_context(|| format!("failed to write {}", file.display()))?;
+            write_file_with_rollback(file.clone(), usecase_plan.rewritten.clone())?;
         }
 
         plans.push(RenamePackageFilePlan {

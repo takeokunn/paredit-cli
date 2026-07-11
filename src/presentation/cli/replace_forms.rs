@@ -59,8 +59,7 @@ pub(super) fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
         let Some(path) = file.as_ref() else {
             anyhow::bail!("replace-forms --write requires --file");
         };
-        fs::write(path, &plan.rewritten)
-            .with_context(|| format!("failed to write {}", path.display()))?;
+        write_file_with_rollback(path.clone(), plan.rewritten.clone())?;
     }
 
     print_replace_forms_plan(&plan, file.as_ref(), dialect, written, output)

@@ -3,10 +3,12 @@ mod forms;
 mod patterns;
 mod symbols;
 
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::is_common_lisp_declaration_form;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
-use super::syntax::atom_text;
+use super::syntax::{atom_text, list_head};
 use forms::collect_inferred_extract_function_special_form;
 use symbols::is_extract_function_param_candidate;
 
@@ -27,6 +29,13 @@ pub(super) fn infer_extract_function_params(
     params
 }
 
+pub(super) fn extract_function_param_name_eq(dialect: Dialect, left: &str, right: &str) -> bool {
+    match dialect {
+        Dialect::CommonLisp | Dialect::Unknown => common_lisp_symbol_name_eq(left, right),
+        _ => left == right,
+    }
+}
+
 fn collect_inferred_extract_function_params(
     dialect: Dialect,
     view: &ExpressionView,
@@ -38,13 +47,27 @@ fn collect_inferred_extract_function_params(
     if let Some(text) = atom_text(view) {
         if !is_call_head
             && is_extract_function_param_candidate(text)
-            && !explicit_params.iter().any(|param| param == text)
-            && !bound_params.iter().any(|param| param == text)
-            && !params.iter().any(|param| param == text)
+            && !explicit_params
+                .iter()
+                .any(|param| extract_function_param_name_eq(dialect, param, text))
+            && !bound_params
+                .iter()
+                .any(|param| extract_function_param_name_eq(dialect, param, text))
+            && !params
+                .iter()
+                .any(|param| extract_function_param_name_eq(dialect, param, text))
         {
             params.push(text.to_owned());
         }
         return;
+    }
+
+    if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
+        if let Some(head) = list_head(view) {
+            if is_common_lisp_declaration_form(head) {
+                return;
+            }
+        }
     }
 
     if collect_inferred_extract_function_special_form(

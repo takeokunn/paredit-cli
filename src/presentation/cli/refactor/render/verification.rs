@@ -15,6 +15,7 @@ pub(in crate::presentation::cli) fn print_refactor_verification(
                 verification.new_symbol.as_deref().unwrap_or("<none>")
             );
             println!("passed\t{}", verification.passed);
+            println!("target_kind\t{}", verification.target_kind.label());
             println!(
                 "before_safe_to_automate\t{}",
                 verification.before.safe_to_automate
@@ -65,6 +66,7 @@ pub(in crate::presentation::cli) fn print_refactor_verification(
                 "symbol": verification.symbol.as_str(),
                 "new_symbol": verification.new_symbol.as_deref(),
                 "passed": verification.passed,
+                "target_kind": verification.target_kind.label(),
                 "before": refactor_summary_json(verification.before),
                 "after": verification.after.map(refactor_summary_json),
                 "checks": verification

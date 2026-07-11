@@ -20,6 +20,50 @@ impl RefactorOperation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RefactorPlanTargetKind {
+    Callable,
+    Macro,
+    CompilerMacro,
+    SetfExpander,
+    SymbolMacro,
+    Unknown,
+}
+
+impl RefactorPlanTargetKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Callable => "callable",
+            Self::Macro => "macro",
+            Self::CompilerMacro => "compiler_macro",
+            Self::SetfExpander => "setf_expander",
+            Self::SymbolMacro => "symbol_macro",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    pub fn is_macro_like(self) -> bool {
+        matches!(
+            self,
+            Self::Macro | Self::CompilerMacro | Self::SetfExpander | Self::SymbolMacro
+        )
+    }
+
+    pub fn skips_signature_compatibility(self) -> bool {
+        self.is_macro_like()
+    }
+
+    pub fn requires_call_coverage(self, operation: RefactorOperation) -> bool {
+        match operation {
+            RefactorOperation::Rename | RefactorOperation::Move => {
+                !matches!(self, Self::SymbolMacro)
+            }
+            RefactorOperation::Signature => !self.skips_signature_compatibility(),
+            RefactorOperation::Remove => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationPhase {
     Pre,
     Post,
@@ -248,6 +292,7 @@ pub struct RefactorVerificationRequest<'a> {
     pub phase: VerificationPhase,
     pub symbol: &'a str,
     pub new_symbol: Option<&'a str>,
+    pub target_kind: RefactorPlanTargetKind,
     pub before: RefactorPlanSummary,
     pub after: Option<RefactorPlanSummary>,
 }
@@ -265,6 +310,7 @@ pub struct RefactorPlanRequest<'a> {
     pub operation: RefactorOperation,
     pub symbol: &'a str,
     pub files: &'a [PathBuf],
+    pub target_kind: RefactorPlanTargetKind,
     pub summary: RefactorPlanSummary,
     pub policy: RefactorPlanPolicyRequest,
     pub risks: Vec<RawRefactorRisk>,

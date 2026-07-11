@@ -1,10 +1,14 @@
-use crate::domain::sexpr::{ByteSpan, SymbolName};
+use crate::domain::{
+    dialect::Dialect,
+    sexpr::{ByteSpan, SymbolName},
+};
 
 use super::PackageOptionSortOrder;
 
 #[derive(Debug, Clone)]
 pub struct AddExportRequest<'a> {
     pub input: &'a str,
+    pub dialect: Dialect,
     pub package: Option<&'a SymbolName>,
     pub symbol: &'a SymbolName,
 }
@@ -25,6 +29,7 @@ pub struct AddExportPlan {
 #[derive(Debug, Clone)]
 pub struct RenamePackageRequest<'a> {
     pub input: &'a str,
+    pub dialect: Dialect,
     pub from: &'a SymbolName,
     pub to: &'a SymbolName,
 }
@@ -39,12 +44,14 @@ pub struct RenamePackagePlan {
 #[derive(Debug, Clone)]
 pub struct SortPackageExportsRequest<'a> {
     pub input: &'a str,
+    pub dialect: Dialect,
     pub package: Option<&'a SymbolName>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SortPackageOptionsRequest<'a> {
     pub input: &'a str,
+    pub dialect: Dialect,
     pub package: Option<&'a SymbolName>,
     pub order: PackageOptionSortOrder,
 }
@@ -52,6 +59,7 @@ pub struct SortPackageOptionsRequest<'a> {
 #[derive(Debug, Clone)]
 pub struct MergePackageOptionsRequest<'a> {
     pub input: &'a str,
+    pub dialect: Dialect,
     pub package: Option<&'a SymbolName>,
 }
 

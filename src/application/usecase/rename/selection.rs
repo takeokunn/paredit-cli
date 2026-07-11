@@ -1,6 +1,7 @@
 use anyhow::Result;
 
-use crate::domain::definition::definition_name_child_index;
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+pub(super) use crate::domain::sexpr::reader::atom_text;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Selection, SymbolName, SyntaxTree,
 };
@@ -22,7 +23,7 @@ pub(super) fn collect_symbol_atom_spans(
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
 ) {
-    if atom_text(view).is_some_and(|text| text == symbol.as_str()) {
+    if atom_text(view).is_some_and(|text| common_lisp_symbol_name_eq(text, symbol.as_str())) {
         output.push(view.span);
         return;
     }
@@ -72,18 +73,8 @@ pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {
     atom_child(view, 0)
 }
 
-pub(super) fn definition_name<'a>(view: &'a ExpressionView, head: &str) -> Option<&'a str> {
-    definition_name_child_index(head).and_then(|index| atom_child(view, index))
-}
-
-fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
-}
-
-pub(super) fn atom_text(view: &ExpressionView) -> Option<&str> {
-    (view.kind == ExpressionKind::Atom)
-        .then_some(view.text.as_deref())
-        .flatten()
 }
 
 pub(super) fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {

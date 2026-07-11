@@ -1,6 +1,17 @@
 use super::*;
 
 #[test]
+fn cli_requires_file_for_replace_forms_writes() {
+    let mut cmd = paredit();
+    cmd.args(["replace-forms", "--path", "0", "--with", "(x)", "--write"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "replace-forms --write requires --file",
+        ));
+}
+
+#[test]
 fn cli_plans_replace_forms_for_duplicate_refactor() {
     let dir = fresh_temp_dir("replace-forms-plan");
     let lisp_file = dir.join("suite.lisp");

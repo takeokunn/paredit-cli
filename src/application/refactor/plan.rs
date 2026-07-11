@@ -14,14 +14,26 @@ pub use types::{
     RefactorPlanAutomationStatus, RefactorPlanAutomationStep, RefactorPlanAutomationStepStatus,
     RefactorPlanDecision, RefactorPlanGate, RefactorPlanPolicy, RefactorPlanPolicyRequest,
     RefactorPlanRequest, RefactorPlanRiskSummary, RefactorPlanStep, RefactorPlanSummary,
-    RefactorRiskLevel, RefactorVerificationCheck, RefactorVerificationRequest, VerificationPhase,
+    RefactorPlanTargetKind, RefactorRiskLevel, RefactorVerificationCheck,
+    RefactorVerificationRequest, VerificationPhase,
 };
 pub use verification::refactor_verification_checks;
 
 pub fn build_refactor_plan_decision(request: RefactorPlanRequest<'_>) -> RefactorPlanDecision {
-    let gates = refactor_plan_gates(request.operation, &request.summary, request.risks);
+    let gates = refactor_plan_gates(
+        request.operation,
+        request.target_kind,
+        &request.summary,
+        request.risks,
+    );
     let risk_summary = RefactorPlanRiskSummary::from_gates(&gates);
-    let steps = refactor_plan_steps(request.operation, request.symbol, request.files, &gates);
+    let steps = refactor_plan_steps(
+        request.operation,
+        request.symbol,
+        request.files,
+        request.target_kind,
+        &gates,
+    );
     let policy = evaluate_refactor_plan_policy(request.policy, &request.summary, &gates);
     let automation = refactor_plan_automation_decision(&policy, &steps);
 
@@ -55,6 +67,17 @@ pub fn refactor_plan_automation_decision(
             next_action: "resolve-policy-violations",
             safe_to_automate: false,
             policy_passed: false,
+            blocking_gate_count: policy.blocking_gate_count,
+        };
+    }
+
+    if apply_action.starts_with("review-") {
+        return RefactorPlanAutomationDecision {
+            status: RefactorPlanAutomationStatus::ManualReview,
+            reason: format!("{apply_action} requires manual review before automated edits"),
+            next_action: apply_action,
+            safe_to_automate: false,
+            policy_passed: true,
             blocking_gate_count: policy.blocking_gate_count,
         };
     }

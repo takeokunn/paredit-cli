@@ -1,18 +1,25 @@
+use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::sexpr::reader::atom_symbol_text;
 use crate::domain::sexpr::{ExpressionView, Path};
 
-use crate::application::usecase::dependency_report::syntax::{
-    atom_text, package_qualified_dependency_target,
-};
+use crate::application::usecase::dependency_report::syntax::package_qualified_dependency_target;
 use crate::application::usecase::dependency_report::types::{DependencyKind, DependencyReportItem};
 
 pub(super) fn collect_qualified_symbol_dependency(
     view: &ExpressionView,
-    path_indexes: &[usize],
+    path: &Path,
+    local_bindings: &[String],
     dependencies: &mut Vec<DependencyReportItem>,
 ) {
-    let Some(atom) = atom_text(view) else {
+    let Some(atom) = atom_symbol_text(view) else {
         return;
     };
+    if local_bindings
+        .iter()
+        .any(|binding| common_lisp_symbol_name_eq(binding, atom))
+    {
+        return;
+    }
     let Some(target) = package_qualified_dependency_target(atom) else {
         return;
     };
@@ -20,7 +27,7 @@ pub(super) fn collect_qualified_symbol_dependency(
     dependencies.push(DependencyReportItem {
         kind: DependencyKind::QualifiedSymbol,
         target,
-        path: Path::from_indexes(path_indexes.to_vec()).to_string(),
+        path: path.to_string(),
         span: view.span,
         source: Some(atom.to_owned()),
     });

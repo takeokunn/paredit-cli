@@ -66,8 +66,7 @@ pub(super) fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
     if args.write {
         let file = input.file.as_ref().context("--write requires --file")?;
         if plan.changed {
-            fs::write(file, &plan.rewritten)
-                .with_context(|| format!("write {}", file.display()))?;
+            write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
         }
         written = true;
     }

@@ -1,9 +1,15 @@
-use crate::domain::sexpr::{ExpressionKind, ExpressionView};
+use crate::domain::{
+    common_lisp::CommonLispPackageDeclarationForm,
+    dialect::Dialect,
+    sexpr::{ExpressionKind, ExpressionView},
+};
 
-pub(super) fn is_package_head(head: &str, expected: &str) -> bool {
-    head.rsplit(':')
-        .next()
-        .is_some_and(|name| name.eq_ignore_ascii_case(expected))
+pub(super) fn is_package_head(
+    dialect: Dialect,
+    head: &str,
+    expected: CommonLispPackageDeclarationForm,
+) -> bool {
+    dialect.common_lisp_package_declaration_form_for_head(head) == Some(expected)
 }
 
 pub(super) fn package_option_name(head: &str) -> String {

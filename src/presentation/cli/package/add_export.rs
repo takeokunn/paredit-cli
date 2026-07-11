@@ -1,10 +1,8 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
 use crate::application::usecase::package as package_usecase;
 
-use super::super::{detect_dialect, read_input};
+use super::super::{detect_dialect, read_input, write_file_with_rollback};
 use super::{
     render::print_add_export_plan,
     types::{AddExportArgs, AddExportPlan},
@@ -15,6 +13,7 @@ pub(in crate::presentation::cli) fn add_export(args: AddExportArgs) -> Result<()
     let dialect = detect_dialect(&input, args.dialect);
     let usecase_plan = package_usecase::plan_add_export(package_usecase::AddExportRequest {
         input: &input.text,
+        dialect,
         package: args.package.as_ref(),
         symbol: &args.symbol,
     })
@@ -23,8 +22,7 @@ pub(in crate::presentation::cli) fn add_export(args: AddExportArgs) -> Result<()
     let written = args.write && changed;
 
     if written {
-        fs::write(&args.file, &usecase_plan.rewritten)
-            .with_context(|| format!("failed to write {}", args.file.display()))?;
+        write_file_with_rollback(args.file.clone(), usecase_plan.rewritten.clone())?;
     }
 
     let plan = AddExportPlan {
