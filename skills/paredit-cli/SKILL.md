@@ -1,7 +1,7 @@
 ---
 name: paredit-cli
 description: This skill should be used when refactoring Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming symbols, functions, macrolet/flet/labels bindings, or packages; moving or splitting definitions between files; extracting, inlining, or reparametrizing functions; threading/unthreading call chains; or removing unused definitions. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
-version: 1.0.0
+version: 1.1.0
 ---
 
 <purpose>
@@ -50,6 +50,7 @@ version: 1.0.0
     <command>paredit inspect dependencies --output json system.asd src/*.lisp</command>
     <command>paredit inspect packages --output json system.asd src/*.lisp</command>
     <command>paredit inspect duplicates --output json src/*.lisp</command>
+    <command>paredit inspect similarity --threshold 0.87 --output json src</command>
   </group>
 
   <group name="rename">
@@ -81,6 +82,7 @@ version: 1.0.0
   <group name="function_shape">
     <description>Function-level refactors: signature changes propagate to explicit call sites.</description>
     <command>paredit refactor extract-function --file f.lisp --path 0.3 --name helper --param value --output json</command>
+    <command>paredit refactor extract-constant --file f.lisp --path 0.3.1 --name +limit+ --output json</command>
     <command>paredit refactor inline-function --file f.lisp --definition-path 0 --call-path 1.3 --output json</command>
     <command>paredit refactor add-function-parameter --file f.lisp --definition-path 0 --name ctx --argument '*ctx*' --all-calls --output json</command>
     <command>paredit refactor move-function-parameter --file f.lisp --definition-path 0 --name ctx --to-index 0 --all-calls --output json</command>
@@ -166,6 +168,7 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <branch condition="Changing a function's parameter list">Use add/move/swap/reorder/remove-function-parameter, always with --all-calls or explicit --call-path</branch>
   <branch condition="Relocating top-level forms">Use move-definition, move-form, or split-file</branch>
   <branch condition="One-off structural edit at a specific path">Use a structural primitive (replace, wrap, splice, raise, slurp/barf)</branch>
+  <branch condition="Consolidating duplicated or near-duplicated code">Use `inspect duplicates` for exact shapes and `inspect similarity` for near-duplicates, then replacement-plan/replace-forms or extract-function/extract-constant</branch>
   <branch condition="Deleting dead code">Use unused-definition-report first, only then remove-unused-definitions --write</branch>
 </decision_tree>
 

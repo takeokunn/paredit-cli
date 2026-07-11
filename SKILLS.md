@@ -66,6 +66,7 @@ timeout 10s paredit refactor move-definition --from-file src/core.lisp --to-file
 timeout 10s paredit refactor move-form --from-file src/core.lisp --to-file src/system.lisp --path 2 --output json
 timeout 10s paredit refactor move-form --from-file src/core.lisp --to-file src/system.lisp --path 2 --insert before --anchor-path 1 --write
 timeout 10s paredit inspect duplicates --output json src/*.lisp test/*.lisp elisp/*.el
+timeout 10s paredit inspect similarity --output json src/*.lisp test/*.lisp elisp/*.el
 timeout 10s paredit refactor replacement-plan --replacement '(run-case)' --output json src/*.lisp test/*.lisp elisp/*.el
 timeout 10s paredit edit replace-forms --file test/suite.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json
 timeout 10s paredit edit replace-forms --file test/suite.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --write
@@ -88,6 +89,8 @@ timeout 10s paredit refactor unthread-expression --file target.clj --path 0 --ou
 timeout 10s paredit refactor unthread-expression --file target.clj --path 0 --write
 timeout 10s paredit refactor extract-function --file target.lisp --path 0.3 --name helper --param value --output json
 timeout 10s paredit refactor extract-function --file target.lisp --path 0.3 --name helper --param value --insert before --anchor-path 2 --write
+timeout 10s paredit refactor extract-constant --file target.lisp --path 0.3.1 --name +max-retries+ --output json
+timeout 10s paredit refactor extract-constant --file target.lisp --path 0.3.1 --name +max-retries+ --insert before --anchor-path 2 --write
 timeout 10s paredit refactor inline-function --file target.lisp --definition-path 0 --call-path 1.3 --output json
 timeout 10s paredit refactor inline-function --file target.lisp --definition-path 0 --all-calls --output json
 timeout 10s paredit refactor inline-function --file target.lisp --definition-path 0 --call-path 1.3 --remove-definition --write
@@ -140,6 +143,7 @@ mv /tmp/target.lisp target.lisp
 - Move a reviewed top-level definition between files: `paredit refactor move-definition --from-file src/core.lisp --to-file src/render.lisp --path 2 --write`
 - Move a reviewed non-definition top-level form between files: `paredit refactor move-form --from-file src/core.lisp --to-file src/system.lisp --path 2 --insert before --anchor-path 1 --write`
 - Report repeated S-expression shapes before helper extraction or table-driven refactors: `paredit inspect duplicates --output json src/*.lisp test/*.lisp elisp/*.el`
+- Report structurally similar forms that exact shape matching misses, ranked by normalized similarity: `paredit inspect similarity --threshold 0.87 --output json src test`
 - Convert duplicate-shape findings into reviewed per-file replacement batches: `paredit refactor replacement-plan --replacement '(run-case)' --output json src/*.lisp test/*.lisp elisp/*.el`
 - Replace reviewed duplicate forms with a helper, macro, or table-driven call: `paredit edit replace-forms --file test/suite.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json`
 - Add a reviewed Common Lisp public export: `paredit refactor add-export --file src/package.lisp --package demo --symbol #:new-api --write`
@@ -165,6 +169,8 @@ mv /tmp/target.lisp target.lisp
 - Apply a multi-file rename after review: `paredit refactor rename-symbols --from old --to new --write src/*.lisp elisp/*.el`
 - Extract a selected expression into a helper with explicit parameters: `paredit refactor extract-function --file target.lisp --path 0.3 --name helper --param value --output json`
 - Apply the reviewed helper extraction at an anchored top-level position: `paredit refactor extract-function --file target.lisp --path 0.3 --name helper --param value --insert before --anchor-path 2 --write`
+- Extract a reviewed magic value or repeated expression into a top-level constant: `paredit refactor extract-constant --file target.lisp --path 0.3.1 --name +max-retries+ --output json`
+- Apply the reviewed constant extraction at an anchored top-level position: `paredit refactor extract-constant --file target.lisp --path 0.3.1 --name +max-retries+ --insert before --anchor-path 2 --write`
 - Plan a reviewed helper inline at one call site: `paredit refactor inline-function --file target.lisp --definition-path 0 --call-path 1.3 --output json`
 - Plan a reviewed helper inline across all same-file calls: `paredit refactor inline-function --file target.lisp --definition-path 0 --all-calls --output json`
 - Apply the reviewed helper inline and remove the selected definition only after every reported `calls` entry has been checked: `paredit refactor inline-function --file target.lisp --definition-path 0 --all-calls --remove-definition --write`
@@ -246,6 +252,13 @@ mv /tmp/target.lisp target.lisp
 - Use `duplicate-report` before macro extraction, helper extraction, and
   table-driven test refactors; compare repeated shapes with behavior coverage
   before abstracting.
+- Use `paredit inspect similarity` when exact duplicate shapes miss
+  near-duplicates; tune `--threshold`, `--min-node-count`, and
+  `--comparison-scope` before proposing consolidation, and use
+  `--fail-on-duplicates` as a CI gate.
+- Use `extract-constant` for reviewed magic-value cleanup; run the JSON plan
+  first, then apply `--write` with `--insert before/after --anchor-path` when
+  constant placement affects compile or load order.
 - Use `replacement-plan` after duplicate review to generate per-file
   `replace-forms` command batches; inspect `paths`, `replace_forms_args`, and
   original texts before applying a real replacement.

@@ -4,9 +4,7 @@ use assert_cmd::Command;
 use assert_cmd::assert::Assert;
 
 fn remove_command() -> Command {
-    let mut command = paredit();
-    command.arg("refactor");
-    command
+    paredit()
 }
 
 fn run_remove_with_stdin(args: &[&str], input: &str) -> std::process::Output {
