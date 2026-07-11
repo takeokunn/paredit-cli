@@ -11,9 +11,10 @@ use crate::domain::dialect::Dialect;
 pub fn discover_workspace_files(options: &WorkspaceDiscoveryOptions) -> Result<WorkspaceDiscovery> {
     let mut discovery = WorkspaceDiscovery::default();
     let mut seen = BTreeSet::new();
+    let excludes = normalized_excludes(&options.exclude)?;
 
     for root in &options.roots {
-        collect_workspace_files(root, 0, options, &mut discovery, &mut seen)
+        collect_workspace_files(root, 0, options, &excludes, &mut discovery, &mut seen)
             .with_context(|| format!("failed to scan {}", root.display()))?;
     }
 
@@ -25,9 +26,15 @@ fn collect_workspace_files(
     path: &Path,
     depth: usize,
     options: &WorkspaceDiscoveryOptions,
+    excludes: &[PathBuf],
     discovery: &mut WorkspaceDiscovery,
     seen: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
+    if is_excluded(path, excludes)? {
+        discovery.skipped_excluded_count += 1;
+        return Ok(());
+    }
+
     let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("failed to inspect {}", path.display()))?;
 
@@ -37,7 +44,7 @@ fn collect_workspace_files(
     }
 
     if metadata.is_dir() {
-        collect_workspace_directory(path, depth, options, discovery, seen)?;
+        collect_workspace_directory(path, depth, options, excludes, discovery, seen)?;
         return Ok(());
     }
 
@@ -52,6 +59,7 @@ fn collect_workspace_directory(
     path: &Path,
     depth: usize,
     options: &WorkspaceDiscoveryOptions,
+    excludes: &[PathBuf],
     discovery: &mut WorkspaceDiscovery,
     seen: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
@@ -80,10 +88,44 @@ fn collect_workspace_directory(
     entries.sort();
 
     for entry in entries {
-        collect_workspace_files(&entry, depth + 1, options, discovery, seen)?;
+        collect_workspace_files(&entry, depth + 1, options, excludes, discovery, seen)?;
     }
 
     Ok(())
+}
+
+fn normalized_excludes(excludes: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    let current_dir = std::env::current_dir().context("failed to resolve current directory")?;
+    let mut normalized = excludes
+        .iter()
+        .map(|path| {
+            let absolute = if path.is_absolute() {
+                path.clone()
+            } else {
+                current_dir.join(path)
+            };
+            fs::canonicalize(&absolute).unwrap_or(absolute)
+        })
+        .collect::<Vec<_>>();
+    normalized.sort();
+    normalized.dedup();
+    Ok(normalized)
+}
+
+fn is_excluded(path: &Path, excludes: &[PathBuf]) -> Result<bool> {
+    if excludes.is_empty() {
+        return Ok(false);
+    }
+    let current_dir = std::env::current_dir().context("failed to resolve current directory")?;
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        current_dir.join(path)
+    };
+    let normalized = fs::canonicalize(&absolute).unwrap_or(absolute);
+    Ok(excludes
+        .iter()
+        .any(|exclude| normalized.starts_with(exclude)))
 }
 
 fn collect_workspace_file(

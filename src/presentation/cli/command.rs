@@ -1,10 +1,11 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_report, extract_function, form_report, function_parameter,
-    impact_report, inline_function, inline_let, introduce_let, let_report, package, refactor,
-    remove_unused_binding, rename, replace_forms, signature_report, symbol_report,
-    thread_expression, unthread_expression, unwrap_call, workspace_report,
+    dependency_report, duplicate_report, extract_constant, extract_function, form_report,
+    function_parameter, impact_report, inline_function, inline_let, introduce_let, let_report,
+    package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
+    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -47,6 +48,8 @@ pub(super) enum InspectCommand {
     UnusedDefinitions(definition_report::args::UnusedDefinitionReportArgs),
     /// Report repeated structural S-expression shapes across explicit files.
     Duplicates(duplicate_report::args::DuplicateReportArgs),
+    /// Report structurally similar S-expression forms across explicit files.
+    Similarity(similarity_report::args::SimilarityReportArgs),
     /// Report local let bindings and inline safety for agent refactor planning.
     Lets(let_report::LetReportArgs),
 }
@@ -137,13 +140,13 @@ pub(super) enum RefactorCommand {
     RenameBinding(rename::args::RenameBindingArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(rename::args::RenameSymbolsArgs),
-    /// Plan or apply a Common Lisp callable definition and callable-designator rename.
+    /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files, including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names, and definition forms such as define-method-combination.
     RenameFunction(rename::args::RenameFunctionArgs),
-    /// Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename.
+    /// Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename across explicit files while keeping expander bodies out of scope.
     RenameMacrolet(rename::args::RenameMacroletArgs),
-    /// Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename.
+    /// Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename across explicit files while keeping expansion and lexical shadowing boundaries separate.
     RenameSymbolMacro(rename::args::RenameSymbolMacroArgs),
-    /// Plan or apply a Common Lisp flet/labels local function binding and call-site rename.
+    /// Plan or apply a Common Lisp flet/labels local function binding and call-site rename across explicit files, preserving the difference between non-recursive flet bodies and recursive labels bodies.
     RenameLocalFunction(rename::args::RenameLocalFunctionArgs),
     /// Plan or replace callable call-site heads across explicit files.
     ReplaceFunctionCalls(rename::args::ReplaceFunctionCallsArgs),
@@ -159,6 +162,8 @@ pub(super) enum RefactorCommand {
     UnthreadExpression(unthread_expression::UnthreadExpressionArgs),
     /// Extract the selected expression into a zero-argument top-level function.
     ExtractFunction(extract_function::ExtractFunctionArgs),
+    /// Extract the selected expression into a top-level constant.
+    ExtractConstant(extract_constant::ExtractConstantArgs),
     /// Inline one selected function call using a selected function definition.
     InlineFunction(inline_function::InlineFunctionArgs),
     /// Add a parameter to a selected function and explicit call sites.

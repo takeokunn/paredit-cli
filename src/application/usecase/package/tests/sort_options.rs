@@ -45,6 +45,25 @@ fn sorts_package_options_in_canonical_order_without_reformatting_bodies() {
 }
 
 #[test]
+fn sorts_options_only_in_target_defpackage_among_mixed_top_level_forms() {
+    let input = "(in-package #:cl-user)\n(defpackage #:other (:export #:x) (:use #:cl))\n42\n(defpackage #:target (:export #:y) (:use #:cl))\n(main)\n";
+    let plan = plan_sort_package_options(SortPackageOptionsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: Some(&SymbolName::new("target").unwrap()),
+        order: PackageOptionSortOrder::Canonical,
+    })
+    .unwrap();
+
+    assert_eq!(plan.packages.len(), 1);
+    assert_eq!(plan.packages[0].package, "#:target");
+    assert_eq!(
+        plan.rewritten,
+        "(in-package #:cl-user)\n(defpackage #:other (:export #:x) (:use #:cl))\n42\n(defpackage #:target (:use #:cl) (:export #:y))\n(main)\n"
+    );
+}
+
+#[test]
 fn sorts_package_options_by_name_when_requested() {
     let input =
         "(defpackage #:demo\n  (:use #:cl)\n  (:export #:main)\n  (:documentation \"demo\"))\n";

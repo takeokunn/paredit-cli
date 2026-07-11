@@ -37,6 +37,12 @@ with no external effect.
 
 ### Added
 
+- `paredit inspect similarity`: report structurally similar S-expression
+  forms across explicit files, with configurable analysis scopes, path
+  exclusions, and bounded candidate collection so large workspaces scan
+  predictably.
+- `paredit refactor extract-constant`: extract the selected expression into a
+  top-level constant.
 - A published documentation site built with mdBook from `docs/src`
   (<https://takeokunn.github.io/paredit-cli/>), covering the command model,
   the refactor workflow lifecycle, safety guidance, and CI/Nix integrations.

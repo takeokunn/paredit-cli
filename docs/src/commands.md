@@ -37,6 +37,7 @@ discovery, impact analysis, and preflight checks.
 | `definitions` | Report definition-like top-level forms across explicit files. |
 | `unused-definitions` | Report definitions with no external exact atom references. |
 | `duplicates` | Report repeated structural S-expression shapes across explicit files. |
+| `similarity` | Report structurally similar S-expression forms across explicit files. |
 | `lets` | Report local let bindings and inline safety for refactor planning. |
 
 Most reports accept `--output json` for machine-readable results.
@@ -135,6 +136,7 @@ plan/preview/verify/apply lifecycle.
 | `thread-expression` | Convert a nested call chain into a thread-first or thread-last pipeline. |
 | `unthread-expression` | Convert a threading pipeline back into nested calls. |
 | `extract-function` | Extract the selected expression into a zero-argument top-level function. |
+| `extract-constant` | Extract the selected expression into a top-level constant. |
 | `inline-function` | Inline one selected function call using a selected function definition. |
 
 ### Parameters and bindings

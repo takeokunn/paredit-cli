@@ -6,8 +6,12 @@ mod write;
 
 fn assert_plan_output(args: &[&str], input: &str, checks: &[&str]) {
     let mut cmd = paredit();
-    cmd.arg("refactor");
-    let mut assert = cmd.args(args).write_stdin(input).assert().success();
+    let mut assert = cmd
+        .arg("refactor")
+        .args(args)
+        .write_stdin(input)
+        .assert()
+        .success();
     for check in checks {
         assert = assert.stdout(predicate::str::contains(*check));
     }

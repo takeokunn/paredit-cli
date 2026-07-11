@@ -37,13 +37,15 @@ fn cli_rejects_function_rename_without_matching_definition() {
 #[test]
 fn cli_help_describes_rename_function_contract() {
     let mut cmd = paredit();
-    cmd.arg("refactor")
-        .arg("rename-function")
+    cmd.arg("refactor").arg("rename-function")
         .arg("--help")
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp callable definition and callable-designator rename",
+            "Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names, and definition forms such as define-method-combination",
         ))
         .stdout(predicate::str::contains("Usage:"))
         .stdout(predicate::str::contains("--from <FROM>"))

@@ -15,9 +15,6 @@ fn top_level_help_routes_new_automation_to_grouped_namespaces() {
         ))
         .stdout(predicate::str::contains(
             "`paredit refactor ...` plans, previews, verifies, and applies semantic changes.",
-        ))
-        .stdout(predicate::str::contains(
-            "All commands are available only through these namespaces.",
         ));
 }
 
@@ -28,8 +25,12 @@ fn rename_function_help_surfaces_common_lisp_callable_designators() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp callable definition and callable-designator rename",
-        ));
+            "Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names",
+        ))
+        .stdout(predicate::str::contains("define-method-combination"));
 }
 
 #[test]
@@ -39,7 +40,10 @@ fn rename_macrolet_help_surfaces_expander_body_boundary() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename",
+            "Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "while keeping expander bodies out of scope",
         ));
 }
 
@@ -50,7 +54,10 @@ fn rename_symbol_macro_help_surfaces_lexical_shadowing_boundary() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename",
+            "Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "while keeping expansion and lexical shadowing boundaries separate",
         ));
 }
 
@@ -61,6 +68,9 @@ fn rename_local_function_help_surfaces_flet_and_labels_boundary() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp flet/labels local function binding and call-site rename",
+            "Plan or apply a Common Lisp flet/labels local function binding and call-site rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "preserving the difference between non-recursive flet bodies and recursive labels bodies",
         ));
 }

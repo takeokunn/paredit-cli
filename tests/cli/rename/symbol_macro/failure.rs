@@ -34,13 +34,15 @@ fn cli_rejects_rename_symbol_macro_without_matching_definition() {
 #[test]
 fn cli_help_describes_rename_symbol_macro_contract() {
     let mut cmd = paredit();
-    cmd.arg("refactor")
-        .arg("rename-symbol-macro")
+    cmd.arg("refactor").arg("rename-symbol-macro")
         .arg("--help")
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename",
+            "Plan or apply a Common Lisp define-symbol-macro binding and value-reference rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "while keeping expansion and lexical shadowing boundaries separate",
         ))
         .stdout(predicate::str::contains("Usage:"))
         .stdout(predicate::str::contains("--from <FROM>"))

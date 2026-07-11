@@ -29,13 +29,15 @@ fn cli_rejects_macrolet_rename_without_matching_definition() {
 #[test]
 fn cli_help_describes_rename_macrolet_contract() {
     let mut cmd = paredit();
-    cmd.arg("refactor")
-        .arg("rename-macrolet")
+    cmd.arg("refactor").arg("rename-macrolet")
         .arg("--help")
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename",
+            "Plan or apply a Common Lisp macrolet/compiler-macrolet binding and call-site rename across explicit files",
+        ))
+        .stdout(predicate::str::contains(
+            "while keeping expander bodies out of scope",
         ))
         .stdout(predicate::str::contains("Usage:"))
         .stdout(predicate::str::contains("--from <FROM>"))

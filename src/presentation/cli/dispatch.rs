@@ -39,6 +39,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::Duplicates(args) => {
                 duplicate_report::workflow::duplicate_report(args)?
             }
+            command::InspectCommand::Similarity(args) => {
+                similarity_report::workflow::similarity_report(args)?
+            }
             command::InspectCommand::Lets(args) => let_report::let_report(args)?,
         },
         Command::Edit { command } => match command {
@@ -148,6 +151,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::ExtractFunction(args) => {
                 extract_function::extract_function(args)?
+            }
+            command::RefactorCommand::ExtractConstant(args) => {
+                extract_constant::extract_constant(args)?
             }
             command::RefactorCommand::InlineFunction(args) => {
                 inline_function::inline_function(args)?

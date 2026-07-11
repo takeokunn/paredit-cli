@@ -1,22 +1,7 @@
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Path, Selection, SymbolName};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExtractFunctionInsert {
-    Append,
-    Before,
-    After,
-}
-
-impl ExtractFunctionInsert {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Append => "append",
-            Self::Before => "before",
-            Self::After => "after",
-        }
-    }
-}
+pub type ExtractFunctionInsert = crate::application::usecase::extract_shared::TopLevelInsert;
 
 #[derive(Debug, Clone)]
 pub struct ExtractFunctionRequest<'a> {
