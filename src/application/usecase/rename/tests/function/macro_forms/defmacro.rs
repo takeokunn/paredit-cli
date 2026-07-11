@@ -67,8 +67,8 @@ fn renames_emacs_lisp_cl_defmacro_definition_and_macro_calls() {
 }
 
 #[test]
-fn renames_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body()
-{
+fn renames_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body(
+) {
     assert_function_rename! {
         input: "(defmacro helper (x) `(list ,x))\n(defun caller () #'(lambda () (macrolet ((helper (value) (list #'helper (function helper) (helper value)))) (helper 1))))",
         dialect: Dialect::CommonLisp,
@@ -170,6 +170,24 @@ fn renames_function_calls_generated_by_define_compiler_macro_quasiquote_expander
 }
 
 #[test]
+fn renames_function_calls_generated_by_define_setf_expander_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun helper (value) value)\n(define-setf-expander slot (place) (values nil nil nil `(helper store) `(helper ,place)))\n(helper root)",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (value) value)",
+            "(define-setf-expander slot (place) (values nil nil nil `(renamed store) `(renamed ,place)))",
+            "(renamed root)"
+        ]
+    };
+}
+
+#[test]
 fn renames_function_designators_generated_by_macrolet_quasiquote_expanders() {
     assert_function_rename! {
         input: "(defun helper (value) value)\n(defun caller () (macrolet ((local () `(#'helper (function helper) (macro-function 'helper) (compiler-macro-function 'helper) (symbol-function 'helper) (fdefinition 'helper)))) (local)))",
@@ -204,8 +222,8 @@ fn does_not_rename_function_calls_inside_flet_quasiquoted_data() {
 }
 
 #[test]
-fn renames_common_lisp_qualified_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body()
-{
+fn renames_common_lisp_qualified_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body(
+) {
     assert_function_rename! {
         input: "(cl:defmacro helper (x) `(list ,x))\n(defun caller () #'(lambda () (macrolet ((helper (value) (list #'helper (function helper) (helper value)))) (helper 1))))",
         dialect: Dialect::CommonLisp,
@@ -222,8 +240,8 @@ fn renames_common_lisp_qualified_defmacro_definition_inside_reader_quoted_lambda
 }
 
 #[test]
-fn renames_common_lisp_user_qualified_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body()
-{
+fn renames_common_lisp_user_qualified_defmacro_definition_inside_reader_quoted_lambda_body_without_touching_shadowed_macro_body(
+) {
     assert_function_rename! {
         input: "(cl-user:defmacro helper (x) `(list ,x))\n(defun caller () #'(lambda () (macrolet ((helper (value) (list #'helper (function helper) (helper value)))) (helper 1))))",
         dialect: Dialect::CommonLisp,

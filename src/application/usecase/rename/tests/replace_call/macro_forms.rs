@@ -45,3 +45,23 @@ fn all_calls_replaces_calls_inside_global_macro_expander_templates() {
         rewritten: "(defmacro build (id) `(load-user ,id)) (load-user root)"
     );
 }
+
+#[test]
+fn all_calls_replaces_calls_inside_define_setf_expander_templates() {
+    assert_replace_calls!(
+        input: "(define-setf-expander slot (place) (values nil nil nil `(fetch-user store) `(fetch-user ,place))) (fetch-user root)",
+        scope: ReplaceFunctionCallsScope::AllCalls,
+        calls: 3,
+        rewritten: "(define-setf-expander slot (place) (values nil nil nil `(load-user store) `(load-user ,place))) (load-user root)"
+    );
+}
+
+#[test]
+fn all_calls_replaces_calls_inside_long_defsetf_templates() {
+    assert_replace_calls!(
+        input: "(defsetf slot (place) (store) `(fetch-user ,place ,store)) (fetch-user root)",
+        scope: ReplaceFunctionCallsScope::AllCalls,
+        calls: 2,
+        rewritten: "(defsetf slot (place) (store) `(load-user ,place ,store)) (load-user root)"
+    );
+}

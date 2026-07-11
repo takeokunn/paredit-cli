@@ -123,6 +123,24 @@ fn renames_defsetf_definition_place_uses_and_designators() {
 }
 
 #[test]
+fn renames_function_calls_generated_by_long_defsetf_quasiquote_expanders() {
+    assert_function_rename! {
+        input: "(defun update-slot (place value) (list place value))\n(defsetf slot (place) (value) `(update-slot ,place ,value))\n(update-slot root value)",
+        dialect: Dialect::CommonLisp,
+        from: "update-slot",
+        to: "store-slot",
+        definitions: 1,
+        calls: 2,
+        changed: true,
+        rewritten_contains: [
+            "(defun store-slot (place value) (list place value))",
+            "(defsetf slot (place) (value) `(store-slot ,place ,value))",
+            "(store-slot root value)"
+        ]
+    };
+}
+
+#[test]
 fn renames_common_lisp_user_qualified_defsetf_definition_place_uses_and_designators() {
     assert_function_rename! {
         input: "(cl-user:defsetf accessor set-accessor)\n(setf (accessor item) 1)\n(list #'accessor (function accessor) accessor)",

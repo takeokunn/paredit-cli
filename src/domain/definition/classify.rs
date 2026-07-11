@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::{CommonLispOperator, normalize_common_lisp_operator_head};
+use crate::domain::common_lisp::{normalize_common_lisp_operator_head, CommonLispOperator};
 use crate::domain::dialect::Dialect;
 
 use super::DefinitionCategory;
@@ -48,7 +48,12 @@ pub(super) fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool
     match dialect {
         Dialect::CommonLisp | Dialect::Unknown => matches!(
             CommonLispOperator::from_head(head),
-            Some(CommonLispOperator::Defmacro | CommonLispOperator::DefineCompilerMacro)
+            Some(
+                CommonLispOperator::Defmacro
+                    | CommonLispOperator::DefineCompilerMacro
+                    | CommonLispOperator::DefineSetfExpander
+                    | CommonLispOperator::Defsetf
+            )
         ),
         Dialect::EmacsLisp => matches!(
             normalize_common_lisp_operator_head(head)
