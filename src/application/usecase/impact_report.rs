@@ -7,7 +7,7 @@ use crate::application::usecase::call_graph_report::{
 };
 use crate::application::usecase::call_report::build_call_report;
 use crate::application::usecase::signature_report::{SignatureCallItem, classify_signature_call};
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::SymbolName;
 
 mod definitions;
@@ -68,7 +68,7 @@ pub fn build_impact_reports(
                 definition
                     .name
                     .as_deref()
-                    .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+                    .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -128,14 +128,14 @@ pub fn build_impact_reports(
                     .collect::<Vec<_>>();
                 let inbound_edges = edges
                     .iter()
-                    .filter(|edge| common_lisp_symbol_name_eq(&edge.callee, symbol.as_str()))
+                    .filter(|edge| common_lisp_symbol_reference_eq(&edge.callee, symbol.as_str()))
                     .cloned()
                     .collect::<Vec<_>>();
                 let outbound_edges = edges
                     .iter()
                     .filter(|edge| {
                         edge.caller.as_deref().is_some_and(|caller| {
-                            common_lisp_symbol_name_eq(caller, symbol.as_str())
+                            common_lisp_symbol_reference_eq(caller, symbol.as_str())
                         })
                     })
                     .cloned()

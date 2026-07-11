@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
@@ -150,7 +150,7 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
             }
 
             let shape = definition_shape(context.dialect, view, head);
-            if common_lisp_symbol_name_eq(head, context.from.as_str())
+            if common_lisp_symbol_reference_eq(head, context.from.as_str())
                 && shape.is_none()
                 && !is_local_callable_bound(state.local_callables, head)
                 && state.shadowed_depth == 0

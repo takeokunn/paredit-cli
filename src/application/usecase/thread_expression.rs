@@ -10,7 +10,7 @@ mod types;
 
 pub use types::{ThreadExpressionPlan, ThreadExpressionRequest, ThreadExpressionStep, ThreadStyle};
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::SyntaxTree;
 use anyhow::{Context, Result};
 use parts::thread_expression_parts;
@@ -21,7 +21,7 @@ pub fn plan_thread_expression(
     request: ThreadExpressionRequest<'_>,
 ) -> Result<ThreadExpressionPlan> {
     if list_head(&request.target)
-        .is_some_and(|head| common_lisp_symbol_name_eq(head, request.operator.as_str()))
+        .is_some_and(|head| common_lisp_symbol_reference_eq(head, request.operator.as_str()))
     {
         anyhow::bail!(
             "thread-expression selection is already threaded with {}",

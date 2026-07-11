@@ -1,7 +1,7 @@
 mod reader;
 mod special_forms;
 
-use crate::domain::common_lisp::{common_lisp_symbol_name_eq, is_common_lisp_declaration_form};
+use crate::domain::common_lisp::{common_lisp_symbol_reference_eq, is_common_lisp_declaration_form};
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
 
 use reader::{
@@ -44,7 +44,7 @@ pub(super) fn collect_symbol_atom_spans_unshadowed_in_context(
 
         if quasiquote_depth == 0
             && atom_symbol_text(view)
-                .is_some_and(|text| common_lisp_symbol_name_eq(text, symbol.as_str()))
+                .is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol.as_str()))
         {
             if let Some(span) = atom_symbol_span(view) {
                 output.push(span);

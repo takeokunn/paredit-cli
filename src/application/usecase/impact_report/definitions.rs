@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{CommonLispPackageDeclarationForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispPackageDeclarationForm, common_lisp_symbol_reference_eq};
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
@@ -57,6 +57,6 @@ pub(super) fn impact_definition_matches_signature(
     definition.parameter_count.is_some()
         && definition.category.is_callable()
         && definition.name.as_deref().is_some_and(|name| {
-            symbol.is_none_or(|target| common_lisp_symbol_name_eq(name, target.as_str()))
+            symbol.is_none_or(|target| common_lisp_symbol_reference_eq(name, target.as_str()))
         })
 }

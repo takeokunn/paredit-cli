@@ -3,7 +3,7 @@ use crate::application::usecase::rename::reader::{
     bare_lambda_body_children, explicit_reader_form_kind,
     explicit_reader_function_lambda_body_children,
 };
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::super::RenameFunctionOccurrence;
@@ -21,7 +21,7 @@ fn collect_callable_target_rename(
         return false;
     };
 
-    if !common_lisp_symbol_name_eq(target.text, context.from.as_str())
+    if !common_lisp_symbol_reference_eq(target.text, context.from.as_str())
         || is_local_callable_bound(state.local_callables, target.text)
         || state.shadowed_depth != 0
     {

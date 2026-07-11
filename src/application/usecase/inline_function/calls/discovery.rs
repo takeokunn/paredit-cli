@@ -4,7 +4,7 @@ use crate::application::usecase::callable_scope::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope,
 };
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -70,7 +70,7 @@ fn collect_function_call_paths(
         && view.delimiter == Some(Delimiter::Paren)
         && !spans_overlap(context.definition_span, view.span)
         && list_head(view)
-            .is_some_and(|head| common_lisp_symbol_name_eq(head, context.function_name.as_str()))
+            .is_some_and(|head| common_lisp_symbol_reference_eq(head, context.function_name.as_str()))
         && !is_local_callable_bound(local_callables, context.function_name.as_str())
     {
         output.push(path.clone());

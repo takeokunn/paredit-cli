@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 pub(super) use crate::domain::sexpr::reader::atom_text;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Selection, SymbolName, SyntaxTree,
@@ -23,7 +23,7 @@ pub(super) fn collect_symbol_atom_spans(
     symbol: &SymbolName,
     output: &mut Vec<ByteSpan>,
 ) {
-    if atom_text(view).is_some_and(|text| common_lisp_symbol_name_eq(text, symbol.as_str())) {
+    if atom_text(view).is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol.as_str())) {
         output.push(view.span);
         return;
     }

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -68,7 +68,7 @@ pub(super) fn parse_inline_function_call(
             .context("inline-function call must not be empty")?,
     )
     .context("inline-function call must start with an atom")?;
-    if !common_lisp_symbol_name_eq(head, function_name.as_str()) {
+    if !common_lisp_symbol_reference_eq(head, function_name.as_str()) {
         anyhow::bail!(
             "inline-function call head '{}' does not match selected definition '{}'",
             head,
@@ -105,7 +105,7 @@ fn validate_explicit_function_call_paths(
         let head = list_head(&view)
             .context("inline-function call must not be empty")?
             .to_owned();
-        if !common_lisp_symbol_name_eq(&head, function_name.as_str()) {
+        if !common_lisp_symbol_reference_eq(&head, function_name.as_str()) {
             anyhow::bail!(
                 "{command} --call-path {call_path} head '{}' does not match selected definition '{}'",
                 head,

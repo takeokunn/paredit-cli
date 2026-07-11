@@ -8,7 +8,7 @@ use crate::application::usecase::remove_unused_definition::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::reader::{atom_symbol_text, atom_text};
@@ -283,7 +283,7 @@ fn list_head(view: &ExpressionView) -> Option<&str> {
 
 fn function_quote_symbol_matches(dialect: Dialect, candidate: &str, symbol: &str) -> bool {
     match dialect {
-        Dialect::CommonLisp => common_lisp_symbol_name_eq(candidate, symbol),
+        Dialect::CommonLisp => common_lisp_symbol_reference_eq(candidate, symbol),
         _ => candidate == symbol,
     }
 }

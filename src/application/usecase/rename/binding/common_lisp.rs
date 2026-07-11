@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::CommonLispHandlerBindingForm;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::super::selection::atom_text;
@@ -117,7 +117,7 @@ pub(super) fn collect_lambda_binding_targets<'a>(
             let parameters = parameter_name_spans(parameter_form, input)?;
             if let Some(parameter) = parameters
                 .iter()
-                .find(|parameter| common_lisp_symbol_name_eq(&parameter.name, from.as_str()))
+                .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
             {
                 *duplicate_count += 1;
                 *target = Some((view, parameter.clone()));

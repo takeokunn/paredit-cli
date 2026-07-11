@@ -1,7 +1,7 @@
 use crate::application::refactor::plan::RefactorPlanTargetKind;
 use crate::application::usecase::impact_report::ImpactDefinitionItem;
 use crate::application::usecase::impact_report::ImpactReportFile;
-use crate::domain::common_lisp::{common_lisp_symbol_name_eq, normalize_common_lisp_operator_head};
+use crate::domain::common_lisp::{common_lisp_symbol_reference_eq, normalize_common_lisp_operator_head};
 use crate::domain::definition::DefinitionCategory;
 
 struct TargetKindRule {
@@ -88,5 +88,5 @@ fn matches_named_definition(definition: &ImpactDefinitionItem, symbol: &str) -> 
     definition
         .name
         .as_deref()
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol))
 }

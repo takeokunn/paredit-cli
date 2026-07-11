@@ -5,7 +5,7 @@ use crate::application::usecase::callable_scope::{
     local_callable_body_scope, local_callable_scope_at_path,
 };
 use crate::application::usecase::rename::selection::list_head;
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
@@ -118,7 +118,7 @@ fn collect_wrap_call_sites_from_view(
             collection.template,
         ) {
             if parent_head
-                .is_some_and(|head| common_lisp_symbol_name_eq(head, collection.wrapper.as_str()))
+                .is_some_and(|head| common_lisp_symbol_reference_eq(head, collection.wrapper.as_str()))
             {
                 collection.skipped_already_wrapped.push(site);
             } else if current_head
@@ -195,6 +195,6 @@ fn call_site_is_already_wrapped(
     let Some(head) = list_head(&parent) else {
         return Ok(false);
     };
-    Ok(common_lisp_symbol_name_eq(head, wrapper.as_str())
+    Ok(common_lisp_symbol_reference_eq(head, wrapper.as_str())
         && definition_shape(dialect, &parent, head).is_none())
 }

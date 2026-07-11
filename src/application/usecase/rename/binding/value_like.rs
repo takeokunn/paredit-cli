@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use crate::domain::common_lisp::{
-    CommonLispLetBindingForm, CommonLispVariableBindingForm, common_lisp_symbol_name_eq,
+    CommonLispLetBindingForm, CommonLispVariableBindingForm, common_lisp_symbol_reference_eq,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionView, SymbolName};
@@ -37,7 +37,7 @@ pub(super) fn let_binding_rename_parts(
             binding
                 .names
                 .iter()
-                .find(|name| common_lisp_symbol_name_eq(&name.name, from.as_str()))
+                .find(|name| common_lisp_symbol_reference_eq(&name.name, from.as_str()))
                 .map(|name| (index, name))
         })
         .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected let"))?;
@@ -95,7 +95,7 @@ pub(super) fn value_binding_rename_parts(
     let bindings = parameter_name_spans(binding_form, input)?;
     let target = bindings
         .iter()
-        .find(|binding| common_lisp_symbol_name_eq(&binding.name, from.as_str()))
+        .find(|binding| common_lisp_symbol_reference_eq(&binding.name, from.as_str()))
         .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
 
     let mut reference_spans = Vec::new();
@@ -135,7 +135,7 @@ pub(super) fn iteration_binding_rename_parts(
         .first()
         .filter(|child| {
             super::super::selection::atom_text(child)
-                .is_some_and(|name| common_lisp_symbol_name_eq(name, from.as_str()))
+                .is_some_and(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
         })
         .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
 
@@ -189,7 +189,7 @@ pub(super) fn common_lisp_variable_binding_rename_parts(
         let Some((name, span)) = common_lisp::variable_spec_binding_name(spec) else {
             continue;
         };
-        if !common_lisp_symbol_name_eq(name, from.as_str()) {
+        if !common_lisp_symbol_reference_eq(name, from.as_str()) {
             continue;
         }
         duplicate_count += 1;

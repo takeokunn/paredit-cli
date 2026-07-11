@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::super::super::common_lisp;
@@ -77,7 +77,7 @@ pub(super) fn collect_loop_references(
 fn binding_pattern_binds(pattern: &ExpressionView, symbol: &SymbolName, input: &str) -> bool {
     binding_pattern_name_spans(pattern, input)
         .iter()
-        .any(|name| common_lisp_symbol_name_eq(&name.name, symbol.as_str()))
+        .any(|name| common_lisp_symbol_reference_eq(&name.name, symbol.as_str()))
 }
 
 fn collect_loop_outer_references(

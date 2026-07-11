@@ -1,5 +1,5 @@
 use crate::domain::common_lisp::CommonLispVariableSpecForm;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionView, SymbolName};
 
 use crate::application::usecase::rename::selection;
@@ -229,11 +229,11 @@ fn iteration_binding_form_binds(binding_form: &ExpressionView, symbol: &SymbolNa
         .children
         .first()
         .and_then(selection::atom_text)
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }
 
 fn variable_spec_binds(spec: &ExpressionView, symbol: &SymbolName) -> bool {
     selection::atom_text(spec)
         .or_else(|| spec.children.first().and_then(selection::atom_text))
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }

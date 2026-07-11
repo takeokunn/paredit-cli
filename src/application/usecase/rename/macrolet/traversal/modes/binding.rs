@@ -1,5 +1,5 @@
 use crate::application::usecase::rename::macrolet::RenameFunctionOccurrence;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ExpressionView, Path};
 
 use super::super::core::RenameTraversalMode;
@@ -29,7 +29,7 @@ impl RenameTraversalMode for BindingTraversal {
             return;
         };
 
-        if !common_lisp_symbol_name_eq(target.text, context.from.as_str()) {
+        if !common_lisp_symbol_reference_eq(target.text, context.from.as_str()) {
             return;
         }
 

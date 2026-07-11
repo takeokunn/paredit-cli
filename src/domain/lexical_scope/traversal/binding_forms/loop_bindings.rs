@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
@@ -172,7 +172,7 @@ fn iteration_binding_form_binds(binding_form: &ExpressionView, symbol: &SymbolNa
         .children
         .first()
         .and_then(super::super::super::syntax::atom_text)
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }
 
 fn variable_spec_binds(spec: &ExpressionView, symbol: &SymbolName) -> bool {
@@ -182,7 +182,7 @@ fn variable_spec_binds(spec: &ExpressionView, symbol: &SymbolName) -> bool {
                 .first()
                 .and_then(super::super::super::syntax::atom_text)
         })
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }
 
 fn variable_spec_init_form(spec: &ExpressionView) -> Option<&ExpressionView> {

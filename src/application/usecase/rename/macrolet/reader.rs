@@ -6,7 +6,7 @@ use crate::domain::sexpr::ExpressionView;
 use super::RenameFunctionOccurrence;
 use super::scope::{LocalCallableRenameKind, MacroletRenameScope};
 pub(super) use crate::application::usecase::rename::reader::{atom_symbol_span, atom_symbol_text};
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{Path, ReaderPrefix, SymbolName};
 
 #[expect(
@@ -46,7 +46,7 @@ pub(super) fn push_callable_target_rename_if_match(
     to: &SymbolName,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
-    if !common_lisp_symbol_name_eq(target.text, from.as_str()) {
+    if !common_lisp_symbol_reference_eq(target.text, from.as_str()) {
         return false;
     }
 
@@ -69,7 +69,7 @@ pub(super) fn push_atom_rename_if_match(
     let Some(text) = atom_symbol_text(view) else {
         return false;
     };
-    if !common_lisp_symbol_name_eq(text, from.as_str()) {
+    if !common_lisp_symbol_reference_eq(text, from.as_str()) {
         return false;
     }
 

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::application::usecase::call_report::CallReportItem;
 use crate::application::usecase::signature_report::types::SignatureCallStatus;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 
 pub fn classify_signature_call(
     definitions_by_name: &BTreeMap<String, Vec<usize>>,
@@ -10,7 +10,7 @@ pub fn classify_signature_call(
 ) -> (Option<usize>, SignatureCallStatus) {
     let parameter_counts = definitions_by_name
         .iter()
-        .filter(|(name, _)| common_lisp_symbol_name_eq(name, &call.head))
+        .filter(|(name, _)| common_lisp_symbol_reference_eq(name, &call.head))
         .flat_map(|(_, counts)| counts.iter().copied())
         .collect::<Vec<_>>();
     let [expected] = parameter_counts.as_slice() else {

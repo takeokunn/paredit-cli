@@ -132,6 +132,47 @@ fn compares_common_lisp_heads_case_insensitively_after_prefix_normalization() {
 }
 
 #[test]
+fn matches_symbol_references_across_arbitrary_package_qualifiers() {
+    // Unlike `common_lisp_symbol_name_eq`, which only recognizes the four
+    // standard CL home-package aliases (see
+    // `compares_common_lisp_heads_case_insensitively_after_prefix_normalization`
+    // and the `elisp:let` guard in `classifies_package_qualified_common_lisp_heads`),
+    // occurrence matching must tolerate a reference qualified by *any*
+    // user-defined package, since `nshell.application:execute-command-line`
+    // and bare `execute-command-line` name the same symbol.
+    assert!(common_lisp_symbol_reference_eq(
+        "nshell.application:execute-command-line",
+        "execute-command-line"
+    ));
+    assert!(common_lisp_symbol_reference_eq(
+        "execute-command-line",
+        "nshell.application:execute-command-line"
+    ));
+    assert!(common_lisp_symbol_reference_eq(
+        "nshell.domain.parsing::%internal-helper",
+        "%internal-helper"
+    ));
+    assert!(common_lisp_symbol_reference_eq(
+        "NSHELL.APPLICATION:FOO",
+        "foo"
+    ));
+    // `#:` uninterned-symbol syntax, as seen in `defpackage` `:export` lists.
+    assert!(common_lisp_symbol_reference_eq(
+        "#:execute-command-line",
+        "execute-command-line"
+    ));
+    // A leading colon with nothing before it is a keyword, not a qualifier,
+    // and must not be conflated with the same-named plain symbol.
+    assert!(!common_lisp_symbol_reference_eq(":foo", "foo"));
+    assert!(common_lisp_symbol_reference_eq(":foo", ":foo"));
+    // Unrelated symbols remain unrelated even once qualifiers are stripped.
+    assert!(!common_lisp_symbol_reference_eq(
+        "nshell.application:foo",
+        "bar"
+    ));
+}
+
+#[test]
 fn exposes_semantic_binding_groups() {
     assert!(CommonLispOperator::Let.is_parallel_let_binding());
     assert!(CommonLispOperator::LetStar.is_sequential_let_binding());

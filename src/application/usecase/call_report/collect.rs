@@ -8,7 +8,7 @@ use crate::application::usecase::callable_scope::{
 };
 use crate::domain::common_lisp::{
     CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispLocalCallableForm,
-    CommonLispOperator, CommonLispSlotBindingForm, common_lisp_symbol_name_eq,
+    CommonLispOperator, CommonLispSlotBindingForm, common_lisp_symbol_reference_eq,
     is_common_lisp_declaration_form,
 };
 use crate::domain::definition::definition_shape;
@@ -136,7 +136,7 @@ fn collect_call_report_items_from_view(
             let shape = definition_shape(ctx.dialect, view, head);
             let matches_symbol = ctx
                 .symbol
-                .is_none_or(|target| common_lisp_symbol_name_eq(head, target.as_str()));
+                .is_none_or(|target| common_lisp_symbol_reference_eq(head, target.as_str()));
 
             if matches_symbol
                 && (ctx.include_definitions || shape.is_none())
@@ -193,7 +193,7 @@ fn collect_binding_refactor_form_calls(
     let shape = definition_shape(ctx.dialect, view, head);
     let matches_symbol = ctx
         .symbol
-        .is_none_or(|target| common_lisp_symbol_name_eq(head, target.as_str()));
+        .is_none_or(|target| common_lisp_symbol_reference_eq(head, target.as_str()));
 
     if matches_symbol
         && (ctx.include_definitions || shape.is_none())
