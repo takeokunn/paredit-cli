@@ -47,7 +47,10 @@ proptest! {
             std::cmp::Ordering::Greater => SignatureCallStatus::ExtraArguments,
         };
 
-        prop_assert_eq!(call.expected_parameter_count, Some(parameter_count));
+        prop_assert_eq!(
+            call.expected_parameter_arity,
+            Some((parameter_count, Some(parameter_count)))
+        );
         prop_assert_eq!(call.status, expected_status);
     }
 }

@@ -38,7 +38,7 @@ pub fn build_impact_reports(
 ) -> Result<Vec<ImpactReportFile>> {
     let mut parsed = Vec::with_capacity(sources.len());
     let mut nodes_by_name = BTreeMap::<String, CallGraphNode>::new();
-    let mut definitions_by_name = BTreeMap::<String, Vec<usize>>::new();
+    let mut definitions_by_name = BTreeMap::<String, Vec<(usize, Option<usize>)>>::new();
 
     for source in sources {
         let outline = source
@@ -83,13 +83,8 @@ pub fn build_impact_reports(
             );
 
             if impact_definition_matches_signature(definition, None) {
-                if let (Some(name), Some(parameter_count)) =
-                    (&definition.name, definition.parameter_count)
-                {
-                    definitions_by_name
-                        .entry(name.clone())
-                        .or_default()
-                        .push(parameter_count);
+                if let (Some(name), Some(arity)) = (&definition.name, definition.parameter_arity) {
+                    definitions_by_name.entry(name.clone()).or_default().push(arity);
                 }
             }
         }
@@ -112,11 +107,11 @@ pub fn build_impact_reports(
                 let calls = calls
                     .into_iter()
                     .map(|call| {
-                        let (expected_parameter_count, status) =
+                        let (expected_parameter_arity, status) =
                             classify_signature_call(&definitions_by_name, &call);
                         SignatureCallItem {
                             call,
-                            expected_parameter_count,
+                            expected_parameter_arity,
                             status,
                         }
                     })

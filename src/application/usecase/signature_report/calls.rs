@@ -5,26 +5,28 @@ use crate::application::usecase::signature_report::types::SignatureCallStatus;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 
 pub fn classify_signature_call(
-    definitions_by_name: &BTreeMap<String, Vec<usize>>,
+    definitions_by_name: &BTreeMap<String, Vec<(usize, Option<usize>)>>,
     call: &CallReportItem,
-) -> (Option<usize>, SignatureCallStatus) {
-    let parameter_counts = definitions_by_name
+) -> (Option<(usize, Option<usize>)>, SignatureCallStatus) {
+    let arities = definitions_by_name
         .iter()
         .filter(|(name, _)| common_lisp_symbol_reference_eq(name, &call.head))
-        .flat_map(|(_, counts)| counts.iter().copied())
+        .flat_map(|(_, arities)| arities.iter().copied())
         .collect::<Vec<_>>();
-    let [expected] = parameter_counts.as_slice() else {
-        return if parameter_counts.is_empty() {
+    let [(min, max)] = arities.as_slice() else {
+        return if arities.is_empty() {
             (None, SignatureCallStatus::UnknownDefinition)
         } else {
             (None, SignatureCallStatus::AmbiguousDefinition)
         };
     };
 
-    let status = match call.argument_count.cmp(expected) {
-        std::cmp::Ordering::Equal => SignatureCallStatus::Exact,
-        std::cmp::Ordering::Less => SignatureCallStatus::MissingArguments,
-        std::cmp::Ordering::Greater => SignatureCallStatus::ExtraArguments,
+    let status = if call.argument_count < *min {
+        SignatureCallStatus::MissingArguments
+    } else if max.is_some_and(|max| call.argument_count > max) {
+        SignatureCallStatus::ExtraArguments
+    } else {
+        SignatureCallStatus::Exact
     };
-    (Some(*expected), status)
+    (Some((*min, *max)), status)
 }

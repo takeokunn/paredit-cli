@@ -9,6 +9,14 @@ use crate::application::usecase::signature_report::{
 use crate::domain::sexpr::SymbolName;
 use crate::presentation::cli::OutputFormat;
 
+fn format_arity((min, max): (usize, Option<usize>)) -> String {
+    match max {
+        Some(max) if max == min => min.to_string(),
+        Some(max) => format!("{min}..{max}"),
+        None => format!("{min}.."),
+    }
+}
+
 pub(super) fn print_signature_report(
     reports: &[SignatureReportFile],
     symbol: Option<&SymbolName>,
@@ -69,8 +77,8 @@ fn print_text_report(
         }
         for item in &report.calls {
             let expected = item
-                .expected_parameter_count
-                .map(|count| count.to_string())
+                .expected_parameter_arity
+                .map(format_arity)
                 .unwrap_or_default();
             let enclosing = item
                 .call
@@ -140,6 +148,8 @@ fn print_json_report(
                             "name": definition.name.as_deref(),
                             "category": definition.category.label(),
                             "parameterCount": definition.parameter_count,
+                            "minParameterCount": definition.parameter_arity.map(|(min, _)| min),
+                            "maxParameterCount": definition.parameter_arity.and_then(|(_, max)| max),
                         }))
                         .collect::<Vec<_>>(),
                     "calls": report
@@ -153,7 +163,8 @@ fn print_json_report(
                             },
                             "head": item.call.head.as_str(),
                             "argumentCount": item.call.argument_count,
-                            "expectedParameterCount": item.expected_parameter_count,
+                            "minParameterCount": item.expected_parameter_arity.map(|(min, _)| min),
+                            "maxParameterCount": item.expected_parameter_arity.and_then(|(_, max)| max),
                             "status": item.status.label(),
                             "enclosingDefinition": item.call.enclosing_definition.as_deref(),
                         }))

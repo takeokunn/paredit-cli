@@ -10,7 +10,7 @@ use crate::domain::sexpr::{ByteSpan, ExpressionView, Path};
 use classify::classify_definition_head;
 use lambda_list::{
     definition_body_start_child_index, definition_lambda_list_child_index,
-    definition_lambda_parameter_count,
+    definition_lambda_parameter_arity, definition_lambda_parameter_count,
 };
 use name::{definition_name_target, definition_name_text};
 
@@ -85,6 +85,14 @@ impl DefinitionShape {
     pub fn lambda_parameter_count(self, view: &ExpressionView) -> Option<usize> {
         self.lambda_list(view)
             .map(definition_lambda_parameter_count)
+    }
+
+    /// Return the (minimum, maximum) call-argument arity this definition's
+    /// lambda list accepts; MAXIMUM is `None` when unbounded. See
+    /// DEFINITION_LAMBDA_PARAMETER_ARITY for why this differs from
+    /// LAMBDA_PARAMETER_COUNT's flat total.
+    pub fn lambda_parameter_arity(self, view: &ExpressionView) -> Option<(usize, Option<usize>)> {
+        self.lambda_list(view).map(definition_lambda_parameter_arity)
     }
 
     pub fn name_target<'a>(
@@ -165,6 +173,54 @@ impl DefinitionCategory {
         matches!(
             self,
             Self::Function | Self::Macro | Self::GenericFunction | Self::Method
+        )
+    }
+
+    /// Whether a definition in this category is safe to bulk-remove based
+    /// purely on "no direct symbol references elsewhere" evidence.
+    ///
+    /// `UnknownMacro` covers a `define-*`-prefixed macro this tool does not
+    /// recognize, whose expansion is unknown. Such a macro commonly derives
+    /// *other* symbol names from its argument via string concatenation (for
+    /// example a strategy DSL where `(define-strategy foo ...)` generates and
+    /// exports `make-foo-strategy`), so "is the argument symbol referenced
+    /// elsewhere" is not a safe proxy for "is this definition unused": the
+    /// argument symbol itself may legitimately have zero direct references
+    /// while the code it defines is very much in use. This is distinct from
+    /// `Other`, which covers a dialect's own recognized definition forms (for
+    /// example Emacs Lisp `defun`/`defvar` or Clojure `defn`) that are not
+    /// broken out into a more specific category but are still known,
+    /// non-generative shapes.
+    ///
+    /// `Struct` (Common Lisp `defstruct`) has the same derived-symbol
+    /// problem even though this tool DOES recognize the form: `defstruct`
+    /// implicitly derives a constructor (`make-<name>` by default, or an
+    /// explicit `(:constructor other-name)` option), a predicate
+    /// (`<name>-p`), a copier, and per-slot accessors from the structure
+    /// name, none of which textually contain the structure name symbol
+    /// itself.
+    ///
+    /// `Test` (`deftest`/`ert-deftest`) and `Package` (`provide`/`require`)
+    /// are entry points invoked by a test runner or the module loader rather
+    /// than referenced by symbol from other code, so "zero direct
+    /// references" is their normal, expected state and carries no signal
+    /// about whether the code is actually dead. `Customization` and `Mode`
+    /// definitions are conventionally discovered by a human through `M-x`
+    /// or a customize buffer rather than called by name from other Lisp
+    /// forms, so the same reasoning applies to them.
+    pub fn is_bulk_removable(self) -> bool {
+        matches!(
+            self,
+            Self::Function
+                | Self::Macro
+                | Self::GenericFunction
+                | Self::Method
+                | Self::Class
+                | Self::Condition
+                | Self::Variable
+                | Self::Constant
+                | Self::Parameter
+                | Self::Other
         )
     }
 }
