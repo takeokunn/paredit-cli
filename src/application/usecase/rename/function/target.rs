@@ -4,13 +4,13 @@ use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path};
 use super::super::reader::{atom_symbol_span, atom_symbol_text};
 use super::super::selection::atom_text;
 
-pub(super) struct CallableNameTarget<'a> {
-    pub(super) path: Path,
-    pub(super) span: ByteSpan,
-    pub(super) text: &'a str,
+pub(in crate::application::usecase::rename) struct CallableNameTarget<'a> {
+    pub(in crate::application::usecase::rename) path: Path,
+    pub(in crate::application::usecase::rename) span: ByteSpan,
+    pub(in crate::application::usecase::rename) text: &'a str,
 }
 
-pub(super) fn callable_name_target<'a>(
+pub(in crate::application::usecase::rename) fn callable_name_target<'a>(
     view: &'a ExpressionView,
     path: &Path,
 ) -> Option<CallableNameTarget<'a>> {

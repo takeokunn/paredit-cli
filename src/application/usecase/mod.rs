@@ -16,6 +16,7 @@ pub mod impact_report;
 pub mod inline_function;
 pub mod inline_let;
 pub mod introduce_let;
+pub(crate) mod leading_trivia;
 pub mod let_report;
 pub mod package;
 pub mod package_report;

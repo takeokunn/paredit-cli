@@ -3,8 +3,9 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::definition_report::DefinitionReportItem;
+use crate::application::usecase::leading_trivia::first_newline_or;
 use crate::domain::definition::definition_shape;
-use crate::domain::sexpr::{Edit, SyntaxTree};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use super::super::shared::{
     detect_dialect, list_head, package_context_before_top_level, read_file_or_empty, read_input,
@@ -59,7 +60,27 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         anyhow::bail!("selected top-level form is not recognized as a definition: {head}");
     };
 
-    let definition_text = selection.text(&from_input.text).to_owned();
+    // A leading own-line comment (or blank run) describing this definition
+    // lives outside its own span. Fold it into the moved text and the
+    // removal span so it travels with the definition instead of being
+    // orphaned in the source file. The very first top-level form has no
+    // preceding sibling to draw a boundary from, so a file-header comment
+    // above it is left in place rather than assumed to belong to it.
+    let leading_start = if target_index == 0 {
+        span.start().get()
+    } else {
+        let previous_end = from_tree
+            .select_path(&Path::root_child(target_index - 1))?
+            .span()
+            .end()
+            .get();
+        first_newline_or(&from_input.text, previous_end, span.start().get())
+    };
+    let move_span = ByteSpan::new(ByteOffset::new(leading_start), span.end());
+    let definition_text = move_span
+        .slice(&from_input.text)
+        .trim_start_matches('\n')
+        .to_owned();
     let source_package = package_context_before_top_level(&from_tree, target_index)?;
     let definition = DefinitionReportItem {
         path: args.path.to_string(),
@@ -71,7 +92,17 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         body_form_count: Some(shape.body_form_count(&view)),
         package: source_package.clone(),
     };
-    let from_rewritten = Edit::kill(&from_input.text, &from_tree, selection)?;
+    // `move_span` already ends exactly at the definition's own end and
+    // starts at the boundary that hands the *next* sibling's leading trivia
+    // back to it, so removing it verbatim leaves the original gap after this
+    // definition as the new separator — no further whitespace absorption
+    // needed (and absorbing more would glue the previous definition onto
+    // whatever follows).
+    let from_rewritten = format!(
+        "{}{}",
+        &from_input.text[..move_span.start().get()],
+        &from_input.text[move_span.end().get()..]
+    );
     let to_tree = SyntaxTree::parse(&to_input.text)?;
     let dest_package = package_context_before_top_level(&to_tree, to_tree.root_children().len())?;
     let appended = match &source_package {

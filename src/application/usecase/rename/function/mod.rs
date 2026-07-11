@@ -8,7 +8,7 @@ use crate::domain::sexpr::{SymbolName, SyntaxTree};
 use super::RenameFunctionOccurrence;
 use super::selection::list_head;
 
-mod target;
+pub(in crate::application::usecase::rename) mod target;
 mod traversal;
 
 pub use traversal::collect_function_call_head_renames;
