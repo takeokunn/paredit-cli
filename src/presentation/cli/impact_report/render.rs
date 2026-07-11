@@ -173,7 +173,8 @@ pub(in crate::presentation::cli) fn print_impact_report(
                                 },
                                 "head": item.call.head.as_str(),
                                 "argumentCount": item.call.argument_count,
-                                "expectedParameterCount": item.expected_parameter_count,
+                                "minParameterCount": item.expected_parameter_arity.map(|(min, _)| min),
+                                "maxParameterCount": item.expected_parameter_arity.and_then(|(_, max)| max),
                                 "status": item.status.label(),
                                 "enclosingDefinition": item.call.enclosing_definition.as_deref(),
                             }))

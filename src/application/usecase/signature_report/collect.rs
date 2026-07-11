@@ -19,7 +19,7 @@ pub fn build_signature_reports(
     symbol: Option<&SymbolName>,
 ) -> Result<Vec<SignatureReportFile>> {
     let mut parsed = Vec::with_capacity(sources.len());
-    let mut definitions_by_name = BTreeMap::<String, Vec<usize>>::new();
+    let mut definitions_by_name = BTreeMap::<String, Vec<(usize, Option<usize>)>>::new();
 
     for source in sources {
         let definitions = collect_signature_definitions(&source.tree, source.dialect, symbol)?;
@@ -29,13 +29,10 @@ pub fn build_signature_reports(
             let Some(name) = &definition.name else {
                 continue;
             };
-            let Some(parameter_count) = definition.parameter_count else {
+            let Some(arity) = definition.parameter_arity else {
                 continue;
             };
-            definitions_by_name
-                .entry(name.clone())
-                .or_default()
-                .push(parameter_count);
+            definitions_by_name.entry(name.clone()).or_default().push(arity);
         }
 
         parsed.push((source.path, source.dialect, definitions, calls));
@@ -50,11 +47,11 @@ pub fn build_signature_reports(
             calls: calls
                 .into_iter()
                 .map(|call| {
-                    let (expected_parameter_count, status) =
+                    let (expected_parameter_arity, status) =
                         classify_signature_call(&definitions_by_name, &call);
                     SignatureCallItem {
                         call,
-                        expected_parameter_count,
+                        expected_parameter_arity,
                         status,
                     }
                 })
@@ -93,13 +90,14 @@ pub(super) fn collect_signature_definitions(
             continue;
         }
 
-        let parameter_count = if is_symbol_macro_definition {
-            None
+        let (parameter_count, parameter_arity) = if is_symbol_macro_definition {
+            (None, None)
         } else {
             let Some(parameter_count) = shape.lambda_parameter_count(&view) else {
                 continue;
             };
-            Some(parameter_count)
+            let parameter_arity = shape.lambda_parameter_arity(&view);
+            (Some(parameter_count), parameter_arity)
         };
 
         definitions.push(SignatureDefinitionItem {
@@ -109,6 +107,7 @@ pub(super) fn collect_signature_definitions(
             name,
             category: shape.category,
             parameter_count,
+            parameter_arity,
         });
     }
 

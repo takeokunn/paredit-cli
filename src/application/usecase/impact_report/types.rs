@@ -35,6 +35,7 @@ pub struct ImpactDefinitionItem {
     pub name: Option<String>,
     pub category: DefinitionCategory,
     pub parameter_count: Option<usize>,
+    pub parameter_arity: Option<(usize, Option<usize>)>,
     pub body_form_count: Option<usize>,
     pub package: Option<String>,
 }

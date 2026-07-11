@@ -42,6 +42,7 @@ pub(super) fn collect_impact_definitions(
             name: shape.name(&view).map(ToOwned::to_owned),
             category: shape.category,
             parameter_count: shape.lambda_parameter_count(&view),
+            parameter_arity: shape.lambda_parameter_arity(&view),
             body_form_count: Some(shape.body_form_count(&view)),
             package: current_package.clone(),
         });
