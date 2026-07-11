@@ -235,6 +235,7 @@ fn assert_rollback_on_write_failure() {
 
 mod failure;
 mod macro_like;
+mod macro_like_plan;
 mod macrolet_scope;
 mod plan;
 mod plan_macrolet_scope;
