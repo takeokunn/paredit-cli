@@ -56,6 +56,28 @@ fn slurps_forward() {
 }
 
 #[test]
+fn slurps_forward_preserves_trailing_newline() {
+    let input = "(foo) bar\n";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    assert_eq!(
+        Edit::slurp_forward(input, &tree, selection).unwrap(),
+        "(foo bar)\n"
+    );
+}
+
+#[test]
+fn slurps_forward_keeps_following_sibling_separator() {
+    let input = "(foo) bar baz\n";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0")).expect("selection");
+    assert_eq!(
+        Edit::slurp_forward(input, &tree, selection).unwrap(),
+        "(foo bar) baz\n"
+    );
+}
+
+#[test]
 fn barfs_forward() {
     let input = "(alpha beta gamma)";
     let tree = SyntaxTree::parse(input).expect("valid");

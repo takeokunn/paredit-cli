@@ -58,6 +58,14 @@ pub(in crate::domain::sexpr) struct Node {
     pub(in crate::domain::sexpr) close: Option<ByteOffset>,
     pub(in crate::domain::sexpr) text: Option<String>,
     pub(in crate::domain::sexpr) source_text: Option<String>,
+    /// Byte offset from `span.start()` to where an atom's own symbol content
+    /// begins, i.e. past its reader prefixes *and* any trivia (whitespace or
+    /// comments) between the last prefix and the symbol. Reader prefixes are
+    /// followed by `skip_trivia()` during parsing (`#' foo` is valid, if
+    /// unusual, syntax), so this cannot be recovered later by summing each
+    /// prefix's fixed source length — it must be recorded while parsing.
+    /// Meaningless (`0`) for non-atom nodes.
+    pub(in crate::domain::sexpr) symbol_offset: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +156,10 @@ pub struct ExpressionView {
     pub span: ByteSpan,
     pub text: Option<String>,
     pub children: Vec<ExpressionView>,
+    /// Byte offset from `span.start()` to where an atom's own symbol content
+    /// begins, past its reader prefixes and any intervening trivia. `0` for
+    /// non-atom nodes.
+    pub symbol_offset: usize,
 }
 
 /// A validated selection of one non-root expression inside a syntax tree.
@@ -215,8 +227,11 @@ impl SyntaxTree {
     /// Collects every atom in the tree together with its path and byte span.
     pub fn atom_occurrences(&self) -> Vec<AtomOccurrence> {
         let mut occurrences = Vec::new();
+        let mut path_stack = Vec::new();
         for (index, child) in self.node(NodeId::ROOT).children.iter().enumerate() {
-            self.collect_atoms(*child, ExpressionPath::root_child(index), &mut occurrences);
+            path_stack.push(index);
+            self.collect_atoms(*child, &mut path_stack, &mut occurrences);
+            path_stack.pop();
         }
         occurrences
     }
@@ -295,10 +310,16 @@ impl SyntaxTree {
         .ok_or_else(|| anyhow!("no expression contains byte offset {}", offset.get()))
     }
 
+    // `path_stack` is pushed/popped in place rather than cloned at every
+    // recursion level (as `ExpressionPath::child` would do): cloning the
+    // whole path on the way down makes a deeply nested document (thousands
+    // of levels) cost O(depth^2) allocation instead of O(depth), which is
+    // slow enough to look hung. A full `ExpressionPath` is only built once
+    // an atom is actually found.
     fn collect_atoms(
         &self,
         node_id: NodeId,
-        path: ExpressionPath,
+        path_stack: &mut Vec<usize>,
         output: &mut Vec<AtomOccurrence>,
     ) {
         let node = self.node(node_id);
@@ -310,17 +331,28 @@ impl SyntaxTree {
             return;
         }
         if node.kind == NodeKind::Atom {
-            if let Some(text) = node.text.clone() {
+            let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
+            if let Some(symbol_text) = (!is_quoted_literal)
+                .then_some(node.text.as_deref())
+                .flatten()
+                .and_then(|text| text.get(node.symbol_offset..))
+            {
+                let symbol_span = ByteSpan::new(
+                    ByteOffset::new(node.span.start().get() + node.symbol_offset),
+                    node.span.end(),
+                );
                 output.push(AtomOccurrence {
-                    path,
-                    span: node.span,
-                    text,
+                    path: ExpressionPath::from_indexes(path_stack.clone()),
+                    span: symbol_span,
+                    text: symbol_text.to_string(),
                 });
             }
             return;
         }
         for (index, child) in node.children.iter().enumerate() {
-            self.collect_atoms(*child, path.child(index), output);
+            path_stack.push(index);
+            self.collect_atoms(*child, path_stack, output);
+            path_stack.pop();
         }
     }
 
@@ -344,6 +376,7 @@ impl SyntaxTree {
             reader_prefixes: node.reader_prefixes.clone(),
             span: node.span,
             text: node.text.clone(),
+            symbol_offset: node.symbol_offset,
             children: node
                 .children
                 .iter()

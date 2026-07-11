@@ -54,18 +54,14 @@ pub(crate) fn atom_text(view: &ExpressionView) -> Option<&str> {
 }
 
 pub(crate) fn atom_symbol_text(view: &ExpressionView) -> Option<&str> {
-    atom_text(view).and_then(|text| text.get(reader_prefix_source_len(&view.reader_prefixes)..))
+    atom_text(view).and_then(|text| text.get(view.symbol_offset..))
 }
 
 pub(crate) fn atom_symbol_span(view: &ExpressionView) -> Option<ByteSpan> {
     (view.kind == ExpressionKind::Atom).then(|| {
-        let start = view.span.start().get() + reader_prefix_source_len(&view.reader_prefixes);
+        let start = view.span.start().get() + view.symbol_offset;
         ByteSpan::new(ByteOffset::new(start), view.span.end())
     })
-}
-
-fn reader_prefix_source_len(prefixes: &[ReaderPrefix]) -> usize {
-    prefixes.iter().map(|prefix| prefix.as_source().len()).sum()
 }
 
 fn is_lambda_like_function_list(view: &ExpressionView) -> bool {

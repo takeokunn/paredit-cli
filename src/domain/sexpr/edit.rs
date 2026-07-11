@@ -58,7 +58,11 @@ impl Edit {
             .ok_or_else(|| anyhow!("selected list has no next sibling to slurp"))?;
         let (_, close) = list_delimiter_offsets(node)?;
         let insertion = format!(" {}", tree.node(sibling).span.slice(input));
-        let removal = expand_removal(input, tree, tree.node(sibling).span);
+        // The sibling sits after the list, so the gap to remove is the
+        // whitespace between the closing delimiter and the sibling. Absorbing
+        // trailing whitespace instead would eat a document-terminating newline
+        // and strand the list-facing gap as a dangling space.
+        let removal = expand_removal_leading(input, tree, tree.node(sibling).span);
         Ok(remove_then_insert(
             input,
             removal,
@@ -196,6 +200,23 @@ fn expand_removal(input: &str, tree: &SyntaxTree, span: ByteSpan) -> ByteSpan {
         while start > floor && bytes[start - 1].is_ascii_whitespace() {
             start -= 1;
         }
+    }
+    ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))
+}
+
+fn expand_removal_leading(input: &str, tree: &SyntaxTree, span: ByteSpan) -> ByteSpan {
+    let bytes = input.as_bytes();
+    let mut start = span.start().get();
+    let end = span.end().get();
+    let floor = tree
+        .comments
+        .iter()
+        .map(|comment| comment.span.end().get())
+        .filter(|comment_end| *comment_end < start)
+        .max()
+        .map_or(0, |comment_end| comment_end + 1);
+    while start > floor && bytes[start - 1].is_ascii_whitespace() {
+        start -= 1;
     }
     ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))
 }

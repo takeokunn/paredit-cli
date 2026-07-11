@@ -74,6 +74,9 @@ fn treats_reader_prefix_as_part_of_selection_span() {
 
 #[test]
 fn does_not_rename_quoted_atom_occurrences() {
+    // `'foo` is a quoted symbol literal (data), so it is left alone. `#'foo`
+    // is a live function reference per CLHS 3.1.2.1.2.4 (equivalent to
+    // `(function foo)`), so it is renamed along with the bare occurrence.
     let input = "'foo foo #'foo";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
@@ -81,7 +84,7 @@ fn does_not_rename_quoted_atom_occurrences() {
         &SymbolName::new("foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
-    assert_eq!(output, "'foo bar #'foo");
+    assert_eq!(output, "'foo bar #'bar");
 }
 
 #[test]

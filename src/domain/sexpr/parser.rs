@@ -55,6 +55,7 @@ impl<'a> Parser<'a> {
             close: None,
             text: None,
             source_text: None,
+            symbol_offset: 0,
         };
         Self {
             input,
@@ -175,6 +176,7 @@ impl<'a> Parser<'a> {
             close: None,
             text: None,
             source_text: None,
+            symbol_offset: 0,
         });
         self.nodes[parent.get()].children.push(id);
         self.stack.push(id);
@@ -328,6 +330,12 @@ impl<'a> Parser<'a> {
         };
         let id = NodeId::new(self.nodes.len());
         let span_start = prefixes.first().map(|prefix| prefix.start).unwrap_or(start);
+        // `start` is the position after `consume_reader_prefixes` already ran
+        // `skip_trivia()`, so this is the true start of the atom's own
+        // content even when whitespace or a comment separates a reader
+        // prefix from what it prefixes (`#' foo` is valid, if unusual, CL
+        // syntax).
+        let symbol_offset = start.get() - span_start.get();
         self.nodes.push(Node {
             kind: NodeKind::Atom,
             delimiter: None,
@@ -339,6 +347,7 @@ impl<'a> Parser<'a> {
             close: None,
             text: Some(self.input[span_start.get()..end.get()].to_string()),
             source_text: None,
+            symbol_offset,
         });
         self.nodes[parent.get()].children.push(id);
     }
