@@ -59,6 +59,32 @@ fn cli_writes_package_option_sort() {
 }
 
 #[test]
+fn cli_writes_package_option_sort_dropping_a_blank_line_left_behind_at_the_front() {
+    let dir = fresh_temp_dir("sort-package-options-blank-line");
+    let package_file = dir.join("package.lisp");
+    fs::write(
+        &package_file,
+        "(defpackage #:demo\n  (:export #:main)\n  (:import-from #:dep #:x)\n\n  (:use #:cl))\n",
+    )
+    .expect("write package fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("sort-package-options")
+        .arg("--file")
+        .arg(&package_file)
+        .arg("--write")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"changed\": true"))
+        .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(package_file).expect("read rewritten package"),
+        "(defpackage #:demo\n  (:use #:cl)\n  (:import-from #:dep #:x)\n  (:export #:main))\n"
+    );
+}
+
+#[test]
 fn cli_keeps_sorted_package_options_idempotent() {
     let dir = fresh_temp_dir("sort-package-options-idempotent");
     let package_file = dir.join("package.lisp");

@@ -1,6 +1,24 @@
-use crate::domain::sexpr::ByteSpan;
+use crate::domain::sexpr::{ByteOffset, ByteSpan};
 
 use super::PackageRenameOccurrence;
+
+/// Grows a to-be-blanked span leftward over its leading indentation and the
+/// single preceding newline so deleting an option collapses its whole line
+/// instead of leaving a dangling blank line behind.
+pub(super) fn expand_blanked_line_span(input: &str, span: ByteSpan) -> ByteSpan {
+    let bytes = input.as_bytes();
+    let mut start = span.start().get();
+    while start > 0 && matches!(bytes[start - 1], b' ' | b'\t') {
+        start -= 1;
+    }
+    if start > 0 && bytes[start - 1] == b'\n' {
+        start -= 1;
+        if start > 0 && bytes[start - 1] == b'\r' {
+            start -= 1;
+        }
+    }
+    ByteSpan::new(ByteOffset::new(start), span.end())
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct SpanReplacement {

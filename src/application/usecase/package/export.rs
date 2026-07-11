@@ -10,7 +10,8 @@ use crate::domain::{
 };
 
 use super::syntax::{
-    atom_text, is_package_head, package_atoms_match, package_option_atoms, package_option_name,
+    atom_text, is_package_head, normalize_package_atom, package_atoms_match, package_option_atoms,
+    package_option_name,
 };
 
 #[derive(Debug)]
@@ -121,7 +122,7 @@ fn analyze_defpackage_export_edit(
             let replacement = if already_exported {
                 String::new()
             } else {
-                format!(" {}", symbol.as_str())
+                format!(" #:{}", normalize_package_atom(symbol.as_str()))
             };
             (
                 Some(option.span),
@@ -131,7 +132,10 @@ fn analyze_defpackage_export_edit(
             )
         } else {
             let insertion_offset = view.span.end().get().saturating_sub(1);
-            let replacement = format!("\n  (:export {})", symbol.as_str());
+            let replacement = format!(
+                "\n  (:export #:{})",
+                normalize_package_atom(symbol.as_str())
+            );
             (None, insertion_offset, false, replacement)
         };
     let insertion_span = ByteSpan::new(

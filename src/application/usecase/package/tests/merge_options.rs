@@ -40,6 +40,23 @@ fn merges_import_from_options_only_by_source_package() {
 }
 
 #[test]
+fn merging_removed_options_leaves_no_dangling_blank_lines() {
+    let input = "(defpackage :dup\n  (:use :cl)\n  (:export :a :b)\n  (:import-from :foo :x)\n  (:export :c :d)\n  (:import-from :foo :y)\n  (:import-from :bar :z))\n";
+    let plan = plan_merge_package_options(MergePackageOptionsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: None,
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    let expected = "(defpackage :dup\n  (:use :cl)\n  (:export :a :b :c :d)\n  (:import-from :foo :x :y)\n  (:import-from :bar :z))\n";
+    assert_eq!(plan.rewritten, expected);
+    assert!(!plan.rewritten.contains("\n  \n"));
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
 fn merged_package_options_are_idempotent() {
     let input = "(defpackage #:demo (:use #:cl) (:export #:a #:b))\n";
     let plan = plan_merge_package_options(MergePackageOptionsRequest {

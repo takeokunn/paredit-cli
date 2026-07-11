@@ -12,6 +12,7 @@ use anyhow::Result;
 
 use crate::domain::sexpr::{Path, SyntaxTree};
 
+use super::leading_trivia::strip_leading_blank_lines;
 use collect::collect_sortable_blocks;
 use ordering::sorted_entry_positions;
 use rewrite::apply_replacements;
@@ -59,13 +60,11 @@ pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<Sort
         // When some other entry displaces the block's original first entry
         // from the front, that entry's own leading trivia (a blank run,
         // possibly with a comment) ends up at the top of the region, where
-        // there is nothing left for it to separate from. Drop just the
-        // blank-line run while leaving a leading comment in place.
-        let replacement = if sorted_positions[0] == 0 {
-            replacement
-        } else {
-            strip_leading_blank_lines(&replacement)
-        };
+        // there is nothing left for it to separate from. Collapsing a
+        // genuinely blank run down to one newline is a no-op when the
+        // original first entry stayed in front, since its own form_text
+        // never carries leading trivia to collapse.
+        let replacement = strip_leading_blank_lines(&replacement);
 
         replacements.push(BlockReplacement {
             start: block.start,
@@ -87,29 +86,4 @@ pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<Sort
         changed,
         written: request.write && changed,
     })
-}
-
-/// Drops leading lines that are empty or all-whitespace, returning the
-/// remainder starting at the first line with content (a comment or a form).
-/// A comment's own indentation is left untouched.
-///
-/// A leading newline is always a slot-boundary marker (the newline that used
-/// to end the previous definition's line), not a blank line by itself, so it
-/// is dropped unconditionally before the remainder is scanned for genuine
-/// blank lines.
-fn strip_leading_blank_lines(text: &str) -> String {
-    let text = text.strip_prefix('\n').unwrap_or(text);
-    let bytes = text.as_bytes();
-    let mut cursor = 0;
-    loop {
-        let line_end = bytes[cursor..]
-            .iter()
-            .position(|&byte| byte == b'\n')
-            .map(|offset| cursor + offset);
-        match line_end {
-            Some(end) if text[cursor..end].trim().is_empty() => cursor = end + 1,
-            _ => break,
-        }
-    }
-    text[cursor..].to_owned()
 }

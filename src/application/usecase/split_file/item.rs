@@ -1,9 +1,10 @@
 use anyhow::Result;
 
+use crate::application::usecase::leading_trivia::first_newline_or;
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Path, SyntaxTree};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use super::syntax::{atom_child, list_head};
 use super::{SplitFileDefinition, SplitFileItem};
@@ -27,7 +28,33 @@ pub(super) fn build_split_file_item(
         );
     };
 
-    let definition_text = selection.text(from_input).to_owned();
+    // A leading own-line comment (or blank run) describing this definition
+    // lives outside its own span. Fold it into the moved text and the
+    // removal span so it travels with the definition instead of being
+    // orphaned in the source file. The very first top-level form has no
+    // preceding sibling to draw a boundary from, so a file-header comment
+    // above it is left in place rather than assumed to belong to it.
+    let leading_start = if target_index == 0 {
+        span.start().get()
+    } else {
+        let previous_end = from_tree
+            .select_path(&Path::root_child(target_index - 1))?
+            .span()
+            .end()
+            .get();
+        first_newline_or(from_input, previous_end, span.start().get())
+    };
+    let move_span = ByteSpan::new(ByteOffset::new(leading_start), span.end());
+
+    // Destination placement (`append_top_level_definitions`, and package
+    // injection) already supplies its own separating blank line before this
+    // text, so drop the leading newline captured above instead of stacking a
+    // second blank line in the destination file. A captured comment's own
+    // indentation is untouched; only the boundary newline(s) are dropped.
+    let definition_text = move_span
+        .slice(from_input)
+        .trim_start_matches('\n')
+        .to_owned();
     let definition = SplitFileDefinition {
         path: path.to_string(),
         span,
@@ -42,7 +69,7 @@ pub(super) fn build_split_file_item(
     Ok(SplitFileItem {
         path,
         span,
-        removal_span: span,
+        removal_span: move_span,
         definition,
         definition_text,
     })

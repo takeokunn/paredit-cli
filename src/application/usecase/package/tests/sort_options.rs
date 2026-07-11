@@ -68,6 +68,63 @@ fn sorts_package_options_by_name_when_requested() {
 }
 
 #[test]
+fn sort_package_options_keeps_leading_comment_with_its_option() {
+    let input = "(defpackage #:demo\n  \
+                 (:documentation \"demo package\")\n  \
+                 ;; networking options\n  \
+                 (:use #:cl #:usocket)\n  \
+                 (:export #:foo))\n";
+    let plan = plan_sort_package_options(SortPackageOptionsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: None,
+        order: PackageOptionSortOrder::Name,
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+    let comment = plan
+        .rewritten
+        .find(";; networking options")
+        .expect("comment");
+    let use_option = plan.rewritten.find("(:use #:cl").expect("use option");
+    let documentation = plan
+        .rewritten
+        .find("(:documentation")
+        .expect("documentation option");
+    assert!(
+        comment < use_option && use_option - comment < 30,
+        "comment should sit directly above the option it describes: {:?}",
+        plan.rewritten
+    );
+    assert!(documentation < comment);
+}
+
+#[test]
+fn sort_package_options_relocating_original_first_option_has_no_stray_gap() {
+    // `:use` is the option list's original first entry (no leading trivia of
+    // its own) and sorts after `:export` by name, so it must pick up a clean
+    // separator instead of gluing onto the previous option's closing paren.
+    let input = "(defpackage #:demo(:use #:cl)(:export #:foo))\n";
+    let plan = plan_sort_package_options(SortPackageOptionsRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: None,
+        order: PackageOptionSortOrder::Name,
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+    assert!(
+        !plan.rewritten.contains(")(:use"),
+        "reordered options must not be glued together: {:?}",
+        plan.rewritten
+    );
+}
+
+#[test]
 fn sorted_package_options_are_idempotent() {
     let input = "(defpackage #:demo (:use #:cl) (:import-from #:dep #:x) (:export #:main))\n";
     let plan = plan_sort_package_options(SortPackageOptionsRequest {

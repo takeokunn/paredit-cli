@@ -1,3 +1,4 @@
+use crate::application::usecase::leading_trivia::strip_leading_blank_lines;
 use crate::domain::sexpr::ByteSpan;
 
 use super::{OptionReplacement, OptionSlot, PackageOptionSortOrder};
@@ -51,13 +52,11 @@ pub(super) fn sort_slots(slots: &[OptionSlot]) -> (Vec<String>, Vec<OptionReplac
         // When some other slot displaces the option list's original first
         // slot from the front, that slot's own leading trivia (a blank run,
         // possibly with a comment) ends up at the top of the region, where
-        // there is nothing left for it to separate from. Drop just the
-        // blank-line run while leaving a leading comment in place.
-        let replacement = if order[0] == 0 {
-            replacement
-        } else {
-            strip_leading_blank_lines(&replacement)
-        };
+        // there is nothing left for it to separate from. Collapsing a
+        // genuinely blank run down to one newline is a no-op when the
+        // original first slot stayed in front, since it never carries more
+        // than a single leading newline of its own.
+        let replacement = strip_leading_blank_lines(&replacement);
 
         vec![OptionReplacement {
             span: region,
@@ -73,31 +72,6 @@ fn is_identity(order: &[usize]) -> bool {
         .iter()
         .enumerate()
         .all(|(index, &value)| index == value)
-}
-
-/// Drops leading lines that are empty or all-whitespace, returning the
-/// remainder starting at the first line with content (a comment or an
-/// option form). A comment's own indentation is left untouched.
-///
-/// A leading newline is always a slot-boundary marker (the newline that used
-/// to end the previous option's line), not a blank line by itself, so it is
-/// dropped unconditionally before the remainder is scanned for genuine blank
-/// lines.
-fn strip_leading_blank_lines(text: &str) -> String {
-    let text = text.strip_prefix('\n').unwrap_or(text);
-    let bytes = text.as_bytes();
-    let mut cursor = 0;
-    loop {
-        let line_end = bytes[cursor..]
-            .iter()
-            .position(|&byte| byte == b'\n')
-            .map(|offset| cursor + offset);
-        match line_end {
-            Some(end) if text[cursor..end].trim().is_empty() => cursor = end + 1,
-            _ => break,
-        }
-    }
-    text[cursor..].to_owned()
 }
 
 pub(super) fn option_sort_key(

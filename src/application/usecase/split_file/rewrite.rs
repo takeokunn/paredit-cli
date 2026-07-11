@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::{ByteOffset, ByteSpan};
+use crate::domain::sexpr::ByteSpan;
 
 pub(super) fn ensure_non_overlapping_spans(
     spans: impl IntoIterator<Item = ByteSpan>,
@@ -39,20 +39,4 @@ pub(super) fn replace_byte_span(input: &str, span: ByteSpan, replacement: &str) 
     output.push_str(replacement);
     output.push_str(&input[span.end().get()..]);
     output
-}
-
-pub(super) fn expand_definition_removal(input: &str, span: ByteSpan) -> ByteSpan {
-    let bytes = input.as_bytes();
-    let mut start = span.start().get();
-    let mut end = span.end().get();
-    if end < bytes.len() && bytes[end].is_ascii_whitespace() {
-        while end < bytes.len() && bytes[end].is_ascii_whitespace() {
-            end += 1;
-        }
-    } else {
-        while start > 0 && bytes[start - 1].is_ascii_whitespace() {
-            start -= 1;
-        }
-    }
-    ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end))
 }

@@ -16,7 +16,10 @@ mod types;
 use export::find_defpackage_export_edit;
 use merge_options::defpackage_option_merge_edits;
 use rename::package_rename_occurrences;
-use rewrite::{SpanReplacement, replace_span, rewrite_package_occurrences, rewrite_spans};
+use rewrite::{
+    SpanReplacement, expand_blanked_line_span, replace_span, rewrite_package_occurrences,
+    rewrite_spans,
+};
 use sort_exports::defpackage_export_sort_edits;
 use sort_options::defpackage_option_sort_edits;
 
@@ -154,9 +157,16 @@ pub fn plan_merge_package_options(
     let replacements = edits
         .iter()
         .flat_map(|edit| {
-            edit.replacements.iter().map(|replacement| SpanReplacement {
-                span: replacement.span,
-                replacement: replacement.replacement.clone(),
+            edit.replacements.iter().map(|replacement| {
+                let span = if replacement.replacement.is_empty() {
+                    expand_blanked_line_span(request.input, replacement.span)
+                } else {
+                    replacement.span
+                };
+                SpanReplacement {
+                    span,
+                    replacement: replacement.replacement.clone(),
+                }
             })
         })
         .collect::<Vec<_>>();

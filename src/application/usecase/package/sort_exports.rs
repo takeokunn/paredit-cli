@@ -10,6 +10,7 @@ use crate::domain::{
 };
 
 use super::syntax::{atom_text, is_package_head, package_atoms_match, package_option_name};
+use crate::application::usecase::leading_trivia::first_newline_or;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ExportSortEdit {
@@ -245,7 +246,6 @@ fn build_export_slots(
         return None;
     }
 
-    let bytes = input.as_bytes();
     let mut starts = Vec::with_capacity(symbols.len());
     for (index, (span, _)) in symbols.iter().enumerate() {
         let previous_end = if index == 0 {
@@ -254,12 +254,7 @@ fn build_export_slots(
             symbols[index - 1].0.end().get()
         };
         let this_start = span.start().get();
-        let gap = &bytes[previous_end..this_start];
-        let start = match gap.iter().position(|&byte| byte == b'\n') {
-            Some(offset) => previous_end + offset,
-            None => previous_end,
-        };
-        starts.push(start);
+        starts.push(first_newline_or(input, previous_end, this_start));
     }
 
     let slots = starts

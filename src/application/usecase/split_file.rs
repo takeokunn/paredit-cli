@@ -13,10 +13,7 @@ mod tests;
 mod types;
 
 use item::{build_split_file_item, package_context_before_top_level};
-use rewrite::{
-    append_top_level_definitions, ensure_non_overlapping_spans, expand_definition_removal,
-    replace_byte_span,
-};
+use rewrite::{append_top_level_definitions, ensure_non_overlapping_spans, replace_byte_span};
 use syntax::list_head;
 pub use types::{SplitFileDefinition, SplitFileItem, SplitFilePlan, SplitFileRequest};
 
@@ -137,11 +134,15 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
             _ => item.definition_text.clone(),
         })
         .collect::<Vec<_>>();
+    // `item.removal_span` already starts at the boundary that hands the
+    // *next* sibling's leading trivia back to it and ends exactly at this
+    // definition's own end, so removing it verbatim leaves the original gap
+    // after the definition as the new separator. Absorbing more trailing
+    // whitespace here would glue the previous definition onto whatever
+    // follows.
     let mut from_rewritten = request.from_input.to_owned();
     for item in items.iter_mut().rev() {
-        let removal_span = expand_definition_removal(&from_rewritten, item.span);
-        item.removal_span = removal_span;
-        from_rewritten = replace_byte_span(&from_rewritten, removal_span, "");
+        from_rewritten = replace_byte_span(&from_rewritten, item.removal_span, "");
     }
     let to_rewritten = append_top_level_definitions(request.to_input, &definition_texts);
 

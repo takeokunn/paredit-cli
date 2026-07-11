@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, Path};
 
 use super::{OptionSlot, PackageOptionSortOrder, ordering};
+use crate::application::usecase::leading_trivia::first_newline_or;
 use crate::application::usecase::package::syntax::{atom_text, package_option_name};
 
 pub(super) fn collect_option_slots(
@@ -43,7 +44,6 @@ fn build_option_slot_spans(
     head_end: usize,
     options: &[&ExpressionView],
 ) -> Vec<ByteSpan> {
-    let bytes = input.as_bytes();
     let mut starts = Vec::with_capacity(options.len());
     for (index, option) in options.iter().enumerate() {
         let previous_end = if index == 0 {
@@ -52,12 +52,7 @@ fn build_option_slot_spans(
             options[index - 1].span.end().get()
         };
         let this_start = option.span.start().get();
-        let gap = &bytes[previous_end..this_start];
-        let start = match gap.iter().position(|&byte| byte == b'\n') {
-            Some(offset) => previous_end + offset,
-            None => previous_end,
-        };
-        starts.push(start);
+        starts.push(first_newline_or(input, previous_end, this_start));
     }
 
     starts

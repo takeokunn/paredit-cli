@@ -2,11 +2,11 @@ use std::path::PathBuf;
 
 use proptest::{prelude::*, test_runner::TestCaseError};
 
-use super::rewrite::{append_top_level_definitions, expand_definition_removal, replace_byte_span};
+use super::rewrite::append_top_level_definitions;
 use super::*;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
+use crate::domain::sexpr::{Path, SyntaxTree};
 
 fn split_request<'a>(from_input: &'a str, to_input: &'a str) -> SplitFileRequest<'a> {
     SplitFileRequest {
@@ -220,26 +220,49 @@ fn append_top_level_definitions_creates_destination_from_empty_input() {
 }
 
 #[test]
-fn expand_definition_removal_consumes_following_separator_when_available() {
-    let input = "(defun a () 1)\n\n(defun b () 2)\n";
-    let span = ByteSpan::new(ByteOffset::new(0), ByteOffset::new("(defun a () 1)".len()));
+fn plan_split_file_moves_a_definitions_leading_comment_with_it() {
+    let mut request = split_request(
+        "(defun render-widget (w) w)\n\n\
+         ;; Counts the widgets in a list.\n\
+         (defun widget-count (widgets) (length widgets))\n\n\
+         (defun widget-noop () nil)\n",
+        "",
+    );
+    request.paths = vec![Path::from_indexes(vec![1])];
+    let plan = plan_split_file(request).expect("split-file plan should be valid");
 
-    let expanded = expand_definition_removal(input, span);
-
-    assert_eq!(expanded.start().get(), 0);
-    assert_eq!(expanded.end().get(), "(defun a () 1)\n\n".len());
-    assert_eq!(replace_byte_span(input, expanded, ""), "(defun b () 2)\n");
+    assert!(
+        !plan
+            .from_rewritten
+            .contains(";; Counts the widgets in a list."),
+        "comment must move with its definition, got: {}",
+        plan.from_rewritten
+    );
+    assert!(
+        plan.to_rewritten
+            .contains(";; Counts the widgets in a list.\n(defun widget-count"),
+        "moved comment must stay directly above its definition, got: {}",
+        plan.to_rewritten
+    );
 }
 
 #[test]
-fn expand_definition_removal_consumes_previous_separator_at_eof() {
-    let input = "(defun a () 1)\n\n(defun b () 2)";
-    let start = "(defun a () 1)\n\n".len();
-    let span = ByteSpan::new(ByteOffset::new(start), ByteOffset::new(input.len()));
+fn plan_split_file_does_not_glue_remaining_definitions_when_removing_a_middle_item() {
+    let mut request = split_request(
+        "(defun render-widget (w) w)\n\n\
+         ;; Counts the widgets in a list.\n\
+         (defun widget-count (widgets) (length widgets))\n\n\
+         ;; Trailing helper, unrelated.\n\
+         (defun widget-noop () nil)\n",
+        "",
+    );
+    request.paths = vec![Path::from_indexes(vec![1])];
+    let plan = plan_split_file(request).expect("split-file plan should be valid");
 
-    let expanded = expand_definition_removal(input, span);
-
-    assert_eq!(expanded.start().get(), "(defun a () 1)".len());
-    assert_eq!(expanded.end().get(), input.len());
-    assert_eq!(replace_byte_span(input, expanded, ""), "(defun a () 1)");
+    assert!(
+        !plan.from_rewritten.contains(")(defun"),
+        "remaining definitions must not be glued together: {:?}",
+        plan.from_rewritten
+    );
+    assert!(SyntaxTree::parse(&plan.from_rewritten).is_ok());
 }

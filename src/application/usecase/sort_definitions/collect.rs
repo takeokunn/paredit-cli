@@ -4,6 +4,7 @@ use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
+use super::super::leading_trivia::first_newline_or;
 use super::syntax::list_head;
 use super::types::{DefinitionBlock, DefinitionEntry, RawDefinition, SortDefinitionsItem};
 
@@ -106,7 +107,6 @@ fn finish_block(input: &str, current: &mut Vec<RawDefinition>, blocks: &mut Vec<
 /// runs between two definitions become the following definition's leading
 /// trivia and move with it when the block is reordered.
 fn compute_slot_starts(input: &str, current: &[RawDefinition]) -> Vec<usize> {
-    let bytes = input.as_bytes();
     let mut starts = Vec::with_capacity(current.len());
     for (index, definition) in current.iter().enumerate() {
         if index == 0 {
@@ -115,12 +115,7 @@ fn compute_slot_starts(input: &str, current: &[RawDefinition]) -> Vec<usize> {
         }
         let previous_end = current[index - 1].span.end().get();
         let this_start = definition.span.start().get();
-        let gap = &bytes[previous_end..this_start];
-        let start = match gap.iter().position(|&byte| byte == b'\n') {
-            Some(offset) => previous_end + offset,
-            None => previous_end,
-        };
-        starts.push(start);
+        starts.push(first_newline_or(input, previous_end, this_start));
     }
     starts
 }

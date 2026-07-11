@@ -19,6 +19,38 @@ fn adds_export_to_existing_option() {
 }
 
 #[test]
+fn adds_export_with_hash_colon_prefix_even_when_symbol_argument_is_bare() {
+    let input = "(defpackage #:demo\n  (:use #:cl)\n  (:export #:old))\n";
+    let plan = plan_add_export(AddExportRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: Some(&SymbolName::new("demo").unwrap()),
+        symbol: &SymbolName::new("new").unwrap(),
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    assert!(plan.rewritten.contains("(:export #:old #:new)"));
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn adds_export_option_with_hash_colon_prefix_when_symbol_argument_is_bare() {
+    let input = "(defpackage #:demo\n  (:use #:cl))\n";
+    let plan = plan_add_export(AddExportRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        package: Some(&SymbolName::new("demo").unwrap()),
+        symbol: &SymbolName::new("new").unwrap(),
+    })
+    .unwrap();
+
+    assert!(plan.changed);
+    assert!(plan.rewritten.contains("(:export #:new)"));
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
 fn add_export_is_idempotent_for_existing_symbol() {
     let input = "(defpackage #:demo (:export #:main))\n";
     let plan = plan_add_export(AddExportRequest {
