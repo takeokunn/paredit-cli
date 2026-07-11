@@ -2,8 +2,12 @@ use std::collections::BTreeMap;
 
 use super::{OptionMerge, OptionReplacement, OptionSlot};
 use crate::application::usecase::package::syntax::normalize_package_atom;
+use crate::domain::sexpr::SyntaxTree;
 
-pub(super) fn merge_slots(slots: &[OptionSlot]) -> (Vec<OptionMerge>, Vec<OptionReplacement>) {
+pub(super) fn merge_slots(
+    slots: &[OptionSlot],
+    tree: &SyntaxTree,
+) -> (Vec<OptionMerge>, Vec<OptionReplacement>) {
     let mut groups = BTreeMap::<(String, Option<String>), Vec<&OptionSlot>>::new();
     for slot in slots {
         groups
@@ -16,6 +20,13 @@ pub(super) fn merge_slots(slots: &[OptionSlot]) -> (Vec<OptionMerge>, Vec<Option
     let mut replacements = Vec::new();
     for ((_name, key), group) in groups {
         if group.len() < 2 {
+            continue;
+        }
+        // Merging rebuilds the kept option's text from parsed atoms and
+        // blanks the others; both steps only see the node tree, so a
+        // comment anywhere in the group's source would be silently dropped.
+        // Leave the group untouched rather than lose it.
+        if group.iter().any(|slot| tree.has_comment_in(slot.span)) {
             continue;
         }
         let kept = group[0];

@@ -61,6 +61,7 @@ pub(super) fn defpackage_option_merge_edits(
         let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
         collect_option_merge_edits(
+            tree,
             &view,
             path.clone(),
             dialect,
@@ -82,6 +83,7 @@ pub(super) fn defpackage_option_merge_edits(
 }
 
 fn collect_option_merge_edits(
+    tree: &SyntaxTree,
     view: &ExpressionView,
     path: Path,
     dialect: Dialect,
@@ -89,10 +91,19 @@ fn collect_option_merge_edits(
     matched_defpackages: &mut usize,
     edits: &mut Vec<OptionMergeEdit>,
 ) -> Result<()> {
-    analyze_defpackage_options(view, &path, dialect, package, matched_defpackages, edits)?;
+    analyze_defpackage_options(
+        tree,
+        view,
+        &path,
+        dialect,
+        package,
+        matched_defpackages,
+        edits,
+    )?;
 
     for (index, child) in view.children.iter().enumerate() {
         collect_option_merge_edits(
+            tree,
             child,
             path.child(index),
             dialect,
@@ -106,6 +117,7 @@ fn collect_option_merge_edits(
 }
 
 fn analyze_defpackage_options(
+    tree: &SyntaxTree,
     view: &ExpressionView,
     path: &Path,
     dialect: Dialect,
@@ -139,7 +151,7 @@ fn analyze_defpackage_options(
     }
 
     let slots = slots::collect_option_slots(view, path)?;
-    let (merges, replacements) = merge::merge_slots(&slots);
+    let (merges, replacements) = merge::merge_slots(&slots, tree);
     if merges.is_empty() {
         return Ok(());
     }
