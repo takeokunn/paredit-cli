@@ -33,3 +33,15 @@ fn explicit_path_rejects_cl_user_compiler_macrolet_shadowed_local_function_calls
         "(defun render () (cl-user:compiler-macrolet ((fetch-user (id) `(trace (fetch-user ,id)))) (trace (fetch-user user))))"
     );
 }
+
+#[test]
+fn all_calls_unwraps_calls_inside_global_macro_expander_templates() {
+    assert_unwrap_calls!(
+        input: "(defmacro build (id) `(trace (fetch-user ,id))) (trace (fetch-user root))",
+        function: "fetch-user",
+        wrapper: "trace",
+        scope: UnwrapFunctionCallsScope::AllCalls,
+        calls: 2,
+        rewritten: "(defmacro build (id) `(fetch-user ,id)) (fetch-user root)"
+    );
+}

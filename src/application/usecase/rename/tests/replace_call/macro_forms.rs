@@ -35,3 +35,13 @@ fn all_calls_replace_outer_calls_inside_cl_user_macrolet_expanders_only() {
         ]
     );
 }
+
+#[test]
+fn all_calls_replaces_calls_inside_global_macro_expander_templates() {
+    assert_replace_calls!(
+        input: "(defmacro build (id) `(fetch-user ,id)) (fetch-user root)",
+        scope: ReplaceFunctionCallsScope::AllCalls,
+        calls: 2,
+        rewritten: "(defmacro build (id) `(load-user ,id)) (load-user root)"
+    );
+}

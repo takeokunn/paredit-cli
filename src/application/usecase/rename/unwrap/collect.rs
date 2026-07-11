@@ -9,6 +9,7 @@ use crate::application::usecase::rename::reader::{
 };
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
+use crate::domain::definition::macro_expander_body_range;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
@@ -167,13 +168,18 @@ impl<'a> UnwrapCollection<'a> {
             }
         }
 
+        let macro_expander_body =
+            list_head(view).and_then(|head| macro_expander_body_range(self.dialect, view, head));
+
         for (index, child) in view.children.iter().enumerate() {
             self.collect_from_view_with_scope(
                 child,
                 path.child(index),
                 local_callables,
                 quasiquote_depth,
-                in_macro_expander,
+                in_macro_expander
+                    || macro_expander_body
+                        .is_some_and(|body_range| body_range.contains_child(index)),
             );
         }
     }

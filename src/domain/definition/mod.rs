@@ -189,6 +189,19 @@ pub fn is_macro_expander_definition(dialect: Dialect, head: &str) -> bool {
     classify::is_macro_expander_definition(dialect, head)
 }
 
+/// Returns the child range containing code returned by a macro expander.
+pub fn macro_expander_body_range(
+    dialect: Dialect,
+    view: &ExpressionView,
+    head: &str,
+) -> Option<DefinitionBodyRange> {
+    if !is_macro_expander_definition(dialect, head) {
+        return None;
+    }
+
+    definition_shape(dialect, view, head).map(DefinitionShape::body_range)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,6 +285,20 @@ mod tests {
         assert!(!is_macro_expander_definition(Dialect::CommonLisp, "defun"));
         assert!(!is_macro_expander_definition(Dialect::Scheme, "define-syntax"));
         assert!(!is_macro_expander_definition(Dialect::Clojure, "defmacro"));
+    }
+
+    #[test]
+    fn identifies_macro_expander_body_range() {
+        let tree = SyntaxTree::parse("(defmacro render (node) (declare (ignore node)) `(fetch node))")
+            .expect("source parses");
+        let view = tree.root_view();
+
+        let range = macro_expander_body_range(Dialect::CommonLisp, &view, "defmacro")
+            .expect("defmacro has a body range");
+
+        assert!(!range.contains_child(2));
+        assert!(range.contains_child(3));
+        assert!(range.contains_child(4));
     }
 
     #[test]

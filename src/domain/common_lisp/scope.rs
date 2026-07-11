@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow};
 
+use crate::domain::definition::macro_expander_body_range;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
 
@@ -15,7 +16,8 @@ pub(crate) fn common_lisp_local_callable_form(
 }
 
 /// Macro expander templates are syntax templates for executable output, so
-/// quasiquoted forms in their binding bodies remain eligible for refactoring.
+/// quasiquoted forms in global and local macro expander bodies remain eligible
+/// for refactoring.
 pub(crate) fn common_lisp_macro_expander_path(
     tree: &SyntaxTree,
     dialect: Dialect,
@@ -25,6 +27,19 @@ pub(crate) fn common_lisp_macro_expander_path(
 
     for ancestor_end in 1..indexes.len() {
         let descendant_indexes = &indexes[ancestor_end..];
+        let ancestor = Path::from_indexes(indexes[..ancestor_end].to_vec());
+        let view = tree.select_path(&ancestor)?.view();
+        let Some(head) = atom_child(&view, 0) else {
+            continue;
+        };
+
+        if descendant_indexes.first().is_some_and(|child_index| {
+            macro_expander_body_range(dialect, &view, head)
+                .is_some_and(|body_range| body_range.contains_child(*child_index))
+        }) {
+            return Ok(true);
+        }
+
         if descendant_indexes.len() < 3
             || descendant_indexes[0] != 1
             || descendant_indexes[2] < 2
@@ -32,11 +47,6 @@ pub(crate) fn common_lisp_macro_expander_path(
             continue;
         }
 
-        let ancestor = Path::from_indexes(indexes[..ancestor_end].to_vec());
-        let view = tree.select_path(&ancestor)?.view();
-        let Some(head) = atom_child(&view, 0) else {
-            continue;
-        };
         if common_lisp_local_callable_form(dialect, head).is_some_and(|form| form.is_macro()) {
             return Ok(true);
         }

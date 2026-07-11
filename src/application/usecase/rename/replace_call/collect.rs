@@ -9,6 +9,7 @@ use crate::application::usecase::rename::reader::{
 };
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
+use crate::domain::definition::macro_expander_body_range;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
@@ -98,7 +99,8 @@ fn collect_replace_call_sites_from_view(
         return Ok(());
     }
 
-    if let Some(head) = list_head(view) {
+    let head = list_head(view);
+    if let Some(head) = head {
         if let Some(form) = common_lisp_local_callable_form(ctx.dialect, head) {
             collect_local_callable_replace_call_sites(
                 view,
@@ -113,6 +115,9 @@ fn collect_replace_call_sites_from_view(
             return Ok(());
         }
     }
+
+    let macro_expander_body =
+        head.and_then(|head| macro_expander_body_range(ctx.dialect, view, head));
 
     if !is_local_callable_bound(local_callables, ctx.from.as_str()) {
         if let Some(site) = replace_call_site_from_view(
@@ -134,7 +139,9 @@ fn collect_replace_call_sites_from_view(
             ctx,
             local_callables,
             quasiquote_depth,
-            in_macro_expander,
+            in_macro_expander
+                || macro_expander_body
+                    .is_some_and(|body_range| body_range.contains_child(index)),
             calls,
         )?;
     }
