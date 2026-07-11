@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
@@ -47,5 +47,5 @@ fn slot_spec_binds(slot_spec: &ExpressionView, symbol: &SymbolName) -> bool {
                 .first()
                 .and_then(super::super::super::syntax::atom_text)
         })
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }

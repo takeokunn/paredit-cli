@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, ensure};
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -72,7 +72,7 @@ impl WrapFunctionCallTemplate {
         let head = crate::application::usecase::rename::selection::list_head(&root)
             .context("wrapper template root form must be a parenthesized list")?;
         ensure!(
-            common_lisp_symbol_name_eq(head, wrapper.as_str()),
+            common_lisp_symbol_reference_eq(head, wrapper.as_str()),
             "wrapper template head must match --wrapper ({})",
             wrapper.as_str()
         );

@@ -3,7 +3,7 @@ mod forms;
 mod patterns;
 mod symbols;
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::common_lisp::is_common_lisp_declaration_form;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
@@ -31,7 +31,7 @@ pub(super) fn infer_extract_function_params(
 
 pub(super) fn extract_function_param_name_eq(dialect: Dialect, left: &str, right: &str) -> bool {
     match dialect {
-        Dialect::CommonLisp | Dialect::Unknown => common_lisp_symbol_name_eq(left, right),
+        Dialect::CommonLisp | Dialect::Unknown => common_lisp_symbol_reference_eq(left, right),
         _ => left == right,
     }
 }

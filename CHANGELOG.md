@@ -14,6 +14,18 @@ with no external effect.
 
 ### Fixed
 
+- `find-symbol`, `symbol-report`, `rename-symbol`, `refactor plan/preview`,
+  `unused-definition-report`, and `remove-unused-definitions` now recognize
+  a Common Lisp symbol referenced through a package qualifier
+  (`nshell.application:execute-command-line`) or the `#:` uninterned-symbol
+  syntax used in `defpackage` `:export` clauses (`#:execute-command-line`)
+  as the same symbol as the bare name. Occurrence matching previously only
+  stripped the four standard CL home-package aliases (`cl:`, `cl-user:`,
+  `common-lisp:`, `common-lisp-user:`), so a definition referenced
+  exclusively through a project-specific package qualifier — the normal way
+  one package's test suite or consumer calls another package's exported
+  function — had zero recognized references and was reported as unused,
+  and would have been deleted by `--write`.
 - `remove-unused-definitions`: Common Lisp `defstruct` definitions are now
   protected by default (require `--include-protected`), like package/
   system/test/customization/mode definitions. A structure's type-name

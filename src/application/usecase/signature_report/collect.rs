@@ -8,7 +8,7 @@ use crate::application::usecase::signature_report::syntax::list_head;
 use crate::application::usecase::signature_report::types::{
     SignatureCallItem, SignatureDefinitionItem, SignatureReportFile, SignatureReportSource,
 };
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
@@ -88,7 +88,7 @@ pub(super) fn collect_signature_definitions(
 
         let name = shape.name(&view).map(ToOwned::to_owned);
         if name.as_deref().is_none_or(|name| {
-            symbol.is_some_and(|target| !common_lisp_symbol_name_eq(name, target.as_str()))
+            symbol.is_some_and(|target| !common_lisp_symbol_reference_eq(name, target.as_str()))
         }) {
             continue;
         }

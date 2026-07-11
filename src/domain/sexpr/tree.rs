@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 
 use super::parser::{ParseError, Parser};
 use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, SymbolName};
@@ -258,7 +258,7 @@ impl SyntaxTree {
         let mut occurrences = self
             .atom_occurrences()
             .into_iter()
-            .filter(|occurrence| common_lisp_symbol_name_eq(&occurrence.text, from.as_str()))
+            .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, from.as_str()))
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.span.start());
         for occurrence in occurrences.into_iter().rev() {

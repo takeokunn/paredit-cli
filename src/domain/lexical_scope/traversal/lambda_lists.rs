@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
@@ -46,7 +46,7 @@ pub(super) fn collect_lambda_list_references(
 
         if lambda_list_binding_names(child, mode)
             .iter()
-            .any(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+            .any(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
         {
             return true;
         }
@@ -86,7 +86,7 @@ fn collect_lambda_list_marker(
                 .get(index + 1)
                 .into_iter()
                 .flat_map(|next| lambda_list_binding_names(next, *mode))
-                .any(|name| common_lisp_symbol_name_eq(&name, symbol.as_str()));
+                .any(|name| common_lisp_symbol_reference_eq(&name, symbol.as_str()));
             Some(if shadowed { usize::MAX } else { index + 2 })
         }
         "&allow-other-keys" => Some(index + 1),

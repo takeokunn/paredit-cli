@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::patterns::{binding_pattern_names, lambda_list_names};
@@ -77,12 +77,12 @@ pub(super) fn parameter_form_binds(parameter_form: &ExpressionView, symbol: &Sym
     parameter_form.kind == ExpressionKind::List
         && lambda_list_names(parameter_form)
             .iter()
-            .any(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+            .any(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }
 
 pub(super) fn binding_binds(binding: &BindingGroup, symbol: &SymbolName) -> bool {
     binding
         .names
         .iter()
-        .any(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .any(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }

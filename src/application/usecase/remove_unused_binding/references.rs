@@ -5,7 +5,7 @@ use crate::application::usecase::callable_scope::{
 };
 use crate::domain::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispBindingReferenceScope, CommonLispLocalCallableForm,
-    CommonLispVariableBindingForm, CommonLispVariableSpecForm, common_lisp_symbol_name_eq,
+    CommonLispVariableBindingForm, CommonLispVariableSpecForm, common_lisp_symbol_reference_eq,
     local_callable_definition_reference_scope,
 };
 use crate::domain::definition::definition_shape;
@@ -300,7 +300,7 @@ fn collect_local_callable_reference_spans_from_view(
                 return;
             }
 
-            if common_lisp_symbol_name_eq(head, name.as_str())
+            if common_lisp_symbol_reference_eq(head, name.as_str())
                 && !is_local_callable_bound(local_callables, head)
             {
                 if let Some(head_view) = view.children.first() {

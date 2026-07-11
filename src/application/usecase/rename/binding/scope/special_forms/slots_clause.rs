@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use crate::application::usecase::rename::selection::atom_text;
@@ -96,5 +96,5 @@ pub(super) fn collect_clause_form_references(
 fn slot_spec_binds(slot_spec: &ExpressionView, symbol: &SymbolName) -> bool {
     atom_text(slot_spec)
         .or_else(|| slot_spec.children.first().and_then(atom_text))
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, symbol.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
 }

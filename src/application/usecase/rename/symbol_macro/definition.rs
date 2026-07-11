@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree};
@@ -113,7 +113,7 @@ fn collect_target_definition_rename(
     let Some(name_target) = shape.name_target(view, path) else {
         return;
     };
-    if !common_lisp_symbol_name_eq(name_target.text, from.as_str()) {
+    if !common_lisp_symbol_reference_eq(name_target.text, from.as_str()) {
         return;
     }
     renames.push(RenameFunctionOccurrence {

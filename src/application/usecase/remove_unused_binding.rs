@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispBindingRefactorForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispBindingRefactorForm, common_lisp_symbol_reference_eq};
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Formatter, SymbolName, SyntaxTree,
 };
@@ -149,7 +149,7 @@ fn remove_unused_binding_parts(
         })?;
         let candidate = candidates
             .iter()
-            .find(|candidate| common_lisp_symbol_name_eq(&candidate.name, name.as_str()))
+            .find(|candidate| common_lisp_symbol_reference_eq(&candidate.name, name.as_str()))
             .with_context(|| {
                 format!(
                     "binding {} was not found in selected binding form",

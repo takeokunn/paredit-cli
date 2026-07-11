@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionView};
 
@@ -156,7 +156,7 @@ pub(super) fn binding_pair_binds_name(binding: &ExpressionView, name: &str) -> b
 }
 
 pub(super) fn variable_spec_binds_name(binding: &ExpressionView, name: &str) -> bool {
-    if atom_text(binding).is_some_and(|binding_name| common_lisp_symbol_name_eq(binding_name, name))
+    if atom_text(binding).is_some_and(|binding_name| common_lisp_symbol_reference_eq(binding_name, name))
     {
         return true;
     }
@@ -216,7 +216,7 @@ fn iteration_binding_binds_name(binding_form: &ExpressionView, name: &str) -> bo
         .children
         .first()
         .and_then(atom_text)
-        .is_some_and(|binding_name| common_lisp_symbol_name_eq(binding_name, name))
+        .is_some_and(|binding_name| common_lisp_symbol_reference_eq(binding_name, name))
 }
 
 fn variable_specs_bind_name(bindings: &ExpressionView, name: &str) -> bool {
@@ -230,7 +230,7 @@ fn slot_specs_bind_name(slot_specs: &ExpressionView, name: &str) -> bool {
     slot_specs.children.iter().any(|slot_spec| {
         atom_text(slot_spec)
             .or_else(|| slot_spec.children.first().and_then(atom_text))
-            .is_some_and(|binding_name| common_lisp_symbol_name_eq(binding_name, name))
+            .is_some_and(|binding_name| common_lisp_symbol_reference_eq(binding_name, name))
     })
 }
 
@@ -345,7 +345,7 @@ fn supplied_p_contains_name(spec: &ExpressionView, name: &str) -> bool {
 
 fn pattern_contains_name(view: &ExpressionView, name: &str) -> bool {
     atom_text(view)
-        .map(|text| common_lisp_symbol_name_eq(text, name))
+        .map(|text| common_lisp_symbol_reference_eq(text, name))
         .unwrap_or_else(|| {
             view.children
                 .iter()

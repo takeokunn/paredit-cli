@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispOperator, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispOperator, common_lisp_symbol_reference_eq};
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
@@ -209,7 +209,7 @@ fn parse_function_parameter_definition(
         }
         if parameters
             .iter()
-            .any(|parameter| common_lisp_symbol_name_eq(&parameter.name, new_parameter.as_str()))
+            .any(|parameter| common_lisp_symbol_reference_eq(&parameter.name, new_parameter.as_str()))
         {
             anyhow::bail!(
                 "add-function-parameter parameter '{}' already exists in {}",

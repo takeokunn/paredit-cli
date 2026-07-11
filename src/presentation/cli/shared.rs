@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{Context, Result};
 
 use super::{DialectArg, SourceInput, TargetArgs};
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     AtomOccurrence, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, Selection,
@@ -262,7 +262,7 @@ pub(super) fn matching_symbol_occurrences(
 ) -> Vec<AtomOccurrence> {
     tree.atom_occurrences()
         .into_iter()
-        .filter(|occurrence| common_lisp_symbol_name_eq(&occurrence.text, symbol.as_str()))
+        .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str()))
         .collect()
 }
 

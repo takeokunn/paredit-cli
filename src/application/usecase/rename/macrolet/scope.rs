@@ -2,7 +2,7 @@ use crate::application::usecase::callable_scope::is_macro_callable_form;
 use crate::application::usecase::rename::reader::atom_symbol_text;
 use crate::application::usecase::rename::selection::list_head;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
 use crate::domain::sexpr::{ExpressionView, SymbolName};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -94,7 +94,7 @@ fn symbol_macrolet_binds_name(view: &ExpressionView, from: &SymbolName) -> bool 
             .children
             .first()
             .and_then(atom_symbol_text)
-            .is_some_and(|name| common_lisp_symbol_name_eq(name, from.as_str()))
+            .is_some_and(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
     })
 }
 
@@ -168,7 +168,7 @@ pub(super) fn target_binding_presence(
 ) -> TargetBindingPresence {
     if local_names
         .iter()
-        .any(|name| common_lisp_symbol_name_eq(name, from.as_str()))
+        .any(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
     {
         TargetBindingPresence::Present
     } else {

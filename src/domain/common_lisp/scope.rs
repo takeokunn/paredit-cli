@@ -5,7 +5,7 @@ use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::CommonLispLocalCallableForm;
 use super::common_lisp_operator_head_eq;
-use super::common_lisp_symbol_name_eq;
+use super::common_lisp_symbol_reference_eq;
 
 pub(crate) fn common_lisp_local_callable_form(
     dialect: Dialect,
@@ -31,7 +31,7 @@ pub(crate) fn local_callable_names(view: &ExpressionView) -> Vec<String> {
 pub(crate) fn is_local_callable_bound(scope: &[String], head: &str) -> bool {
     scope
         .iter()
-        .any(|name| common_lisp_symbol_name_eq(name, head))
+        .any(|name| common_lisp_symbol_reference_eq(name, head))
 }
 
 pub(crate) fn local_callable_body_scope(

@@ -1,4 +1,4 @@
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SymbolName};
@@ -26,7 +26,7 @@ pub(super) fn is_target_define_symbol_macro(
     definition_shape(dialect, view, head)
         .filter(|shape| shape.category == DefinitionCategory::Variable)
         .and_then(|shape| shape.name(view))
-        .is_some_and(|name| common_lisp_symbol_name_eq(name, from.as_str()))
+        .is_some_and(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
 }
 
 pub(super) fn list_head(view: &ExpressionView) -> Option<&str> {

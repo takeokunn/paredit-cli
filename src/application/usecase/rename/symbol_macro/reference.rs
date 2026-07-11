@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::domain::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispOperator, common_lisp_binding_refactor_form_for_head,
-    common_lisp_symbol_name_eq, is_common_lisp_declaration_form,
+    common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,
 };
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
@@ -124,7 +124,7 @@ fn collect_symbol_spans_in_context(
         }
 
         if quasiquote_depth == 0
-            && atom_text(view).is_some_and(|text| common_lisp_symbol_name_eq(text, symbol.as_str()))
+            && atom_text(view).is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol.as_str()))
         {
             if let Some(span) = atom_symbol_span(view) {
                 output.push(span);

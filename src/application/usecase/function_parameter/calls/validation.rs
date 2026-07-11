@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::function_parameter::list_edit::atom_text;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::{common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq};
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 pub(in crate::application::usecase::function_parameter) fn matches_function_call_view(
@@ -9,9 +9,9 @@ pub(in crate::application::usecase::function_parameter) fn matches_function_call
     function_name: &SymbolName,
 ) -> bool {
     direct_function_call_head(view)
-        .is_some_and(|head| common_lisp_symbol_name_eq(head, function_name.as_str()))
+        .is_some_and(|head| common_lisp_symbol_reference_eq(head, function_name.as_str()))
         || setf_place_call_head(view)
-            .is_some_and(|head| common_lisp_symbol_name_eq(head, function_name.as_str()))
+            .is_some_and(|head| common_lisp_symbol_reference_eq(head, function_name.as_str()))
 }
 
 pub(super) fn ensure_matching_function_call(
@@ -53,7 +53,7 @@ pub(in crate::application::usecase::function_parameter) fn resolve_function_call
     ensure_matching_function_call(view, function_name, command)?;
 
     if direct_function_call_head(view)
-        .is_some_and(|head| common_lisp_symbol_name_eq(head, function_name.as_str()))
+        .is_some_and(|head| common_lisp_symbol_reference_eq(head, function_name.as_str()))
     {
         return Ok(FunctionCallView {
             view,

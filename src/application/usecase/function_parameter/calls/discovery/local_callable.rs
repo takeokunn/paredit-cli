@@ -6,7 +6,7 @@ use crate::application::usecase::callable_scope::{
 };
 use crate::application::usecase::function_parameter::calls::matches_function_call_view;
 use crate::application::usecase::function_parameter::list_edit::{list_head, spans_overlap};
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -126,7 +126,7 @@ fn collect_selected_binding_enclosing_form(
 ) {
     let local_names = local_callable_names(view)
         .into_iter()
-        .filter(|name| !common_lisp_symbol_name_eq(name, context.function_name.as_str()))
+        .filter(|name| !common_lisp_symbol_reference_eq(name, context.function_name.as_str()))
         .collect::<Vec<_>>();
     let mut body_scope = local_callables.to_vec();
     body_scope.extend(local_names);

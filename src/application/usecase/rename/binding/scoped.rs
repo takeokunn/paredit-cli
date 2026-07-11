@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 use super::build_binding_rename_parts;
@@ -29,7 +29,7 @@ pub(super) fn clause_binding_rename_parts(
         let parameters = parameter_name_spans(parameter_form, input)?;
         let Some(parameter) = parameters
             .iter()
-            .find(|parameter| common_lisp_symbol_name_eq(&parameter.name, from.as_str()))
+            .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
         else {
             continue;
         };
@@ -79,7 +79,7 @@ pub(super) fn loop_binding_rename_parts(
     let mut duplicate_count = 0usize;
 
     for spec in common_lisp::loop_binding_specs(view, input) {
-        if !common_lisp_symbol_name_eq(&spec.name, from.as_str()) {
+        if !common_lisp_symbol_reference_eq(&spec.name, from.as_str()) {
             continue;
         }
         duplicate_count += 1;
@@ -134,7 +134,7 @@ pub(super) fn slot_binding_rename_parts(
         let Some((name, span, edit)) = common_lisp::slot_spec_binding_name(spec) else {
             continue;
         };
-        if !common_lisp_symbol_name_eq(name, from.as_str()) {
+        if !common_lisp_symbol_reference_eq(name, from.as_str()) {
             continue;
         }
         duplicate_count += 1;

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::{CommonLispHandlerBindingForm, common_lisp_symbol_name_eq};
+use crate::domain::common_lisp::{CommonLispHandlerBindingForm, common_lisp_symbol_reference_eq};
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
@@ -27,7 +27,7 @@ pub(super) fn parameter_binding_rename_parts(
     let parameters = parameter_name_spans(parameter_form, input)?;
     let target = parameters
         .iter()
-        .find(|parameter| common_lisp_symbol_name_eq(&parameter.name, from.as_str()))
+        .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
         .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
 
     let mut reference_spans = Vec::new();
@@ -123,7 +123,7 @@ fn collect_lambda_list_parameter_references(
             pending_binding_only = false;
             binding_pattern_name_spans(child, input)
                 .iter()
-                .any(|name| common_lisp_symbol_name_eq(&name.name, from.as_str()))
+                .any(|name| common_lisp_symbol_reference_eq(&name.name, from.as_str()))
         } else {
             lambda_list_spec_binds(child, mode, from)
         };
@@ -199,7 +199,7 @@ fn lambda_list_spec_binds(spec: &ExpressionView, mode: LambdaListMode, from: &Sy
 
     names
         .iter()
-        .any(|name| common_lisp_symbol_name_eq(&name.name, from.as_str()))
+        .any(|name| common_lisp_symbol_reference_eq(&name.name, from.as_str()))
 }
 
 pub(super) fn defmethod_binding_rename_parts(
@@ -218,7 +218,7 @@ pub(super) fn defmethod_binding_rename_parts(
     let parameters = specialized_parameter_name_spans(parameter_form, input)?;
     let target = parameters
         .iter()
-        .find(|parameter| common_lisp_symbol_name_eq(&parameter.name, from.as_str()))
+        .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
         .ok_or_else(|| anyhow::anyhow!("binding '{from}' was not found in selected {form}"))?;
 
     let mut reference_spans = Vec::new();
@@ -267,7 +267,7 @@ pub(super) fn local_callable_lambda_binding_rename_parts(
         let parameters = parameter_name_spans(parameter_form, input)?;
         let Some(parameter) = parameters
             .iter()
-            .find(|parameter| common_lisp_symbol_name_eq(&parameter.name, from.as_str()))
+            .find(|parameter| common_lisp_symbol_reference_eq(&parameter.name, from.as_str()))
         else {
             continue;
         };

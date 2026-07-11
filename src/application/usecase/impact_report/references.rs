@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::path::Path as FsPath;
 
 use crate::application::usecase::signature_report::SignatureCallItem;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::{AtomOccurrence, ByteSpan, SymbolName, SyntaxTree};
@@ -59,7 +59,7 @@ pub(super) fn matching_symbol_occurrences(
 
     tree.atom_occurrences()
         .into_iter()
-        .filter(|occurrence| common_lisp_symbol_name_eq(&occurrence.text, symbol.as_str()))
+        .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str()))
         .collect()
 }
 
@@ -83,7 +83,7 @@ fn matching_common_lisp_symbol_occurrences(
     tree.atom_occurrences()
         .into_iter()
         .filter(|occurrence| {
-            common_lisp_symbol_name_eq(&occurrence.text, symbol.as_str())
+            common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str())
                 && matched_spans
                     .contains(&(occurrence.span.start().get(), occurrence.span.end().get()))
         })

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionView, SymbolName};
@@ -45,7 +45,7 @@ pub(super) fn let_binding_reference_spans(
 }
 
 pub(super) fn fallback_reference_count(view: &ExpressionView, symbol: &str) -> usize {
-    usize::from(atom_text(view).is_some_and(|text| common_lisp_symbol_name_eq(text, symbol)))
+    usize::from(atom_text(view).is_some_and(|text| common_lisp_symbol_reference_eq(text, symbol)))
         + view
             .children
             .iter()

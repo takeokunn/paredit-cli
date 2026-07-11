@@ -1,6 +1,6 @@
 use crate::application::usecase::rename::function::target::callable_name_target;
 use crate::application::usecase::rename::macrolet::RenameFunctionOccurrence;
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ExpressionView, Path};
 
 use super::super::super::reader::{
@@ -70,7 +70,7 @@ impl RenameTraversalMode for CallTraversal {
         let Some(head) = crate::application::usecase::rename::selection::list_head(view) else {
             return;
         };
-        if !common_lisp_symbol_name_eq(head, context.from.as_str())
+        if !common_lisp_symbol_reference_eq(head, context.from.as_str())
             || !state.allows_current_scope_rename()
         {
             return;

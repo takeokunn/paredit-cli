@@ -1,5 +1,5 @@
 use crate::domain::common_lisp::{
-    common_lisp_operator_head_eq, common_lisp_symbol_name_eq, normalize_common_lisp_operator_head,
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq, normalize_common_lisp_operator_head,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
@@ -63,7 +63,7 @@ pub(super) fn collect_unshadowed_symbol_references_in_context(
 /// `myfn`, or matching a package-qualified `cl:foo` against a local `foo`.
 pub(super) fn symbol_name_matches(dialect: Dialect, candidate: &str, symbol: &str) -> bool {
     match dialect {
-        Dialect::CommonLisp => common_lisp_symbol_name_eq(candidate, symbol),
+        Dialect::CommonLisp => common_lisp_symbol_reference_eq(candidate, symbol),
         _ => candidate == symbol,
     }
 }
