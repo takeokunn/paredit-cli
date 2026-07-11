@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "cli/action_contract.rs"]
+mod action_contract;
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
 #[path = "cli/bug_report_contract.rs"]

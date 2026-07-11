@@ -1,0 +1,69 @@
+name: paredit-lint
+description: >-
+  Structural S-expression lint and canonical-format checks for Lisp sources
+  (Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, Fennel), powered by
+  paredit-cli.
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  mode:
+    description: >-
+      lint: fail when any discovered Lisp source has structural parse errors.
+      format: fail when any parsed source is not in canonical paredit format.
+      fix: rewrite sources into canonical format in place (pair with a
+      commit/suggestion step of your choice).
+    required: false
+    default: lint
+  paths:
+    description: Space-separated files or directories to scan recursively.
+    required: false
+    default: .
+  version:
+    description: >-
+      paredit-cli git ref to run. Defaults to the ref this action is pinned
+      to, so `uses: takeokunn/paredit-cli@v0.1.1` runs the v0.1.1 binary.
+    required: false
+    default: ""
+  cachix-name:
+    description: Public Cachix cache to pull prebuilt binaries from.
+    required: false
+    default: takeokunn-paredit-cli
+
+runs:
+  using: composite
+  steps:
+    - uses: cachix/install-nix-action@v31
+    - uses: cachix/cachix-action@v17
+      with:
+        name: ${{ inputs.cachix-name }}
+        skipPush: true
+    - shell: bash
+      env:
+        PAREDIT_MODE: ${{ inputs.mode }}
+        PAREDIT_PATHS: ${{ inputs.paths }}
+        PAREDIT_REF: ${{ inputs.version != '' && inputs.version || github.action_ref }}
+      run: |
+        set -euo pipefail
+        ref="${PAREDIT_REF:-main}"
+        case "$PAREDIT_MODE" in
+          lint)
+            app="lint"
+            extra=()
+            ;;
+          format)
+            app="format"
+            extra=(--check)
+            ;;
+          fix)
+            app="format"
+            extra=()
+            ;;
+          *)
+            echo "::error::unknown mode '$PAREDIT_MODE' (expected lint, format, or fix)"
+            exit 1
+            ;;
+        esac
+        # shellcheck disable=SC2086
+        nix run "github:takeokunn/paredit-cli/$ref#$app" -- ${extra[@]+"${extra[@]}"} $PAREDIT_PATHS

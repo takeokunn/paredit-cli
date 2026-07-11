@@ -25,6 +25,18 @@ Install directly from GitHub:
 cargo install --git https://github.com/takeokunn/paredit-cli --locked
 ```
 
+Pin a released line for stable automation:
+
+```sh
+cargo install --git https://github.com/takeokunn/paredit-cli --tag v0.1.1 --locked
+```
+
+Run without installing (Nix):
+
+```sh
+nix run github:takeokunn/paredit-cli -- check --file source.lisp
+```
+
 The current minimum supported Rust version is `1.85`.
 
 ## Quickstart
@@ -50,6 +62,85 @@ gates, parse checks, and target-file scope are all correct.
 
 Use the grouped entrypoints `paredit refactor ...` and
 `paredit workspace ...` as the canonical automation surface.
+
+## Lint and Format Integration
+
+`paredit-cli` ships as a reusable structural linter and canonical formatter
+for any repository that contains Lisp-family sources. Both gates are
+read-only unless you explicitly opt into rewriting.
+
+- `paredit-lint` fails when any discovered Lisp source has structural parse
+  errors, and emits GitHub error annotations in CI.
+- `paredit-format --check` fails when any parsed source differs from the
+  canonical `paredit format` rendering; without `--check` it rewrites files
+  in place.
+
+### GitHub Actions
+
+Use the bundled composite action from any workflow. Prebuilt binaries are
+pulled from the public `takeokunn-paredit-cli` Cachix cache:
+
+```yaml
+jobs:
+  paredit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: takeokunn/paredit-cli@v0.1.1
+        with:
+          mode: lint
+          paths: src
+      - uses: takeokunn/paredit-cli@v0.1.1
+        with:
+          mode: format
+          paths: src
+```
+
+Action inputs: `mode` (`lint`, `format`, or `fix`), `paths` (default `.`),
+`version` (defaults to the action ref), and `cachix-name`.
+
+### Nix Run
+
+```sh
+nix run github:takeokunn/paredit-cli#lint -- .
+nix run github:takeokunn/paredit-cli#format -- --check .
+nix run github:takeokunn/paredit-cli#format -- .
+```
+
+### Flake Integration
+
+Add the flake input and reuse the packaged tools, the overlay, or the
+ready-made flake checks:
+
+```nix
+{
+  inputs.paredit-cli.url = "github:takeokunn/paredit-cli";
+
+  outputs = { self, nixpkgs, paredit-cli, ... }: {
+    # Overlay: provides pkgs.paredit-cli, pkgs.paredit-lint,
+    # pkgs.paredit-format, and pkgs.paredit-format-files.
+    # nixpkgs.overlays = [ paredit-cli.overlays.default ];
+
+    checks.x86_64-linux = {
+      paredit-lint = paredit-cli.lib.x86_64-linux.mkLintCheck { src = ./.; };
+      paredit-format = paredit-cli.lib.x86_64-linux.mkFormatCheck { src = ./.; };
+    };
+  };
+}
+```
+
+### treefmt-nix
+
+Register paredit as a formatter for Lisp sources in a
+[treefmt-nix](https://github.com/numtide/treefmt-nix) configuration; this
+repository formats itself the same way:
+
+```nix
+treefmt-nix.lib.evalModule pkgs {
+  projectRootFile = "flake.nix";
+  settings.formatter.paredit = paredit-cli.lib.${system}.treefmtFormatter;
+}
+```
 
 ## Stability and Support
 
@@ -88,8 +179,11 @@ Pick the document that matches the decision you need to make:
   [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md),
   [SUPPORT.md](SUPPORT.md), [LICENSE](LICENSE),
   [API docs](https://docs.rs/paredit-cli)
+- AI coding agents: [SKILLS.md](SKILLS.md) for the refactoring playbook and
+  [skills/paredit-cli/SKILL.md](skills/paredit-cli/SKILL.md) for an
+  installable agent skill definition
 - Contributors: [CONTRIBUTING.md](CONTRIBUTING.md), [ROADMAP.md](ROADMAP.md),
-  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SKILLS.md](SKILLS.md)
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Maintainers and release reviewers: [GOVERNANCE.md](GOVERNANCE.md),
   [MAINTAINERS.md](MAINTAINERS.md), [RELEASE.md](RELEASE.md)
 
