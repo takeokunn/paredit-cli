@@ -4,6 +4,20 @@ use crate::application::usecase::package_report::PackageDefinitionReport;
 use crate::application::usecase::remove_unused_definition::types::UnusedDefinitionDefinition;
 use crate::domain::definition::DefinitionCategory;
 
+/// `DefinitionCategory::UnknownMacro` covers a `define-*`-prefixed macro
+/// this tool does not recognize, whose expansion is unknown. Such a macro
+/// commonly derives *other* symbol names from its argument via string
+/// concatenation (for example a strategy DSL where `(define-strategy foo
+/// ...)` generates and exports `make-foo-strategy`), so "is the argument
+/// symbol referenced elsewhere" is not a safe proxy for "is this definition
+/// unused": the argument symbol itself may legitimately have zero direct
+/// references while the code it defines is very much in use. Bulk removal
+/// therefore requires the same explicit `--include-protected` opt-in as
+/// other categories this tool cannot fully verify. This is distinct from
+/// `Other`, which covers a dialect's own recognized definition forms (for
+/// example Emacs Lisp `defun`/`defvar` or Clojure `defn`) that are not
+/// broken out into a more specific category but are still known,
+/// non-generative shapes.
 pub(super) fn definition_is_bulk_removable(category: DefinitionCategory) -> bool {
     matches!(
         category,

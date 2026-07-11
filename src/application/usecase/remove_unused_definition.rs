@@ -13,6 +13,11 @@ use candidates::collect_unused_definition_candidates;
 use policy::{collect_exported_symbol_index, definition_is_bulk_removable, definition_is_exported};
 use rewrite::{expand_definition_removal, replace_span};
 
+// Re-exported so `definition_report::references` can share the same
+// callable-reference detection `remove-unused-definitions` uses instead of
+// drifting out of sync with it (see candidates.rs doc comments).
+pub(crate) use candidates::{collect_function_quote_references, collect_quoted_data_references};
+
 pub use types::{
     PlannedDefinitionRemoval, RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsFilePlan,
     RemoveUnusedDefinitionsPlan, RemoveUnusedDefinitionsRequest, SkippedDefinitionRemoval,

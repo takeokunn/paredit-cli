@@ -24,6 +24,7 @@ proptest! {
             PathBuf::from("generated.lisp"),
             Dialect::CommonLisp,
             &tree,
+            &input,
         )
         .expect("build generated parsed file");
 

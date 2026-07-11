@@ -1,5 +1,8 @@
-use crate::domain::common_lisp::common_lisp_symbol_name_eq;
-use crate::domain::sexpr::ByteSpan;
+use crate::application::usecase::remove_unused_definition::{
+    collect_function_quote_references, collect_quoted_data_references,
+};
+use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
+use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
 
 use super::types::{
     DefinitionReference, ParsedDefinitionFile, UnusedDefinitionFile, UnusedDefinitionItem,
@@ -8,6 +11,22 @@ use super::types::{
 pub fn collect_unused_definition_candidates(
     files: &[ParsedDefinitionFile],
 ) -> Vec<UnusedDefinitionFile> {
+    // Scope-aware value-namespace collection (`collect_unshadowed_symbol_references`)
+    // is the primary scan, supplemented by function-namespace (`#'name`) and
+    // quoted-data-table traversals. This must stay in sync with
+    // `remove_unused_definition::candidates`, which the `remove-unused-definitions`
+    // command uses for the same "is this definition still referenced?"
+    // question — otherwise the two commands would disagree on whether a
+    // same-named local binding elsewhere shadows or shows a real reference.
+    let views: Vec<_> = files
+        .iter()
+        .map(|file| {
+            SyntaxTree::parse(&file.text)
+                .ok()
+                .map(|tree| tree.root_view())
+        })
+        .collect();
+
     files
         .iter()
         .enumerate()
@@ -20,24 +39,44 @@ pub fn collect_unused_definition_candidates(
                 .iter()
                 .filter_map(|definition| {
                     let name = definition.name.as_ref()?;
+                    let symbol = SymbolName::new(name.clone()).ok()?;
                     let references = files
                         .iter()
                         .enumerate()
                         .flat_map(|(other_index, other)| {
-                            other
-                                .atoms
-                                .iter()
-                                .filter(move |occurrence| {
-                                    common_lisp_symbol_name_eq(&occurrence.text, name)
-                                })
-                                .filter(move |occurrence| {
+                            let mut spans = Vec::new();
+                            if let Some(view) = &views[other_index] {
+                                collect_unshadowed_symbol_references(
+                                    other.dialect,
+                                    view,
+                                    &symbol,
+                                    &other.text,
+                                    &mut spans,
+                                );
+                                collect_function_quote_references(
+                                    other.dialect,
+                                    view,
+                                    &symbol,
+                                    &mut spans,
+                                );
+                                collect_quoted_data_references(
+                                    other.dialect,
+                                    view,
+                                    &symbol,
+                                    &mut spans,
+                                );
+                            }
+
+                            spans
+                                .into_iter()
+                                .filter(move |span| {
                                     !(other_index == file_index
-                                        && span_contains(definition.span, occurrence.span))
+                                        && span_contains(definition.span, *span))
                                 })
-                                .map(move |occurrence| DefinitionReference {
+                                .map(move |span| DefinitionReference {
                                     file_index: other_index,
-                                    path: occurrence.path.to_string(),
-                                    span: occurrence.span,
+                                    path: String::new(),
+                                    span,
                                 })
                         })
                         .collect();

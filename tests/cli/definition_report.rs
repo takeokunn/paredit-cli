@@ -60,6 +60,27 @@ fn cli_reports_definition_inventory_for_refactor_planning() {
 }
 
 #[test]
+fn cli_reports_unrecognized_define_style_macros_as_unknown_macro_category() {
+    let dir = fresh_temp_dir("definition-report-unknown-macro");
+    let lisp_file = dir.join("strategy.lisp");
+    fs::write(
+        &lisp_file,
+        "(define-trading-strategy d1-momentum :parameters 42)\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("definition-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"category\": \"unknown-macro\""))
+        .stdout(predicate::str::contains("\"name\": \"d1-momentum\""));
+}
+
+#[test]
 fn cli_reports_unused_definitions_for_dead_code_planning() {
     let dir = fresh_temp_dir("unused-definition-report");
     let lisp_file = dir.join("core.lisp");
@@ -97,6 +118,35 @@ fn cli_reports_unused_definitions_for_dead_code_planning() {
         .stdout(predicate::str::contains("\"unused\": true"))
         .stdout(predicate::str::contains("\"name\": \"used\""))
         .stdout(predicate::str::contains("\"reference_count\": 1"));
+}
+
+#[test]
+fn cli_treats_a_shadowing_let_binding_as_no_reference_to_the_global_definition() {
+    // Regression test: `unused-definition-report` must agree with
+    // `remove-unused-definitions` on whether a same-named local binding
+    // shadows the global definition. Previously the report used a flat,
+    // scope-blind atom scan, so `foo` here was counted as referenced by the
+    // `let`-shadowed occurrences inside `bar` even though nothing calls the
+    // actual global `foo`.
+    let dir = fresh_temp_dir("unused-definition-report-shadowed-let");
+    let lisp_file = dir.join("core.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun foo () :global)\n\
+         (defun bar () (let ((foo 1)) (+ foo foo)))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("unused-definition-report")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"candidate_count\": 2"))
+        .stdout(predicate::str::contains("\"name\": \"foo\""))
+        .stdout(predicate::str::contains("\"name\": \"bar\""));
 }
 
 #[test]

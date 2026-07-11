@@ -6,9 +6,13 @@ fn unused_candidates_ignore_self_references_and_count_external_references() {
              (defun caller () (used))\n\
              (defun recursive-unused () (recursive-unused))\n";
     let tree = SyntaxTree::parse(input).expect("parse input");
-    let parsed =
-        build_parsed_definition_file(PathBuf::from("core.lisp"), Dialect::CommonLisp, &tree)
-            .expect("build parsed file");
+    let parsed = build_parsed_definition_file(
+        PathBuf::from("core.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        input,
+    )
+    .expect("build parsed file");
 
     let reports = collect_unused_definition_candidates(&[parsed]);
     let used = reports[0]
@@ -32,9 +36,13 @@ fn unused_candidates_count_unqualified_references_to_package_qualified_common_li
     let input = "(defun cl-user:used () :ok)\n\
              (defun caller () (used))\n";
     let tree = SyntaxTree::parse(input).expect("parse input");
-    let parsed =
-        build_parsed_definition_file(PathBuf::from("core.lisp"), Dialect::CommonLisp, &tree)
-            .expect("build parsed file");
+    let parsed = build_parsed_definition_file(
+        PathBuf::from("core.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        input,
+    )
+    .expect("build parsed file");
 
     let reports = collect_unused_definition_candidates(&[parsed]);
     let used = reports[0]
@@ -48,12 +56,53 @@ fn unused_candidates_count_unqualified_references_to_package_qualified_common_li
 }
 
 #[test]
+fn unused_candidates_count_function_quote_and_quoted_dispatch_table_references() {
+    // A definition reachable only through `#'name` (function-namespace
+    // capture) or a bare `'name` inside a quoted dispatch table/alist is
+    // still live. `remove-unused-definitions` already treats both as
+    // references (see remove_unused_definition::candidates); this pins the
+    // same behavior for `unused-definition-report`, which used to run a
+    // narrower, atoms-only scan and disagree with it.
+    let input = "(defun handler () 1)\n\
+                 (defun dispatch-target () 2)\n\
+                 (defparameter *routes* (list (cons :get #'handler)))\n\
+                 (defparameter *table* '((:dispatch 'dispatch-target)))\n";
+    let tree = SyntaxTree::parse(input).expect("parse input");
+    let parsed = build_parsed_definition_file(
+        PathBuf::from("core.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        input,
+    )
+    .expect("build parsed file");
+
+    let reports = collect_unused_definition_candidates(&[parsed]);
+    let handler = reports[0]
+        .definitions
+        .iter()
+        .find(|item| item.definition.name.as_deref() == Some("handler"))
+        .expect("handler definition");
+    let dispatch_target = reports[0]
+        .definitions
+        .iter()
+        .find(|item| item.definition.name.as_deref() == Some("dispatch-target"))
+        .expect("dispatch-target definition");
+
+    assert!(!handler.references.is_empty());
+    assert!(!dispatch_target.references.is_empty());
+}
+
+#[test]
 fn policy_reports_fail_on_unused_and_required_minimum() {
     let input = "(defun stale () :stale)\n";
     let tree = SyntaxTree::parse(input).expect("parse input");
-    let parsed =
-        build_parsed_definition_file(PathBuf::from("core.lisp"), Dialect::CommonLisp, &tree)
-            .expect("build parsed file");
+    let parsed = build_parsed_definition_file(
+        PathBuf::from("core.lisp"),
+        Dialect::CommonLisp,
+        &tree,
+        input,
+    )
+    .expect("build parsed file");
     let reports = collect_unused_definition_candidates(&[parsed]);
 
     let policy = evaluate_unused_definition_policy(

@@ -32,6 +32,11 @@ pub enum DefinitionCategory {
     Customization,
     Mode,
     Other,
+    /// A `define-*`-prefixed macro not otherwise recognized by this tool.
+    /// Unlike `Other` (a dialect's own known definition forms, such as
+    /// Emacs Lisp `defun` or Clojure `defn`), this macro's expansion — and
+    /// any symbol names it derives from its argument — is unknown.
+    UnknownMacro,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +134,7 @@ impl DefinitionCategory {
             Self::Customization => "customization",
             Self::Mode => "mode",
             Self::Other => "other",
+            Self::UnknownMacro => "unknown-macro",
         }
     }
 
@@ -150,6 +156,7 @@ impl DefinitionCategory {
             "customization" => Some(Self::Customization),
             "mode" => Some(Self::Mode),
             "other" => Some(Self::Other),
+            "unknown-macro" => Some(Self::UnknownMacro),
             _ => None,
         }
     }
