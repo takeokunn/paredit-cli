@@ -122,8 +122,33 @@ pub(super) fn collect_shadow_aware_special_form(
                 return false;
             };
 
-            if should_scan_definition_body(operator) {
-                collect_body_forms(dialect, shape.body_forms(view), symbol, input, output);
+            let body_forms: &[ExpressionView] = if should_scan_definition_body(operator) {
+                shape.body_forms(view)
+            } else {
+                &[]
+            };
+
+            match shape.lambda_list(view) {
+                // A lambda-list parameter's default-value form (`&optional
+                // (y *default*)`) is an ordinary evaluated expression, not a
+                // binding, and must be scanned like any other reference; only
+                // the parameter *names* shadow the body. COLLECT_LAMBDA_LIST_
+                // REFERENCES handles both in one pass, matching the LAMBDA/
+                // FLET-bound-function branch above; the plain body-only scan
+                // this replaced skipped every default-value form entirely.
+                Some(parameter_form) => {
+                    collect_lambda_list_references(
+                        dialect,
+                        parameter_form,
+                        body_forms,
+                        symbol,
+                        input,
+                        output,
+                    );
+                }
+                None => {
+                    collect_body_forms(dialect, body_forms, symbol, input, output);
+                }
             }
             true
         }
