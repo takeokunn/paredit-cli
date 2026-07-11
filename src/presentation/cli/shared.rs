@@ -262,6 +262,12 @@ pub(super) fn matching_symbol_occurrences(
 ) -> Vec<AtomOccurrence> {
     tree.atom_occurrences()
         .into_iter()
+        // Bare quoted-symbol designators (`'foo`) are also included: they are
+        // the standard idiom for referencing a symbol as data (e.g. `(error
+        // 'foo ...)`, `(typep x 'foo)`), and a rename that skips them would
+        // silently leave behind a reference to a definition that no longer
+        // exists.
+        .chain(tree.quoted_symbol_designator_occurrences())
         .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str()))
         .collect()
 }

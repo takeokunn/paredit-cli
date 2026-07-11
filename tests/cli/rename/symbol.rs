@@ -86,6 +86,69 @@ fn cli_writes_multi_file_symbol_rename_without_string_or_comment_matches() {
 }
 
 #[test]
+fn cli_renames_bare_quoted_symbol_designator_references() {
+    // `'foo` is the standard Common Lisp idiom for referencing a symbol as
+    // data (condition/class designators passed to `error`, `typep`,
+    // `make-instance`, etc). A rename that skipped it would silently leave
+    // a dangling reference to a definition that no longer exists.
+    let mut cmd = paredit();
+    cmd.args(["rename-symbol", "--from", "foo", "--to", "bar"])
+        .write_stdin("(define-condition foo (error) ())\n(error 'foo)")
+        .assert()
+        .success()
+        .stdout("(define-condition bar (error) ())\n(error 'bar)");
+}
+
+#[test]
+fn cli_refactor_preview_renames_bare_quoted_symbol_designator_in_symbol_and_function_mode() {
+    for mode in ["symbol", "function"] {
+        let dir = fresh_temp_dir(&format!("quoted-designator-{mode}"));
+        let lisp_file = dir.join("core.lisp");
+        fs::write(
+            &lisp_file,
+            "(define-condition foo (error) ())\n(defun signal-foo () (error 'foo))",
+        )
+        .expect("write lisp fixture");
+
+        let mut cmd = paredit();
+        cmd.arg("refactor")
+            .arg("preview")
+            .arg("--from")
+            .arg("foo")
+            .arg("--to")
+            .arg("bar")
+            .arg("--mode")
+            .arg(mode)
+            .arg("--write")
+            .arg("--output")
+            .arg("json")
+            .arg(&lisp_file)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("\"written\": true"));
+
+        let rewritten = fs::read_to_string(&lisp_file).expect("read rewritten lisp");
+        assert!(
+            rewritten.contains("(error 'bar)"),
+            "mode {mode}: quoted designator was not renamed: {rewritten}"
+        );
+        assert!(
+            !rewritten.contains("'foo"),
+            "mode {mode}: stale quoted reference left behind: {rewritten}"
+        );
+
+        // The rewritten file must still parse; `find-symbol` is a cheap way
+        // to force the CLI to reparse it end-to-end.
+        let mut find_cmd = paredit();
+        find_cmd
+            .args(["find-symbol", "--symbol", "bar", "--file"])
+            .arg(&lisp_file)
+            .assert()
+            .success();
+    }
+}
+
+#[test]
 fn cli_renames_unqualified_occurrences_of_package_qualified_common_lisp_symbol() {
     let dir = fresh_temp_dir("rename-qualified-common-lisp-symbol");
     let lisp_file = dir.join("core.lisp");

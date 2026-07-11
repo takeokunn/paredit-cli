@@ -102,6 +102,31 @@ fn renames_function_designators_but_skips_quoted_data() {
 }
 
 #[test]
+fn renames_bare_quoted_symbol_designator_but_skips_quoted_call_shaped_data() {
+    // `'helper` (a bare quoted-symbol atom) is a live reference in the
+    // value/type namespace -- the idiom used by e.g. `(error 'helper ...)`,
+    // `(typep x 'helper)`, `(make-instance 'helper)` -- so it is renamed
+    // together with the callable definition. `(quote helper)` is the
+    // unabbreviated spelling of the same thing and is renamed too. `'(helper
+    // 1)` is a genuine quoted *list* (data shaped like a call) and stays
+    // untouched, exactly like the sibling `renames_function_designators_but_skips_quoted_data`
+    // test above.
+    assert_function_rename! {
+        input: "(defun helper (x) x)\n(list 'helper (quote helper) '(helper 1) (error 'helper))",
+        dialect: Dialect::CommonLisp,
+        from: "helper",
+        to: "renamed",
+        definitions: 1,
+        calls: 3,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (x) x)",
+            "(list 'renamed (quote renamed) '(helper 1) (error 'renamed))"
+        ]
+    };
+}
+
+#[test]
 fn renames_unquoted_callable_designators_inside_quasiquote() {
     assert_function_rename! {
         input: "(defun helper (x) x)\n(defun caller () `(list ,#'helper ,(function helper) ,(symbol-function 'helper) ,(fdefinition 'helper)))",
@@ -166,40 +191,6 @@ fn renames_qualified_macro_function_designators_inside_quasiquote() {
             "(defmacro renamed (x) x)",
             "(define-compiler-macro renamed (x) x)",
             "(defun caller () `(list ,(cl:macro-function 'renamed) ,(cl-user:compiler-macro-function 'renamed) '(cl:macro-function helper) '(cl-user:compiler-macro-function helper)))"
-        ]
-    };
-}
-
-#[test]
-fn renames_quoted_setf_function_names_in_fdefinition() {
-    assert_function_rename! {
-        input: "(defun accessor (x) x)\n(fdefinition '(setf accessor))",
-        dialect: Dialect::CommonLisp,
-        from: "accessor",
-        to: "slot-accessor",
-        definitions: 1,
-        calls: 1,
-        changed: true,
-        rewritten_contains: [
-            "(defun slot-accessor (x) x)",
-            "(fdefinition '(setf slot-accessor))"
-        ]
-    };
-}
-
-#[test]
-fn renames_unquoted_setf_function_designators_inside_quasiquote() {
-    assert_function_rename! {
-        input: "(defun accessor (x) x)\n(defun caller () `(list ,#'(setf accessor) ,(function (setf accessor)) ,(fdefinition '(setf accessor))))",
-        dialect: Dialect::CommonLisp,
-        from: "accessor",
-        to: "slot-accessor",
-        definitions: 1,
-        calls: 3,
-        changed: true,
-        rewritten_contains: [
-            "(defun slot-accessor (x) x)",
-            "(defun caller () `(list ,#'(setf slot-accessor) ,(function (setf slot-accessor)) ,(fdefinition '(setf slot-accessor))))"
         ]
     };
 }

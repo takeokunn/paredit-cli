@@ -14,8 +14,7 @@ fn cli_writes_common_lisp_macro_like_callable_rename() {
             },
             FixtureFile {
                 path: "caller.lisp",
-                contents:
-                    "(defun caller () (old-name place 1) #'old-name (function old-name) old-name)\n",
+                contents: "(defun caller () (old-name place 1) #'old-name (function old-name) old-name)\n",
             },
         ],
         expected_files: &[
@@ -25,8 +24,7 @@ fn cli_writes_common_lisp_macro_like_callable_rename() {
             },
             FixtureFile {
                 path: "caller.lisp",
-                contents:
-                    "(defun caller () (new-name place 1) #'new-name (function new-name) old-name)\n",
+                contents: "(defun caller () (new-name place 1) #'new-name (function new-name) old-name)\n",
             },
         ],
         expected_definition_count: 1,
@@ -388,8 +386,8 @@ fn cli_writes_common_lisp_define_compiler_macro_rename_inside_reader_quoted_lamb
 }
 
 #[test]
-fn cli_writes_common_lisp_user_qualified_define_compiler_macro_rename_inside_reader_quoted_lambda_body(
-) {
+fn cli_writes_common_lisp_user_qualified_define_compiler_macro_rename_inside_reader_quoted_lambda_body()
+ {
     assert_write_case(WriteCase {
         fixture_name: "rename-function-common-lisp-user-qualified-compiler-macro-reader-quoted-lambda-body",
         dialect: None,

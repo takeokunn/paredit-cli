@@ -1,7 +1,9 @@
 use crate::application::refactor::plan::RefactorPlanTargetKind;
 use crate::application::usecase::impact_report::ImpactDefinitionItem;
 use crate::application::usecase::impact_report::ImpactReportFile;
-use crate::domain::common_lisp::{common_lisp_symbol_reference_eq, normalize_common_lisp_operator_head};
+use crate::domain::common_lisp::{
+    common_lisp_symbol_reference_eq, normalize_common_lisp_operator_head,
+};
 use crate::domain::definition::DefinitionCategory;
 
 struct TargetKindRule {

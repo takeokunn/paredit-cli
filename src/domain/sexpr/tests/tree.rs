@@ -73,10 +73,30 @@ fn treats_reader_prefix_as_part_of_selection_span() {
 }
 
 #[test]
-fn does_not_rename_quoted_atom_occurrences() {
-    // `'foo` is a quoted symbol literal (data), so it is left alone. `#'foo`
-    // is a live function reference per CLHS 3.1.2.1.2.4 (equivalent to
-    // `(function foo)`), so it is renamed along with the bare occurrence.
+fn atom_occurrences_excludes_bare_quoted_symbol_designators() {
+    // Low-level `atom_occurrences` treats a bare `'foo` as inert data and
+    // excludes it; consumers that need quote-awareness (unused-definition,
+    // impact, analysis reports) use their own, more precise reference
+    // collectors instead of relying on this blanket exclusion.
+    let input = "'foo foo #'foo";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let texts = tree
+        .atom_occurrences()
+        .into_iter()
+        .map(|occurrence| occurrence.text)
+        .collect::<Vec<_>>();
+    assert_eq!(texts, vec!["foo", "foo"]);
+}
+
+#[test]
+fn rename_symbol_renames_bare_quoted_symbol_designators() {
+    // `rename-symbol` is a blunt, tree-wide rename, and `'foo` is the
+    // standard Common Lisp idiom for referencing a symbol as data (e.g.
+    // `(error 'foo ...)`, `(typep x 'foo)`, `(make-instance 'foo)`), so it is
+    // rewritten too -- otherwise the rename would silently leave behind a
+    // reference to a definition that no longer exists. `#'foo` is a live
+    // function reference per CLHS 3.1.2.1.2.4 (equivalent to `(function
+    // foo)`), so it is renamed along with the bare occurrence.
     let input = "'foo foo #'foo";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
@@ -84,7 +104,7 @@ fn does_not_rename_quoted_atom_occurrences() {
         &SymbolName::new("foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
-    assert_eq!(output, "'foo bar #'bar");
+    assert_eq!(output, "'bar bar #'bar");
 }
 
 #[test]
