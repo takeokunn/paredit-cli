@@ -195,6 +195,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::ConvertIfToCond(args) => {
                 convert_if_to_cond::convert_if_to_cond(args)?
             }
+            command::RefactorCommand::ConvertCondToIf(args) => {
+                convert_cond_to_if::convert_cond_to_if(args)?
+            }
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?
             }

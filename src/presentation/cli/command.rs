@@ -1,6 +1,7 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
-    call_graph_report, call_report, convert_if_to_cond, convert_let_star_to_let, definition_movement,
+    call_graph_report, call_report, convert_cond_to_if, convert_if_to_cond,
+    convert_let_star_to_let, definition_movement,
     definition_removal, definition_report, dependency_report, duplicate_report, extract_constant,
     extract_function, extract_local_function, form_report, function_parameter, impact_report,
     inline_function, inline_lambda, inline_let, inline_local_function, introduce_let, let_report,
@@ -198,6 +199,8 @@ pub(super) enum RefactorCommand {
     ConvertLetStarToLet(convert_let_star_to_let::ConvertLetStarToLetArgs),
     /// Convert a Common Lisp or Emacs Lisp if form into cond.
     ConvertIfToCond(convert_if_to_cond::ConvertIfToCondArgs),
+    /// Convert a Common Lisp or Emacs Lisp cond form into nested if forms.
+    ConvertCondToIf(convert_cond_to_if::ConvertCondToIfArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }
