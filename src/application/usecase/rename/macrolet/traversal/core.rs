@@ -6,8 +6,7 @@ use crate::application::usecase::rename::reader::apply_reader_prefix_context;
 
 use super::super::RenameFunctionOccurrence;
 use super::super::scope::{
-    LocalCallableRenameKind, MacroletRenameScope, symbol_macrolet_binds_name,
-    symbol_macrolet_shadowing_scope,
+    LocalCallableRenameKind, MacroletRenameScope, symbol_macrolet_shadowing_scope,
 };
 use super::local_callable::{LocalCallableTraversal, collect_local_callable_or_definition};
 use super::reader::{collect_explicit_reader_form_renames, collect_reader_lambda_renames};
@@ -115,7 +114,8 @@ pub(in crate::application::usecase::rename::macrolet) fn collect_renames_from_vi
     state: TraversalState,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
-    let symbol_macrolet_shadows_value = symbol_macrolet_binds_name(view, context.from);
+    let scope = symbol_macrolet_shadowing_scope(state.scope, view, context.from);
+    let state = state.with_scope(scope);
 
     if M::collect_pre_reader_renames(view, &path, context, state, renames) {
         return;
@@ -151,47 +151,13 @@ pub(in crate::application::usecase::rename::macrolet) fn collect_renames_from_vi
                 continue;
             }
         }
-        let child_state = state.with_scope(symbol_macrolet_shadowing_scope(
-            state.scope,
-            view,
-            context.from,
-        ));
-
-        if symbol_macrolet_shadows_value && index == 1 {
-            recurse_symbol_macrolet_expansions::<M>(
-                child,
-                &path.child(index),
-                context,
-                child_state.with_quasiquote_depth(0),
-                renames,
-            );
-            continue;
-        }
-
         recurse_child::<M>(
             child,
             path.child(index),
             context,
-            child_state.with_quasiquote_depth(0),
+            state.with_quasiquote_depth(0),
             renames,
         );
-    }
-}
-
-fn recurse_symbol_macrolet_expansions<M: RenameTraversalMode>(
-    bindings: &ExpressionView,
-    bindings_path: &Path,
-    context: TraversalContext<'_>,
-    state: TraversalState,
-    renames: &mut Vec<RenameFunctionOccurrence>,
-) {
-    for (binding_index, binding) in bindings.children.iter().enumerate() {
-        let binding_path = bindings_path.child(binding_index);
-
-        // A symbol-macrolet binding name is in the value namespace, never callable.
-        for (index, child) in binding.children.iter().enumerate().skip(1) {
-            recurse_child::<M>(child, binding_path.child(index), context, state, renames);
-        }
     }
 }
 

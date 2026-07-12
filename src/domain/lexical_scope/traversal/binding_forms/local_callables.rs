@@ -1,4 +1,6 @@
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, local_callable_names};
+use crate::domain::common_lisp::{
+    CommonLispLocalCallableForm, common_lisp_symbol_reference_eq, local_callable_names,
+};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
@@ -21,7 +23,7 @@ pub(super) fn collect_local_callable_references(
     let body_is_shadowed = matches!(form, CommonLispLocalCallableForm::Labels)
         && local_names
             .iter()
-            .any(|name| name.is_ordinary_named(symbol.as_str()));
+            .any(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()));
 
     for spec in &binding_form.children {
         if spec.kind != ExpressionKind::List || spec.delimiter != Some(Delimiter::Paren) {
@@ -50,7 +52,7 @@ pub(super) fn collect_local_callable_references(
 
     if local_names
         .iter()
-        .any(|name| name.is_ordinary_named(symbol.as_str()))
+        .any(|name| common_lisp_symbol_reference_eq(name, symbol.as_str()))
     {
         return;
     }

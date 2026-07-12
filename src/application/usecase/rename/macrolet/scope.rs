@@ -9,7 +9,6 @@ use crate::domain::sexpr::{ExpressionView, SymbolName};
 pub(super) struct MacroletRenameScope {
     active_target_depth: usize,
     shadowed_depth: usize,
-    value_shadowed_depth: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,10 +50,6 @@ impl MacroletRenameScope {
         self.shadowed_depth > 0
     }
 
-    pub(super) fn is_value_shadowed(self) -> bool {
-        self.is_shadowed() || self.value_shadowed_depth > 0
-    }
-
     fn enter_active_target(mut self) -> Self {
         self.active_target_depth += 1;
         self
@@ -62,11 +57,6 @@ impl MacroletRenameScope {
 
     fn enter_shadowed(mut self) -> Self {
         self.shadowed_depth += 1;
-        self
-    }
-
-    fn enter_value_shadowed(mut self) -> Self {
-        self.value_shadowed_depth += 1;
         self
     }
 }
@@ -96,13 +86,13 @@ pub(super) fn symbol_macrolet_shadowing_scope(
     from: &SymbolName,
 ) -> MacroletRenameScope {
     if symbol_macrolet_binds_name(view, from) {
-        scope.enter_value_shadowed()
+        scope.enter_shadowed()
     } else {
         scope
     }
 }
 
-pub(super) fn symbol_macrolet_binds_name(view: &ExpressionView, from: &SymbolName) -> bool {
+fn symbol_macrolet_binds_name(view: &ExpressionView, from: &SymbolName) -> bool {
     let Some(head) = list_head(view) else {
         return false;
     };
@@ -196,12 +186,12 @@ fn shadow_current_target_in_definition_body(scope: MacroletRenameScope) -> Macro
 }
 
 pub(super) fn target_binding_presence(
-    local_names: &[crate::application::usecase::callable_scope::LocalCallableName],
+    local_names: &[String],
     from: &SymbolName,
 ) -> TargetBindingPresence {
     if local_names
         .iter()
-        .any(|name| name.is_ordinary_named(from.as_str()))
+        .any(|name| common_lisp_symbol_reference_eq(name, from.as_str()))
     {
         TargetBindingPresence::Present
     } else {

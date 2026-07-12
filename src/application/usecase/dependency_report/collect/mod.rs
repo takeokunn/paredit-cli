@@ -1,11 +1,12 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::{
-    CommonLispOperator, common_lisp_local_callable_form, local_callable_names,
+    CommonLispOperator, common_lisp_local_callable_form, local_callable_binding_body_scope,
+    local_callable_body_scope,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionPath, ExpressionView, SyntaxTree};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::types::DependencyReportItem;
 
@@ -20,7 +21,7 @@ pub(super) fn collect_dependency_items(
     let mut dependencies = Vec::new();
 
     for index in 0..tree.root_children().len() {
-        let path = ExpressionPath::root_child(index);
+        let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
         collect_dependency_items_from_view(&view, dialect, path, &[], 0, &mut dependencies);
     }
@@ -31,7 +32,7 @@ pub(super) fn collect_dependency_items(
 fn collect_dependency_items_from_view(
     view: &ExpressionView,
     dialect: Dialect,
-    path: ExpressionPath,
+    path: Path,
     local_bindings: &[String],
     quasiquote_depth: usize,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -99,7 +100,7 @@ fn collect_dependency_items_from_view(
 fn collect_local_callable_dependency_items(
     view: &ExpressionView,
     dialect: Dialect,
-    path: &ExpressionPath,
+    path: &Path,
     local_bindings: &[String],
     quasiquote_depth: usize,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -130,22 +131,11 @@ fn collect_local_callable_dependency_items(
         );
     }
 
-    let mut body_scope = local_bindings.to_vec();
-    body_scope.extend(
-        local_callable_names(view)
-            .iter()
-            .filter_map(|name| name.ordinary_name().map(str::to_owned)),
-    );
+    let body_scope = local_callable_body_scope(local_bindings, view);
 
     if let Some(bindings) = view.children.get(1) {
-        let binding_body_scope = if matches!(
-            form,
-            crate::domain::common_lisp::CommonLispLocalCallableForm::Labels
-        ) {
-            body_scope.as_slice()
-        } else {
-            local_bindings
-        };
+        let binding_body_scope =
+            local_callable_binding_body_scope(form, local_bindings, &body_scope);
         for (binding_index, binding) in bindings.children.iter().enumerate() {
             if binding.kind != ExpressionKind::List || binding.delimiter != Some(Delimiter::Paren) {
                 continue;
@@ -181,7 +171,7 @@ fn collect_local_callable_dependency_items(
 fn collect_symbol_macrolet_dependency_items(
     view: &ExpressionView,
     dialect: Dialect,
-    path: &ExpressionPath,
+    path: &Path,
     local_bindings: &[String],
     quasiquote_depth: usize,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -200,7 +190,7 @@ fn collect_symbol_macrolet_dependency_items(
     else {
         return false;
     };
-    if !CommonLispOperator::from_head(head).is_some_and(CommonLispOperator::is_symbol_macrolet) {
+    if CommonLispOperator::from_head(head) != Some(CommonLispOperator::SymbolMacrolet) {
         return false;
     }
 

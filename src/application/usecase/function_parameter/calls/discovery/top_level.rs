@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use crate::application::usecase::callable_scope::{
-    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
-    local_callable_binding_body_scope, local_callable_body_scope,
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope,
 };
 use crate::application::usecase::function_parameter::calls::matches_function_call_view;
 use crate::application::usecase::function_parameter::list_edit::{list_head, spans_overlap};
@@ -47,7 +47,7 @@ fn collect_function_call_paths(
     view: &ExpressionView,
     path: Path,
     context: &FunctionCallTraversal<'_>,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
 ) {
     if let Some(head) = list_head(view) {
@@ -90,7 +90,7 @@ fn collect_local_callable_function_call_paths(
     view: &ExpressionView,
     path: Path,
     context: &FunctionCallTraversal<'_>,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
     form: CommonLispLocalCallableForm,
 ) {
@@ -121,7 +121,7 @@ fn collect_matched_top_level_function_call_descendants(
     view: &ExpressionView,
     path: Path,
     context: &FunctionCallTraversal<'_>,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
 ) {
     if let Some(place) = matched_setf_place_call(view, context.function_name) {

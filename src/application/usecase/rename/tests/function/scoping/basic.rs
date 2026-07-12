@@ -65,40 +65,6 @@ fn renames_outer_function_calls_inside_flet_binding_bodies_only() {
 }
 
 #[test]
-fn renames_ordinary_calls_inside_flet_with_setf_binding_of_same_name() {
-    assert_function_rename! {
-        input: "(defun helper (x) x)\n(defun main () (flet (((setf helper) (value object) (list value object))) (helper 1)))",
-        dialect: Dialect::CommonLisp,
-        from: "helper",
-        to: "renamed",
-        definitions: 1,
-        calls: 1,
-        changed: true,
-        rewritten_contains: [
-            "(defun renamed (x) x)",
-            "(flet (((setf helper) (value object) (list value object))) (renamed 1))"
-        ]
-    };
-}
-
-#[test]
-fn renames_ordinary_calls_inside_labels_with_setf_binding_of_same_name() {
-    assert_function_rename! {
-        input: "(defun helper (x) x)\n(defun main () (labels (((setf helper) (value object) (list value object))) (helper 1)))",
-        dialect: Dialect::CommonLisp,
-        from: "helper",
-        to: "renamed",
-        definitions: 1,
-        calls: 1,
-        changed: true,
-        rewritten_contains: [
-            "(defun renamed (x) x)",
-            "(labels (((setf helper) (value object) (list value object))) (renamed 1))"
-        ]
-    };
-}
-
-#[test]
 fn renames_emacs_lisp_function_calls_and_designators_without_value_references() {
     assert_function_rename! {
         input: "(defun helper (x) x)\n(defun caller () (helper 1) #'helper (function helper) helper)",

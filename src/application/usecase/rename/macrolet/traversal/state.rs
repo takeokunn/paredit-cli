@@ -48,6 +48,6 @@ impl TraversalState {
     }
 
     pub(super) fn allows_active_rename(&self, scope: MacroletRenameScope) -> bool {
-        self.quasiquote_depth == 0 && scope.is_target_active() && !scope.is_value_shadowed()
+        self.quasiquote_depth == 0 && scope.is_target_active() && !scope.is_shadowed()
     }
 }

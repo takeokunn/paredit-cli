@@ -46,52 +46,6 @@ fn post_rename_verification_requires_old_symbol_removed_and_new_symbol_present()
 }
 
 #[test]
-fn post_rename_verification_allows_reference_only_context_for_new_symbol_presence() {
-    let before = RefactorPlanSummary {
-        definition_count: 0,
-        reference_count: 2,
-        ..summary()
-    };
-    let after = RefactorPlanSummary {
-        definition_count: 0,
-        reference_count: 1,
-        signature_mismatch_count: 3,
-        ..summary()
-    };
-    let checks = refactor_verification_checks(
-        RefactorVerificationRequest {
-            operation: RefactorOperation::Rename,
-            phase: VerificationPhase::Post,
-            symbol: "old-name",
-            new_symbol: Some("new-name"),
-            target_kind: RefactorPlanTargetKind::Callable,
-            before,
-            after: Some(after),
-        },
-        &[],
-    );
-
-    let old_symbol_removed = checks
-        .iter()
-        .find(|check| check.code == "old-symbol-removed")
-        .expect("expected old-symbol-removed post-check");
-    let new_symbol_present = checks
-        .iter()
-        .find(|check| check.code == "new-symbol-present")
-        .expect("expected new-symbol-present post-check");
-
-    assert!(!old_symbol_removed.passed);
-    assert_eq!(old_symbol_removed.count, 2);
-    assert!(new_symbol_present.passed);
-    assert_eq!(new_symbol_present.count, 1);
-    assert!(
-        !checks
-            .iter()
-            .any(|check| check.code == "new-symbol-signature-compatible")
-    );
-}
-
-#[test]
 fn post_rename_verification_skips_signature_check_for_macros() {
     let before = RefactorPlanSummary {
         definition_count: 0,

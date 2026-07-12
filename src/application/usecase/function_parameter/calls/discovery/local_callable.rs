@@ -1,12 +1,12 @@
 use anyhow::Result;
 
 use crate::application::usecase::callable_scope::{
-    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
-    local_callable_binding_body_scope, local_callable_body_scope, local_callable_names,
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope, local_callable_names,
 };
 use crate::application::usecase::function_parameter::calls::matches_function_call_view;
 use crate::application::usecase::function_parameter::list_edit::{list_head, spans_overlap};
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
+use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -59,7 +59,7 @@ fn collect_selected_local_callable_binding_call_paths(
     path: Path,
     context: &SelectedLocalCallableTraversal<'_>,
     selected_binding_visible: bool,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
 ) {
     if view.span == context.enclosing_form_span
@@ -121,12 +121,12 @@ fn collect_selected_binding_enclosing_form(
     view: &ExpressionView,
     path: Path,
     context: &SelectedLocalCallableTraversal<'_>,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
 ) {
     let local_names = local_callable_names(view)
         .into_iter()
-        .filter(|name| !name.is_ordinary_named(context.function_name.as_str()))
+        .filter(|name| !common_lisp_symbol_reference_eq(name, context.function_name.as_str()))
         .collect::<Vec<_>>();
     let mut body_scope = local_callables.to_vec();
     body_scope.extend(local_names);
@@ -171,7 +171,7 @@ fn collect_nested_local_callable_paths(
     path: Path,
     context: &SelectedLocalCallableTraversal<'_>,
     selected_binding_visible: bool,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
     form: CommonLispLocalCallableForm,
 ) {
@@ -211,7 +211,7 @@ fn collect_matched_function_call_descendants(
     path: Path,
     context: &SelectedLocalCallableTraversal<'_>,
     selected_binding_visible: bool,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<Path>,
 ) {
     if let Some(place) = matched_setf_place_call(view, context.function_name) {

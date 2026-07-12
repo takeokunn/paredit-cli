@@ -101,7 +101,7 @@ pub(super) fn collect_shadow_aware_special_form(
             collect_local_callable_references(dialect, view, symbol, input, output, form);
             true
         }
-        operator if operator.is_locally() => {
+        CommonLispOperator::Locally => {
             collect_body_forms(dialect, &view.children[2..], symbol, input, output);
             true
         }
@@ -202,5 +202,8 @@ fn collect_named_let_references(
 }
 
 fn should_scan_definition_body(operator: CommonLispOperator) -> bool {
-    !operator.is_macro_expander_definition()
+    !matches!(
+        operator,
+        CommonLispOperator::DefineSetfExpander | CommonLispOperator::DefineCompilerMacro
+    )
 }
