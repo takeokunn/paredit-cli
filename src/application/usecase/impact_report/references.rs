@@ -53,17 +53,20 @@ pub(super) fn matching_symbol_occurrences(
     tree: &SyntaxTree,
     symbol: &SymbolName,
 ) -> Vec<AtomOccurrence> {
+    let occurrences = tree.atom_occurrences();
+
     if dialect == Dialect::CommonLisp {
-        return matching_common_lisp_symbol_occurrences(tree, symbol);
+        return matching_common_lisp_symbol_occurrences(occurrences, tree, symbol);
     }
 
-    tree.atom_occurrences()
+    occurrences
         .into_iter()
         .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str()))
         .collect()
 }
 
 fn matching_common_lisp_symbol_occurrences(
+    occurrences: Vec<AtomOccurrence>,
     tree: &SyntaxTree,
     symbol: &SymbolName,
 ) -> Vec<AtomOccurrence> {
@@ -80,7 +83,7 @@ fn matching_common_lisp_symbol_occurrences(
         .map(|span| (span.start().get(), span.end().get()))
         .collect::<BTreeSet<_>>();
 
-    tree.atom_occurrences()
+    occurrences
         .into_iter()
         .filter(|occurrence| {
             common_lisp_symbol_reference_eq(&occurrence.text, symbol.as_str())
