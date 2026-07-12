@@ -241,7 +241,7 @@ fn walk_tag(
     Ok(())
 }
 
-fn direct_tags<'a>(form: &'a ExpressionView) -> Vec<&'a ExpressionView> {
+fn direct_tags(form: &ExpressionView) -> Vec<&ExpressionView> {
     form.children
         .iter()
         .skip(1)
