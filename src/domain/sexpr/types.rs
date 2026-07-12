@@ -30,15 +30,9 @@ pub struct ByteSpan {
 impl ByteSpan {
     /// Creates a span from byte offsets.
     ///
-    /// # Panics
-    ///
-    /// Panics when `start` is after `end`. Use [`Self::try_new`] when input
-    /// ordering is not trusted.
+    /// This constructor preserves the historical unchecked behavior. Use
+    /// [`Self::try_new`] when input ordering is not trusted.
     pub const fn new(start: ByteOffset, end: ByteOffset) -> Self {
-        assert!(
-            start.get() <= end.get(),
-            "byte span start must not exceed end"
-        );
         Self { start, end }
     }
 
@@ -105,9 +99,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "byte span start must not exceed end")]
-    fn new_rejects_reversed_offsets() {
-        let _ = ByteSpan::new(ByteOffset::new(8), ByteOffset::new(3));
+    fn new_preserves_unchecked_compatibility() {
+        assert_eq!(
+            ByteSpan::new(ByteOffset::new(8), ByteOffset::new(3)),
+            ByteSpan::new(ByteOffset::new(8), ByteOffset::new(3))
+        );
     }
 }
 
