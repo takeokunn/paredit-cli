@@ -74,16 +74,20 @@ pub fn refactor_verification_checks(
             if request.operation == RefactorOperation::Rename {
                 match (request.new_symbol, request.after) {
                     (Some(new_symbol), Some(after)) => {
+                        let reference_only_rename_context = after.has_reference_only_rename_context();
                         checks.push(RefactorVerificationCheck {
                             code: "new-symbol-present",
                             level: RefactorRiskLevel::Error,
-                            passed: after.definition_count > 0 && after.reference_count > 0,
+                            passed: after.reference_count > 0
+                                && (after.definition_count > 0 || reference_only_rename_context),
                             message: format!(
-                                "New symbol `{new_symbol}` must have at least one definition and one reference."
+                                "New symbol `{new_symbol}` must have at least one reference; a definition is required unless this is a reference-only rename."
                             ),
                             count: after.reference_count + after.definition_count,
                         });
-                        if !request.target_kind.skips_signature_compatibility() {
+                        if !reference_only_rename_context
+                            && !request.target_kind.skips_signature_compatibility()
+                        {
                             checks.push(RefactorVerificationCheck {
                                 code: "new-symbol-signature-compatible",
                                 level: RefactorRiskLevel::Error,

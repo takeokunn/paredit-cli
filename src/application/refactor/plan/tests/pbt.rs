@@ -43,7 +43,7 @@ proptest! {
     }
 
     #[test]
-    fn post_rename_verification_passes_iff_old_symbol_is_removed_and_new_symbol_is_usable(
+    fn post_rename_verification_allows_reference_only_new_symbol_context(
         old_definitions in 0usize..4,
         old_references in 0usize..4,
         new_definitions in 0usize..4,
@@ -61,6 +61,8 @@ proptest! {
             signature_mismatch_count: signature_mismatches,
             ..summary()
         };
+        // A parameter or local binding can be renamed without a discoverable definition.
+        let new_symbol_is_reference_only = after.has_reference_only_rename_context();
 
         let checks = refactor_verification_checks(
             RefactorVerificationRequest {
@@ -76,9 +78,8 @@ proptest! {
         );
         let expected_passed = old_definitions == 0
             && old_references == 0
-            && new_definitions > 0
             && new_references > 0
-            && signature_mismatches == 0;
+            && (new_symbol_is_reference_only || signature_mismatches == 0);
 
         prop_assert_eq!(
             checks.iter().all(|check| check.passed),
@@ -98,16 +99,19 @@ proptest! {
                 .find(|check| check.code == "new-symbol-present")
                 .expect("new symbol check")
                 .passed,
-            new_definitions > 0 && new_references > 0
+            new_references > 0 && (new_definitions > 0 || new_symbol_is_reference_only)
         );
-        prop_assert_eq!(
-            checks
-                .iter()
-                .find(|check| check.code == "new-symbol-signature-compatible")
-                .expect("signature check")
-                .passed,
-            signature_mismatches == 0
-        );
+        let signature_check = checks
+            .iter()
+            .find(|check| check.code == "new-symbol-signature-compatible");
+        if new_symbol_is_reference_only {
+            prop_assert!(signature_check.is_none());
+        } else {
+            prop_assert_eq!(
+                signature_check.expect("signature check").passed,
+                signature_mismatches == 0
+            );
+        }
     }
 
     #[test]

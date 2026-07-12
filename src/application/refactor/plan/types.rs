@@ -108,6 +108,12 @@ pub struct RefactorPlanSummary {
     pub safe_to_automate: bool,
 }
 
+impl RefactorPlanSummary {
+    pub fn has_reference_only_rename_context(self) -> bool {
+        self.definition_count == 0 && self.reference_count > 0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RefactorPlanGate {
     pub level: RefactorRiskLevel,
