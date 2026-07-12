@@ -19,3 +19,4 @@ pub mod report_policy;
 pub mod sexpr;
 pub mod signature_report;
 pub mod similarity_report;
+pub mod workspace_report;
