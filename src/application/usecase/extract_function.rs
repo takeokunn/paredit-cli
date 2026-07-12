@@ -6,7 +6,7 @@ use crate::application::usecase::mutation_safety::reject_common_lisp_reader_cond
 use crate::domain::sexpr::{ExpressionView, SyntaxTree};
 
 mod inference;
-mod rewrite;
+pub(crate) mod rewrite;
 mod syntax;
 #[cfg(test)]
 mod tests;

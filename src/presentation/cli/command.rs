@@ -1,11 +1,11 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_report, extract_constant, extract_function, form_report,
-    function_parameter, impact_report, inline_function, inline_let, introduce_let, let_report,
-    package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
-    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
-    workspace_report,
+    dependency_report, duplicate_report, extract_constant, extract_function,
+    extract_local_function, form_report, function_parameter, impact_report, inline_function,
+    inline_let, introduce_let, let_report, package, refactor, remove_unused_binding, rename,
+    replace_forms, signature_report, similarity_report, symbol_report, thread_expression,
+    unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
 
@@ -169,6 +169,8 @@ pub(super) enum RefactorCommand {
     UnthreadExpression(unthread_expression::UnthreadExpressionArgs),
     /// Extract the selected expression into a top-level function with inferred parameters.
     ExtractFunction(extract_function::ExtractFunctionArgs),
+    /// Extract the selected expression into a local flet or labels function.
+    ExtractLocalFunction(extract_local_function::ExtractLocalFunctionArgs),
     /// Extract the selected expression into a top-level constant.
     ExtractConstant(extract_constant::ExtractConstantArgs),
     /// Inline one selected function call using a selected function definition.

@@ -33,6 +33,8 @@ mod edit_transpose;
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
 mod extract_function;
+#[path = "cli/extract_local_function/mod.rs"]
+mod extract_local_function;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]

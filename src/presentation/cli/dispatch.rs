@@ -159,6 +159,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::ExtractFunction(args) => {
                 extract_function::extract_function(args)?
             }
+            command::RefactorCommand::ExtractLocalFunction(args) => {
+                extract_local_function::extract_local_function(args)?
+            }
             command::RefactorCommand::ExtractConstant(args) => {
                 extract_constant::extract_constant(args)?
             }

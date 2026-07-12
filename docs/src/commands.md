@@ -138,6 +138,7 @@ plan/preview/verify/apply lifecycle.
 | `thread-expression` | Convert a nested call chain into a thread-first or thread-last pipeline. |
 | `unthread-expression` | Convert a threading pipeline back into nested calls. |
 | `extract-function` | Extract the selected expression into a top-level function with inferred parameters. |
+| `extract-local-function` | Extract the selected expression into a Common Lisp `flet` or `labels` binding. |
 | `extract-constant` | Extract the selected expression into a top-level constant. |
 | `inline-function` | Inline one selected function call using a selected function definition. |
 

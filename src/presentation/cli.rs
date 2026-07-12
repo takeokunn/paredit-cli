@@ -12,6 +12,7 @@ mod dispatch;
 mod duplicate_report;
 mod extract_constant;
 mod extract_function;
+mod extract_local_function;
 mod form_report;
 mod function_parameter;
 mod impact_report;

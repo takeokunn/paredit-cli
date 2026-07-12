@@ -11,6 +11,7 @@ pub mod dependency_report;
 pub mod duplicate_report;
 pub mod extract_constant;
 pub mod extract_function;
+pub mod extract_local_function;
 pub(crate) mod extract_shared;
 pub mod form_report;
 pub mod function_parameter;
