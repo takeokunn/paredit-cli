@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::call_graph_report::CallGraphEdge;
 use crate::application::usecase::signature_report::SignatureCallItem;
+use crate::domain::call_graph_report::CallGraphEdge;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 pub use crate::domain::impact_report::{ImpactReportPolicy, ImpactRisk, ImpactRiskLevel};

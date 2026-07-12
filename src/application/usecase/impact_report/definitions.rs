@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::{
-    CommonLispPackageDeclarationForm, common_lisp_symbol_reference_eq,
+    common_lisp_symbol_reference_eq, CommonLispPackageDeclarationForm,
 };
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;

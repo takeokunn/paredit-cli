@@ -1,10 +1,17 @@
-use std::collections::{BTreeMap, BTreeSet};
+use anyhow::Result;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-use crate::domain::definition::DefinitionCategory;
+use crate::domain::call_report::{build_call_report, CallReportItem};
+use crate::domain::common_lisp::{
+    common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
+    CommonLispPackageDeclarationForm,
+};
+use crate::domain::definition::{definition_shape, DefinitionCategory};
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
+};
 
 #[derive(Debug)]
 pub struct CallGraphReportSource {
@@ -72,6 +79,167 @@ pub struct CallGraphPolicyOptions {
     fail_on_inbound_callers: bool,
     require_edges: Option<usize>,
     require_internal_edges: Option<usize>,
+}
+
+pub type CallGraphNodeIndex = HashMap<String, String>;
+
+pub fn build_call_graph_report(
+    sources: Vec<CallGraphReportSource>,
+    include_external: bool,
+    symbol: Option<&SymbolName>,
+) -> Result<CallGraphReport> {
+    let mut parsed = Vec::with_capacity(sources.len());
+    let mut nodes_by_name = BTreeMap::<String, CallGraphNode>::new();
+    let mut node_index = CallGraphNodeIndex::new();
+
+    for source in sources {
+        let definitions = collect_call_graph_definitions(&source.tree, source.dialect)?;
+        let calls = build_call_report(&source.tree, source.dialect, None, false)?;
+        for definition in &definitions {
+            insert_call_graph_node(
+                &mut nodes_by_name,
+                &mut node_index,
+                definition.name.as_deref(),
+                definition.category,
+            );
+        }
+        parsed.push((source.path, source.dialect, definitions, calls));
+    }
+
+    let files = parsed
+        .into_iter()
+        .map(|(path, dialect, definitions, calls)| {
+            let edges = calls
+                .into_iter()
+                .map(|call| build_call_graph_edge(call, &nodes_by_name, &node_index))
+                .filter(|edge| include_external || edge.internal)
+                .filter(|edge| call_graph_edge_matches(edge, symbol))
+                .collect();
+            CallGraphFile {
+                path,
+                dialect,
+                definitions,
+                edges,
+            }
+        })
+        .collect();
+
+    Ok(CallGraphReport {
+        files,
+        nodes_by_name,
+    })
+}
+
+pub fn insert_call_graph_node(
+    nodes_by_name: &mut BTreeMap<String, CallGraphNode>,
+    node_index: &mut CallGraphNodeIndex,
+    name: Option<&str>,
+    category: DefinitionCategory,
+) {
+    if let Some(name) = name {
+        let needle = common_lisp_symbol_reference_needle(name);
+        if let Some(node) = node_index
+            .get(&needle)
+            .and_then(|key| nodes_by_name.get_mut(key))
+        {
+            node.definition_count += 1;
+            node.categories.insert(category);
+        } else {
+            nodes_by_name.insert(
+                name.to_owned(),
+                CallGraphNode {
+                    name: name.to_owned(),
+                    definition_count: 1,
+                    categories: BTreeSet::from([category]),
+                },
+            );
+            node_index.insert(needle, name.to_owned());
+        }
+    }
+}
+
+pub fn build_call_graph_edge(
+    call: CallReportItem,
+    nodes_by_name: &BTreeMap<String, CallGraphNode>,
+    node_index: &CallGraphNodeIndex,
+) -> CallGraphEdge {
+    let categories = node_index
+        .get(&common_lisp_symbol_reference_needle(&call.head))
+        .and_then(|key| nodes_by_name.get(key))
+        .map(|node| node.categories.clone())
+        .unwrap_or_default();
+    CallGraphEdge {
+        caller: call.enclosing_definition,
+        callee: call.head,
+        path: call.path,
+        argument_count: call.argument_count,
+        span: call.span,
+        internal: !categories.is_empty(),
+        callee_categories: categories,
+    }
+}
+
+pub fn call_graph_edge_matches(edge: &CallGraphEdge, symbol: Option<&SymbolName>) -> bool {
+    symbol
+        .map(|symbol| {
+            edge.caller
+                .as_deref()
+                .is_some_and(|caller| common_lisp_symbol_reference_eq(caller, symbol.as_str()))
+                || common_lisp_symbol_reference_eq(&edge.callee, symbol.as_str())
+        })
+        .unwrap_or(true)
+}
+
+fn collect_call_graph_definitions(
+    tree: &SyntaxTree,
+    dialect: Dialect,
+) -> Result<Vec<CallGraphDefinitionItem>> {
+    let mut items = Vec::new();
+    for index in 0..tree.root_children().len() {
+        let path = Path::root_child(index);
+        let view = tree.select_path(&path)?.view();
+        collect_call_graph_definitions_from_view(&view, dialect, path, &mut items);
+    }
+    Ok(items)
+}
+
+fn collect_call_graph_definitions_from_view(
+    view: &ExpressionView,
+    dialect: Dialect,
+    path: Path,
+    items: &mut Vec<CallGraphDefinitionItem>,
+) {
+    if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
+        if let Some(head) = list_head(view) {
+            let is_in_package = dialect.common_lisp_package_declaration_form_for_head(head)
+                == Some(CommonLispPackageDeclarationForm::InPackage);
+            if !is_in_package {
+                if let Some(shape) = definition_shape(dialect, view, head) {
+                    items.push(CallGraphDefinitionItem {
+                        name: shape.name(view).map(str::to_owned),
+                        category: shape.category,
+                        path: path.clone(),
+                        span: view.span,
+                        parameter_count: shape.lambda_parameter_count(view).unwrap_or(0),
+                    });
+                }
+            }
+        }
+    }
+    for (index, child) in view.children.iter().enumerate() {
+        collect_call_graph_definitions_from_view(child, dialect, path.child(index), items);
+    }
+}
+
+fn list_head(view: &ExpressionView) -> Option<&str> {
+    (view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren))
+        .then_some(())
+        .and_then(|_| view.children.first())
+        .and_then(|child| {
+            (child.kind == ExpressionKind::Atom)
+                .then_some(child.text.as_deref())
+                .flatten()
+        })
 }
 
 impl CallGraphPolicyOptions {
