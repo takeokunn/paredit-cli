@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use proptest::prelude::*;
 
-use crate::application::refactor::plan::RefactorPlanSummary;
 use crate::application::usecase::signature_report::SignatureCallStatus;
 use crate::domain::dialect::Dialect;
+use crate::domain::refactor_plan::RefactorPlanSummary;
 use crate::domain::sexpr::{SymbolName, SyntaxTree};
 
 use super::*;

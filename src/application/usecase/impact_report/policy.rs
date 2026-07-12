@@ -1,5 +1,5 @@
-use crate::application::refactor::plan::RefactorPlanSummary;
 use crate::domain::impact_report::ImpactReportPolicyOptions;
+use crate::domain::refactor_plan::RefactorPlanSummary;
 
 use super::types::{ImpactReportPolicy, ImpactRiskLevel};
 

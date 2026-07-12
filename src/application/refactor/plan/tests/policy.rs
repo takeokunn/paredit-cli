@@ -11,11 +11,7 @@ fn policy_fails_on_blocking_gates_and_required_counts() {
         blocks_automation: true,
     }];
     let policy = evaluate_refactor_plan_policy(
-        RefactorPlanPolicyRequest {
-            fail_on_blocking_gate: true,
-            require_definitions: Some(2),
-            require_references: Some(4),
-        },
+        RefactorPlanPolicyOptions::new(true, Some(2), Some(4)).expect("valid policy options"),
         &summary(),
         &gates,
     );

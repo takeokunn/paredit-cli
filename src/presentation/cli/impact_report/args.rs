@@ -1,6 +1,6 @@
 use super::super::*;
-use crate::application::refactor::plan::RefactorRiskLevel;
 use crate::application::usecase::impact_report::ImpactRiskLevel as ApplicationImpactRiskLevel;
+use crate::domain::refactor_plan::RefactorRiskLevel;
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct ImpactReportArgs {

@@ -21,11 +21,7 @@ fn rename_plan_blocks_ambiguous_definitions() {
             .any(|gate| gate.code == "ambiguous-definition" && gate.blocks_automation)
     );
     let policy = evaluate_refactor_plan_policy(
-        RefactorPlanPolicyRequest {
-            fail_on_blocking_gate: true,
-            require_definitions: None,
-            require_references: None,
-        },
+        RefactorPlanPolicyOptions::new(true, None, None).expect("valid policy options"),
         &summary(),
         &gates,
     );
