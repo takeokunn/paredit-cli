@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::{
-    common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
-    CommonLispOperator,
+    CommonLispOperator, common_lisp_local_callable_form, local_callable_binding_body_scope,
+    local_callable_body_scope,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;

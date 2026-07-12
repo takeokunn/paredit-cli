@@ -1,5 +1,5 @@
 use crate::domain::common_lisp::{
-    normalize_common_lisp_operator_head, CommonLispLambdaListShape, CommonLispOperator,
+    CommonLispLambdaListShape, CommonLispOperator, normalize_common_lisp_operator_head,
 };
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 

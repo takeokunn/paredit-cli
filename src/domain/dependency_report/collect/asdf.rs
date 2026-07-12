@@ -50,13 +50,13 @@ fn collect_dependency_designators(
 ) {
     if let Some(target) = dependency_designator_text(view) {
         if !target.starts_with(':') {
-            dependencies.push(DependencyReportItem {
+            dependencies.push(DependencyReportItem::new(
                 kind,
                 target,
-                path: path.to_string(),
-                span: view.span,
+                path.to_string(),
+                view.span,
                 source,
-            });
+            ));
         }
         return;
     }
@@ -79,13 +79,13 @@ fn collect_component_items(
     {
         if let Some(name) = atom_child(view, 1) {
             let component_kind = atom_child(view, 0).unwrap_or(":component");
-            dependencies.push(DependencyReportItem {
-                kind: DependencyKind::AsdfComponent,
-                target: format!("{component_kind} {name}"),
-                path: path.to_string(),
-                span: view.span,
-                source: Some(":components".to_owned()),
-            });
+            dependencies.push(DependencyReportItem::new(
+                DependencyKind::AsdfComponent,
+                format!("{component_kind} {name}"),
+                path.to_string(),
+                view.span,
+                Some(":components".to_owned()),
+            ));
         }
     }
 

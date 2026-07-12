@@ -2,12 +2,12 @@ use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 
-use crate::domain::call_report::{build_call_report, CallReportItem};
+use crate::domain::call_report::{CallReportItem, build_call_report};
 use crate::domain::common_lisp::{
-    common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
-    CommonLispPackageDeclarationForm,
+    CommonLispPackageDeclarationForm, common_lisp_symbol_reference_eq,
+    common_lisp_symbol_reference_needle,
 };
-use crate::domain::definition::{definition_shape, DefinitionCategory};
+use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,

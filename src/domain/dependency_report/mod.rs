@@ -22,13 +22,7 @@ pub fn build_dependency_report(tree: &SyntaxTree, dialect: Dialect) -> Result<De
     let package_report = build_package_report(tree, dialect)?;
     let mut dependencies = collect_dependency_items(tree, dialect)?;
     dependencies.extend(defpackage_dependency_items(&package_report.defpackages));
-    dependencies.sort_by(|left, right| {
-        left.span
-            .start()
-            .cmp(&right.span.start())
-            .then_with(|| left.kind.cmp(&right.kind))
-            .then_with(|| left.target.cmp(&right.target))
-    });
+    dependencies.sort_by(DependencyReportItem::cmp_position);
 
-    Ok(DependencyReport { dependencies })
+    Ok(DependencyReport::new(dependencies))
 }

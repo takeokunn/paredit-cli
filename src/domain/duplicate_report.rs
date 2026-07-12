@@ -6,7 +6,7 @@ use std::path::{Path as FsPath, PathBuf};
 use anyhow::Result;
 
 use crate::domain::dialect::Dialect;
-use crate::domain::form_shape::{duplicate_shape, FormShape};
+use crate::domain::form_shape::{FormShape, duplicate_shape};
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 #[derive(Debug, Clone)]

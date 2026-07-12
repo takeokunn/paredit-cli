@@ -1,8 +1,8 @@
-use std::path::Path;
+use std::path::Path as FsPath;
 use std::path::PathBuf;
 
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Path as SExprPath, SyntaxTree};
 
 use super::*;
 
@@ -23,7 +23,7 @@ fn candidates(file: &str, input: &str, min_node_count: usize) -> Vec<SimilarityC
     collect_similarity_candidates(
         &tree,
         input,
-        Path::new(file),
+        FsPath::new(file),
         Dialect::CommonLisp,
         &options,
         &mut result,
@@ -82,38 +82,87 @@ fn build_similarity_pairs(
 }
 
 fn report_form(path: &str, start: usize, end: usize) -> SimilarityFormReport {
-    SimilarityFormReport {
-        path: PathBuf::from(path),
-        dialect: Dialect::CommonLisp,
-        form_path: format!("{start}:{end}"),
-        span: ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end)),
-        node_count: 1,
-        head: None,
-        text: String::new(),
-    }
+    SimilarityFormReport::new(
+        PathBuf::from(path),
+        Dialect::CommonLisp,
+        SExprPath::from_indexes(vec![start, end]),
+        ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end)),
+        1,
+        None,
+        String::new(),
+    )
 }
 
 fn similarity_candidate(file: &str, node_count: usize) -> SimilarityCandidate {
     let input = "(foo a)";
     let tree = SyntaxTree::parse(input).unwrap();
-    SimilarityCandidate {
-        form: SimilarityFormReport {
-            path: PathBuf::from(file),
-            dialect: Dialect::CommonLisp,
-            form_path: "0:7".to_string(),
-            span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
+    SimilarityCandidate::new(
+        SimilarityFormReport::new(
+            PathBuf::from(file),
+            Dialect::CommonLisp,
+            SExprPath::from_indexes(vec![0, 7]),
+            ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
             node_count,
-            head: Some("foo".to_string()),
-            text: input.to_string(),
-        },
-        tree: crate::domain::form_similarity::StructuralTree::from_view(
+            Some("foo".into()),
+            input,
+        ),
+        crate::domain::form_similarity::StructuralTree::from_view(
             &tree
                 .select_path(&crate::domain::sexpr::Path::root_child(0))
                 .unwrap()
                 .view(),
         ),
-        comparison_head: Some("foo".to_string()),
-    }
+        Some("foo".into()),
+    )
+}
+
+#[test]
+fn similarity_form_containment_is_span_based() {
+    let outer = report_form("a.lisp", 0, 30);
+    let inner = report_form("a.lisp", 10, 20);
+    let same = report_form("a.lisp", 0, 30);
+
+    assert!(outer.contains_span(&inner));
+    assert!(outer.strictly_contains_span(&inner));
+    assert!(outer.contains_span(&same));
+    assert!(!outer.strictly_contains_span(&same));
+}
+
+#[test]
+fn similarity_pair_containment_is_span_based_per_side() {
+    let outer = SimilarityPairReport::new(
+        1.0,
+        2.0,
+        report_form("a.lisp", 0, 30),
+        report_form("b.lisp", 10, 20),
+    );
+    let inner = SimilarityPairReport::new(
+        1.0,
+        1.0,
+        report_form("a.lisp", 5, 25),
+        report_form("b.lisp", 12, 18),
+    );
+    let sibling = SimilarityPairReport::new(
+        1.0,
+        1.0,
+        report_form("a.lisp", 0, 30),
+        report_form("b.lisp", 30, 40),
+    );
+
+    assert!(outer.strictly_contains_pair(&inner));
+    assert!(!inner.strictly_contains_pair(&outer));
+    assert!(!outer.strictly_contains_pair(&sibling));
+}
+
+#[test]
+fn similarity_candidate_comparison_bucket_uses_head_identity() {
+    let left = similarity_candidate("a.lisp", 3);
+    let matching = left.clone();
+    let missing_head = SimilarityCandidate::new(left.form.clone(), left.tree.clone(), None);
+
+    assert!(left.same_comparison_bucket(&matching));
+    assert!(!left.same_comparison_bucket(&missing_head));
+    assert!(missing_head.cmp_comparison_bucket(&left).is_lt());
 }
 
 #[test]
@@ -123,7 +172,7 @@ fn form_scope_top_level_excludes_nested_forms() {
     collect_similarity_candidates(
         &tree,
         "(outer (inner value))",
-        Path::new("a.lisp"),
+        FsPath::new("a.lisp"),
         Dialect::CommonLisp,
         &report_options(
             0.87,
@@ -152,7 +201,7 @@ fn minimum_line_span_uses_inclusive_one_based_length() {
     collect_similarity_candidates(
         &tree,
         input,
-        Path::new("a.lisp"),
+        FsPath::new("a.lisp"),
         Dialect::CommonLisp,
         &report_options(
             0.87,
@@ -181,7 +230,7 @@ fn candidate_limit_counts_only_eligible_omissions() {
     let omitted = collect_similarity_candidates(
         &tree,
         input,
-        Path::new("a.lisp"),
+        FsPath::new("a.lisp"),
         Dialect::CommonLisp,
         &report_options(
             0.87,
@@ -208,7 +257,7 @@ fn candidate_limit_counts_only_eligible_omissions() {
     let omitted = collect_similarity_candidates(
         &tree,
         input,
-        Path::new("a.lisp"),
+        FsPath::new("a.lisp"),
         Dialect::CommonLisp,
         &report_options(
             0.87,
@@ -409,18 +458,18 @@ fn maximal_overlap_suppresses_only_strictly_contained_pairs() {
 #[test]
 fn maximal_overlap_retains_sibling_pairs() {
     let mut pairs = vec![
-        SimilarityPairReport {
-            similarity: 1.0,
-            score: 2.0,
-            left: report_form("a.lisp", 0, 10),
-            right: report_form("b.lisp", 0, 10),
-        },
-        SimilarityPairReport {
-            similarity: 1.0,
-            score: 1.0,
-            left: report_form("a.lisp", 20, 30),
-            right: report_form("b.lisp", 20, 30),
-        },
+        SimilarityPairReport::new(
+            1.0,
+            2.0,
+            report_form("a.lisp", 0, 10),
+            report_form("b.lisp", 0, 10),
+        ),
+        SimilarityPairReport::new(
+            1.0,
+            1.0,
+            report_form("a.lisp", 20, 30),
+            report_form("b.lisp", 20, 30),
+        ),
     ];
 
     assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 0);
@@ -430,18 +479,18 @@ fn maximal_overlap_retains_sibling_pairs() {
 #[test]
 fn maximal_overlap_suppresses_when_only_one_side_is_strictly_contained() {
     let mut pairs = vec![
-        SimilarityPairReport {
-            similarity: 1.0,
-            score: 2.0,
-            left: report_form("a.lisp", 10, 20),
-            right: report_form("b.lisp", 0, 30),
-        },
-        SimilarityPairReport {
-            similarity: 1.0,
-            score: 1.0,
-            left: report_form("a.lisp", 0, 30),
-            right: report_form("b.lisp", 0, 30),
-        },
+        SimilarityPairReport::new(
+            1.0,
+            2.0,
+            report_form("a.lisp", 10, 20),
+            report_form("b.lisp", 0, 30),
+        ),
+        SimilarityPairReport::new(
+            1.0,
+            1.0,
+            report_form("a.lisp", 0, 30),
+            report_form("b.lisp", 0, 30),
+        ),
     ];
 
     assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 1);
@@ -452,18 +501,18 @@ fn maximal_overlap_suppresses_when_only_one_side_is_strictly_contained() {
 #[test]
 fn maximal_overlap_suppression_is_independent_of_score_order() {
     let mut pairs = vec![
-        SimilarityPairReport {
-            similarity: 1.0,
-            score: 10.0,
-            left: report_form("a.lisp", 10, 20),
-            right: report_form("b.lisp", 10, 20),
-        },
-        SimilarityPairReport {
-            similarity: 1.0,
-            score: 1.0,
-            left: report_form("a.lisp", 0, 30),
-            right: report_form("b.lisp", 0, 30),
-        },
+        SimilarityPairReport::new(
+            1.0,
+            10.0,
+            report_form("a.lisp", 10, 20),
+            report_form("b.lisp", 10, 20),
+        ),
+        SimilarityPairReport::new(
+            1.0,
+            1.0,
+            report_form("a.lisp", 0, 30),
+            report_form("b.lisp", 0, 30),
+        ),
     ];
 
     assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 1);

@@ -24,11 +24,11 @@ pub(super) fn collect_qualified_symbol_dependency(
         return;
     };
 
-    dependencies.push(DependencyReportItem {
-        kind: DependencyKind::QualifiedSymbol,
+    dependencies.push(DependencyReportItem::new(
+        DependencyKind::QualifiedSymbol,
         target,
-        path: path.to_string(),
-        span: view.span,
-        source: Some(atom.to_owned()),
-    });
+        path.to_string(),
+        view.span,
+        Some(atom.to_owned()),
+    ));
 }

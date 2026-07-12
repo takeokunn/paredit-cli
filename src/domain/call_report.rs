@@ -1,13 +1,13 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope,
+    CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispLocalCallableForm,
+    CommonLispOperator, CommonLispSlotBindingForm, common_lisp_symbol_reference_eq,
+    is_common_lisp_declaration_form,
 };
 use crate::domain::common_lisp::{
-    common_lisp_symbol_reference_eq, is_common_lisp_declaration_form, CommonLispBindingListShape,
-    CommonLispBindingRefactorForm, CommonLispLocalCallableForm, CommonLispOperator,
-    CommonLispSlotBindingForm,
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope,
 };
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;

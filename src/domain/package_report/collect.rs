@@ -17,10 +17,7 @@ pub fn build_package_report(tree: &SyntaxTree, dialect: Dialect) -> Result<Packa
         collect_package_forms_from_view(&view, path, dialect, &mut defpackages, &mut in_packages)?;
     }
 
-    Ok(PackageReport {
-        defpackages,
-        in_packages,
-    })
+    Ok(PackageReport::new(defpackages, in_packages))
 }
 
 fn collect_package_forms_from_view(

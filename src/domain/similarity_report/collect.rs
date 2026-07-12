@@ -8,7 +8,8 @@ use crate::domain::form_similarity::StructuralTree;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::types::{
-    SimilarityCandidate, SimilarityFormReport, SimilarityFormScope, SimilarityReportOptions,
+    ComparisonHead, FormHead, SimilarityCandidate, SimilarityFormReport, SimilarityFormScope,
+    SimilarityReportOptions,
 };
 
 pub fn collect_similarity_candidates(
@@ -76,25 +77,26 @@ impl CandidateCollection<'_> {
                     let (tree, node_count) = StructuralTree::from_view_with_count(view);
                     if node_count >= self.options.min_node_count() {
                         let head = view.children.first().and_then(atom_text);
-                        self.candidates.push(SimilarityCandidate {
-                            form: SimilarityFormReport {
-                                path: self.file.to_path_buf(),
-                                dialect: self.dialect,
-                                form_path: Path::from_indexes(path_stack.clone()).to_string(),
-                                span: view.span,
-                                node_count,
-                                head: head.map(ToOwned::to_owned),
-                                text: text.to_owned(),
-                            },
-                            tree,
-                            comparison_head: head.map(|head| {
-                                if self.dialect == Dialect::CommonLisp {
-                                    normalize_common_lisp_operator_head(head).to_ascii_lowercase()
-                                } else {
-                                    head.to_ascii_lowercase()
-                                }
-                            }),
+                        let form = SimilarityFormReport::new(
+                            self.file.to_path_buf(),
+                            self.dialect,
+                            Path::from_indexes(path_stack.clone()),
+                            view.span,
+                            node_count,
+                            head.map(FormHead::from),
+                            text,
+                        );
+                        let comparison_head = head.map(|head| {
+                            if self.dialect == Dialect::CommonLisp {
+                                ComparisonHead::from(
+                                    normalize_common_lisp_operator_head(head).to_ascii_lowercase(),
+                                )
+                            } else {
+                                ComparisonHead::from(head.to_ascii_lowercase())
+                            }
                         });
+                        self.candidates
+                            .push(SimilarityCandidate::new(form, tree, comparison_head));
                     }
                 }
             }

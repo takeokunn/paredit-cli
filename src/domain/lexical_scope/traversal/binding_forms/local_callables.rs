@@ -1,5 +1,5 @@
 use crate::domain::common_lisp::{
-    common_lisp_symbol_reference_eq, local_callable_names, CommonLispLocalCallableForm,
+    CommonLispLocalCallableForm, common_lisp_symbol_reference_eq, local_callable_names,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};

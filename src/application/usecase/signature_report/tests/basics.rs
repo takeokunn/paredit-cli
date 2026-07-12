@@ -71,12 +71,10 @@ fn rest_parameter_makes_arity_unbounded() {
     .unwrap();
 
     assert_eq!(reports[0].definitions[0].parameter_arity, Some((1, None)));
-    assert!(
-        reports[0]
-            .calls
-            .iter()
-            .all(|item| item.status == SignatureCallStatus::Exact)
-    );
+    assert!(reports[0]
+        .calls
+        .iter()
+        .all(|item| item.status == SignatureCallStatus::Exact));
 }
 
 #[test]
@@ -109,12 +107,10 @@ fn reports_ambiguous_definition_when_multiple_signatures_exist() {
     )
     .unwrap();
 
-    assert!(
-        reports[0]
-            .calls
-            .iter()
-            .all(|item| item.status == SignatureCallStatus::AmbiguousDefinition)
-    );
+    assert!(reports[0]
+        .calls
+        .iter()
+        .all(|item| item.status == SignatureCallStatus::AmbiguousDefinition));
 }
 
 #[test]
@@ -127,12 +123,10 @@ fn ignores_common_lisp_local_callable_calls_when_checking_global_signatures() {
     )
     .unwrap();
 
-    assert!(
-        !reports[0]
-            .calls
-            .iter()
-            .any(|item| item.call.head == "helper")
-    );
+    assert!(!reports[0]
+        .calls
+        .iter()
+        .any(|item| item.call.head == "helper"));
 }
 
 #[test]
@@ -174,22 +168,16 @@ fn classifies_common_lisp_symbol_macrolet_expansion_and_body_calls_without_bindi
     assert_eq!(reports[0].definitions[0].name.as_deref(), Some("target"));
     assert_eq!(reports[0].definitions[0].parameter_count, Some(1));
     assert_eq!(reports[0].calls.len(), 2);
-    assert!(
-        reports[0]
-            .calls
-            .iter()
-            .all(|item| item.call.head == "target")
-    );
-    assert!(
-        reports[0]
-            .calls
-            .iter()
-            .all(|item| item.expected_parameter_arity == Some((1, Some(1))))
-    );
-    assert!(
-        reports[0]
-            .calls
-            .iter()
-            .all(|item| item.status == SignatureCallStatus::Exact)
-    );
+    assert!(reports[0]
+        .calls
+        .iter()
+        .all(|item| item.call.head == "target"));
+    assert!(reports[0]
+        .calls
+        .iter()
+        .all(|item| item.expected_parameter_arity == Some((1, Some(1)))));
+    assert!(reports[0]
+        .calls
+        .iter()
+        .all(|item| item.status == SignatureCallStatus::Exact));
 }

@@ -3,7 +3,7 @@ use crate::domain::definition::DefinitionCategory;
 use super::super::{
     CommonLispLambdaListShape, CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm,
 };
-use super::{classify, CommonLispOperator};
+use super::{CommonLispOperator, classify};
 
 impl CommonLispOperator {
     pub(crate) fn is_lambda_like(self) -> bool {

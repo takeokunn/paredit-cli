@@ -1,6 +1,7 @@
 use proptest::prelude::*;
 
 use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::{ByteOffset, ByteSpan};
 
 use super::*;
 
@@ -14,6 +15,27 @@ fn contains_dependency(report: &DependencyReport, kind: DependencyKind, target: 
         .dependencies
         .iter()
         .any(|dependency| dependency.kind == kind && dependency.target == target)
+}
+
+#[test]
+fn orders_dependency_items_by_span_kind_and_target() {
+    let earlier = DependencyReportItem::new(
+        DependencyKind::Require,
+        "alpha",
+        "a.lisp",
+        ByteSpan::new(ByteOffset::new(1), ByteOffset::new(2)),
+        None,
+    );
+    let later = DependencyReportItem::new(
+        DependencyKind::Provide,
+        "beta",
+        "a.lisp",
+        ByteSpan::new(ByteOffset::new(3), ByteOffset::new(4)),
+        None,
+    );
+
+    assert!(earlier.cmp_position(&later).is_lt());
+    assert!(later.cmp_position(&earlier).is_gt());
 }
 
 #[test]

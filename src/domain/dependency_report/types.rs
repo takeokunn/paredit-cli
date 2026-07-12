@@ -1,8 +1,16 @@
+use std::cmp::Ordering;
+
 use crate::domain::sexpr::ByteSpan;
 
 #[derive(Debug, Clone)]
 pub struct DependencyReport {
     pub dependencies: Vec<DependencyReportItem>,
+}
+
+impl DependencyReport {
+    pub fn new(dependencies: Vec<DependencyReportItem>) -> Self {
+        Self { dependencies }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -12,6 +20,32 @@ pub struct DependencyReportItem {
     pub path: String,
     pub span: ByteSpan,
     pub source: Option<String>,
+}
+
+impl DependencyReportItem {
+    pub fn new(
+        kind: DependencyKind,
+        target: impl Into<String>,
+        path: impl Into<String>,
+        span: ByteSpan,
+        source: Option<String>,
+    ) -> Self {
+        Self {
+            kind,
+            target: target.into(),
+            path: path.into(),
+            span,
+            source,
+        }
+    }
+
+    pub fn cmp_position(&self, other: &Self) -> Ordering {
+        self.span
+            .start()
+            .cmp(&other.span.start())
+            .then_with(|| self.kind.cmp(&other.kind))
+            .then_with(|| self.target.cmp(&other.target))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

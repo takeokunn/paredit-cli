@@ -1,7 +1,7 @@
 # paredit-cli
 
 [![CI](https://github.com/takeokunn/paredit-cli/actions/workflows/main.yml/badge.svg)](https://github.com/takeokunn/paredit-cli/actions/workflows/main.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/takeokunn/paredit-cli/blob/main/LICENSE)
 
 `paredit` is a structure-aware CLI for inspecting and safely refactoring Lisp
 S-expressions. Its canonical command layout is designed for both people and AI

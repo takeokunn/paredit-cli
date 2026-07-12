@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, SyntaxTree};
-use super::types::{is_symbol_boundary, ByteOffset, ByteSpan, Delimiter, NodeId};
+use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId, is_symbol_boundary};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParseError {

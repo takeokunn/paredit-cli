@@ -3,7 +3,7 @@ use super::super::{
     CommonLispLocalCallableForm, CommonLispResourceBindingForm, CommonLispSlotBindingForm,
     CommonLispValueScopeForm, CommonLispVariableBindingForm,
 };
-use super::{classify, CommonLispOperator};
+use super::{CommonLispOperator, classify};
 
 impl CommonLispOperator {
     pub(crate) fn is_parallel_let_binding(self) -> bool {

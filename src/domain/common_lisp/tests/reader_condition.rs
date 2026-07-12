@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::common_lisp::{
-    common_lisp_reader_conditional_dispatches, CommonLispReaderConditionalKind,
+    CommonLispReaderConditionalKind, common_lisp_reader_conditional_dispatches,
 };
 
 #[test]

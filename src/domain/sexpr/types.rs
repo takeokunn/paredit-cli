@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops::Range;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 /// A byte offset into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -128,26 +128,36 @@ mod tests {
     #[test]
     fn validate_against_rejects_invalid_ranges() {
         let input = "a\u{00e9}b";
-        assert!(ByteSpan::new(ByteOffset::new(4), ByteOffset::new(2))
-            .validate_against(input)
-            .is_err());
-        assert!(ByteSpan::new(ByteOffset::new(0), ByteOffset::new(99))
-            .validate_against(input)
-            .is_err());
-        assert!(ByteSpan::new(ByteOffset::new(2), ByteOffset::new(3))
-            .validate_against(input)
-            .is_err());
+        assert!(
+            ByteSpan::new(ByteOffset::new(4), ByteOffset::new(2))
+                .validate_against(input)
+                .is_err()
+        );
+        assert!(
+            ByteSpan::new(ByteOffset::new(0), ByteOffset::new(99))
+                .validate_against(input)
+                .is_err()
+        );
+        assert!(
+            ByteSpan::new(ByteOffset::new(2), ByteOffset::new(3))
+                .validate_against(input)
+                .is_err()
+        );
     }
 
     #[test]
     fn validate_against_accepts_empty_and_unicode_boundaries() {
         let input = "a\u{00e9}b";
-        assert!(ByteSpan::new(ByteOffset::new(1), ByteOffset::new(3))
-            .validate_against(input)
-            .is_ok());
-        assert!(ByteSpan::new(ByteOffset::new(3), ByteOffset::new(3))
-            .validate_against(input)
-            .is_ok());
+        assert!(
+            ByteSpan::new(ByteOffset::new(1), ByteOffset::new(3))
+                .validate_against(input)
+                .is_ok()
+        );
+        assert!(
+            ByteSpan::new(ByteOffset::new(3), ByteOffset::new(3))
+                .validate_against(input)
+                .is_ok()
+        );
     }
 }
 

@@ -50,11 +50,11 @@ fn push_dependency_from_child(
         return;
     };
 
-    dependencies.push(DependencyReportItem {
+    dependencies.push(DependencyReportItem::new(
         kind,
         target,
-        path: path.child(child_index).to_string(),
-        span: child.span,
+        path.child(child_index).to_string(),
+        child.span,
         source,
-    });
+    ));
 }

@@ -54,26 +54,23 @@ pub(super) fn analyze_defpackage_form(
             "import-from" => {
                 let mut atoms = package_option_atoms(option).skip(1);
                 if let Some(package) = atoms.next() {
-                    imports.push(PackageImportReport {
-                        package,
-                        symbols: atoms.collect(),
-                    });
+                    imports.push(PackageImportReport::new(package, atoms.collect()));
                 }
             }
             _ => {}
         }
     }
 
-    Ok(Some(PackageDefinitionReport {
-        path: path.to_string(),
-        span: view.span,
+    Ok(Some(PackageDefinitionReport::new(
+        path.to_string(),
+        view.span,
         name,
         nicknames,
         uses,
         exports,
         imports,
         option_count,
-    }))
+    )))
 }
 
 pub(super) fn analyze_in_package_form(
@@ -103,9 +100,9 @@ pub(super) fn analyze_in_package_form(
     };
     let name = name.to_owned();
 
-    Ok(Some(InPackageReport {
-        path: path.to_string(),
-        span: view.span,
+    Ok(Some(InPackageReport::new(
+        path.to_string(),
+        view.span,
         name,
-    }))
+    )))
 }

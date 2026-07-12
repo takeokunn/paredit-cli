@@ -12,6 +12,7 @@ use anyhow::Result;
 use super::types::{
     SimilarityCandidate, SimilarityComparisonScope, SimilarityFormReport, SimilarityOverlapPolicy,
     SimilarityPairReport, SimilarityReport, SimilarityReportOptions, SimilarityReportSummary,
+    strictly_contains_pair_forms,
 };
 
 #[derive(Clone, Copy)]
@@ -25,6 +26,15 @@ struct SimilarityPairCandidate<'a> {
 pub(super) trait PairLike {
     fn left_form(&self) -> &SimilarityFormReport;
     fn right_form(&self) -> &SimilarityFormReport;
+
+    fn strictly_contains_pair(&self, other: &Self) -> bool {
+        strictly_contains_pair_forms(
+            self.left_form(),
+            self.right_form(),
+            other.left_form(),
+            other.right_form(),
+        )
+    }
 }
 
 impl PairLike for SimilarityPairCandidate<'_> {
@@ -74,7 +84,9 @@ pub fn build_similarity_pairs_with_omissions(
     // 低コストな候補から前に並べると、サイズ差だけで落ちる組を早く打ち切れる。
     candidates.sort_unstable_by(compare_candidates_for_scan);
     let possible_pairs = scoped_pair_count(&candidates, options.comparison_scope());
-    let groups: Vec<&[SimilarityCandidate]> = candidates.chunk_by(same_comparison_bucket).collect();
+    let groups: Vec<&[SimilarityCandidate]> = candidates
+        .chunk_by(SimilarityCandidate::same_comparison_bucket)
+        .collect();
     let comparison_limit_reached = false;
     let mut evaluated_pairs = 0;
     let mut pruned_by_size = 0;
@@ -139,7 +151,7 @@ fn build_similarity_pairs_sequential(
     let mut pruned_by_size = 0;
     let mut pairs: Vec<SimilarityPairCandidate<'_>> = Vec::new();
     let mut workspace = TreeSimilarityWorkspace::default();
-    'pairs: for group in candidates.chunk_by(same_comparison_bucket) {
+    'pairs: for group in candidates.chunk_by(SimilarityCandidate::same_comparison_bucket) {
         match options.comparison_scope() {
             SimilarityComparisonScope::All => {
                 for left_index in 0..group.len() {
@@ -320,22 +332,21 @@ fn finalize_similarity_pairs(
     let reported_pairs = pairs.len();
     let pairs = pairs.into_iter().map(materialize_pair).collect();
 
-    SimilarityReport {
-        summary: SimilarityReportSummary {
-            candidate_limit_reached: omitted_candidates > 0,
-            omitted_candidates,
-            possible_pairs,
-            evaluated_pairs,
-            pruned_by_size,
-            comparison_limit_reached,
-            unprocessed_pairs,
-            matched_pairs,
-            suppressed_pairs,
-            reported_pairs,
-            truncated,
-        },
-        pairs,
-    }
+    let summary = SimilarityReportSummary::new(
+        omitted_candidates > 0,
+        omitted_candidates,
+        possible_pairs,
+        evaluated_pairs,
+        pruned_by_size,
+        comparison_limit_reached,
+        unprocessed_pairs,
+        matched_pairs,
+        suppressed_pairs,
+        reported_pairs,
+        truncated,
+    );
+
+    SimilarityReport::new(summary, pairs)
 }
 
 /// One schedulable unit of pair comparison. `Group` covers a whole
@@ -454,15 +465,15 @@ fn scoped_pair_count(
 ) -> usize {
     match scope {
         SimilarityComparisonScope::All => candidates
-            .chunk_by(same_comparison_bucket)
+            .chunk_by(SimilarityCandidate::same_comparison_bucket)
             .map(|group| pair_count(group.len()))
             .sum(),
         SimilarityComparisonScope::SameFile => candidates
-            .chunk_by(same_comparison_bucket)
+            .chunk_by(SimilarityCandidate::same_comparison_bucket)
             .map(same_file_pair_count)
             .sum(),
         SimilarityComparisonScope::CrossFile => candidates
-            .chunk_by(same_comparison_bucket)
+            .chunk_by(SimilarityCandidate::same_comparison_bucket)
             .map(|group| pair_count(group.len()) - same_file_pair_count(group))
             .sum(),
     }
@@ -710,18 +721,6 @@ pub(super) fn compare_cross_file_group_pair<'a>(
     (output, false)
 }
 
-fn same_comparison_bucket(left: &SimilarityCandidate, right: &SimilarityCandidate) -> bool {
-    comparison_head(left) == comparison_head(right)
-}
-
-fn compare_comparison_bucket(left: &SimilarityCandidate, right: &SimilarityCandidate) -> Ordering {
-    comparison_head(left).cmp(&comparison_head(right))
-}
-
-fn comparison_head(candidate: &SimilarityCandidate) -> Option<&str> {
-    candidate.comparison_head.as_deref()
-}
-
 fn size_bound_excludes(left: usize, right: usize, threshold: f64) -> bool {
     let maximum = left.max(right) as f64;
     let difference = left.abs_diff(right) as f64;
@@ -757,21 +756,13 @@ pub(super) fn suppress_contained_pairs<P: PairLike>(pairs: &mut Vec<P>) -> usize
                 if suppressed[index] {
                     continue;
                 }
-                if indices[position + 1..].iter().any(|&other_index| {
-                    pair_is_strictly_contained(
-                        pairs[index].left_form(),
-                        pairs[index].right_form(),
-                        pairs[other_index].left_form(),
-                        pairs[other_index].right_form(),
-                    )
-                }) || indices[..position].iter().any(|&other_index| {
-                    pair_is_strictly_contained(
-                        pairs[index].left_form(),
-                        pairs[index].right_form(),
-                        pairs[other_index].left_form(),
-                        pairs[other_index].right_form(),
-                    )
-                }) {
+                if indices[position + 1..]
+                    .iter()
+                    .any(|&other_index| pairs[other_index].strictly_contains_pair(&pairs[index]))
+                    || indices[..position].iter().any(|&other_index| {
+                        pairs[other_index].strictly_contains_pair(&pairs[index])
+                    })
+                {
                     suppressed[index] = true;
                 }
             }
@@ -791,7 +782,7 @@ fn compare_candidates_for_scan(
     left: &SimilarityCandidate,
     right: &SimilarityCandidate,
 ) -> Ordering {
-    compare_comparison_bucket(left, right)
+    left.cmp_comparison_bucket(right)
         .then_with(|| left.form.node_count.cmp(&right.form.node_count))
         .then_with(|| left.form.path.as_os_str().cmp(right.form.path.as_os_str()))
         .then_with(|| left.form.form_path.cmp(&right.form.form_path))
@@ -844,32 +835,11 @@ impl PairLikeScore for SimilarityPairReport {
     }
 }
 
-fn pair_is_strictly_contained(
-    lower_left: &SimilarityFormReport,
-    lower_right: &SimilarityFormReport,
-    higher_left: &SimilarityFormReport,
-    higher_right: &SimilarityFormReport,
-) -> bool {
-    form_is_strictly_contained(lower_left, higher_left)
-        && form_is_contained(lower_right, higher_right)
-        || form_is_contained(lower_left, higher_left)
-            && form_is_strictly_contained(lower_right, higher_right)
-}
-
-fn form_is_contained(inner: &SimilarityFormReport, outer: &SimilarityFormReport) -> bool {
-    inner.span.start().get() >= outer.span.start().get()
-        && inner.span.end().get() <= outer.span.end().get()
-}
-
-fn form_is_strictly_contained(inner: &SimilarityFormReport, outer: &SimilarityFormReport) -> bool {
-    form_is_contained(inner, outer) && inner.span != outer.span
-}
-
 fn materialize_pair(pair: SimilarityPairCandidate<'_>) -> SimilarityPairReport {
-    SimilarityPairReport {
-        similarity: pair.similarity,
-        score: pair.score,
-        left: pair.left.form.clone(),
-        right: pair.right.form.clone(),
-    }
+    SimilarityPairReport::new(
+        pair.similarity,
+        pair.score,
+        pair.left.form.clone(),
+        pair.right.form.clone(),
+    )
 }

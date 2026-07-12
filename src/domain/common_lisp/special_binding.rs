@@ -1,7 +1,7 @@
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix, SymbolName};
 
 use super::{
-    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq, CommonLispDeclarationScope,
+    CommonLispDeclarationScope, common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
 };
 
 /// Returns the first body child covered by a leading `(declare (special ...))`

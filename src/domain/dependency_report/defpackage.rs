@@ -9,22 +9,22 @@ pub(super) fn defpackage_dependency_items(
 
     for defpackage in defpackages {
         for target in &defpackage.uses {
-            dependencies.push(DependencyReportItem {
-                kind: DependencyKind::DefpackageUse,
-                target: target.clone(),
-                path: defpackage.path.clone(),
-                span: defpackage.span,
-                source: Some(defpackage.name.clone()),
-            });
+            dependencies.push(DependencyReportItem::new(
+                DependencyKind::DefpackageUse,
+                target.clone(),
+                defpackage.path.clone(),
+                defpackage.span,
+                Some(defpackage.name.clone()),
+            ));
         }
         for import in &defpackage.imports {
-            dependencies.push(DependencyReportItem {
-                kind: DependencyKind::DefpackageImportFrom,
-                target: import.package.clone(),
-                path: defpackage.path.clone(),
-                span: defpackage.span,
-                source: Some(defpackage.name.clone()),
-            });
+            dependencies.push(DependencyReportItem::new(
+                DependencyKind::DefpackageImportFrom,
+                import.package.clone(),
+                defpackage.path.clone(),
+                defpackage.span,
+                Some(defpackage.name.clone()),
+            ));
         }
     }
 

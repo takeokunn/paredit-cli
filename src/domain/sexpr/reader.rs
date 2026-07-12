@@ -1,5 +1,5 @@
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
 use crate::domain::common_lisp::CommonLispOperator;
+use crate::domain::common_lisp::common_lisp_operator_head_eq;
 
 use super::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, ReaderPrefix};
 
