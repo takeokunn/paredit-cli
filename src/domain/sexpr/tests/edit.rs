@@ -45,6 +45,36 @@ fn raises_expression() {
 }
 
 #[test]
+fn transposes_expression_forward_while_keeping_trivia_in_place() {
+    let input = "(alpha  ;; slot comment\n beta gamma)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.0")).expect("selection");
+    let result = Edit::transpose_forward(input, &tree, selection).unwrap();
+    assert_eq!(result, "(beta  ;; slot comment\n alpha gamma)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn transposes_expression_backward_while_keeping_trivia_in_place() {
+    let input = "(alpha  ;; slot comment\n beta gamma)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+    let result = Edit::transpose_backward(input, &tree, selection).unwrap();
+    assert_eq!(result, "(beta  ;; slot comment\n alpha gamma)");
+    SyntaxTree::parse(&result).expect("result stays balanced");
+}
+
+#[test]
+fn transpose_rejects_sibling_boundaries() {
+    let input = "(alpha beta)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let first = tree.select_path(&parse_path("0.0")).expect("selection");
+    let last = tree.select_path(&parse_path("0.1")).expect("selection");
+    assert!(Edit::transpose_backward(input, &tree, first).is_err());
+    assert!(Edit::transpose_forward(input, &tree, last).is_err());
+}
+
+#[test]
 fn slurps_forward() {
     let input = "(alpha beta) gamma";
     let tree = SyntaxTree::parse(input).expect("valid");

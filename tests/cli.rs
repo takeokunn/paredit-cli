@@ -27,6 +27,8 @@ mod definition_report;
 mod dependency_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
+#[path = "cli/edit_transpose.rs"]
+mod edit_transpose;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]

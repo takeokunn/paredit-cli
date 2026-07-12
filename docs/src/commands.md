@@ -57,6 +57,8 @@ output before redirecting it.
 | `wrap` | Wrap the selected S-expression in a new list. |
 | `splice` | Remove one list pair while keeping its children. |
 | `raise` | Replace the selected expression's parent list with the selection. |
+| `transpose-forward` | Exchange the selected expression with its next sibling while keeping trivia in place. |
+| `transpose-backward` | Exchange the selected expression with its previous sibling while keeping trivia in place. |
 | `slurp-forward` | Pull the next sibling into the selected list. |
 | `slurp-backward` | Pull the previous sibling into the selected list. |
 | `barf-forward` | Push the last child out of the selected list. |
@@ -65,7 +67,7 @@ output before redirecting it.
 For example:
 
 ```sh
-paredit edit wrap --file source.lisp --start 0 --end 5 --wrapper list
+paredit edit wrap --file source.lisp --path 0.1
 ```
 
 ## Refactor
@@ -135,7 +137,7 @@ plan/preview/verify/apply lifecycle.
 | `unwrap-call` | Replace one selected wrapper call with one selected argument. |
 | `thread-expression` | Convert a nested call chain into a thread-first or thread-last pipeline. |
 | `unthread-expression` | Convert a threading pipeline back into nested calls. |
-| `extract-function` | Extract the selected expression into a zero-argument top-level function. |
+| `extract-function` | Extract the selected expression into a top-level function with inferred parameters. |
 | `extract-constant` | Extract the selected expression into a top-level constant. |
 | `inline-function` | Inline one selected function call using a selected function definition. |
 

@@ -71,6 +71,10 @@ pub(super) enum EditCommand {
     Splice(TargetArgs),
     /// Replace the selected expression's parent list with the selected expression.
     Raise(TargetArgs),
+    /// Exchange the selected expression with its next sibling.
+    TransposeForward(TargetArgs),
+    /// Exchange the selected expression with its previous sibling.
+    TransposeBackward(TargetArgs),
     /// Pull the next sibling into the selected list.
     SlurpForward(TargetArgs),
     /// Pull the previous sibling into the selected list.
@@ -163,7 +167,7 @@ pub(super) enum RefactorCommand {
     ThreadExpression(thread_expression::ThreadExpressionArgs),
     /// Convert a selected thread-first or thread-last pipeline into nested calls.
     UnthreadExpression(unthread_expression::UnthreadExpressionArgs),
-    /// Extract the selected expression into a zero-argument top-level function.
+    /// Extract the selected expression into a top-level function with inferred parameters.
     ExtractFunction(extract_function::ExtractFunctionArgs),
     /// Extract the selected expression into a top-level constant.
     ExtractConstant(extract_constant::ExtractConstantArgs),

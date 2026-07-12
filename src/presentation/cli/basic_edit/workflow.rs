@@ -41,6 +41,14 @@ pub(in crate::presentation::cli) fn raise(args: TargetArgs) -> Result<()> {
     edit_target(args, Edit::raise)
 }
 
+pub(in crate::presentation::cli) fn transpose_forward(args: TargetArgs) -> Result<()> {
+    edit_target(args, Edit::transpose_forward)
+}
+
+pub(in crate::presentation::cli) fn transpose_backward(args: TargetArgs) -> Result<()> {
+    edit_target(args, Edit::transpose_backward)
+}
+
 pub(in crate::presentation::cli) fn slurp_forward(args: TargetArgs) -> Result<()> {
     edit_target(args, Edit::slurp_forward)
 }

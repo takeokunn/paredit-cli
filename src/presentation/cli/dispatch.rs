@@ -52,6 +52,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::Wrap(args) => basic_edit::workflow::wrap(args)?,
             command::EditCommand::Splice(args) => basic_edit::workflow::splice(args)?,
             command::EditCommand::Raise(args) => basic_edit::workflow::raise(args)?,
+            command::EditCommand::TransposeForward(args) => {
+                basic_edit::workflow::transpose_forward(args)?
+            }
+            command::EditCommand::TransposeBackward(args) => {
+                basic_edit::workflow::transpose_backward(args)?
+            }
             command::EditCommand::SlurpForward(args) => basic_edit::workflow::slurp_forward(args)?,
             command::EditCommand::SlurpBackward(args) => {
                 basic_edit::workflow::slurp_backward(args)?
