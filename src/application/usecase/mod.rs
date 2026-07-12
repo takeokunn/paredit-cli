@@ -10,6 +10,8 @@ pub mod convert_cond_to_if;
 pub mod convert_if_to_unless;
 pub mod convert_if_to_when;
 pub mod convert_if_to_cond;
+pub mod convert_labels_to_flet;
+pub mod convert_let_to_let_star;
 pub mod convert_let_star_to_let;
 pub mod convert_unless_to_if;
 pub mod convert_when_to_if;

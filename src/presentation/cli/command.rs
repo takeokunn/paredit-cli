@@ -1,14 +1,13 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, convert_cond_to_if, convert_if_to_cond, convert_if_to_unless,
-    convert_if_to_when, convert_let_star_to_let, convert_unless_to_if, convert_when_to_if,
-    definition_movement,
-    definition_removal, definition_report, dependency_report, duplicate_report, extract_constant,
-    extract_function, extract_local_function, form_report, function_parameter, impact_report,
-    inline_function, inline_lambda, inline_let, inline_local_function, introduce_let, let_report,
-    package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
-    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
-    workspace_report,
+    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
+    convert_unless_to_if, convert_when_to_if, definition_movement, definition_removal,
+    definition_report, dependency_report, duplicate_report, extract_constant, extract_function,
+    extract_local_function, form_report, function_parameter, impact_report, inline_function,
+    inline_lambda, inline_let, inline_local_function, introduce_let, let_report, package, refactor,
+    remove_unused_binding, rename, replace_forms, signature_report, similarity_report,
+    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
 
@@ -196,6 +195,8 @@ pub(super) enum RefactorCommand {
     IntroduceLet(introduce_let::IntroduceLetArgs),
     /// Inline a single local let binding into its body.
     InlineLet(inline_let::InlineLetArgs),
+    /// Convert a Common Lisp or Emacs Lisp parallel let form into let*.
+    ConvertLetToLetStar(convert_let_to_let_star::ConvertLetToLetStarArgs),
     /// Convert an independent Common Lisp let* form into let.
     ConvertLetStarToLet(convert_let_star_to_let::ConvertLetStarToLetArgs),
     /// Convert a Common Lisp or Emacs Lisp if form into cond.
@@ -210,6 +211,8 @@ pub(super) enum RefactorCommand {
     ConvertIfToWhen(convert_if_to_when::ConvertIfToWhenArgs),
     /// Convert a Common Lisp or Emacs Lisp if form with a nil then branch into unless.
     ConvertIfToUnless(convert_if_to_unless::ConvertIfToUnlessArgs),
+    /// Convert a non-recursive Common Lisp labels form into flet.
+    ConvertLabelsToFlet(convert_labels_to_flet::ConvertLabelsToFletArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }

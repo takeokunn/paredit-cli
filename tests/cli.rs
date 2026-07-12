@@ -21,8 +21,12 @@ mod conditional_conversion;
 mod convert_cond_to_if;
 #[path = "cli/convert_if_to_cond.rs"]
 mod convert_if_to_cond;
+#[path = "cli/convert_labels_to_flet.rs"]
+mod convert_labels_to_flet;
 #[path = "cli/convert_let_star_to_let.rs"]
 mod convert_let_star_to_let;
+#[path = "cli/convert_let_to_let_star.rs"]
+mod convert_let_to_let_star;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
 #[path = "cli/definition_movement.rs"]

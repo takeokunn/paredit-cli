@@ -143,6 +143,7 @@ plan/preview/verify/apply lifecycle.
 | `inline-function` | Inline one selected function call using a selected function definition. |
 | `inline-lambda` | Replace a safe, immediately invoked Common Lisp lambda with a parallel `let`. |
 | `inline-local-function` | Inline the sole direct call in a safe, single-binding Common Lisp `flet` form. |
+| `convert-labels-to-flet` | Convert a non-recursive Common Lisp `labels` form into `flet`. |
 
 ### Parameters and bindings
 
@@ -155,6 +156,7 @@ plan/preview/verify/apply lifecycle.
 | `remove-function-parameter` | Remove one positional parameter from a function and its call sites. |
 | `introduce-let` | Replace the selected expression with a local binding in the enclosing list. |
 | `inline-let` | Inline a single local let binding into its body. |
+| `convert-let-to-let-star` | Convert a Common Lisp or Emacs Lisp `let` to `let*` when later initializers do not reference earlier bindings. |
 | `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. |
 | `convert-if-to-cond` | Convert a Common Lisp or Emacs Lisp `(if test then [else])` form to `cond`. |
 | `convert-cond-to-if` | Convert simple Common Lisp or Emacs Lisp `cond` clauses to nested `if` forms. |

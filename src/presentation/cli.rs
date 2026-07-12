@@ -9,6 +9,8 @@ mod convert_cond_to_if;
 mod convert_if_to_unless;
 mod convert_if_to_when;
 mod convert_if_to_cond;
+mod convert_labels_to_flet;
+mod convert_let_to_let_star;
 mod convert_let_star_to_let;
 mod convert_unless_to_if;
 mod convert_when_to_if;
