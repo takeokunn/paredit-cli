@@ -67,9 +67,9 @@ use serde_json::{Value, json};
 use args::*;
 use command::Command;
 pub(crate) use shared::{
-    apply_byte_span_edits, bounded_preview, detect_dialect, matching_symbol_occurrences,
-    read_input, require_output_file, resolve_target, stable_text_hash, unified_diff,
-    write_file_with_rollback, write_files_with_rollback,
+    apply_byte_span_edits, bounded_preview, matching_symbol_occurrences, read_input_and_dialect,
+    read_input_dialect_and_tree, require_output_file, resolve_target, stable_text_hash,
+    unified_diff, write_file_with_rollback, write_files_with_rollback,
 };
 
 #[derive(Debug, Parser)]
