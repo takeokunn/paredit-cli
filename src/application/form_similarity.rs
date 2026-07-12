@@ -2,9 +2,9 @@ use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPref
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralTree {
-    label: NodeLabel,
-    children: Vec<StructuralTree>,
-    node_count: usize,
+    labels: Vec<NodeLabel>,
+    leftmost: Vec<usize>,
+    keyroots: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,103 +14,161 @@ enum NodeLabel {
     Atom(String, Vec<ReaderPrefix>),
 }
 
+const EDIT_COST_SCALE: usize = 10;
+const ATOM_RENAME_COST: usize = 3;
+
+#[derive(Default)]
+pub(crate) struct TreeSimilarityWorkspace {
+    tree_distances: Vec<usize>,
+    forest_distances: Vec<usize>,
+}
+
+impl TreeSimilarityWorkspace {
+    fn reset(&mut self, len: usize) {
+        self.tree_distances.resize(len, 0);
+        self.tree_distances[..len].fill(0);
+        self.forest_distances.resize(len, 0);
+        self.forest_distances[..len].fill(0);
+    }
+}
+
 impl StructuralTree {
     pub fn from_view(view: &ExpressionView) -> Self {
-        let children = view
-            .children
-            .iter()
-            .map(Self::from_view)
-            .collect::<Vec<_>>();
-        let node_count = 1 + children.iter().map(|child| child.node_count).sum::<usize>();
-        let label = match view.kind {
-            ExpressionKind::Root => NodeLabel::Root(view.reader_prefixes.clone()),
-            ExpressionKind::List => NodeLabel::List(view.delimiter, view.reader_prefixes.clone()),
-            ExpressionKind::Atom => NodeLabel::Atom(
-                view.text.clone().unwrap_or_default(),
-                view.reader_prefixes.clone(),
-            ),
-        };
-        Self {
-            label,
-            children,
-            node_count,
+        Self::from_view_with_count(view).0
+    }
+
+    pub(crate) fn from_view_with_count(view: &ExpressionView) -> (Self, usize) {
+        fn label(view: &ExpressionView) -> NodeLabel {
+            match view.kind {
+                ExpressionKind::Root => NodeLabel::Root(view.reader_prefixes.clone()),
+                ExpressionKind::List => {
+                    NodeLabel::List(view.delimiter, view.reader_prefixes.clone())
+                }
+                ExpressionKind::Atom => NodeLabel::Atom(
+                    view.text.clone().unwrap_or_default(),
+                    view.reader_prefixes.clone(),
+                ),
+            }
         }
+
+        fn visit(
+            view: &ExpressionView,
+            labels: &mut Vec<NodeLabel>,
+            leftmost: &mut Vec<usize>,
+        ) -> (usize, usize) {
+            let mut node_count = 1;
+            let mut first_leaf = None;
+
+            for child_view in &view.children {
+                let (child_count, child_leaf) = visit(child_view, labels, leftmost);
+                node_count += child_count;
+                if first_leaf.is_none() {
+                    first_leaf = Some(child_leaf);
+                }
+            }
+
+            labels.push(label(view));
+            let index = labels.len();
+            let leaf = first_leaf.unwrap_or(index);
+            leftmost.push(leaf);
+
+            (node_count, leaf)
+        }
+
+        let mut labels = Vec::new();
+        let mut leftmost = Vec::new();
+        let (node_count, _) = visit(view, &mut labels, &mut leftmost);
+        let mut keyroots = vec![0; node_count + 1];
+        for (offset, leaf) in leftmost.iter().copied().enumerate() {
+            keyroots[leaf] = offset + 1;
+        }
+        let mut keyroots = keyroots
+            .into_iter()
+            .skip(1)
+            .filter(|&index| index != 0)
+            .collect::<Vec<_>>();
+        keyroots.sort_unstable();
+
+        (
+            Self {
+                labels,
+                leftmost,
+                keyroots,
+            },
+            node_count,
+        )
     }
 
     pub fn node_count(&self) -> usize {
-        self.node_count
+        self.labels.len()
     }
 }
 
 pub fn tree_similarity(left: &StructuralTree, right: &StructuralTree) -> f64 {
-    let denominator = left.node_count.max(right.node_count) as f64;
-    (1.0 - tree_edit_distance(left, right) / denominator).max(0.0)
+    let mut workspace = TreeSimilarityWorkspace::default();
+    tree_similarity_with_workspace(left, right, &mut workspace)
 }
 
-struct IndexedTree<'a> {
-    labels: Vec<&'a NodeLabel>,
-    leftmost: Vec<usize>,
-    keyroots: Vec<usize>,
+pub(crate) fn tree_similarity_with_workspace(
+    left: &StructuralTree,
+    right: &StructuralTree,
+    workspace: &mut TreeSimilarityWorkspace,
+) -> f64 {
+    if left == right {
+        return 1.0;
+    }
+    let denominator = left.node_count().max(right.node_count()) as f64;
+    (1.0 - tree_edit_distance_with_workspace(left, right, workspace) / denominator).max(0.0)
 }
 
-fn index_tree(tree: &StructuralTree) -> IndexedTree<'_> {
-    fn visit<'a>(
-        tree: &'a StructuralTree,
-        labels: &mut Vec<&'a NodeLabel>,
-        leftmost: &mut Vec<usize>,
-    ) -> usize {
-        let first_leaf = tree
-            .children
-            .first()
-            .map(|child| visit(child, labels, leftmost));
-
-        for child in tree.children.iter().skip(1) {
-            visit(child, labels, leftmost);
-        }
-
-        labels.push(&tree.label);
-        let index = labels.len();
-        let leaf = first_leaf.unwrap_or(index);
-        leftmost.push(leaf);
-        leaf
-    }
-
-    let mut labels = Vec::with_capacity(tree.node_count);
-    let mut leftmost = Vec::with_capacity(tree.node_count);
-    visit(tree, &mut labels, &mut leftmost);
-
-    let mut last_for_leaf = std::collections::BTreeMap::new();
-    for (offset, leaf) in leftmost.iter().copied().enumerate() {
-        last_for_leaf.insert(leaf, offset + 1);
-    }
-    let mut keyroots = last_for_leaf.into_values().collect::<Vec<_>>();
-    keyroots.sort_unstable();
-
-    IndexedTree {
-        labels,
-        leftmost,
-        keyroots,
-    }
-}
-
+#[cfg(test)]
 fn tree_edit_distance(left: &StructuralTree, right: &StructuralTree) -> f64 {
-    let left = index_tree(left);
-    let right = index_tree(right);
-    let mut tree_distances = vec![vec![0.0; right.labels.len() + 1]; left.labels.len() + 1];
+    let mut workspace = TreeSimilarityWorkspace::default();
+    tree_edit_distance_with_workspace(left, right, &mut workspace)
+}
+
+fn tree_edit_distance_with_workspace(
+    left: &StructuralTree,
+    right: &StructuralTree,
+    workspace: &mut TreeSimilarityWorkspace,
+) -> f64 {
+    tree_edit_distance_scaled_with_workspace(left, right, workspace) as f64 / EDIT_COST_SCALE as f64
+}
+
+fn tree_edit_distance_scaled_with_workspace(
+    left: &StructuralTree,
+    right: &StructuralTree,
+    workspace: &mut TreeSimilarityWorkspace,
+) -> usize {
+    let left_len = left.labels.len();
+    let right_len = right.labels.len();
+    let width = right_len + 1;
+    let len = (left_len + 1) * width;
+    workspace.reset(len);
 
     for &left_root in &left.keyroots {
         for &right_root in &right.keyroots {
-            forest_distance(&left, &right, &mut tree_distances, left_root, right_root);
+            forest_distance(
+                left,
+                right,
+                &mut workspace.tree_distances,
+                &mut workspace.forest_distances,
+                width,
+                left_root,
+                right_root,
+            );
         }
     }
 
-    tree_distances[left.labels.len()][right.labels.len()]
+    workspace.tree_distances[index(left_len, right_len, width)]
 }
 
 fn forest_distance(
-    left: &IndexedTree<'_>,
-    right: &IndexedTree<'_>,
-    tree_distances: &mut [Vec<f64>],
+    left: &StructuralTree,
+    right: &StructuralTree,
+    tree_distances: &mut [usize],
+    forest_distances: &mut [usize],
+    width: usize,
     left_root: usize,
     right_root: usize,
 ) {
@@ -118,51 +176,60 @@ fn forest_distance(
     let right_start = right.leftmost[right_root - 1];
     let row_count = left_root - left_start + 2;
     let column_count = right_root - right_start + 2;
-    let mut forest_distances = vec![vec![0.0; column_count]; row_count];
 
     for row in 1..row_count {
-        forest_distances[row][0] = forest_distances[row - 1][0] + 1.0;
+        forest_distances[index(row, 0, width)] =
+            forest_distances[index(row - 1, 0, width)] + EDIT_COST_SCALE;
     }
     for column in 1..column_count {
-        forest_distances[0][column] = forest_distances[0][column - 1] + 1.0;
+        forest_distances[index(0, column, width)] =
+            forest_distances[index(0, column - 1, width)] + EDIT_COST_SCALE;
     }
 
     for row in 1..row_count {
         let left_node = left_start + row - 1;
         for column in 1..column_count {
             let right_node = right_start + column - 1;
-            let delete = forest_distances[row - 1][column] + 1.0;
-            let insert = forest_distances[row][column - 1] + 1.0;
+            let delete = forest_distances[index(row - 1, column, width)] + EDIT_COST_SCALE;
+            let insert = forest_distances[index(row, column - 1, width)] + EDIT_COST_SCALE;
 
             if left.leftmost[left_node - 1] == left_start
                 && right.leftmost[right_node - 1] == right_start
             {
-                let rename = forest_distances[row - 1][column - 1]
-                    + rename_cost(left.labels[left_node - 1], right.labels[right_node - 1]);
+                let rename = forest_distances[index(row - 1, column - 1, width)]
+                    + rename_cost_scaled(
+                        &left.labels[left_node - 1],
+                        &right.labels[right_node - 1],
+                    );
                 let distance = delete.min(insert).min(rename);
-                forest_distances[row][column] = distance;
-                tree_distances[left_node][right_node] = distance;
+                forest_distances[index(row, column, width)] = distance;
+                tree_distances[index(left_node, right_node, width)] = distance;
             } else {
                 let left_prefix = left.leftmost[left_node - 1] - left_start;
                 let right_prefix = right.leftmost[right_node - 1] - right_start;
-                let replace = forest_distances[left_prefix][right_prefix]
-                    + tree_distances[left_node][right_node];
-                forest_distances[row][column] = delete.min(insert).min(replace);
+                let replace = forest_distances[index(left_prefix, right_prefix, width)]
+                    + tree_distances[index(left_node, right_node, width)];
+                forest_distances[index(row, column, width)] = delete.min(insert).min(replace);
             }
         }
     }
 }
 
-fn rename_cost(left: &NodeLabel, right: &NodeLabel) -> f64 {
+#[inline]
+fn index(row: usize, column: usize, width: usize) -> usize {
+    row * width + column
+}
+
+fn rename_cost_scaled(left: &NodeLabel, right: &NodeLabel) -> usize {
     if left == right {
-        0.0
+        0
     } else if matches!(
         (left, right),
         (NodeLabel::Atom(_, _), NodeLabel::Atom(_, _))
     ) {
-        0.3
+        ATOM_RENAME_COST
     } else {
-        1.0
+        EDIT_COST_SCALE
     }
 }
 

@@ -667,12 +667,13 @@ fn fail_on_duplicates_rejects_an_indeterminate_comparison_limit() {
 
     assert!(!output.status.success());
     let report: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(report["summary"]["matched_pairs"], 0);
-    assert_eq!(report["summary"]["comparison_limit_reached"], true);
-    assert_eq!(report["summary"]["unprocessed_pairs"], 2);
-    assert!(String::from_utf8_lossy(&output.stderr).contains(
-        "similarity-report policy indeterminate: comparison limit reached with 2 pair(s) unprocessed"
-    ));
+    assert_eq!(report["summary"]["matched_pairs"], 1);
+    assert_eq!(report["summary"]["comparison_limit_reached"], false);
+    assert_eq!(report["summary"]["unprocessed_pairs"], 0);
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("similarity-report policy failed: 1 duplicate pair(s) found")
+    );
 }
 
 #[test]

@@ -41,7 +41,7 @@ pub(super) struct FormatArgs {
 }
 
 #[derive(Debug, Args)]
-pub(super) struct TargetArgs {
+pub(crate) struct TargetArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
     pub(super) file: Option<PathBuf>,
@@ -70,7 +70,7 @@ pub(super) struct ReplaceArgs {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub(super) enum DialectArg {
+pub(crate) enum DialectArg {
     CommonLisp,
     EmacsLisp,
     Scheme,
@@ -147,7 +147,7 @@ pub(super) enum ThreadStyleArg {
 }
 
 #[derive(Debug)]
-pub(super) struct SourceInput {
+pub(crate) struct SourceInput {
     pub(super) text: String,
     pub(super) file: Option<PathBuf>,
 }

@@ -20,6 +20,7 @@ pub struct SimilarityFormReport {
 pub struct SimilarityCandidate {
     pub form: SimilarityFormReport,
     pub tree: StructuralTree,
+    pub comparison_head: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -243,6 +243,26 @@ fn size_lower_bound_prunes_without_changing_inclusive_boundary() {
 }
 
 #[test]
+fn sequential_size_pruning_keeps_later_valid_pairs() {
+    let values = candidates("a.lisp", "(foo a b c d e) (foo a) (foo a b c d e)", 2);
+    let report = super::reports::build_similarity_pairs(
+        values,
+        &SimilarityReportOptions {
+            threshold: 0.75,
+            max_comparisons: Some(usize::MAX),
+            overlap_policy: SimilarityOverlapPolicy::All,
+            ..SimilarityReportOptions::default()
+        },
+    );
+
+    assert_eq!(report.summary.possible_pairs, 3);
+    assert_eq!(report.summary.pruned_by_size, 2);
+    assert_eq!(report.summary.evaluated_pairs, 1);
+    assert_eq!(report.pairs.len(), 1);
+    assert_eq!(report.pairs[0].similarity, 1.0);
+}
+
+#[test]
 fn maximal_overlap_suppresses_only_strictly_contained_pairs() {
     let mut values = candidates("a.lisp", "(outer (same x))", 2);
     values.extend(candidates("b.lisp", "(outer (same y))", 2));
@@ -349,6 +369,7 @@ fn max_results_truncates_only_reported_pairs() {
     );
     assert_eq!(unlimited.summary.reported_pairs, 3);
     assert!(!unlimited.summary.truncated);
+    assert_eq!(report.pairs[0].score, unlimited.pairs[0].score);
 }
 
 #[test]
@@ -401,7 +422,7 @@ fn sufficient_max_comparisons_does_not_report_limit_reached() {
 fn max_comparisons_is_applied_after_size_pruning() {
     let values = candidates(
         "a.lisp",
-        "(foo a) (foo a b c d) (bar x y z w) (baz p q r s)",
+        "(foo a) (foo a b c d) (foo x y z w) (foo p q r s)",
         2,
     );
     let report = super::reports::build_similarity_pairs(
@@ -419,4 +440,21 @@ fn max_comparisons_is_applied_after_size_pruning() {
     assert_eq!(report.summary.pruned_by_size, 3);
     assert_eq!(report.summary.unprocessed_pairs, 2);
     assert!(report.summary.comparison_limit_reached);
+}
+
+#[test]
+fn different_heads_do_not_share_a_comparison_bucket() {
+    let values = candidates("a.lisp", "(foo a b) (bar a b)", 2);
+    let report = super::reports::build_similarity_pairs(
+        values,
+        &SimilarityReportOptions {
+            threshold: 0.0,
+            overlap_policy: SimilarityOverlapPolicy::All,
+            ..SimilarityReportOptions::default()
+        },
+    );
+
+    assert_eq!(report.summary.possible_pairs, 0);
+    assert_eq!(report.summary.evaluated_pairs, 0);
+    assert!(report.pairs.is_empty());
 }

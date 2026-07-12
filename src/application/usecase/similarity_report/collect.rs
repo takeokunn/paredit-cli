@@ -3,8 +3,9 @@ use std::path::Path as FsPath;
 use anyhow::Result;
 
 use crate::application::form_similarity::StructuralTree;
+use crate::domain::common_lisp::normalize_common_lisp_operator_head;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::types::{
     SimilarityCandidate, SimilarityFormReport, SimilarityFormScope, SimilarityReportOptions,
@@ -18,8 +19,10 @@ pub fn collect_similarity_candidates(
     options: &SimilarityReportOptions,
     candidates: &mut Vec<SimilarityCandidate>,
 ) -> Result<usize> {
+    let line_index = (options.min_line_span > 1).then_some(LineIndex::new(input));
     let mut collection = CandidateCollection {
         input,
+        line_index: line_index.as_ref(),
         file,
         dialect,
         options,
@@ -36,6 +39,7 @@ pub fn collect_similarity_candidates(
 
 struct CandidateCollection<'a> {
     input: &'a str,
+    line_index: Option<&'a LineIndex>,
     file: &'a FsPath,
     dialect: Dialect,
     options: &'a SimilarityReportOptions,
@@ -45,21 +49,17 @@ struct CandidateCollection<'a> {
 
 impl CandidateCollection<'_> {
     fn collect_from_view(&mut self, view: &ExpressionView, path: Path) {
+        let is_top_level = path.indexes().len() == 1;
+        if self.options.form_scope == SimilarityFormScope::TopLevel && !is_top_level {
+            return;
+        }
         if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
-            let node_count = expression_node_count(view);
-            let line_span = view
-                .span
-                .slice(self.input)
-                .bytes()
-                .filter(|&byte| byte == b'\n')
-                .count()
-                + 1;
-            let in_scope =
-                self.options.form_scope == SimilarityFormScope::All || path.indexes().len() == 1;
-            if in_scope
-                && node_count >= self.options.min_node_count
-                && line_span >= self.options.min_line_span
-            {
+            let text = view.span.slice(self.input);
+            let line_span = self
+                .line_index
+                .map_or(1, |line_index| line_index.line_span(view.span));
+            let in_scope = self.options.form_scope == SimilarityFormScope::All || is_top_level;
+            if in_scope && line_span >= self.options.min_line_span {
                 if self
                     .options
                     .max_candidates
@@ -67,25 +67,35 @@ impl CandidateCollection<'_> {
                 {
                     self.omitted_candidates = self.omitted_candidates.saturating_add(1);
                 } else {
-                    let tree = StructuralTree::from_view(view);
-                    self.candidates.push(SimilarityCandidate {
-                        form: SimilarityFormReport {
-                            path: self.file.to_path_buf(),
-                            dialect: self.dialect,
-                            form_path: path.to_string(),
-                            span: view.span,
-                            node_count,
-                            head: view
-                                .children
-                                .first()
-                                .and_then(atom_text)
-                                .map(ToOwned::to_owned),
-                            text: view.span.slice(self.input).to_owned(),
-                        },
-                        tree,
-                    });
+                    let (tree, node_count) = StructuralTree::from_view_with_count(view);
+                    if node_count >= self.options.min_node_count {
+                        let head = view.children.first().and_then(atom_text);
+                        self.candidates.push(SimilarityCandidate {
+                            form: SimilarityFormReport {
+                                path: self.file.to_path_buf(),
+                                dialect: self.dialect,
+                                form_path: path.to_string(),
+                                span: view.span,
+                                node_count,
+                                head: head.map(ToOwned::to_owned),
+                                text: text.to_owned(),
+                            },
+                            tree,
+                            comparison_head: head.map(|head| {
+                                if self.dialect == Dialect::CommonLisp {
+                                    normalize_common_lisp_operator_head(head).to_ascii_lowercase()
+                                } else {
+                                    head.to_ascii_lowercase()
+                                }
+                            }),
+                        });
+                    }
                 }
             }
+        }
+
+        if self.options.form_scope == SimilarityFormScope::TopLevel && is_top_level {
+            return;
         }
 
         for (index, child) in view.children.iter().enumerate() {
@@ -94,16 +104,34 @@ impl CandidateCollection<'_> {
     }
 }
 
-fn expression_node_count(view: &ExpressionView) -> usize {
-    1 + view
-        .children
-        .iter()
-        .map(expression_node_count)
-        .sum::<usize>()
-}
-
 fn atom_text(view: &ExpressionView) -> Option<&str> {
     (view.kind == ExpressionKind::Atom)
         .then_some(view.text.as_deref())
         .flatten()
+}
+
+#[derive(Debug)]
+struct LineIndex {
+    newline_offsets: Vec<usize>,
+}
+
+impl LineIndex {
+    fn new(input: &str) -> Self {
+        let newline_offsets = input
+            .bytes()
+            .enumerate()
+            .filter_map(|(index, byte)| (byte == b'\n').then_some(index))
+            .collect();
+        Self { newline_offsets }
+    }
+
+    fn line_span(&self, span: ByteSpan) -> usize {
+        let start = span.start().get();
+        let end = span.end().get();
+        let start_index = self
+            .newline_offsets
+            .partition_point(|&offset| offset < start);
+        let end_index = self.newline_offsets.partition_point(|&offset| offset < end);
+        end_index.saturating_sub(start_index) + 1
+    }
 }
