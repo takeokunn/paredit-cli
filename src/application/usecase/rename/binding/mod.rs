@@ -26,7 +26,9 @@ use value_like::{
 };
 
 pub(in crate::application::usecase::rename) use forms::parameter_form_binds;
+pub(in crate::application::usecase::rename) use lambda_like::collect_enclosing_lambda_list_references;
 pub(super) use scope::collect_symbol_atom_spans_unshadowed;
+pub(super) use scope::collect_symbol_atom_spans_unshadowed_ignoring_declared_specials;
 pub(super) use types::BindingRenameParts;
 
 pub(super) fn collect_shadow_aware_special_form(

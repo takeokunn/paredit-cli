@@ -2,7 +2,7 @@ use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
-use super::super::super::forms::{parameter_form_binds, specialized_parameter_form_binds};
+use super::super::super::collect_enclosing_lambda_list_references;
 use super::super::collect_symbol_atom_spans_unshadowed;
 
 pub(super) fn collect_defmethod_references(
@@ -21,8 +21,13 @@ pub(super) fn collect_defmethod_references(
         return;
     };
 
-    if specialized_parameter_form_binds(parameter_form, symbol, input) {
-        *shadowed_scope_count += 1;
+    if collect_enclosing_lambda_list_references(
+        parameter_form,
+        symbol,
+        input,
+        output,
+        shadowed_scope_count,
+    ) {
         return;
     }
 
@@ -91,8 +96,13 @@ pub(super) fn collect_local_callable_references(
                 continue;
             };
 
-            if parameter_form_binds(parameter_form, symbol, input) {
-                *shadowed_scope_count += 1;
+            if collect_enclosing_lambda_list_references(
+                parameter_form,
+                symbol,
+                input,
+                output,
+                shadowed_scope_count,
+            ) {
                 continue;
             }
 

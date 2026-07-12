@@ -23,6 +23,90 @@ fn plans_binding_rename_without_shadowed_inner_binding() {
 }
 
 #[test]
+fn plans_binding_rename_through_global_special_declaim() {
+    let input = "(let ((value 1)) (declaim (special value)) value)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("seed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((seed 1)) (declaim (special seed)) seed)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_binding_rename_through_global_special_proclaim() {
+    let input = "(let ((value 1)) (proclaim '(special value)) value)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("seed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((seed 1)) (proclaim '(special seed)) seed)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_binding_rename_through_local_special_declaration() {
+    let input = "(let ((value 1)) (declare (special value)) (declaim (special value)) (proclaim '(special value)) value)";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("seed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 4);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((seed 1)) (declare (special seed)) (declaim (special seed)) (proclaim '(special seed)) seed)"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_binding_rename_through_locally_wrapped_special_declaration() {
+    let input = "(let ((value 1)) (locally (declare (special value)) (declaim (special value)) (proclaim '(special value)) value))";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::CommonLisp,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("seed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 4);
+    assert_eq!(
+        plan.rewritten,
+        "(let ((seed 1)) (locally (declare (special seed)) (declaim (special seed)) (proclaim '(special seed)) seed))"
+    );
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
 fn plans_clojure_vector_binding_rename_through_later_binding_values() {
     let input = "(let [value 1 next (+ value 1)] [value next])";
     let plan = plan_rename_binding(RenameBindingRequest {

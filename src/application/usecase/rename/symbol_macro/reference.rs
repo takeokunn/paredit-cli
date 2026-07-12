@@ -12,7 +12,7 @@ use crate::domain::sexpr::{
 
 use super::super::RenameFunctionOccurrence;
 use super::super::binding::collect_shadow_aware_special_form;
-use super::super::binding::collect_symbol_atom_spans_unshadowed;
+use super::super::binding::collect_symbol_atom_spans_unshadowed_ignoring_declared_specials;
 use super::super::binding::parameter_form_binds;
 use super::super::reader::atom_symbol_span;
 use super::super::reader::{
@@ -56,7 +56,7 @@ fn collect_reference_renames_from_view(
 ) {
     let mut reference_spans = Vec::new();
     let mut shadowed_scope_count = 0usize;
-    collect_symbol_atom_spans_unshadowed(
+    collect_symbol_atom_spans_unshadowed_ignoring_declared_specials(
         view,
         from,
         &mut reference_spans,

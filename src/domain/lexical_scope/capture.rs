@@ -8,8 +8,6 @@
 //! captured" by reusing the shared shadow-aware reference collector rather than
 //! re-deriving shadowing rules.
 
-use std::collections::BTreeSet;
-
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName, SyntaxTree};
 
@@ -93,8 +91,10 @@ fn value_free_variables(
     value_view: &ExpressionView,
     input: &str,
 ) -> Vec<SymbolName> {
-    let mut candidates = BTreeSet::new();
+    let mut candidates = Vec::new();
     collect_candidate_symbols(value_view, &mut candidates);
+    candidates.sort_unstable();
+    candidates.dedup();
     candidates
         .into_iter()
         .filter_map(|name| {
@@ -106,10 +106,10 @@ fn value_free_variables(
         .collect()
 }
 
-fn collect_candidate_symbols(view: &ExpressionView, out: &mut BTreeSet<String>) {
+fn collect_candidate_symbols(view: &ExpressionView, out: &mut Vec<String>) {
     if view.kind == ExpressionKind::Atom {
         if let Some(text) = atom_symbol_text(view) {
-            out.insert(text.to_owned());
+            out.push(text.to_owned());
         }
         return;
     }

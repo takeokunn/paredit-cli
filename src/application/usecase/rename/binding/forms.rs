@@ -68,17 +68,6 @@ pub(super) fn specialized_parameter_name_spans(
     Ok(specialized_lambda_list_name_spans(parameter_form, input))
 }
 
-pub(super) fn specialized_parameter_form_binds(
-    parameter_form: &ExpressionView,
-    symbol: &SymbolName,
-    input: &str,
-) -> bool {
-    parameter_form.kind == ExpressionKind::List
-        && specialized_lambda_list_name_spans(parameter_form, input)
-            .iter()
-            .any(|name| common_lisp_symbol_reference_eq(&name.name, symbol.as_str()))
-}
-
 pub(super) fn binding_binds(binding: &BindingGroup, symbol: &SymbolName) -> bool {
     binding
         .names

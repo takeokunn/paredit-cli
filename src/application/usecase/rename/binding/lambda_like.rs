@@ -143,6 +143,88 @@ fn collect_lambda_list_parameter_references(
     }
 }
 
+pub(in crate::application::usecase::rename) fn collect_enclosing_lambda_list_references(
+    parameter_form: &ExpressionView,
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<crate::domain::sexpr::ByteSpan>,
+    shadowed_scope_count: &mut usize,
+) -> bool {
+    if parameter_form.kind != ExpressionKind::List {
+        return false;
+    }
+
+    let mut mode = LambdaListMode::Required;
+    let mut index = 0usize;
+    let mut pending_binding_only = false;
+    let mut shadows_symbol = false;
+
+    while index < parameter_form.children.len() {
+        let child = &parameter_form.children[index];
+
+        if let Some(marker) = super::super::selection::atom_text(child) {
+            match marker {
+                "&optional" => {
+                    mode = LambdaListMode::Optional;
+                    index += 1;
+                    continue;
+                }
+                "&key" => {
+                    mode = LambdaListMode::Key;
+                    index += 1;
+                    continue;
+                }
+                "&aux" => {
+                    mode = LambdaListMode::Aux;
+                    index += 1;
+                    continue;
+                }
+                "&rest" | "&body" | "&whole" | "&environment" => {
+                    pending_binding_only = true;
+                    index += 1;
+                    continue;
+                }
+                "&allow-other-keys" => {
+                    index += 1;
+                    continue;
+                }
+                _ if marker.starts_with('&') => {
+                    index += 1;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+
+        let binds_symbol = if pending_binding_only {
+            pending_binding_only = false;
+            binding_pattern_name_spans(child, input)
+                .iter()
+                .any(|name| common_lisp_symbol_reference_eq(&name.name, symbol.as_str()))
+        } else {
+            lambda_list_spec_binds(child, mode, symbol)
+        };
+
+        if !shadows_symbol {
+            collect_lambda_list_spec_references(
+                child,
+                mode,
+                symbol,
+                input,
+                output,
+                shadowed_scope_count,
+            );
+        }
+        shadows_symbol |= binds_symbol;
+        index += 1;
+    }
+
+    if shadows_symbol {
+        *shadowed_scope_count += 1;
+    }
+    shadows_symbol
+}
+
 fn collect_lambda_list_spec_references(
     spec: &ExpressionView,
     mode: LambdaListMode,
@@ -168,38 +250,39 @@ fn collect_lambda_list_spec_references(
 }
 
 fn lambda_list_spec_binds(spec: &ExpressionView, mode: LambdaListMode, from: &SymbolName) -> bool {
-    let names = match mode {
-        LambdaListMode::Required => binding_pattern_name_spans(spec, ""),
-        LambdaListMode::Optional | LambdaListMode::Aux => {
-            if spec.kind == ExpressionKind::List {
-                spec.children
-                    .first()
-                    .map(|binding| binding_pattern_name_spans(binding, ""))
-                    .unwrap_or_default()
-            } else {
-                binding_pattern_name_spans(spec, "")
-            }
-        }
-        LambdaListMode::Key => {
-            if spec.kind == ExpressionKind::List && !spec.children.is_empty() {
-                if let Some(designator) = super::super::selection::atom_text(&spec.children[0]) {
-                    if designator.starts_with(':') && spec.children.len() >= 2 {
-                        binding_pattern_name_spans(&spec.children[1], "")
-                    } else {
-                        binding_pattern_name_spans(spec, "")
-                    }
-                } else {
-                    binding_pattern_name_spans(spec, "")
-                }
-            } else {
-                binding_pattern_name_spans(spec, "")
-            }
-        }
+    let binds = |pattern: &ExpressionView| {
+        binding_pattern_name_spans(pattern, "")
+            .iter()
+            .any(|name| common_lisp_symbol_reference_eq(&name.name, from.as_str()))
     };
 
-    names
-        .iter()
-        .any(|name| common_lisp_symbol_reference_eq(&name.name, from.as_str()))
+    if spec.kind != ExpressionKind::List {
+        return binds(spec);
+    }
+
+    match mode {
+        LambdaListMode::Required => binds(spec),
+        LambdaListMode::Optional => {
+            spec.children.first().is_some_and(binds) || spec.children.get(2).is_some_and(binds)
+        }
+        LambdaListMode::Aux => spec.children.first().is_some_and(binds),
+        LambdaListMode::Key => {
+            let Some(name_spec) = spec.children.first() else {
+                return false;
+            };
+            let binding = if let Some(designator) = super::super::selection::atom_text(name_spec) {
+                if designator.starts_with(':') {
+                    spec.children.get(1).unwrap_or(name_spec)
+                } else {
+                    name_spec
+                }
+            } else {
+                name_spec
+            };
+
+            binds(binding) || spec.children.get(2).is_some_and(binds)
+        }
+    }
 }
 
 pub(super) fn defmethod_binding_rename_parts(

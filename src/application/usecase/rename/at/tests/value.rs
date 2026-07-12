@@ -12,14 +12,6 @@ fn renames_value_binding_from_reference() {
     assert_eq!(plan.rewritten, "(let ((count 1)) (+ count count))");
 }
 
-// NOT ported: `renames_value_binding_through_local_special_declaration`
-// (renaming a `let` binding also renames its own `(declare (special ...))`
-// mention) needs `binding_rename_parts`'s reference collection to treat a
-// `declare (special name)` mention as a renamable reference, which main's
-// shared rename/binding walker does not do yet. See the note in
-// `rename/at/tests.rs` above `nested_lambda_initializers` — same category of
-// out-of-scope shared-engine enhancement.
-
 #[test]
 fn keeps_common_lisp_value_and_function_namespaces_separate() {
     let input = "(let ((value 1)) (list value (value)))";

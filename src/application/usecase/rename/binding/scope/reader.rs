@@ -7,6 +7,7 @@ pub(super) use crate::application::usecase::rename::reader::{
 };
 use crate::domain::common_lisp::common_lisp_operator_head_eq;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn collect_explicit_reader_form(
     view: &ExpressionView,
     symbol: &SymbolName,
@@ -14,6 +15,7 @@ pub(super) fn collect_explicit_reader_form(
     shadowed_scope_count: &mut usize,
     input: &str,
     quasiquote_depth: usize,
+    collect_declared_specials: bool,
 ) -> bool {
     if view.kind != ExpressionKind::List || view.children.len() < 2 {
         return false;
@@ -41,6 +43,7 @@ pub(super) fn collect_explicit_reader_form(
                     shadowed_scope_count,
                     input,
                     quasiquote_depth + 1,
+                    collect_declared_specials,
                 );
             }
             true
@@ -54,6 +57,7 @@ pub(super) fn collect_explicit_reader_form(
                     shadowed_scope_count,
                     input,
                     quasiquote_depth - 1,
+                    collect_declared_specials,
                 );
             }
             true
