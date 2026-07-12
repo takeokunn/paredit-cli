@@ -17,6 +17,7 @@ mod form_report;
 mod function_parameter;
 mod impact_report;
 mod inline_function;
+mod inline_lambda;
 mod inline_let;
 mod inline_local_function;
 mod introduce_let;

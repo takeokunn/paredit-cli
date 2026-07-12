@@ -17,6 +17,7 @@ pub mod form_report;
 pub mod function_parameter;
 pub mod impact_report;
 pub mod inline_function;
+pub mod inline_lambda;
 pub mod inline_let;
 pub mod inline_local_function;
 pub mod introduce_let;

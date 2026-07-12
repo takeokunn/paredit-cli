@@ -47,6 +47,8 @@ mod help_contract;
 mod impact_report;
 #[path = "cli/inline_function/mod.rs"]
 mod inline_function;
+#[path = "cli/inline_lambda.rs"]
+mod inline_lambda;
 #[path = "cli/inline_local_function.rs"]
 mod inline_local_function;
 #[path = "cli/let_refactor/mod.rs"]

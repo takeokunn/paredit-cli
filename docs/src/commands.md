@@ -141,6 +141,7 @@ plan/preview/verify/apply lifecycle.
 | `extract-local-function` | Extract the selected expression into a Common Lisp `flet` or `labels` binding. |
 | `extract-constant` | Extract the selected expression into a top-level constant. |
 | `inline-function` | Inline one selected function call using a selected function definition. |
+| `inline-lambda` | Replace a safe, immediately invoked Common Lisp lambda with a parallel `let`. |
 | `inline-local-function` | Inline the sole direct call in a safe, single-binding Common Lisp `flet` form. |
 
 ### Parameters and bindings
