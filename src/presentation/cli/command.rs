@@ -3,9 +3,9 @@ use super::{
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
     dependency_report, duplicate_report, extract_constant, extract_function,
     extract_local_function, form_report, function_parameter, impact_report, inline_function,
-    inline_let, introduce_let, let_report, package, refactor, remove_unused_binding, rename,
-    replace_forms, signature_report, similarity_report, symbol_report, thread_expression,
-    unthread_expression, unwrap_call, workspace_report,
+    inline_let, inline_local_function, introduce_let, let_report, package, refactor,
+    remove_unused_binding, rename, replace_forms, signature_report, similarity_report,
+    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
 
@@ -175,6 +175,8 @@ pub(super) enum RefactorCommand {
     ExtractConstant(extract_constant::ExtractConstantArgs),
     /// Inline one selected function call using a selected function definition.
     InlineFunction(inline_function::InlineFunctionArgs),
+    /// Inline the sole direct call in a single-binding Common Lisp flet form.
+    InlineLocalFunction(inline_local_function::InlineLocalFunctionArgs),
     /// Add a parameter to a selected function and explicit call sites.
     AddFunctionParameter(function_parameter::args::AddFunctionParameterArgs),
     /// Move one positional parameter in a selected function and explicit call sites.

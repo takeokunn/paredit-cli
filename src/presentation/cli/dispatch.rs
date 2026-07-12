@@ -168,6 +168,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::InlineFunction(args) => {
                 inline_function::inline_function(args)?
             }
+            command::RefactorCommand::InlineLocalFunction(args) => {
+                inline_local_function::inline_local_function(args)?
+            }
             command::RefactorCommand::AddFunctionParameter(args) => {
                 function_parameter::add::add_function_parameter(args)?
             }

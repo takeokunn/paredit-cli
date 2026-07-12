@@ -18,6 +18,7 @@ mod function_parameter;
 mod impact_report;
 mod inline_function;
 mod inline_let;
+mod inline_local_function;
 mod introduce_let;
 mod let_report;
 mod package;
