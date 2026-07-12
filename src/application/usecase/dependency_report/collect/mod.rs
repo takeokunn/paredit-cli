@@ -1,8 +1,7 @@
 use anyhow::Result;
 
 use crate::domain::common_lisp::{
-    CommonLispOperator, common_lisp_local_callable_form, local_callable_binding_body_scope,
-    local_callable_body_scope,
+    CommonLispOperator, common_lisp_local_callable_form, local_callable_names,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
@@ -131,11 +130,19 @@ fn collect_local_callable_dependency_items(
         );
     }
 
-    let body_scope = local_callable_body_scope(local_bindings, view);
+    let mut body_scope = local_bindings.to_vec();
+    body_scope.extend(
+        local_callable_names(view)
+            .iter()
+            .filter_map(|name| name.ordinary_name().map(str::to_owned)),
+    );
 
     if let Some(bindings) = view.children.get(1) {
-        let binding_body_scope =
-            local_callable_binding_body_scope(form, local_bindings, &body_scope);
+        let binding_body_scope = if matches!(form, crate::domain::common_lisp::CommonLispLocalCallableForm::Labels) {
+            body_scope.as_slice()
+        } else {
+            local_bindings
+        };
         for (binding_index, binding) in bindings.children.iter().enumerate() {
             if binding.kind != ExpressionKind::List || binding.delimiter != Some(Delimiter::Paren) {
                 continue;

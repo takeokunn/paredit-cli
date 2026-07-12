@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_body_scope,
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_body_scope, LocalCallableName,
 };
 use crate::domain::common_lisp::{
     CommonLispBindingRefactorForm, CommonLispBindingReferenceScope, CommonLispLocalCallableForm,
@@ -234,7 +234,7 @@ fn collect_local_callable_form_reference_spans(
     view: &ExpressionView,
     dialect: Dialect,
     name: &SymbolName,
-    local_callables: &[String],
+    local_callables: &[LocalCallableName],
     form: CommonLispLocalCallableForm,
     count_this_forms_local_names: bool,
     output: &mut Vec<ByteSpan>,
@@ -280,7 +280,7 @@ fn collect_local_callable_reference_spans_from_view(
     view: &ExpressionView,
     dialect: Dialect,
     name: &SymbolName,
-    local_callables: &[String],
+    local_callables: &[LocalCallableName],
     output: &mut Vec<ByteSpan>,
 ) {
     let mut definition_body_range = None;

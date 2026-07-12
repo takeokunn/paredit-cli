@@ -34,6 +34,7 @@ pub(in crate::application::usecase::rename::function) fn collect_local_callable_
                         quasiquote_depth: 0,
                         in_macro_expander: state.in_macro_expander || form.is_macro(),
                         shadowed_depth: state.shadowed_depth,
+                        setf_place_accessor: false,
                     },
                     renames,
                 );

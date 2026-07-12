@@ -5,9 +5,9 @@ use crate::domain::sexpr::reader::apply_reader_prefix_context;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::{
-    common_lisp_local_callable_form, common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+    CommonLispLocalCallableForm, CommonLispValueScopeForm, common_lisp_local_callable_form,
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     destructuring_lambda_list_bindings, macro_lambda_list_bindings, ordinary_lambda_list_bindings,
-    CommonLispLocalCallableForm, CommonLispValueScopeForm,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]

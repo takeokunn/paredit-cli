@@ -15,9 +15,11 @@ fn finds_local_functions_used_as_values() {
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(diagnostics[0].name, "finish-attempt");
     assert_eq!(diagnostics[1].name, "retry");
-    assert!(diagnostics
-        .iter()
-        .all(|diagnostic| diagnostic.code() == "function-used-as-value"));
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code() == "function-used-as-value")
+    );
 }
 
 #[test]
