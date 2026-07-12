@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 
-use super::super::shared::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::shared::{
+    detect_dialect, expand_input_paths, read_input, write_files_with_rollback,
+};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
 use crate::application::usecase::definition_report::{
@@ -16,10 +18,11 @@ use crate::domain::sexpr::SyntaxTree;
 pub(in crate::presentation::cli) fn remove_unused_definitions(
     args: RemoveUnusedDefinitionsArgs,
 ) -> Result<()> {
-    let mut input_files = Vec::with_capacity(args.files.len());
+    let files = expand_input_paths(&args.files)?;
+    let mut input_files = Vec::with_capacity(files.len());
     let mut package_definitions = Vec::new();
 
-    for file in &args.files {
+    for file in files {
         let input = read_input(Some(file.clone()))?;
         let dialect = detect_dialect(&input, args.dialect);
         let tree = SyntaxTree::parse(&input.text)
