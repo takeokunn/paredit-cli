@@ -1,7 +1,6 @@
 use super::*;
 use crate::domain::common_lisp::{
-    common_lisp_reader_conditional_dispatches, contains_common_lisp_reader_conditional,
-    CommonLispReaderConditionalKind,
+    CommonLispReaderConditionalKind, common_lisp_reader_conditional_dispatches,
 };
 
 #[test]
@@ -27,7 +26,6 @@ fn detects_bare_include_and_exclude_dispatches() {
             .collect::<Vec<_>>(),
         vec!["0", "1"]
     );
-    assert!(contains_common_lisp_reader_conditional(&tree));
 }
 
 #[test]
@@ -110,6 +108,5 @@ fn does_not_confuse_clojure_conditionals_or_reader_comments_with_common_lisp_dis
         let tree = SyntaxTree::parse(input).expect("parse succeeds");
 
         assert!(common_lisp_reader_conditional_dispatches(&tree).is_empty());
-        assert!(!contains_common_lisp_reader_conditional(&tree));
     }
 }

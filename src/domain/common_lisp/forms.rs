@@ -187,9 +187,7 @@ impl CommonLispValueScopeForm {
             Self::Let(_) | Self::Lambda | Self::LocalCallable(_) | Self::Resource(_) => {
                 Some(CommonLispDeclarationScope::new(2))
             }
-            Self::Definition | Self::Value | Self::Slot => {
-                Some(CommonLispDeclarationScope::new(3))
-            }
+            Self::Definition | Self::Value | Self::Slot => Some(CommonLispDeclarationScope::new(3)),
             Self::FunctionLiteral
             | Self::Clause
             | Self::Handler(_)

@@ -12,7 +12,4 @@ pub use dispatch::{
     CommonLispReaderConditionalDispatch, CommonLispReaderConditionalForm,
     CommonLispReaderConditionalKind,
 };
-pub use query::{
-    common_lisp_reader_conditional_dispatches, common_lisp_reader_conditional_forms,
-    contains_common_lisp_reader_conditional,
-};
+pub use query::{common_lisp_reader_conditional_dispatches, common_lisp_reader_conditional_forms};

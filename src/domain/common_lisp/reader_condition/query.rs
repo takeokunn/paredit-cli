@@ -22,11 +22,6 @@ pub fn common_lisp_reader_conditional_dispatches(
     dispatches
 }
 
-/// Returns whether a parsed document contains a Common Lisp `#+` or `#-` dispatch.
-pub fn contains_common_lisp_reader_conditional(tree: &SyntaxTree) -> bool {
-    !common_lisp_reader_conditional_dispatches(tree).is_empty()
-}
-
 /// Returns the complete source region consumed by every reader conditional.
 ///
 /// The parser represents a reader conditional as three sibling expressions:

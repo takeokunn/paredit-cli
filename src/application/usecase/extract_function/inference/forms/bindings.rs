@@ -4,9 +4,9 @@ use crate::domain::common_lisp::CommonLispResourceBindingForm;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
+use super::super::super::syntax::atom_text;
 use super::super::bindings::extract_function_binding_entries;
 use super::super::patterns::parameter_names;
-use super::super::super::syntax::atom_text;
 use super::{extend_extract_function_bound_params, slot_spec_bound_name};
 
 pub(super) fn collect_inferred_extract_function_let(
