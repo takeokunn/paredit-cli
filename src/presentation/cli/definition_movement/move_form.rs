@@ -2,11 +2,11 @@ use anyhow::{Context, Result};
 
 use crate::domain::sexpr::{Edit, SyntaxTree};
 
-use super::super::MoveInsert;
 use super::super::shared::{
     detect_dialect, list_head, read_file_or_empty, read_input_dialect_and_tree,
     write_files_with_rollback,
 };
+use super::super::MoveInsert;
 use super::args::MoveFormArgs;
 use super::render::move_form::print_move_form_plan;
 use super::shared::{insert_top_level_form, same_file_path, top_level_path_index};
@@ -53,6 +53,7 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
         &form_text,
         args.insert,
         args.anchor_path.as_ref(),
+        "move-form",
     )?;
 
     SyntaxTree::parse(&from_rewritten).with_context(|| {

@@ -101,6 +101,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::MoveForm(args) => {
                 definition_movement::move_form::move_form(args)?
             }
+            command::RefactorCommand::InsertTopLevel(args) => {
+                definition_movement::insert_top_level::insert_top_level(args)?
+            }
             command::RefactorCommand::ReplacementPlan(args) => {
                 duplicate_report::workflow::replacement_plan(args)?
             }
