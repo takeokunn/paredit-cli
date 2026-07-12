@@ -160,87 +160,69 @@ impl Formatter {
                 output.push(delimiter.open());
                 output.push(delimiter.close());
             }
-            NodeKind::List if self.inline_list(tree, node_id).is_some() => {
-                if let Some(inline) = self.inline_list(tree, node_id) {
-                    output.push_str(&inline);
-                }
-            }
             NodeKind::List => {
                 if self.is_opaque_reader_form(node) {
                     output.push_str(node.source_text.as_deref().unwrap_or_default());
                     return;
                 }
-                self.write_reader_prefixes(node, output);
-                if let Some(head) = self.head_text(tree, node_id) {
-                    match self.style_for_head(head) {
-                        ListStyle::Definition => {
-                            self.format_definition(tree, node_id, depth, output);
-                        }
-                        ListStyle::SystemDefinition => {
-                            self.format_system_definition(tree, node_id, depth, output);
-                        }
-                        ListStyle::Defmethod => {
-                            self.format_defmethod(tree, node_id, depth, output);
-                        }
-                        ListStyle::DefinitionNameBody => {
-                            self.format_prefix_body(tree, node_id, depth, 1, output);
-                        }
-                        ListStyle::Lambda => {
-                            self.format_prefix_body(tree, node_id, depth, 1, output);
-                        }
-                        ListStyle::NamedLambda => {
-                            self.format_prefix_body(tree, node_id, depth, 2, output);
-                        }
-                        ListStyle::Binding => {
-                            self.format_binding_form(tree, node_id, depth, output);
-                        }
-                        ListStyle::LocalFunctions => {
-                            self.format_local_callable_form(tree, node_id, depth, head, output);
-                        }
-                        ListStyle::OneArgumentBody => {
-                            self.format_prefix_body(tree, node_id, depth, 1, output);
-                        }
-                        ListStyle::TwoArgumentBody => {
-                            self.format_prefix_body(tree, node_id, depth, 2, output);
-                        }
-                        ListStyle::ClauseForm => {
-                            self.format_clause_form(tree, node_id, depth, output);
-                        }
-                        ListStyle::CondClauses => {
-                            self.format_cond_clauses(tree, node_id, depth, output);
-                        }
-                        ListStyle::CaseClauses => {
-                            self.format_case_clauses(tree, node_id, depth, output);
-                        }
-                        ListStyle::Do => {
-                            self.format_do_form(tree, node_id, depth, head, output);
-                        }
-                        ListStyle::Prog => {
-                            self.format_prog_form(tree, node_id, depth, head, output);
-                        }
-                        ListStyle::Declaration => {
-                            self.format_declaration_form(tree, node_id, depth, head, output);
-                        }
-                        ListStyle::PairAssignment => {
-                            self.format_pair_assignment_form(tree, node_id, depth, head, output);
-                        }
-                        ListStyle::Loop => {
-                            self.format_loop_form(tree, node_id, depth, head, output);
-                        }
-                        ListStyle::HeadBody => {
-                            self.format_head_body(tree, node_id, depth, output);
-                        }
-                        ListStyle::If => {
-                            self.format_prefix_body(tree, node_id, depth, 2, output);
-                        }
-                        ListStyle::General => {
-                            self.format_general_list(tree, node_id, depth, output);
-                        }
-                    }
-                } else {
-                    self.format_general_list(tree, node_id, depth, output);
+                if let Some(inline) = self.inline_list(tree, node_id) {
+                    output.push_str(&inline);
+                    return;
                 }
+                self.write_reader_prefixes(node, output);
+                self.format_styled_list(tree, node_id, depth, output);
             }
+        }
+    }
+
+    fn format_styled_list(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        output: &mut String,
+    ) {
+        let Some(head) = self.head_text(tree, node_id) else {
+            self.format_general_list(tree, node_id, depth, output);
+            return;
+        };
+
+        match self.style_for_head(head) {
+            ListStyle::Definition => self.format_definition(tree, node_id, depth, output),
+            ListStyle::SystemDefinition => {
+                self.format_system_definition(tree, node_id, depth, output);
+            }
+            ListStyle::Defmethod => self.format_defmethod(tree, node_id, depth, output),
+            ListStyle::DefinitionNameBody => {
+                self.format_prefix_body(tree, node_id, depth, 1, output);
+            }
+            ListStyle::Lambda => self.format_prefix_body(tree, node_id, depth, 1, output),
+            ListStyle::NamedLambda => self.format_prefix_body(tree, node_id, depth, 2, output),
+            ListStyle::Binding => self.format_binding_form(tree, node_id, depth, output),
+            ListStyle::LocalFunctions => {
+                self.format_local_callable_form(tree, node_id, depth, head, output);
+            }
+            ListStyle::OneArgumentBody => {
+                self.format_prefix_body(tree, node_id, depth, 1, output);
+            }
+            ListStyle::TwoArgumentBody => {
+                self.format_prefix_body(tree, node_id, depth, 2, output);
+            }
+            ListStyle::ClauseForm => self.format_clause_form(tree, node_id, depth, output),
+            ListStyle::CondClauses => self.format_cond_clauses(tree, node_id, depth, output),
+            ListStyle::CaseClauses => self.format_case_clauses(tree, node_id, depth, output),
+            ListStyle::Do => self.format_do_form(tree, node_id, depth, head, output),
+            ListStyle::Prog => self.format_prog_form(tree, node_id, depth, head, output),
+            ListStyle::Declaration => {
+                self.format_declaration_form(tree, node_id, depth, head, output);
+            }
+            ListStyle::PairAssignment => {
+                self.format_pair_assignment_form(tree, node_id, depth, head, output);
+            }
+            ListStyle::Loop => self.format_loop_form(tree, node_id, depth, head, output),
+            ListStyle::HeadBody => self.format_head_body(tree, node_id, depth, output),
+            ListStyle::If => self.format_prefix_body(tree, node_id, depth, 2, output),
+            ListStyle::General => self.format_general_list(tree, node_id, depth, output),
         }
     }
 
