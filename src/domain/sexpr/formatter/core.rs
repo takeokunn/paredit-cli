@@ -148,11 +148,11 @@ impl Formatter {
         match node.kind {
             NodeKind::Root => (),
             NodeKind::Atom => {
-                output.push_str(node.text.as_deref().unwrap_or_default());
+                output.push_str(node.span.slice(&tree.source));
             }
             NodeKind::List if node.children.is_empty() => {
                 if self.is_opaque_reader_form(node) {
-                    output.push_str(node.source_text.as_deref().unwrap_or_default());
+                    output.push_str(node.span.slice(&tree.source));
                     return;
                 }
                 self.write_reader_prefixes(node, output);
@@ -160,14 +160,13 @@ impl Formatter {
                 output.push(delimiter.open());
                 output.push(delimiter.close());
             }
-            NodeKind::List if self.inline_list(tree, node_id).is_some() => {
+            NodeKind::List => {
                 if let Some(inline) = self.inline_list(tree, node_id) {
                     output.push_str(&inline);
+                    return;
                 }
-            }
-            NodeKind::List => {
                 if self.is_opaque_reader_form(node) {
-                    output.push_str(node.source_text.as_deref().unwrap_or_default());
+                    output.push_str(node.span.slice(&tree.source));
                     return;
                 }
                 self.write_reader_prefixes(node, output);
@@ -256,10 +255,10 @@ impl Formatter {
         let node = tree.node(node_id);
         match node.kind {
             NodeKind::Root => None,
-            NodeKind::Atom => Some(node.text.as_deref().unwrap_or_default().to_owned()),
+            NodeKind::Atom => Some(node.span.slice(&tree.source).to_owned()),
             NodeKind::List => {
                 if self.is_opaque_reader_form(node) {
-                    return node.source_text.clone();
+                    return Some(node.span.slice(&tree.source).to_owned());
                 }
                 if let Some(head) = self.head_text(tree, node_id) {
                     if self.style_for_head(head) != ListStyle::General {
@@ -302,8 +301,7 @@ impl Formatter {
         let first = *node.children.first()?;
         let first = tree.node(first);
         (first.kind == NodeKind::Atom && first.reader_prefixes.is_empty())
-            .then_some(first.text.as_deref())
-            .flatten()
+            .then(|| first.span.slice(&tree.source))
     }
 
     pub(super) fn list_delimiter(&self, node: &Node) -> Delimiter {

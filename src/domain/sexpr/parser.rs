@@ -53,8 +53,6 @@ impl<'a> Parser<'a> {
             span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
             open: None,
             close: None,
-            text: None,
-            source_text: None,
             symbol_offset: 0,
         };
         Self {
@@ -174,8 +172,6 @@ impl<'a> Parser<'a> {
             span: ByteSpan::new(start, ByteOffset::new(self.pos.get() + 1)),
             open: Some(self.pos),
             close: None,
-            text: None,
-            source_text: None,
             symbol_offset: 0,
         });
         self.nodes[parent.get()].children.push(id);
@@ -227,9 +223,6 @@ impl<'a> Parser<'a> {
             ByteOffset::new(self.pos.get() + 1),
         );
         self.nodes[id.get()].close = Some(self.pos);
-        self.nodes[id.get()].source_text = Some(
-            self.input[self.nodes[id.get()].span.start().get()..self.pos.get() + 1].to_string(),
-        );
         self.advance();
         Ok(())
     }
@@ -345,8 +338,6 @@ impl<'a> Parser<'a> {
             span: ByteSpan::new(span_start, end),
             open: None,
             close: None,
-            text: Some(self.input[span_start.get()..end.get()].to_string()),
-            source_text: None,
             symbol_offset,
         });
         self.nodes[parent.get()].children.push(id);

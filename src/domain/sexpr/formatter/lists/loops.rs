@@ -93,9 +93,7 @@ impl Formatter {
         node_id: NodeId,
     ) -> Option<&'a str> {
         let node = tree.node(node_id);
-        (node.kind == NodeKind::Atom)
-            .then_some(node.text.as_deref())
-            .flatten()
+        (node.kind == NodeKind::Atom).then(|| node.span.slice(&tree.source))
     }
 
     pub(in crate::domain::sexpr::formatter) fn is_loop_clause_keyword(keyword: &str) -> bool {
