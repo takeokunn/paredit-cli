@@ -583,6 +583,29 @@ fn max_comparisons_is_applied_after_size_pruning() {
 }
 
 #[test]
+fn candidate_limit_is_preserved_when_building_the_report() {
+    let report = super::reports::build_similarity_pairs_with_omissions(
+        candidates("a.lisp", "(foo a) (bar b) (baz c)", 2),
+        1,
+        &report_options(
+            1.0,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::TopLevel,
+            SimilarityOverlapPolicy::Maximal,
+            None,
+            None,
+            None,
+        ),
+    )
+    .unwrap();
+
+    assert!(report.summary.candidate_limit_reached);
+    assert_eq!(report.summary.omitted_candidates, 1);
+}
+
+#[test]
 fn different_heads_do_not_share_a_comparison_bucket() {
     let values = candidates("a.lisp", "(foo a b) (bar a b)", 2);
     let report = super::reports::build_similarity_pairs(
