@@ -19,8 +19,8 @@ pub fn collect_similarity_candidates(
     options: &SimilarityReportOptions,
     candidates: &mut Vec<SimilarityCandidate>,
 ) -> Result<usize> {
-    let min_line_span = options.min_line_span();
-    let line_index = (min_line_span > 1).then_some(LineIndex::new(input));
+    options.validate()?;
+    let line_index = (options.min_line_span() > 1).then_some(LineIndex::new(input));
     let mut collection = CandidateCollection {
         input,
         line_index: line_index.as_ref(),
@@ -55,9 +55,8 @@ impl CandidateCollection<'_> {
     // forms that actually become candidates, instead of cloning the whole
     // index vector at every recursion step (O(nodes × depth) allocation).
     fn collect_from_view(&mut self, view: &ExpressionView, path_stack: &mut Vec<usize>) {
-        let form_scope = self.options.form_scope();
         let is_top_level = path_stack.len() == 1;
-        if form_scope == SimilarityFormScope::TopLevel && !is_top_level {
+        if self.options.form_scope() == SimilarityFormScope::TopLevel && !is_top_level {
             return;
         }
         if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
@@ -65,9 +64,8 @@ impl CandidateCollection<'_> {
             let line_span = self
                 .line_index
                 .map_or(1, |line_index| line_index.line_span(view.span));
-            let in_scope = form_scope == SimilarityFormScope::All || is_top_level;
-            let min_line_span = self.options.min_line_span();
-            if in_scope && line_span >= min_line_span {
+            let in_scope = self.options.form_scope() == SimilarityFormScope::All || is_top_level;
+            if in_scope && line_span >= self.options.min_line_span() {
                 if self
                     .options
                     .max_candidates()
@@ -82,7 +80,7 @@ impl CandidateCollection<'_> {
                             form: SimilarityFormReport {
                                 path: self.file.to_path_buf(),
                                 dialect: self.dialect,
-                                form_path: Path::from_indexes(path_stack.clone()),
+                                form_path: Path::from_indexes(path_stack.clone()).to_string(),
                                 span: view.span,
                                 node_count,
                                 head: head.map(ToOwned::to_owned),
@@ -102,7 +100,7 @@ impl CandidateCollection<'_> {
             }
         }
 
-        if form_scope == SimilarityFormScope::TopLevel && is_top_level {
+        if self.options.form_scope() == SimilarityFormScope::TopLevel && is_top_level {
             return;
         }
 

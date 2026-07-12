@@ -2,22 +2,38 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::Path as ExpressionPath;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 
 use super::*;
 
-const DEFAULT_THRESHOLD: f64 = 0.87;
-const DEFAULT_MIN_NODE_COUNT: usize = 4;
-const DEFAULT_MIN_LINE_SPAN: usize = 1;
-const DEFAULT_COMPARISON_SCOPE: SimilarityComparisonScope = SimilarityComparisonScope::All;
-const DEFAULT_FORM_SCOPE: SimilarityFormScope = SimilarityFormScope::All;
-const DEFAULT_OVERLAP_POLICY: SimilarityOverlapPolicy = SimilarityOverlapPolicy::Maximal;
-const DEFAULT_MAX_CANDIDATES: Option<usize> = None;
-const DEFAULT_MAX_COMPARISONS: Option<usize> = None;
-const DEFAULT_MAX_RESULTS: Option<usize> = None;
+fn candidates(file: &str, input: &str, min_node_count: usize) -> Vec<SimilarityCandidate> {
+    let tree = SyntaxTree::parse(input).unwrap();
+    let mut result = Vec::new();
+    let options = report_options(
+        0.87,
+        min_node_count,
+        1,
+        SimilarityComparisonScope::All,
+        SimilarityFormScope::All,
+        SimilarityOverlapPolicy::Maximal,
+        None,
+        None,
+        None,
+    );
+    collect_similarity_candidates(
+        &tree,
+        input,
+        Path::new(file),
+        Dialect::CommonLisp,
+        &options,
+        &mut result,
+    )
+    .unwrap();
+    result
+}
 
-fn options(
+#[allow(clippy::too_many_arguments)]
+fn report_options(
     threshold: f64,
     min_node_count: usize,
     min_line_span: usize,
@@ -42,32 +58,6 @@ fn options(
     .unwrap()
 }
 
-fn candidates(file: &str, input: &str, min_node_count: usize) -> Vec<SimilarityCandidate> {
-    let tree = SyntaxTree::parse(input).unwrap();
-    let mut result = Vec::new();
-    let report_options = options(
-        DEFAULT_THRESHOLD,
-        min_node_count,
-        DEFAULT_MIN_LINE_SPAN,
-        DEFAULT_COMPARISON_SCOPE,
-        DEFAULT_FORM_SCOPE,
-        DEFAULT_OVERLAP_POLICY,
-        DEFAULT_MAX_CANDIDATES,
-        DEFAULT_MAX_COMPARISONS,
-        DEFAULT_MAX_RESULTS,
-    );
-    collect_similarity_candidates(
-        &tree,
-        input,
-        Path::new(file),
-        Dialect::CommonLisp,
-        &report_options,
-        &mut result,
-    )
-    .unwrap();
-    result
-}
-
 fn build_similarity_pairs(
     candidates: Vec<SimilarityCandidate>,
     threshold: f64,
@@ -76,29 +66,53 @@ fn build_similarity_pairs(
 ) -> SimilarityReport {
     super::reports::build_similarity_pairs(
         candidates,
-        &options(
+        &report_options(
             threshold,
-            DEFAULT_MIN_NODE_COUNT,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
             overlap_policy,
-            DEFAULT_MAX_CANDIDATES,
-            DEFAULT_MAX_COMPARISONS,
+            None,
+            None,
             max_results,
         ),
     )
+    .unwrap()
 }
 
 fn report_form(path: &str, start: usize, end: usize) -> SimilarityFormReport {
     SimilarityFormReport {
         path: PathBuf::from(path),
         dialect: Dialect::CommonLisp,
-        form_path: ExpressionPath::from_indexes(vec![start, end]),
+        form_path: format!("{start}:{end}"),
         span: ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end)),
         node_count: 1,
         head: None,
         text: String::new(),
+    }
+}
+
+fn similarity_candidate(file: &str, node_count: usize) -> SimilarityCandidate {
+    let input = "(foo a)";
+    let tree = SyntaxTree::parse(input).unwrap();
+    SimilarityCandidate {
+        form: SimilarityFormReport {
+            path: PathBuf::from(file),
+            dialect: Dialect::CommonLisp,
+            form_path: "0:7".to_string(),
+            span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
+            node_count,
+            head: Some("foo".to_string()),
+            text: input.to_string(),
+        },
+        tree: crate::domain::form_similarity::StructuralTree::from_view(
+            &tree
+                .select_path(&crate::domain::sexpr::Path::root_child(0))
+                .unwrap()
+                .view(),
+        ),
+        comparison_head: Some("foo".to_string()),
     }
 }
 
@@ -111,16 +125,16 @@ fn form_scope_top_level_excludes_nested_forms() {
         "(outer (inner value))",
         Path::new("a.lisp"),
         Dialect::CommonLisp,
-        &options(
-            DEFAULT_THRESHOLD,
+        &report_options(
+            0.87,
             2,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
+            1,
+            SimilarityComparisonScope::All,
             SimilarityFormScope::TopLevel,
-            DEFAULT_OVERLAP_POLICY,
-            DEFAULT_MAX_CANDIDATES,
-            DEFAULT_MAX_COMPARISONS,
-            DEFAULT_MAX_RESULTS,
+            SimilarityOverlapPolicy::Maximal,
+            None,
+            None,
+            None,
         ),
         &mut values,
     )
@@ -140,16 +154,16 @@ fn minimum_line_span_uses_inclusive_one_based_length() {
         input,
         Path::new("a.lisp"),
         Dialect::CommonLisp,
-        &options(
-            DEFAULT_THRESHOLD,
+        &report_options(
+            0.87,
             2,
             2,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
-            DEFAULT_OVERLAP_POLICY,
-            DEFAULT_MAX_CANDIDATES,
-            DEFAULT_MAX_COMPARISONS,
-            DEFAULT_MAX_RESULTS,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
+            SimilarityOverlapPolicy::Maximal,
+            None,
+            None,
+            None,
         ),
         &mut values,
     )
@@ -169,16 +183,16 @@ fn candidate_limit_counts_only_eligible_omissions() {
         input,
         Path::new("a.lisp"),
         Dialect::CommonLisp,
-        &options(
-            DEFAULT_THRESHOLD,
+        &report_options(
+            0.87,
             3,
             2,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
-            DEFAULT_OVERLAP_POLICY,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
+            SimilarityOverlapPolicy::Maximal,
             Some(1),
-            DEFAULT_MAX_COMPARISONS,
-            DEFAULT_MAX_RESULTS,
+            None,
+            None,
         ),
         &mut values,
     )
@@ -196,16 +210,16 @@ fn candidate_limit_counts_only_eligible_omissions() {
         input,
         Path::new("a.lisp"),
         Dialect::CommonLisp,
-        &options(
-            DEFAULT_THRESHOLD,
+        &report_options(
+            0.87,
             3,
             2,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
-            DEFAULT_OVERLAP_POLICY,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
+            SimilarityOverlapPolicy::Maximal,
             Some(1),
-            DEFAULT_MAX_COMPARISONS,
-            DEFAULT_MAX_RESULTS,
+            None,
+            None,
         ),
         &mut values,
     )
@@ -223,18 +237,19 @@ fn comparison_scope_filters_pair_population() {
     let report = |comparison_scope| {
         super::reports::build_similarity_pairs(
             values.clone(),
-            &options(
+            &report_options(
                 0.0,
-                DEFAULT_MIN_NODE_COUNT,
-                DEFAULT_MIN_LINE_SPAN,
+                4,
+                1,
                 comparison_scope,
-                DEFAULT_FORM_SCOPE,
+                SimilarityFormScope::All,
                 SimilarityOverlapPolicy::All,
-                DEFAULT_MAX_CANDIDATES,
-                DEFAULT_MAX_COMPARISONS,
-                DEFAULT_MAX_RESULTS,
+                None,
+                None,
+                None,
             ),
         )
+        .unwrap()
     };
 
     let all = report(SimilarityComparisonScope::All);
@@ -264,14 +279,16 @@ fn empty_and_single_candidates_produce_no_pairs() {
             .pairs
             .is_empty()
     );
-    assert!(build_similarity_pairs(
-        candidates("a.lisp", "(foo a)", 2),
-        0.0,
-        SimilarityOverlapPolicy::All,
-        None,
-    )
-    .pairs
-    .is_empty());
+    assert!(
+        build_similarity_pairs(
+            candidates("a.lisp", "(foo a)", 2),
+            0.0,
+            SimilarityOverlapPolicy::All,
+            None,
+        )
+        .pairs
+        .is_empty()
+    );
 }
 
 #[test]
@@ -320,24 +337,52 @@ fn sequential_size_pruning_keeps_later_valid_pairs() {
     let values = candidates("a.lisp", "(foo a b c d e) (foo a) (foo a b c d e)", 2);
     let report = super::reports::build_similarity_pairs(
         values,
-        &options(
+        &report_options(
             0.75,
-            DEFAULT_MIN_NODE_COUNT,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
             SimilarityOverlapPolicy::All,
-            DEFAULT_MAX_CANDIDATES,
+            None,
             Some(usize::MAX),
-            DEFAULT_MAX_RESULTS,
+            None,
         ),
-    );
+    )
+    .unwrap();
 
     assert_eq!(report.summary.possible_pairs, 3);
     assert_eq!(report.summary.pruned_by_size, 2);
     assert_eq!(report.summary.evaluated_pairs, 1);
     assert_eq!(report.pairs.len(), 1);
     assert_eq!(report.pairs[0].similarity, 1.0);
+}
+
+#[test]
+fn cross_file_size_pruning_keeps_later_valid_pairs() {
+    let left_group = [similarity_candidate("a.lisp", 5)];
+    let right_group = [
+        similarity_candidate("b.lisp", 1),
+        similarity_candidate("b.lisp", 5),
+    ];
+    let left_refs: Vec<_> = left_group.iter().collect();
+    let right_refs: Vec<_> = right_group.iter().collect();
+    let mut workspace = crate::domain::form_similarity::TreeSimilarityWorkspace::default();
+    let mut evaluated_pairs = 0;
+
+    let (output, limit_reached) = super::reports::compare_cross_file_group_pair(
+        &left_refs,
+        &right_refs,
+        0.75,
+        None,
+        &mut evaluated_pairs,
+        &mut workspace,
+    );
+
+    assert!(!limit_reached);
+    assert_eq!(output.pruned_by_size, 1);
+    assert_eq!(output.evaluated_pairs, 1);
+    assert_eq!(output.pair_count(), 1);
 }
 
 #[test]
@@ -454,18 +499,19 @@ fn max_results_truncates_only_reported_pairs() {
 fn max_comparisons_stops_ted_evaluation_and_tracks_unprocessed_pairs() {
     let report = super::reports::build_similarity_pairs(
         candidates("a.lisp", "(foo a) (foo b) (foo c)", 2),
-        &options(
+        &report_options(
             0.0,
-            DEFAULT_MIN_NODE_COUNT,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
             SimilarityOverlapPolicy::All,
-            DEFAULT_MAX_CANDIDATES,
+            None,
             Some(1),
-            DEFAULT_MAX_RESULTS,
+            None,
         ),
-    );
+    )
+    .unwrap();
 
     assert_eq!(report.summary.possible_pairs, 3);
     assert_eq!(report.summary.evaluated_pairs, 1);
@@ -485,18 +531,19 @@ fn max_comparisons_stops_ted_evaluation_and_tracks_unprocessed_pairs() {
 fn sufficient_max_comparisons_does_not_report_limit_reached() {
     let report = super::reports::build_similarity_pairs(
         candidates("a.lisp", "(foo a) (foo b) (foo c)", 2),
-        &options(
+        &report_options(
             0.0,
-            DEFAULT_MIN_NODE_COUNT,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
             SimilarityOverlapPolicy::All,
-            DEFAULT_MAX_CANDIDATES,
+            None,
             Some(3),
             Some(1),
         ),
-    );
+    )
+    .unwrap();
 
     assert_eq!(report.summary.evaluated_pairs, 3);
     assert_eq!(report.summary.unprocessed_pairs, 0);
@@ -514,18 +561,19 @@ fn max_comparisons_is_applied_after_size_pruning() {
     );
     let report = super::reports::build_similarity_pairs(
         values,
-        &options(
+        &report_options(
             0.6,
-            DEFAULT_MIN_NODE_COUNT,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
             SimilarityOverlapPolicy::All,
-            DEFAULT_MAX_CANDIDATES,
+            None,
             Some(1),
-            DEFAULT_MAX_RESULTS,
+            None,
         ),
-    );
+    )
+    .unwrap();
 
     assert_eq!(report.summary.possible_pairs, 6);
     assert_eq!(report.summary.evaluated_pairs, 1);
@@ -535,22 +583,46 @@ fn max_comparisons_is_applied_after_size_pruning() {
 }
 
 #[test]
+fn candidate_limit_is_preserved_when_building_the_report() {
+    let report = super::reports::build_similarity_pairs_with_omissions(
+        candidates("a.lisp", "(foo a) (bar b) (baz c)", 2),
+        1,
+        &report_options(
+            1.0,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::TopLevel,
+            SimilarityOverlapPolicy::Maximal,
+            None,
+            None,
+            None,
+        ),
+    )
+    .unwrap();
+
+    assert!(report.summary.candidate_limit_reached);
+    assert_eq!(report.summary.omitted_candidates, 1);
+}
+
+#[test]
 fn different_heads_do_not_share_a_comparison_bucket() {
     let values = candidates("a.lisp", "(foo a b) (bar a b)", 2);
     let report = super::reports::build_similarity_pairs(
         values,
-        &options(
+        &report_options(
             0.0,
-            DEFAULT_MIN_NODE_COUNT,
-            DEFAULT_MIN_LINE_SPAN,
-            DEFAULT_COMPARISON_SCOPE,
-            DEFAULT_FORM_SCOPE,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
             SimilarityOverlapPolicy::All,
-            DEFAULT_MAX_CANDIDATES,
-            DEFAULT_MAX_COMPARISONS,
-            DEFAULT_MAX_RESULTS,
+            None,
+            None,
+            None,
         ),
-    );
+    )
+    .unwrap();
 
     assert_eq!(report.summary.possible_pairs, 0);
     assert_eq!(report.summary.evaluated_pairs, 0);

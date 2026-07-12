@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::{Context, Result};
 
 use crate::application::usecase::replace_forms::ReplaceFormsTarget;
-use crate::domain::form_shape::{duplicate_shape, FormShape};
+use crate::domain::form_shape::duplicate_shape;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 pub(super) fn collect_replace_targets(
@@ -11,12 +11,12 @@ pub(super) fn collect_replace_targets(
     tree: &SyntaxTree,
     paths: &[Path],
 ) -> Result<Vec<ReplaceFormsTarget>> {
-    let mut seen_paths = HashSet::<Path>::new();
+    let mut seen_paths = HashSet::<String>::new();
     let mut targets = Vec::with_capacity(paths.len());
     for path in paths {
         let path_key = path.to_string();
         anyhow::ensure!(
-            seen_paths.insert(path.clone()),
+            seen_paths.insert(path_key.clone()),
             "duplicate --path: {path_key}"
         );
         let selection = tree
@@ -35,13 +35,13 @@ pub(super) fn collect_replace_targets(
     Ok(targets)
 }
 
-pub(super) fn original_shape_for_targets(targets: &[ReplaceFormsTarget]) -> Option<FormShape> {
+pub(super) fn original_shape_for_targets(targets: &[ReplaceFormsTarget]) -> Option<String> {
     targets.first().map(|target| target.shape.clone())
 }
 
 pub(super) fn ensure_same_shape_when_required(
     targets: &[ReplaceFormsTarget],
-    original_shape: Option<&FormShape>,
+    original_shape: Option<&String>,
     require_same_shape: bool,
 ) -> Result<()> {
     if !require_same_shape {

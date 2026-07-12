@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::thread;
 
-use anyhow::{Error, Result, bail};
+use anyhow::{Result, bail};
 
 use crate::application::usecase::similarity_report::{
-    SimilarityCandidate, SimilarityReportOptions, build_similarity_pairs,
+    SimilarityCandidate, SimilarityReportOptions, build_similarity_pairs_with_omissions,
     collect_similarity_candidates,
 };
 use crate::domain::sexpr::SyntaxTree;
@@ -35,8 +35,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         args.max_candidates,
         args.max_comparisons,
         args.max_results,
-    )
-    .map_err(Error::msg)?;
+    )?;
     let output = process_workspace_files(
         discovery.files.clone(),
         args.dialect,
@@ -65,9 +64,11 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         })
         .collect();
 
-    let mut report = build_similarity_pairs(output.candidates, &options);
-    report.summary.candidate_limit_reached = output.omitted_candidates > 0;
-    report.summary.omitted_candidates = output.omitted_candidates;
+    let report = build_similarity_pairs_with_omissions(
+        output.candidates,
+        output.omitted_candidates,
+        &options,
+    )?;
     print_similarity_report(&report, &discovery, &errors, &args)?;
 
     if args.fail_on_duplicates && report.summary.matched_pairs > 0 {

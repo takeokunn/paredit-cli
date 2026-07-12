@@ -3,11 +3,11 @@ mod reports;
 mod types;
 
 pub use collect::collect_similarity_candidates;
-pub use reports::build_similarity_pairs;
+pub use reports::{build_similarity_pairs, build_similarity_pairs_with_omissions};
 pub use types::{
     SimilarityCandidate, SimilarityComparisonScope, SimilarityFormReport, SimilarityFormScope,
     SimilarityOverlapPolicy, SimilarityPairReport, SimilarityReport, SimilarityReportOptions,
-    SimilarityReportSummary,
+    SimilarityReportOptionsError, SimilarityReportSummary,
 };
 
 #[cfg(test)]

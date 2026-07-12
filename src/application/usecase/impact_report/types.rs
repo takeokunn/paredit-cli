@@ -5,9 +5,6 @@ use crate::application::usecase::call_graph_report::CallGraphEdge;
 use crate::application::usecase::signature_report::SignatureCallItem;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
-pub use crate::domain::impact_report::{
-    ImpactReportPolicy, ImpactReportPolicyOptions, ImpactRisk, ImpactRiskLevel,
-};
 use crate::domain::sexpr::{ByteSpan, SyntaxTree};
 
 #[derive(Debug)]
@@ -58,6 +55,23 @@ pub struct ImpactSymbolOccurrenceContext {
     pub definition_like: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ImpactRiskLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl ImpactRiskLevel {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+}
+
 impl From<ImpactRiskLevel> for RefactorRiskLevel {
     fn from(value: ImpactRiskLevel) -> Self {
         match value {
@@ -66,4 +80,39 @@ impl From<ImpactRiskLevel> for RefactorRiskLevel {
             ImpactRiskLevel::Error => Self::Error,
         }
     }
+}
+
+impl From<RefactorRiskLevel> for ImpactRiskLevel {
+    fn from(value: RefactorRiskLevel) -> Self {
+        match value {
+            RefactorRiskLevel::Info => Self::Info,
+            RefactorRiskLevel::Warning => Self::Warning,
+            RefactorRiskLevel::Error => Self::Error,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ImpactRisk {
+    pub level: ImpactRiskLevel,
+    pub code: &'static str,
+    pub message: String,
+    pub count: usize,
+}
+
+#[derive(Debug)]
+pub struct ImpactReportPolicy {
+    pub fail_on_risk_level: Option<ImpactRiskLevel>,
+    pub require_definitions: Option<usize>,
+    pub require_references: Option<usize>,
+    pub require_calls: Option<usize>,
+    pub definition_count: usize,
+    pub reference_count: usize,
+    pub call_count: usize,
+    pub inbound_edge_count: usize,
+    pub non_call_reference_count: usize,
+    pub signature_mismatch_count: usize,
+    pub risk_level: ImpactRiskLevel,
+    pub passed: bool,
+    pub violations: Vec<String>,
 }

@@ -4,12 +4,14 @@ use std::ops::Range;
 use std::path::Path;
 use std::thread;
 
+use crate::domain::form_similarity::{
+    TreeSimilarityWorkspace, similarity_upper_bound, tree_similarity_with_workspace,
+};
+use anyhow::Result;
+
 use super::types::{
     SimilarityCandidate, SimilarityComparisonScope, SimilarityFormReport, SimilarityOverlapPolicy,
     SimilarityPairReport, SimilarityReport, SimilarityReportOptions, SimilarityReportSummary,
-};
-use crate::domain::form_similarity::{
-    similarity_upper_bound, tree_similarity_with_workspace, TreeSimilarityWorkspace,
 };
 
 #[derive(Clone, Copy)]
@@ -18,12 +20,6 @@ struct SimilarityPairCandidate<'a> {
     score: f64,
     left: &'a SimilarityCandidate,
     right: &'a SimilarityCandidate,
-}
-
-enum ComparisonAction {
-    Continue,
-    BreakInner,
-    StopAll,
 }
 
 pub(super) trait PairLike {
@@ -52,46 +48,62 @@ impl PairLike for SimilarityPairReport {
 }
 
 pub fn build_similarity_pairs(
-    mut candidates: Vec<SimilarityCandidate>,
+    candidates: Vec<SimilarityCandidate>,
     options: &SimilarityReportOptions,
-) -> SimilarityReport {
-    let threshold = options.threshold();
-    let comparison_scope = options.comparison_scope();
-    let max_comparisons = options.max_comparisons();
-    if max_comparisons.is_some() {
-        return build_similarity_pairs_sequential(candidates, options);
+) -> Result<SimilarityReport> {
+    build_similarity_pairs_with_omissions(candidates, 0, options)
+}
+
+/// Build the report while recording how many eligible candidates were dropped
+/// upstream (e.g. by `--max-candidates`). Threading the count in here keeps the
+/// summary correct by construction, instead of letting callers patch the
+/// `candidate_limit_reached` / `omitted_candidates` fields after the fact.
+pub fn build_similarity_pairs_with_omissions(
+    mut candidates: Vec<SimilarityCandidate>,
+    omitted_candidates: usize,
+    options: &SimilarityReportOptions,
+) -> Result<SimilarityReport> {
+    options.validate()?;
+    if options.max_comparisons().is_some() {
+        return Ok(build_similarity_pairs_sequential(
+            candidates,
+            omitted_candidates,
+            options,
+        ));
     }
     // 低コストな候補から前に並べると、サイズ差だけで落ちる組を早く打ち切れる。
     candidates.sort_unstable_by(compare_candidates_for_scan);
-    let possible_pairs = scoped_pair_count(&candidates, comparison_scope);
+    let possible_pairs = scoped_pair_count(&candidates, options.comparison_scope());
     let groups: Vec<&[SimilarityCandidate]> = candidates.chunk_by(same_comparison_bucket).collect();
     let comparison_limit_reached = false;
     let mut evaluated_pairs = 0;
     let mut pruned_by_size = 0;
     let mut pairs: Vec<SimilarityPairCandidate<'_>> = Vec::new();
     if groups.is_empty() {
-        return finalize_similarity_pairs(
+        return Ok(finalize_similarity_pairs(
             pairs,
             possible_pairs,
             evaluated_pairs,
             pruned_by_size,
             comparison_limit_reached,
+            omitted_candidates,
             options,
-        );
+        ));
     }
 
     let worker_count = thread::available_parallelism()
         .map(|parallelism| parallelism.get())
         .unwrap_or(1)
         .max(1);
-    let work_items = build_work_items(&groups, comparison_scope, worker_count);
+    let work_items = build_work_items(&groups, options.comparison_scope(), worker_count);
     let worker_items = partition_items_for_workers(work_items, worker_count);
 
     thread::scope(|scope| {
         let mut handles = Vec::new();
         for chunk in worker_items {
-            handles
-                .push(scope.spawn(move || compare_work_items(&chunk, threshold, comparison_scope)));
+            handles.push(scope.spawn(move || {
+                compare_work_items(&chunk, options.threshold(), options.comparison_scope())
+            }));
         }
 
         for handle in handles {
@@ -104,101 +116,157 @@ pub fn build_similarity_pairs(
         }
     });
 
-    finalize_similarity_pairs(
+    Ok(finalize_similarity_pairs(
         pairs,
         possible_pairs,
         evaluated_pairs,
         pruned_by_size,
         comparison_limit_reached,
+        omitted_candidates,
         options,
-    )
+    ))
 }
 
 fn build_similarity_pairs_sequential(
     mut candidates: Vec<SimilarityCandidate>,
+    omitted_candidates: usize,
     options: &SimilarityReportOptions,
 ) -> SimilarityReport {
-    let threshold = options.threshold();
-    let comparison_scope = options.comparison_scope();
-    let max_comparisons = options.max_comparisons();
     candidates.sort_unstable_by(compare_candidates_for_scan);
-    let possible_pairs = scoped_pair_count(&candidates, comparison_scope);
+    let possible_pairs = scoped_pair_count(&candidates, options.comparison_scope());
     let mut comparison_limit_reached = false;
     let mut evaluated_pairs = 0;
     let mut pruned_by_size = 0;
     let mut pairs: Vec<SimilarityPairCandidate<'_>> = Vec::new();
     let mut workspace = TreeSimilarityWorkspace::default();
     'pairs: for group in candidates.chunk_by(same_comparison_bucket) {
-        match comparison_scope {
+        match options.comparison_scope() {
             SimilarityComparisonScope::All => {
                 for left_index in 0..group.len() {
                     for right_index in left_index + 1..group.len() {
-                        match compare_candidate_pair(
-                            &group[left_index],
-                            &group[right_index],
-                            threshold,
-                            max_comparisons,
-                            &mut evaluated_pairs,
-                            &mut pruned_by_size,
-                            &mut comparison_limit_reached,
-                            &mut workspace,
-                            &mut pairs,
+                        let left = &group[left_index];
+                        let right = &group[right_index];
+                        if size_bound_excludes(
+                            left.form.node_count,
+                            right.form.node_count,
+                            options.threshold(),
                         ) {
-                            ComparisonAction::Continue => {}
-                            ComparisonAction::BreakInner => break,
-                            ComparisonAction::StopAll => break 'pairs,
+                            pruned_by_size += 1;
+                            if options.max_comparisons().is_none() {
+                                break;
+                            }
+                            continue;
+                        }
+                        if options
+                            .max_comparisons()
+                            .is_some_and(|limit| evaluated_pairs == limit)
+                        {
+                            comparison_limit_reached = true;
+                            break 'pairs;
+                        }
+                        evaluated_pairs += 1;
+                        if similarity_upper_bound(&left.tree, &right.tree) < options.threshold() {
+                            continue;
+                        }
+                        let similarity =
+                            tree_similarity_with_workspace(&left.tree, &right.tree, &mut workspace);
+                        if similarity >= options.threshold() {
+                            let average_node_count =
+                                (left.form.node_count + right.form.node_count) as f64 / 2.0;
+                            pairs.push(SimilarityPairCandidate {
+                                similarity,
+                                score: similarity * average_node_count,
+                                left,
+                                right,
+                            });
                         }
                     }
                 }
             }
             SimilarityComparisonScope::SameFile => {
-                for same_file_group in group_candidates_by_path(group).into_values() {
+                let mut same_file_groups: HashMap<&Path, Vec<&SimilarityCandidate>> =
+                    HashMap::with_capacity(group.len());
+                for candidate in group {
+                    same_file_groups
+                        .entry(candidate.form.path.as_path())
+                        .or_default()
+                        .push(candidate);
+                }
+
+                for same_file_group in same_file_groups.values() {
                     for left_index in 0..same_file_group.len() {
                         for right_index in left_index + 1..same_file_group.len() {
-                            match compare_candidate_pair(
-                                same_file_group[left_index],
-                                same_file_group[right_index],
-                                threshold,
-                                max_comparisons,
-                                &mut evaluated_pairs,
-                                &mut pruned_by_size,
-                                &mut comparison_limit_reached,
-                                &mut workspace,
-                                &mut pairs,
+                            let left = same_file_group[left_index];
+                            let right = same_file_group[right_index];
+                            if size_bound_excludes(
+                                left.form.node_count,
+                                right.form.node_count,
+                                options.threshold(),
                             ) {
-                                ComparisonAction::Continue => {}
-                                ComparisonAction::BreakInner => break,
-                                ComparisonAction::StopAll => break 'pairs,
+                                pruned_by_size += 1;
+                                if options.max_comparisons().is_none() {
+                                    break;
+                                }
+                                continue;
+                            }
+                            if options
+                                .max_comparisons()
+                                .is_some_and(|limit| evaluated_pairs == limit)
+                            {
+                                comparison_limit_reached = true;
+                                break 'pairs;
+                            }
+                            evaluated_pairs += 1;
+                            if similarity_upper_bound(&left.tree, &right.tree) < options.threshold()
+                            {
+                                continue;
+                            }
+                            let similarity = tree_similarity_with_workspace(
+                                &left.tree,
+                                &right.tree,
+                                &mut workspace,
+                            );
+                            if similarity >= options.threshold() {
+                                let average_node_count =
+                                    (left.form.node_count + right.form.node_count) as f64 / 2.0;
+                                pairs.push(SimilarityPairCandidate {
+                                    similarity,
+                                    score: similarity * average_node_count,
+                                    left,
+                                    right,
+                                });
                             }
                         }
                     }
                 }
             }
             SimilarityComparisonScope::CrossFile => {
-                let cross_file_groups: Vec<_> =
-                    group_candidates_by_path(group).into_values().collect();
-                for left_group_index in 0..cross_file_groups.len() {
+                let mut cross_file_groups: HashMap<&Path, Vec<&SimilarityCandidate>> =
+                    HashMap::with_capacity(group.len());
+                for candidate in group {
+                    cross_file_groups
+                        .entry(candidate.form.path.as_path())
+                        .or_default()
+                        .push(candidate);
+                }
+
+                let cross_file_groups: Vec<_> = cross_file_groups.into_values().collect();
+                'cross_file_groups: for left_group_index in 0..cross_file_groups.len() {
                     for right_group_index in left_group_index + 1..cross_file_groups.len() {
-                        let left_group = &cross_file_groups[left_group_index];
-                        let right_group = &cross_file_groups[right_group_index];
-                        for left in left_group {
-                            for right in right_group {
-                                match compare_candidate_pair(
-                                    left,
-                                    right,
-                                    threshold,
-                                    max_comparisons,
-                                    &mut evaluated_pairs,
-                                    &mut pruned_by_size,
-                                    &mut comparison_limit_reached,
-                                    &mut workspace,
-                                    &mut pairs,
-                                ) {
-                                    ComparisonAction::Continue => {}
-                                    ComparisonAction::BreakInner => break,
-                                    ComparisonAction::StopAll => break 'pairs,
-                                }
-                            }
+                        let (output, limit_reached) = compare_cross_file_group_pair(
+                            cross_file_groups[left_group_index].as_slice(),
+                            cross_file_groups[right_group_index].as_slice(),
+                            options.threshold(),
+                            options.max_comparisons(),
+                            &mut evaluated_pairs,
+                            &mut workspace,
+                        );
+                        pruned_by_size += output.pruned_by_size;
+                        evaluated_pairs += output.evaluated_pairs;
+                        pairs.extend(output.pairs);
+                        if limit_reached {
+                            comparison_limit_reached = true;
+                            break 'cross_file_groups;
                         }
                     }
                 }
@@ -212,51 +280,9 @@ fn build_similarity_pairs_sequential(
         evaluated_pairs,
         pruned_by_size,
         comparison_limit_reached,
+        omitted_candidates,
         options,
     )
-}
-
-fn compare_candidate_pair<'a>(
-    left: &'a SimilarityCandidate,
-    right: &'a SimilarityCandidate,
-    threshold: f64,
-    max_comparisons: Option<usize>,
-    evaluated_pairs: &mut usize,
-    pruned_by_size: &mut usize,
-    comparison_limit_reached: &mut bool,
-    workspace: &mut TreeSimilarityWorkspace,
-    pairs: &mut Vec<SimilarityPairCandidate<'a>>,
-) -> ComparisonAction {
-    if size_bound_excludes(left.form.node_count, right.form.node_count, threshold) {
-        *pruned_by_size += 1;
-        return if max_comparisons.is_none() {
-            ComparisonAction::BreakInner
-        } else {
-            ComparisonAction::Continue
-        };
-    }
-    if max_comparisons.is_some_and(|limit| *evaluated_pairs == limit) {
-        *comparison_limit_reached = true;
-        return ComparisonAction::StopAll;
-    }
-
-    *evaluated_pairs += 1;
-    if similarity_upper_bound(&left.tree, &right.tree) < threshold {
-        return ComparisonAction::Continue;
-    }
-
-    let similarity = tree_similarity_with_workspace(&left.tree, &right.tree, workspace);
-    if similarity >= threshold {
-        let average_node_count = (left.form.node_count + right.form.node_count) as f64 / 2.0;
-        pairs.push(SimilarityPairCandidate {
-            similarity,
-            score: similarity * average_node_count,
-            left,
-            right,
-        });
-    }
-
-    ComparisonAction::Continue
 }
 
 fn finalize_similarity_pairs(
@@ -265,18 +291,19 @@ fn finalize_similarity_pairs(
     evaluated_pairs: usize,
     pruned_by_size: usize,
     comparison_limit_reached: bool,
+    omitted_candidates: usize,
     options: &SimilarityReportOptions,
 ) -> SimilarityReport {
     let unprocessed_pairs = possible_pairs - evaluated_pairs - pruned_by_size;
     let matched_pairs = pairs.len();
-    let overlap_policy = options.overlap_policy();
-    let max_results = options.max_results();
-    let suppressed_pairs = match overlap_policy {
+    let suppressed_pairs = match options.overlap_policy() {
         SimilarityOverlapPolicy::All => 0,
         SimilarityOverlapPolicy::Maximal => suppress_contained_pairs(&mut pairs),
     };
-    let truncated = max_results.is_some_and(|limit| pairs.len() > limit);
-    if let Some(limit) = max_results {
+    let truncated = options
+        .max_results()
+        .is_some_and(|limit| pairs.len() > limit);
+    if let Some(limit) = options.max_results() {
         if limit == 0 {
             pairs.clear();
         } else if pairs.len() > limit {
@@ -295,8 +322,8 @@ fn finalize_similarity_pairs(
 
     SimilarityReport {
         summary: SimilarityReportSummary {
-            candidate_limit_reached: false,
-            omitted_candidates: 0,
+            candidate_limit_reached: omitted_candidates > 0,
+            omitted_candidates,
             possible_pairs,
             evaluated_pairs,
             pruned_by_size,
@@ -421,19 +448,6 @@ fn estimated_group_cost(group: &[SimilarityCandidate], scope: SimilarityComparis
     }
 }
 
-fn group_candidates_by_path<'a>(
-    group: &'a [SimilarityCandidate],
-) -> HashMap<&'a Path, Vec<&'a SimilarityCandidate>> {
-    let mut groups: HashMap<&Path, Vec<&SimilarityCandidate>> = HashMap::with_capacity(group.len());
-    for candidate in group {
-        groups
-            .entry(candidate.form.path.as_path())
-            .or_default()
-            .push(candidate);
-    }
-    groups
-}
-
 fn scoped_pair_count(
     candidates: &[SimilarityCandidate],
     scope: SimilarityComparisonScope,
@@ -458,10 +472,17 @@ fn pair_count(count: usize) -> usize {
     count.saturating_sub(1) * count / 2
 }
 
-struct GroupComparisonOutput<'a> {
+pub(crate) struct GroupComparisonOutput<'a> {
     pairs: Vec<SimilarityPairCandidate<'a>>,
-    evaluated_pairs: usize,
-    pruned_by_size: usize,
+    pub(crate) evaluated_pairs: usize,
+    pub(crate) pruned_by_size: usize,
+}
+
+impl<'a> GroupComparisonOutput<'a> {
+    #[cfg(test)]
+    pub(crate) fn pair_count(&self) -> usize {
+        self.pairs.len()
+    }
 }
 
 fn compare_work_items<'a>(
@@ -619,39 +640,74 @@ fn compare_group_cross_file<'a>(
     }
 
     let cross_file_groups: Vec<_> = cross_file_groups.into_values().collect();
-    for left_group_index in 0..cross_file_groups.len() {
+    'cross_file_groups: for left_group_index in 0..cross_file_groups.len() {
         for right_group_index in left_group_index + 1..cross_file_groups.len() {
-            let left_group = &cross_file_groups[left_group_index];
-            let right_group = &cross_file_groups[right_group_index];
-            for left in left_group {
-                for right in right_group {
-                    if size_bound_excludes(left.form.node_count, right.form.node_count, threshold) {
-                        output.pruned_by_size += 1;
-                        break;
-                    }
-
-                    output.evaluated_pairs += 1;
-                    if similarity_upper_bound(&left.tree, &right.tree) < threshold {
-                        continue;
-                    }
-                    let similarity =
-                        tree_similarity_with_workspace(&left.tree, &right.tree, workspace);
-                    if similarity >= threshold {
-                        let average_node_count =
-                            (left.form.node_count + right.form.node_count) as f64 / 2.0;
-                        output.pairs.push(SimilarityPairCandidate {
-                            similarity,
-                            score: similarity * average_node_count,
-                            left,
-                            right,
-                        });
-                    }
-                }
+            let mut _pair_evaluated_pairs = 0;
+            let (pair_output, limit_reached) = compare_cross_file_group_pair(
+                cross_file_groups[left_group_index].as_slice(),
+                cross_file_groups[right_group_index].as_slice(),
+                threshold,
+                None,
+                &mut _pair_evaluated_pairs,
+                workspace,
+            );
+            output.evaluated_pairs += pair_output.evaluated_pairs;
+            output.pruned_by_size += pair_output.pruned_by_size;
+            output.pairs.extend(pair_output.pairs);
+            if limit_reached {
+                break 'cross_file_groups;
             }
         }
     }
 
     output
+}
+
+pub(super) fn compare_cross_file_group_pair<'a>(
+    left_group: &[&'a SimilarityCandidate],
+    right_group: &[&'a SimilarityCandidate],
+    threshold: f64,
+    max_comparisons: Option<usize>,
+    evaluated_pairs: &mut usize,
+    workspace: &mut TreeSimilarityWorkspace,
+) -> (GroupComparisonOutput<'a>, bool) {
+    let mut output = GroupComparisonOutput {
+        pairs: Vec::new(),
+        evaluated_pairs: 0,
+        pruned_by_size: 0,
+    };
+
+    for left in left_group {
+        for right in right_group {
+            if size_bound_excludes(left.form.node_count, right.form.node_count, threshold) {
+                output.pruned_by_size += 1;
+                continue;
+            }
+
+            if max_comparisons.is_some_and(|limit| *evaluated_pairs == limit) {
+                return (output, true);
+            }
+
+            *evaluated_pairs += 1;
+            output.evaluated_pairs += 1;
+            if similarity_upper_bound(&left.tree, &right.tree) < threshold {
+                continue;
+            }
+            let similarity = tree_similarity_with_workspace(&left.tree, &right.tree, workspace);
+            if similarity >= threshold {
+                let average_node_count =
+                    (left.form.node_count + right.form.node_count) as f64 / 2.0;
+                output.pairs.push(SimilarityPairCandidate {
+                    similarity,
+                    score: similarity * average_node_count,
+                    left,
+                    right,
+                });
+            }
+        }
+    }
+
+    (output, false)
 }
 
 fn same_comparison_bucket(left: &SimilarityCandidate, right: &SimilarityCandidate) -> bool {

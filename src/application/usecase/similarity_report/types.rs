@@ -2,17 +2,19 @@ use std::path::PathBuf;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::form_similarity::StructuralTree;
+use crate::domain::sexpr::ByteSpan;
+
+#[allow(unused_imports)]
 pub use crate::domain::similarity_report::{
     SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
-    SimilarityReportOptions,
+    SimilarityReportOptions, SimilarityReportOptionsError,
 };
-use crate::domain::sexpr::{ByteSpan, Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityFormReport {
     pub path: PathBuf,
     pub dialect: Dialect,
-    pub form_path: Path,
+    pub form_path: String,
     pub span: ByteSpan,
     pub node_count: usize,
     pub head: Option<String>,
@@ -33,7 +35,6 @@ pub struct SimilarityPairReport {
     pub left: SimilarityFormReport,
     pub right: SimilarityFormReport,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityReportSummary {

@@ -25,14 +25,14 @@ mod types;
 use definitions::{collect_impact_definitions, impact_definition_matches_signature};
 use references::{count_non_call_references, matching_symbol_occurrences};
 
+pub use crate::domain::report_policy::ImpactReportPolicyOptions;
 pub use policy::evaluate_impact_report_policy;
 pub use summary::{
     impact_risks, impact_status_counts, raw_refactor_risks, summarize_impact_reports,
 };
 pub use types::{
-    ImpactDefinitionItem, ImpactReportFile, ImpactReportPolicy, ImpactReportPolicyOptions,
-    ImpactReportSource, ImpactRisk, ImpactRiskLevel, ImpactSymbolOccurrence,
-    ImpactSymbolOccurrenceContext,
+    ImpactDefinitionItem, ImpactReportFile, ImpactReportPolicy, ImpactReportSource, ImpactRisk,
+    ImpactRiskLevel, ImpactSymbolOccurrence, ImpactSymbolOccurrenceContext,
 };
 
 pub fn build_impact_reports(

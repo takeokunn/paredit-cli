@@ -1,6 +1,7 @@
 use crate::application::refactor::plan::RefactorPlanSummary;
+use crate::domain::report_policy::ImpactReportPolicyOptions;
 
-use super::types::{ImpactReportPolicy, ImpactReportPolicyOptions, ImpactRiskLevel};
+use super::types::{ImpactReportPolicy, ImpactRiskLevel};
 
 pub fn evaluate_impact_report_policy(
     options: ImpactReportPolicyOptions,
@@ -9,8 +10,8 @@ pub fn evaluate_impact_report_policy(
 ) -> ImpactReportPolicy {
     let mut violations = Vec::new();
 
-    if let Some(threshold) = options.fail_on_risk_level() {
-        if risk_level >= threshold {
+    if let Some(threshold) = options.fail_on_risk_level {
+        if risk_level >= threshold.into() {
             violations.push(format!(
                 "--fail-on-risk-level {} failed with {} risk",
                 threshold.label(),
@@ -18,7 +19,7 @@ pub fn evaluate_impact_report_policy(
             ));
         }
     }
-    if let Some(required) = options.require_definitions() {
+    if let Some(required) = options.require_definitions {
         if summary.definition_count < required {
             violations.push(format!(
                 "--require-definitions expected at least {required}, found {}",
@@ -26,7 +27,7 @@ pub fn evaluate_impact_report_policy(
             ));
         }
     }
-    if let Some(required) = options.require_references() {
+    if let Some(required) = options.require_references {
         if summary.reference_count < required {
             violations.push(format!(
                 "--require-references expected at least {required}, found {}",
@@ -34,7 +35,7 @@ pub fn evaluate_impact_report_policy(
             ));
         }
     }
-    if let Some(required) = options.require_calls() {
+    if let Some(required) = options.require_calls {
         if summary.call_count < required {
             violations.push(format!(
                 "--require-calls expected at least {required}, found {}",
@@ -44,10 +45,10 @@ pub fn evaluate_impact_report_policy(
     }
 
     ImpactReportPolicy {
-        fail_on_risk_level: options.fail_on_risk_level(),
-        require_definitions: options.require_definitions(),
-        require_references: options.require_references(),
-        require_calls: options.require_calls(),
+        fail_on_risk_level: options.fail_on_risk_level.map(Into::into),
+        require_definitions: options.require_definitions,
+        require_references: options.require_references,
+        require_calls: options.require_calls,
         definition_count: summary.definition_count,
         reference_count: summary.reference_count,
         call_count: summary.call_count,
