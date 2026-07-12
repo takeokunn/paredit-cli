@@ -74,6 +74,8 @@ Mutating commands also accept:
 | `wrap` | Wrap the selected S-expression in a new list. |
 | `splice` | Remove one list pair while keeping its children. |
 | `raise` | Replace the selected expression's parent list with the selection. |
+| `transpose-forward` | Exchange the selected expression with its next sibling while keeping trivia in place. |
+| `transpose-backward` | Exchange the selected expression with its previous sibling while keeping trivia in place. |
 | `slurp-forward` | Pull the next sibling into the selected list. |
 | `slurp-backward` | Pull the previous sibling into the selected list. |
 | `barf-forward` | Push the last child out of the selected list. |
@@ -155,9 +157,20 @@ plan/preview/verify/apply lifecycle.
 | `unwrap-call` | Replace one selected wrapper call with one selected argument. |
 | `thread-expression` | Convert a nested call chain into a thread-first or thread-last pipeline. |
 | `unthread-expression` | Convert a threading pipeline back into nested calls. |
-| `extract-function` | Extract the selected expression into a zero-argument top-level function. |
+| `extract-function` | Extract the selected expression into a top-level function with inferred parameters. |
+| `extract-local-function` | Extract the selected expression into a Common Lisp `flet` or `labels` binding. |
 | `extract-constant` | Extract the selected expression into a top-level constant. |
 | `inline-function` | Inline one selected function call using a selected function definition. |
+| `inline-lambda` | Replace a safe, immediately invoked Common Lisp lambda with a parallel `let`. |
+| `inline-local-function` | Inline the sole direct call in a safe, single-binding Common Lisp `flet` form. |
+| `inline-symbol-macro` | Expand a conservative single-binding Common Lisp `symbol-macrolet` form. |
+| `inline-literal-constant` | Inline an immutable self-evaluating Common Lisp `defconstant` value. |
+| `convert-labels-to-flet` | Convert a non-recursive Common Lisp `labels` form into `flet`. |
+| `convert-flet-to-labels` | Convert a Common Lisp `flet` form into `labels` when definition references cannot be captured. |
+| `rename-block` | Rename a selected Common Lisp `block` and matching `return-from` references. |
+| `rename-tag` | Rename one tag in a selected Common Lisp `tagbody` and matching `go` references. |
+| `remove-unused-block` | Remove a selected Common Lisp `block` with no matching `return-from`. |
+| `remove-unused-tag` | Remove an unreferenced tag from a selected Common Lisp `tagbody`. |
 
 ### Parameters and bindings
 
@@ -170,4 +183,21 @@ plan/preview/verify/apply lifecycle.
 | `remove-function-parameter` | Remove one positional parameter from a function and its call sites. |
 | `introduce-let` | Replace the selected expression with a local binding in the enclosing list. |
 | `inline-let` | Inline a single local let binding into its body. |
+| `convert-let-to-let-star` | Convert a Common Lisp or Emacs Lisp `let` to `let*` when later initializers do not reference earlier bindings. |
+| `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. |
+| `convert-do-star-to-do` | Convert a Common Lisp `do*` to `do` when later initializers and step expressions do not reference earlier bindings. |
+| `convert-prog-star-to-prog` | Convert a Common Lisp `prog*` to `prog` when later initializers do not reference earlier bindings. |
+| `merge-nested-let-star` | Merge a directly nested Common Lisp or Emacs Lisp `let*` into one sequential binding form. |
+| `split-let-star` | Split a Common Lisp or Emacs Lisp `let*` into nested sequential binding forms at `--binding-index`. |
+| `merge-nested-let` | Merge directly nested Common Lisp or Emacs Lisp parallel `let` forms when inner initializers are independent. |
+| `merge-nested-flet` | Merge directly nested Common Lisp `flet` forms when inner definitions do not reference outer local functions. |
+| `split-let` | Split a Common Lisp or Emacs Lisp parallel `let` at `--binding-index` without capturing initializer references. |
+| `eliminate-empty-binding-form` | Remove an empty Common Lisp or Emacs Lisp `let` or `let*` from a known expression position. |
+| `flatten-progn` | Flatten directly nested Common Lisp or Emacs Lisp `progn` forms in a safe expression context. |
+| `convert-if-to-cond` | Convert a Common Lisp or Emacs Lisp `(if test then [else])` form to `cond`. |
+| `convert-cond-to-if` | Convert simple Common Lisp or Emacs Lisp `cond` clauses to nested `if` forms. |
+| `convert-when-to-if` | Convert a Common Lisp or Emacs Lisp `when` form to `if`. |
+| `convert-unless-to-if` | Convert a Common Lisp or Emacs Lisp `unless` form to `if`. |
+| `convert-if-to-when` | Convert a Common Lisp or Emacs Lisp `if` without a meaningful else to `when`. |
+| `convert-if-to-unless` | Convert a Common Lisp or Emacs Lisp `if` with a literal `nil` then branch to `unless`. |
 | `remove-unused-binding` | Plan or remove one unused local let binding. |

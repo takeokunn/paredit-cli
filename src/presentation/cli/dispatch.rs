@@ -53,6 +53,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::EditCommand::Wrap(args) => basic_edit::workflow::wrap(args)?,
             command::EditCommand::Splice(args) => basic_edit::workflow::splice(args)?,
             command::EditCommand::Raise(args) => basic_edit::workflow::raise(args)?,
+            command::EditCommand::TransposeForward(args) => {
+                basic_edit::workflow::transpose_forward(args)?
+            }
+            command::EditCommand::TransposeBackward(args) => {
+                basic_edit::workflow::transpose_backward(args)?
+            }
             command::EditCommand::SlurpForward(args) => basic_edit::workflow::slurp_forward(args)?,
             command::EditCommand::SlurpBackward(args) => {
                 basic_edit::workflow::slurp_backward(args)?
@@ -120,6 +126,14 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::RenameBinding(args) => {
                 rename::rename_binding::rename_binding(args)?
             }
+            command::RefactorCommand::RenameBlock(args) => rename_control::rename_block(args)?,
+            command::RefactorCommand::RenameTag(args) => rename_control::rename_tag(args)?,
+            command::RefactorCommand::RemoveUnusedBlock(args) => {
+                remove_unused_control::remove_unused_block(args)?
+            }
+            command::RefactorCommand::RemoveUnusedTag(args) => {
+                remove_unused_control::remove_unused_tag(args)?
+            }
             command::RefactorCommand::RenameSymbols(args) => {
                 rename::rename_symbols::rename_symbols(args)?
             }
@@ -154,11 +168,24 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::ExtractFunction(args) => {
                 extract_function::extract_function(args)?
             }
+            command::RefactorCommand::ExtractLocalFunction(args) => {
+                extract_local_function::extract_local_function(args)?
+            }
             command::RefactorCommand::ExtractConstant(args) => {
                 extract_constant::extract_constant(args)?
             }
             command::RefactorCommand::InlineFunction(args) => {
                 inline_function::inline_function(args)?
+            }
+            command::RefactorCommand::InlineLambda(args) => inline_lambda::inline_lambda(args)?,
+            command::RefactorCommand::InlineLocalFunction(args) => {
+                inline_local_function::inline_local_function(args)?
+            }
+            command::RefactorCommand::InlineSymbolMacro(args) => {
+                inline_symbol_macro::inline_symbol_macro(args)?
+            }
+            command::RefactorCommand::InlineLiteralConstant(args) => {
+                inline_literal_constant::inline_literal_constant(args)?
             }
             command::RefactorCommand::AddFunctionParameter(args) => {
                 function_parameter::add::add_function_parameter(args)?
@@ -177,6 +204,57 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::IntroduceLet(args) => introduce_let::introduce_let(args)?,
             command::RefactorCommand::InlineLet(args) => inline_let::inline_let(args)?,
+            command::RefactorCommand::ConvertLetToLetStar(args) => {
+                convert_let_to_let_star::convert_let_to_let_star(args)?
+            }
+            command::RefactorCommand::ConvertLetStarToLet(args) => {
+                convert_let_star_to_let::convert_let_star_to_let(args)?
+            }
+            command::RefactorCommand::ConvertDoStarToDo(args) => {
+                convert_sequential_binding::convert_do_star_to_do(args)?
+            }
+            command::RefactorCommand::ConvertProgStarToProg(args) => {
+                convert_sequential_binding::convert_prog_star_to_prog(args)?
+            }
+            command::RefactorCommand::MergeNestedLetStar(args) => {
+                merge_nested_let_star::merge_nested_let_star(args)?
+            }
+            command::RefactorCommand::MergeNestedLet(args) => {
+                merge_nested_let::merge_nested_let(args)?
+            }
+            command::RefactorCommand::MergeNestedFlet(args) => {
+                merge_nested_flet::merge_nested_flet(args)?
+            }
+            command::RefactorCommand::SplitLetStar(args) => split_let_star::split_let_star(args)?,
+            command::RefactorCommand::SplitLet(args) => split_let::split_let(args)?,
+            command::RefactorCommand::EliminateEmptyBindingForm(args) => {
+                eliminate_empty_binding_form::eliminate_empty_binding_form(args)?
+            }
+            command::RefactorCommand::FlattenProgn(args) => flatten_progn::flatten_progn(args)?,
+            command::RefactorCommand::ConvertIfToCond(args) => {
+                convert_if_to_cond::convert_if_to_cond(args)?
+            }
+            command::RefactorCommand::ConvertCondToIf(args) => {
+                convert_cond_to_if::convert_cond_to_if(args)?
+            }
+            command::RefactorCommand::ConvertWhenToIf(args) => {
+                convert_when_to_if::convert_when_to_if(args)?
+            }
+            command::RefactorCommand::ConvertUnlessToIf(args) => {
+                convert_unless_to_if::convert_unless_to_if(args)?
+            }
+            command::RefactorCommand::ConvertIfToWhen(args) => {
+                convert_if_to_when::convert_if_to_when(args)?
+            }
+            command::RefactorCommand::ConvertIfToUnless(args) => {
+                convert_if_to_unless::convert_if_to_unless(args)?
+            }
+            command::RefactorCommand::ConvertLabelsToFlet(args) => {
+                convert_labels_to_flet::convert_labels_to_flet(args)?
+            }
+            command::RefactorCommand::ConvertFletToLabels(args) => {
+                convert_flet_to_labels::convert_flet_to_labels(args)?
+            }
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?
             }

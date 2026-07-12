@@ -1,7 +1,7 @@
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SymbolName;
 
-pub(super) fn extracted_call(name: &SymbolName, params: &[String]) -> String {
+pub(crate) fn extracted_call(name: &SymbolName, params: &[String]) -> String {
     if params.is_empty() {
         format!("({})", name.as_str())
     } else {

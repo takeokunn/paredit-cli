@@ -21,6 +21,22 @@ mod call_report;
 mod capabilities_contract;
 #[path = "cli/completions_contract.rs"]
 mod completions_contract;
+#[path = "cli/conditional_conversion.rs"]
+mod conditional_conversion;
+#[path = "cli/convert_cond_to_if.rs"]
+mod convert_cond_to_if;
+#[path = "cli/convert_flet_to_labels.rs"]
+mod convert_flet_to_labels;
+#[path = "cli/convert_if_to_cond.rs"]
+mod convert_if_to_cond;
+#[path = "cli/convert_labels_to_flet.rs"]
+mod convert_labels_to_flet;
+#[path = "cli/convert_let_star_to_let.rs"]
+mod convert_let_star_to_let;
+#[path = "cli/convert_let_to_let_star.rs"]
+mod convert_let_to_let_star;
+#[path = "cli/convert_sequential_binding.rs"]
+mod convert_sequential_binding;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
 #[path = "cli/definition_movement.rs"]
@@ -33,10 +49,18 @@ mod definition_report;
 mod dependency_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
+#[path = "cli/edit_transpose.rs"]
+mod edit_transpose;
+#[path = "cli/eliminate_empty_binding_form.rs"]
+mod eliminate_empty_binding_form;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
 mod extract_function;
+#[path = "cli/extract_local_function/mod.rs"]
+mod extract_local_function;
+#[path = "cli/flatten_progn.rs"]
+mod flatten_progn;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]
@@ -49,8 +73,22 @@ mod help_contract;
 mod impact_report;
 #[path = "cli/inline_function/mod.rs"]
 mod inline_function;
+#[path = "cli/inline_lambda.rs"]
+mod inline_lambda;
+#[path = "cli/inline_literal_constant.rs"]
+mod inline_literal_constant;
+#[path = "cli/inline_local_function.rs"]
+mod inline_local_function;
+#[path = "cli/inline_symbol_macro.rs"]
+mod inline_symbol_macro;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/merge_nested_flet.rs"]
+mod merge_nested_flet;
+#[path = "cli/merge_nested_let_star.rs"]
+mod merge_nested_let_star;
+#[path = "cli/merge_split_let.rs"]
+mod merge_split_let;
 #[path = "cli/package/mod.rs"]
 mod package;
 #[path = "cli/package_archive_contract.rs"]
@@ -85,10 +123,14 @@ mod refactor_preview;
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding/mod.rs"]
 mod remove_unused_binding;
+#[path = "cli/remove_unused_control.rs"]
+mod remove_unused_control;
 #[path = "cli/rename/mod.rs"]
 mod rename;
 #[path = "cli/rename_at/mod.rs"]
 mod rename_at;
+#[path = "cli/rename_control.rs"]
+mod rename_control;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
 #[path = "cli/signature_report.rs"]
@@ -101,6 +143,8 @@ mod skill_contract;
 mod sort_definitions;
 #[path = "cli/split_file.rs"]
 mod split_file;
+#[path = "cli/split_let_star.rs"]
+mod split_let_star;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
 #[path = "cli/thread_expression/mod.rs"]

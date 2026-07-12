@@ -47,6 +47,34 @@ impl Edit {
         Ok(replace_span(input, parent.span, selection.text(input)))
     }
 
+    pub fn transpose_forward(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+    ) -> Result<String> {
+        let sibling = next_sibling(tree, selection.node_id)
+            .ok_or_else(|| anyhow!("selected expression has no next sibling to transpose"))?;
+        Ok(swap_node_text(
+            input,
+            selection.node().span,
+            tree.node(sibling).span,
+        ))
+    }
+
+    pub fn transpose_backward(
+        input: &str,
+        tree: &SyntaxTree,
+        selection: Selection<'_>,
+    ) -> Result<String> {
+        let sibling = previous_sibling(tree, selection.node_id)
+            .ok_or_else(|| anyhow!("selected expression has no previous sibling to transpose"))?;
+        Ok(swap_node_text(
+            input,
+            tree.node(sibling).span,
+            selection.node().span,
+        ))
+    }
+
     pub fn slurp_forward(
         input: &str,
         tree: &SyntaxTree,
@@ -174,6 +202,17 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output.push_str(&input[..span.start().get()]);
     output.push_str(replacement);
     output.push_str(&input[span.end().get()..]);
+    output
+}
+
+fn swap_node_text(input: &str, left: ByteSpan, right: ByteSpan) -> String {
+    let mut output = String::with_capacity(input.len());
+    output.push_str(&input[..left.start().get()]);
+    output.push_str(right.slice(input));
+    // Trivia belongs to its structural slot, not to either expression.
+    output.push_str(&input[left.end().get()..right.start().get()]);
+    output.push_str(left.slice(input));
+    output.push_str(&input[right.end().get()..]);
     output
 }
 

@@ -1,11 +1,17 @@
 use super::{
     args::{AnalyzeArgs, EditTargetArgs, FormatArgs, ReplaceArgs, TargetArgs},
-    call_graph_report, call_report, capabilities, definition_movement, definition_removal,
-    definition_report, dependency_report, duplicate_report, extract_constant, extract_function,
-    form_report, function_parameter, impact_report, inline_function, inline_let, introduce_let,
-    let_report, package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
-    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
-    workspace_report,
+    call_graph_report, call_report, capabilities, convert_cond_to_if, convert_flet_to_labels,
+    convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
+    convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
+    convert_unless_to_if, convert_when_to_if, definition_movement, definition_removal,
+    definition_report, dependency_report, duplicate_report, eliminate_empty_binding_form,
+    extract_constant, extract_function, extract_local_function, flatten_progn, form_report,
+    function_parameter, impact_report, inline_function, inline_lambda, inline_let,
+    inline_literal_constant, inline_local_function, inline_symbol_macro, introduce_let, let_report,
+    merge_nested_flet, merge_nested_let, merge_nested_let_star, package, refactor,
+    remove_unused_binding, remove_unused_control, rename, rename_control, replace_forms,
+    signature_report, similarity_report, split_let, split_let_star, symbol_report,
+    thread_expression, unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
 
@@ -81,6 +87,10 @@ pub(super) enum EditCommand {
     Splice(EditTargetArgs),
     /// Replace the selected expression's parent list with the selected expression.
     Raise(EditTargetArgs),
+    /// Exchange the selected expression with its next sibling.
+    TransposeForward(EditTargetArgs),
+    /// Exchange the selected expression with its previous sibling.
+    TransposeBackward(EditTargetArgs),
     /// Pull the next sibling into the selected list.
     SlurpForward(EditTargetArgs),
     /// Pull the previous sibling into the selected list.
@@ -151,6 +161,14 @@ pub(super) enum RefactorCommand {
     RenameInForm(rename::args::RenameInFormArgs),
     /// Rename one local binding and only the references in its lexical scope.
     RenameBinding(rename::args::RenameBindingArgs),
+    /// Rename a selected Common Lisp block and matching return-from references.
+    RenameBlock(rename_control::RenameBlockArgs),
+    /// Rename one tag in a selected Common Lisp tagbody and matching go references.
+    RenameTag(rename_control::RenameTagArgs),
+    /// Remove a selected Common Lisp block with no matching return-from.
+    RemoveUnusedBlock(remove_unused_control::RemoveUnusedBlockArgs),
+    /// Remove an unreferenced tag from a selected Common Lisp tagbody.
+    RemoveUnusedTag(remove_unused_control::RemoveUnusedTagArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(rename::args::RenameSymbolsArgs),
     /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files, including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names, and definition forms such as define-method-combination.
@@ -173,12 +191,22 @@ pub(super) enum RefactorCommand {
     ThreadExpression(thread_expression::ThreadExpressionArgs),
     /// Convert a selected thread-first or thread-last pipeline into nested calls.
     UnthreadExpression(unthread_expression::UnthreadExpressionArgs),
-    /// Extract the selected expression into a zero-argument top-level function.
+    /// Extract the selected expression into a top-level function with inferred parameters.
     ExtractFunction(extract_function::ExtractFunctionArgs),
+    /// Extract the selected expression into a local flet or labels function.
+    ExtractLocalFunction(extract_local_function::ExtractLocalFunctionArgs),
     /// Extract the selected expression into a top-level constant.
     ExtractConstant(extract_constant::ExtractConstantArgs),
     /// Inline one selected function call using a selected function definition.
     InlineFunction(inline_function::InlineFunctionArgs),
+    /// Replace an immediately invoked Common Lisp lambda with a parallel let.
+    InlineLambda(inline_lambda::InlineLambdaArgs),
+    /// Inline the sole direct call in a single-binding Common Lisp flet form.
+    InlineLocalFunction(inline_local_function::InlineLocalFunctionArgs),
+    /// Expand one conservative Common Lisp symbol-macrolet binding.
+    InlineSymbolMacro(inline_symbol_macro::InlineSymbolMacroArgs),
+    /// Inline an immutable self-evaluating Common Lisp defconstant value.
+    InlineLiteralConstant(inline_literal_constant::InlineLiteralConstantArgs),
     /// Add a parameter to a selected function and explicit call sites.
     AddFunctionParameter(function_parameter::args::AddFunctionParameterArgs),
     /// Move one positional parameter in a selected function and explicit call sites.
@@ -193,6 +221,44 @@ pub(super) enum RefactorCommand {
     IntroduceLet(introduce_let::IntroduceLetArgs),
     /// Inline a single local let binding into its body.
     InlineLet(inline_let::InlineLetArgs),
+    /// Convert a Common Lisp or Emacs Lisp parallel let form into let*.
+    ConvertLetToLetStar(convert_let_to_let_star::ConvertLetToLetStarArgs),
+    /// Convert an independent Common Lisp let* form into let.
+    ConvertLetStarToLet(convert_let_star_to_let::ConvertLetStarToLetArgs),
+    /// Convert an independent Common Lisp do* form into do.
+    ConvertDoStarToDo(convert_sequential_binding::ConvertDoStarToDoArgs),
+    /// Convert an independent Common Lisp prog* form into prog.
+    ConvertProgStarToProg(convert_sequential_binding::ConvertProgStarToProgArgs),
+    /// Merge a directly nested Common Lisp or Emacs Lisp let* form.
+    MergeNestedLetStar(merge_nested_let_star::MergeNestedLetStarArgs),
+    /// Merge directly nested independent Common Lisp or Emacs Lisp let forms.
+    MergeNestedLet(merge_nested_let::MergeNestedLetArgs),
+    /// Merge directly nested Common Lisp flet forms when definition scope is unchanged.
+    MergeNestedFlet(merge_nested_flet::MergeNestedFletArgs),
+    /// Split a Common Lisp or Emacs Lisp let* at a binding boundary.
+    SplitLetStar(split_let_star::SplitLetStarArgs),
+    /// Split a Common Lisp or Emacs Lisp let without capturing free references.
+    SplitLet(split_let::SplitLetArgs),
+    /// Remove an empty Common Lisp or Emacs Lisp let or let* in an expression position.
+    EliminateEmptyBindingForm(eliminate_empty_binding_form::EliminateEmptyBindingFormArgs),
+    /// Flatten directly nested progn forms in a conservative expression context.
+    FlattenProgn(flatten_progn::FlattenPrognArgs),
+    /// Convert a Common Lisp or Emacs Lisp if form into cond.
+    ConvertIfToCond(convert_if_to_cond::ConvertIfToCondArgs),
+    /// Convert a Common Lisp or Emacs Lisp cond form into nested if forms.
+    ConvertCondToIf(convert_cond_to_if::ConvertCondToIfArgs),
+    /// Convert a Common Lisp or Emacs Lisp when form into if.
+    ConvertWhenToIf(convert_when_to_if::ConvertWhenToIfArgs),
+    /// Convert a Common Lisp or Emacs Lisp unless form into if.
+    ConvertUnlessToIf(convert_unless_to_if::ConvertUnlessToIfArgs),
+    /// Convert a Common Lisp or Emacs Lisp if form without a meaningful else into when.
+    ConvertIfToWhen(convert_if_to_when::ConvertIfToWhenArgs),
+    /// Convert a Common Lisp or Emacs Lisp if form with a nil then branch into unless.
+    ConvertIfToUnless(convert_if_to_unless::ConvertIfToUnlessArgs),
+    /// Convert a non-recursive Common Lisp labels form into flet.
+    ConvertLabelsToFlet(convert_labels_to_flet::ConvertLabelsToFletArgs),
+    /// Convert a Common Lisp flet form into labels when no definition reference can be captured.
+    ConvertFletToLabels(convert_flet_to_labels::ConvertFletToLabelsArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }

@@ -1,7 +1,7 @@
 ---
 name: paredit-cli
-description: This skill should be used when refactoring Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming symbols, functions, macrolet/flet/labels bindings, or packages; moving or splitting definitions between files; extracting, inlining, or reparametrizing functions; threading/unthreading call chains; or removing unused definitions. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
-version: 1.2.0
+description: This skill should be used when refactoring Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming scoped symbols, functions, control targets, or packages; moving definitions; extracting or inlining local code; reshaping bindings, conditionals, calls, or parameters; or removing unused code. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
+version: 1.3.0
 ---
 
 <purpose>
@@ -13,13 +13,15 @@ version: 1.2.0
 <overview>
   paredit detects the Lisp dialect (Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, Fennel)
   from file extension or an explicit --dialect flag, and exposes every read and write
-  operation as a separate subcommand under `paredit <command> ...`.
+  operation under `paredit inspect ...`, `paredit edit ...`, or `paredit refactor ...`.
 
   The core rule: never hand-edit balanced delimiters during a refactor. Validate the file,
   locate the exact form or symbol with a report command, apply one structural edit, then
   validate again.
 
   Grouped entrypoints:
+  - `paredit inspect ...` — read-only validation, discovery, inventories, and analysis.
+  - `paredit edit ...` — low-level structural edits on one file.
   - `paredit refactor ...` — plan, preview, verify, apply/diff flows for a rename or move.
   - `paredit inspect workspace ...` — directory-root discovery and inventory across many files.
 
@@ -37,7 +39,6 @@ version: 1.2.0
     <command>paredit inspect agent-report --file f.lisp --output json</command>
     <command>paredit inspect outline --file f.lisp --output json</command>
     <command>paredit inspect form --file f.lisp --path 0 --include-source --output json</command>
-    <command>paredit edit select --file f.lisp --path 0.3</command>
     <command>paredit inspect workspace --output json .</command>
   </group>
 
@@ -67,6 +68,10 @@ version: 1.2.0
     <command>paredit refactor rename-macrolet --from old --to new --output json src/*.lisp</command>
     <command>paredit refactor rename-symbol-macro --from old --to new --output json src/*.lisp</command>
     <command>paredit refactor rename-package --from old.pkg --to new.pkg --output json system.asd src/*.lisp</command>
+    <command>paredit refactor rename-at --file f.lisp --at 42 --to new-name --output json</command>
+    <command>paredit refactor rename-symbols --from old --to new --output json f.lisp</command>
+    <command>paredit refactor rename-block --file f.lisp --path 0 --from old --to new --output json</command>
+    <command>paredit refactor rename-tag --file f.lisp --path 0 --from old --to new --output json</command>
     <command>paredit refactor plan --symbol old --operation rename --fail-on-blocking-gate --require-definitions 1 --require-references 1 --output json src/*.lisp</command>
     <command>paredit refactor workspace-plan --symbol old --output json .</command>
   </group>
@@ -81,6 +86,10 @@ version: 1.2.0
     <command>paredit refactor remove-unused-definitions --output json system.asd src/*.lisp</command>
     <command>paredit refactor replacement-plan --replacement '(run-case)' --output json src/*.lisp</command>
     <command>paredit refactor replace-forms --file a.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json</command>
+    <command>paredit refactor add-export --file package.lisp --symbol run-case --output json</command>
+    <command>paredit refactor sort-package-exports --file package.lisp --output json</command>
+    <command>paredit refactor sort-package-options --file package.lisp --output json</command>
+    <command>paredit refactor merge-package-options --file package.lisp --output json</command>
   </group>
 
   <group name="function_shape">
@@ -88,6 +97,11 @@ version: 1.2.0
     <command>paredit refactor extract-function --file f.lisp --path 0.3 --name helper --param value --output json</command>
     <command>paredit refactor extract-constant --file f.lisp --path 0.3.1 --name +limit+ --output json</command>
     <command>paredit refactor inline-function --file f.lisp --definition-path 0 --call-path 1.3 --output json</command>
+    <command>paredit refactor extract-local-function --file f.lisp --path 0.3 --enclosing-path 0 --name helper --infer-params --output json</command>
+    <command>paredit refactor inline-lambda --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor inline-local-function --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor inline-symbol-macro --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor inline-literal-constant --file f.lisp --path 0.3 --output json</command>
     <command>paredit refactor add-function-parameter --file f.lisp --definition-path 0 --name ctx --argument '*ctx*' --all-calls --output json</command>
     <command>paredit refactor move-function-parameter --file f.lisp --definition-path 0 --name ctx --to-index 0 --all-calls --output json</command>
     <command>paredit refactor swap-function-parameters --file f.lisp --definition-path 0 --left-name a --right-name b --all-calls --output json</command>
@@ -99,6 +113,40 @@ version: 1.2.0
     <command>paredit refactor inline-let --file f.lisp --path 0.3.1 --output json</command>
     <command>paredit inspect lets --output json f.lisp</command>
     <command>paredit inspect lets --output json src/*.lisp</command>
+  </group>
+
+  <group name="calls_and_control_flow">
+    <description>Reshape calls and conditionals while preserving evaluation and lexical scope.</description>
+    <command>paredit refactor replace-function-calls --from old --to new --all-calls --output json f.lisp</command>
+    <command>paredit refactor wrap-function-calls --function run --wrapper trace-call --all-calls --output json f.lisp</command>
+    <command>paredit refactor unwrap-function-calls --function run --wrapper trace-call --all-calls --output json f.lisp</command>
+    <command>paredit refactor unwrap-call --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-if-to-cond --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-cond-to-if --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-when-to-if --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-unless-to-if --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-if-to-when --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-if-to-unless --file f.lisp --path 0.3 --output json</command>
+  </group>
+
+  <group name="bindings_and_cleanup">
+    <description>Convert, merge, split, or remove lexical binding forms with scope checks.</description>
+    <command>paredit refactor convert-labels-to-flet --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-flet-to-labels --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-let-to-let-star --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-let-star-to-let --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-do-star-to-do --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor convert-prog-star-to-prog --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor merge-nested-let-star --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor split-let-star --file f.lisp --path 0.3 --binding-index 1 --output json</command>
+    <command>paredit refactor merge-nested-let --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor merge-nested-flet --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor split-let --file f.lisp --path 0.3 --binding-index 1 --output json</command>
+    <command>paredit refactor eliminate-empty-binding-form --file f.lisp --path 0.3 --output json</command>
+    <command>paredit refactor remove-unused-binding --file f.lisp --path 0.3 --all-bindings --output json</command>
+    <command>paredit refactor remove-unused-block --file f.lisp --path 0 --name done --output json</command>
+    <command>paredit refactor remove-unused-tag --file f.lisp --path 0 --name retry --output json</command>
+    <command>paredit refactor flatten-progn --file f.lisp --path 0.3 --output json</command>
   </group>
 
   <group name="structural_primitives">
@@ -122,6 +170,9 @@ version: 1.2.0
     <command>paredit edit slurp-backward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit barf-forward --file f.lisp --path 0.3 --write</command>
     <command>paredit edit barf-backward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit transpose-forward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit transpose-backward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit select --file f.lisp --path 0.3</command>
   </group>
 </command_groups>
 
@@ -143,6 +194,8 @@ paredit refactor verify --symbol old-name --new-symbol new-name --operation rena
 HASH=$(paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --manifest-out rename.preview.json --output json src/*.lisp | jq -r '.manifest_hash')
 paredit refactor diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
 paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
+paredit refactor status --manifest rename.preview.json --root . --output json
+paredit refactor check --manifest rename.preview.json --root . --output json
     </example>
   </pattern>
 
@@ -168,14 +221,18 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
 
 <decision_tree name="which_command_family">
   <question>What is the refactor goal?</question>
-  <branch condition="Just need to know what's in a file or directory">Use inspect group (check, outline, form-report, workspace report)</branch>
+  <branch condition="Just need to know what's in a file or directory">Use inspect group (check, outline, form, or workspace)</branch>
   <branch condition="Renaming something and the binding kind is known (function, local var, macrolet, package)">Use the specific rename-* command; fall back to rename-symbol only for a plain atom with no scope semantics</branch>
   <branch condition="Renaming or moving across many files at once">Use `paredit refactor plan/preview/verify` (explicit files) or `workspace-plan/workspace-preview/workspace-execute` (directory roots)</branch>
   <branch condition="Changing a function's parameter list">Use add/move/swap/reorder/remove-function-parameter, always with --all-calls or explicit --call-path</branch>
+  <branch condition="Extracting or inlining code inside one lexical scope">Use extract-local-function or the matching inline-lambda/inline-local-function/inline-symbol-macro/inline-literal-constant command</branch>
+  <branch condition="Reshaping lexical bindings">Use the matching convert-*, merge-nested-*, split-*, eliminate-empty-binding-form, or remove-unused-binding command</branch>
+  <branch condition="Canonicalizing a conditional">Use the exact convert-if/cond/when/unless command for the source and target forms</branch>
+  <branch condition="Renaming or removing a block/tag target">Use rename-block/rename-tag or remove-unused-block/remove-unused-tag so target scope is respected</branch>
   <branch condition="Relocating top-level forms">Use move-definition, move-form, or split-file</branch>
   <branch condition="One-off structural edit at a specific path">Use a structural primitive (replace, wrap, splice, raise, slurp/barf)</branch>
   <branch condition="Consolidating duplicated or near-duplicated code">Use `inspect duplicates` for exact shapes and `inspect similarity` for near-duplicates, then replacement-plan/replace-forms or extract-function/extract-constant</branch>
-  <branch condition="Deleting dead code">Use unused-definition-report first, only then remove-unused-definitions --write</branch>
+  <branch condition="Deleting dead code">Use `inspect unused-definitions` first, only then remove-unused-definitions --write</branch>
 </decision_tree>
 
 <best_practices>
@@ -185,6 +242,7 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <practice priority="high">Use --path for deterministic scripted edits; use --at (byte offset) when a prior report or grep result already gives an offset</practice>
   <practice priority="high">Use --fail-on-* and --require-* gates (e.g. --fail-on-blocking-gate, --require-definitions 1) so a plan command exits non-zero instead of silently under-matching</practice>
   <practice priority="high">Branch on exit codes: 0 success, 1 hard failure (parse/IO/refused write), 2 usage error, 3 policy gate tripped after the report was printed — on 3, read the report and decide; on 1-2, fix the invocation</practice>
+  <practice priority="high">Treat a refused transform as a safety result: planners conservatively reject capture, shadowing, target ambiguity, evaluation-order changes, and unsupported shapes</practice>
   <practice priority="medium">Run refactor verify with --phase pre before editing and --phase post after, to catch regressions the preview step could not predict</practice>
   <practice priority="medium">Wrap every invocation in a command timeout in automated pipelines; a hang should not block the surrounding agent loop</practice>
 </best_practices>
@@ -204,7 +262,7 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   </avoid>
   <avoid name="removal_without_reference_check">
     <description>Deleting a definition because it looks unused without checking call sites</description>
-    <instead>Run unused-definition-report (or symbol-report/call-report) across every relevant file first</instead>
+    <instead>Run `paredit inspect unused-definitions` (or inspect symbols/calls) across every relevant file first</instead>
   </avoid>
 </anti_patterns>
 
@@ -224,8 +282,8 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <phase name="inspect">
     <objective>Establish ground truth about the current file or workspace before changing anything</objective>
     <step order="1">Run `paredit inspect check` on every target file</step>
-    <step order="2">Run outline/form-report or workspace report to get paths and spans</step>
-    <step order="3">Run the relevant *-report command (symbol, call, signature, impact, unused-definition) to see the full blast radius</step>
+    <step order="2">Run inspect outline/form or inspect workspace to get paths and spans</step>
+    <step order="3">Run the relevant inspect command (symbols, calls, signature, impact, or unused-definitions) to see the full blast radius</step>
   </phase>
   <phase name="plan_and_preview">
     <objective>Produce a reviewable, no-write description of the exact edit</objective>
@@ -256,5 +314,5 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
   <must>Use the scope-aware rename-* command when the binding kind (function, local function, macrolet, symbol-macro, package) is known</must>
   <avoid>Hand-editing parentheses, brackets, or quoting to "fix" a refactor</avoid>
   <avoid>Passing --write on a first, unreviewed invocation</avoid>
-  <avoid>Deleting definitions without an unused-definition-report or reference check</avoid>
+  <avoid>Deleting definitions without `inspect unused-definitions` or another reference check</avoid>
 </constraints>
