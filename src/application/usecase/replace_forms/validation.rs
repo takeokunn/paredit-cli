@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 
-use crate::application::form_shape::duplicate_shape;
 use crate::application::usecase::replace_forms::ReplaceFormsTarget;
+use crate::domain::form_shape::duplicate_shape;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 pub(super) fn collect_replace_targets(

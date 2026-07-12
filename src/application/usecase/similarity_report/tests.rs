@@ -106,7 +106,7 @@ fn similarity_candidate(file: &str, node_count: usize) -> SimilarityCandidate {
             head: Some("foo".to_string()),
             text: input.to_string(),
         },
-        tree: crate::application::form_similarity::StructuralTree::from_view(
+        tree: crate::domain::form_similarity::StructuralTree::from_view(
             &tree
                 .select_path(&crate::domain::sexpr::Path::root_child(0))
                 .unwrap()
@@ -266,7 +266,7 @@ fn comparison_scope_filters_pair_population() {
 fn threshold_is_inclusive() {
     let values = candidates("a.lisp", "(foo a b) (foo x y)", 2);
     let similarity =
-        crate::application::form_similarity::tree_similarity(&values[0].tree, &values[1].tree);
+        crate::domain::form_similarity::tree_similarity(&values[0].tree, &values[1].tree);
     let report = build_similarity_pairs(values, similarity, SimilarityOverlapPolicy::All, None);
     assert_eq!(report.pairs.len(), 1);
     assert_eq!(report.summary.evaluated_pairs, 1);
@@ -367,7 +367,7 @@ fn cross_file_size_pruning_keeps_later_valid_pairs() {
     ];
     let left_refs: Vec<_> = left_group.iter().collect();
     let right_refs: Vec<_> = right_group.iter().collect();
-    let mut workspace = crate::application::form_similarity::TreeSimilarityWorkspace::default();
+    let mut workspace = crate::domain::form_similarity::TreeSimilarityWorkspace::default();
     let mut evaluated_pairs = 0;
 
     let (output, limit_reached) = super::reports::compare_cross_file_group_pair(
