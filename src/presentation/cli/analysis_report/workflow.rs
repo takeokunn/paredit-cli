@@ -1,5 +1,6 @@
+use crate::domain::common_lisp::function_value_namespace_diagnostics;
 use crate::domain::sexpr::SyntaxTree;
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use crate::presentation::cli::args::{AnalyzeArgs, InputArgs};
 use crate::presentation::cli::{detect_dialect, read_input};
@@ -8,7 +9,19 @@ use super::render::{print_agent_report, print_dialect, print_outline, print_stat
 
 pub(in crate::presentation::cli) fn check(args: InputArgs) -> Result<()> {
     let input = read_input(args.file)?;
-    SyntaxTree::parse(&input.text)?;
+    let tree = SyntaxTree::parse(&input.text)?;
+    let dialect = detect_dialect(&input, None);
+    if let Some(diagnostic) = function_value_namespace_diagnostics(&tree, dialect)?
+        .into_iter()
+        .next()
+    {
+        bail!(
+            "{}: {}. {}",
+            diagnostic.code(),
+            diagnostic.message(),
+            diagnostic.suggestion()
+        );
+    }
     println!("ok");
     Ok(())
 }

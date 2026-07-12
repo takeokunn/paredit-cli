@@ -23,6 +23,17 @@ fn check_rejects_invalid_input() {
 }
 
 #[test]
+fn check_rejects_local_function_used_as_a_value_from_standard_input() {
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("check")
+        .write_stdin("(flet ((finish-attempt () nil)) (funcall finish-attempt))")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("function-used-as-value"));
+}
+
+#[test]
 fn cli_selects_by_path() {
     let mut cmd = paredit();
     cmd.args(["edit", "select", "--path", "0.2"])
