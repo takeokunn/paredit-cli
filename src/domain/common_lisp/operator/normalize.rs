@@ -51,6 +51,20 @@ pub(crate) fn common_lisp_symbol_reference_eq(candidate: &str, expected: &str) -
         .eq_ignore_ascii_case(strip_common_lisp_symbol_qualifiers(expected))
 }
 
+/// Lowercased unqualified name of `symbol`, for substring prefiltering.
+///
+/// Every reference matcher built on [`common_lisp_symbol_reference_eq`] (or
+/// on exact equality for other dialects) only accepts an atom whose source
+/// text contains this needle ASCII-case-insensitively: the stripped
+/// candidate is a substring of the candidate's source text, and (case-
+/// insensitive) equality with the stripped symbol makes it an occurrence of
+/// the needle. Source text whose lowercased form lacks the needle therefore
+/// cannot contain any match, so whole-file reference scans can be skipped
+/// after one substring test.
+pub(crate) fn common_lisp_symbol_reference_needle(symbol: &str) -> String {
+    strip_common_lisp_symbol_qualifiers(symbol).to_ascii_lowercase()
+}
+
 pub(crate) fn is_common_lisp_declaration_form(head: &str) -> bool {
     common_lisp_operator_head_eq(head, "declare")
         || common_lisp_operator_head_eq(head, "declaim")

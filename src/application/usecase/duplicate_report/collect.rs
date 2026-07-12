@@ -17,29 +17,34 @@ pub fn collect_duplicate_candidates(
     min_node_count: usize,
     grouped: &mut DuplicateCandidateGroups,
 ) -> Result<()> {
+    let mut path_stack = Vec::new();
     for index in 0..tree.root_children().len() {
-        let path = Path::root_child(index);
-        let view = tree.select_path(&path)?.view();
+        let view = tree.select_path(&Path::root_child(index))?.view();
+        path_stack.push(index);
         collect_duplicate_candidates_from_view(
             &view,
             input,
             file,
             dialect,
-            path,
+            &mut path_stack,
             min_node_count,
             grouped,
         );
+        path_stack.pop();
     }
 
     Ok(())
 }
 
+// `path_stack` is pushed/popped in place; a full `Path` is only built for
+// forms that reach the candidate map, instead of cloning the whole index
+// vector at every recursion step (O(nodes × depth) allocation).
 fn collect_duplicate_candidates_from_view(
     view: &ExpressionView,
     input: &str,
     file: &FsPath,
     dialect: Dialect,
-    path: Path,
+    path_stack: &mut Vec<usize>,
     min_node_count: usize,
     grouped: &mut DuplicateCandidateGroups,
 ) {
@@ -50,7 +55,7 @@ fn collect_duplicate_candidates_from_view(
             grouped.entry(shape).or_default().push(DuplicateFormReport {
                 path: file.to_path_buf(),
                 dialect,
-                form_path: path.to_string(),
+                form_path: Path::from_indexes(path_stack.clone()).to_string(),
                 span: view.span,
                 node_count,
                 head: view
@@ -64,15 +69,16 @@ fn collect_duplicate_candidates_from_view(
     }
 
     for (index, child) in view.children.iter().enumerate() {
-        let child_path = path.child(index);
+        path_stack.push(index);
         collect_duplicate_candidates_from_view(
             child,
             input,
             file,
             dialect,
-            child_path,
+            path_stack,
             min_node_count,
             grouped,
         );
+        path_stack.pop();
     }
 }

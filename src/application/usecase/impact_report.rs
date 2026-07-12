@@ -3,11 +3,14 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 
 use crate::application::usecase::call_graph_report::{
-    CallGraphNode, build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node,
+    CallGraphNode, CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches,
+    insert_call_graph_node,
 };
 use crate::application::usecase::call_report::build_call_report;
 use crate::application::usecase::signature_report::{SignatureCallItem, classify_signature_call};
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::common_lisp::{
+    common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
+};
 use crate::domain::sexpr::SymbolName;
 
 mod definitions;
@@ -38,6 +41,7 @@ pub fn build_impact_reports(
 ) -> Result<Vec<ImpactReportFile>> {
     let mut parsed = Vec::with_capacity(sources.len());
     let mut nodes_by_name = BTreeMap::<String, CallGraphNode>::new();
+    let mut node_index = CallGraphNodeIndex::new();
     let mut definitions_by_name = BTreeMap::<String, Vec<(usize, Option<usize>)>>::new();
 
     for source in sources {
@@ -78,6 +82,7 @@ pub fn build_impact_reports(
         for definition in &all_definitions {
             insert_call_graph_node(
                 &mut nodes_by_name,
+                &mut node_index,
                 definition.name.as_deref(),
                 definition.category,
             );
@@ -85,7 +90,7 @@ pub fn build_impact_reports(
             if impact_definition_matches_signature(definition, None) {
                 if let (Some(name), Some(arity)) = (&definition.name, definition.parameter_arity) {
                     definitions_by_name
-                        .entry(name.clone())
+                        .entry(common_lisp_symbol_reference_needle(name))
                         .or_default()
                         .push(arity);
                 }
@@ -121,7 +126,7 @@ pub fn build_impact_reports(
                     .collect::<Vec<_>>();
                 let edges = all_calls
                     .into_iter()
-                    .map(|call| build_call_graph_edge(call, &nodes_by_name))
+                    .map(|call| build_call_graph_edge(call, &nodes_by_name, &node_index))
                     .filter(|edge| call_graph_edge_matches(edge, Some(symbol)))
                     .collect::<Vec<_>>();
                 let inbound_edges = edges

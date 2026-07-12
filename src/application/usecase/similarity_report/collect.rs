@@ -29,10 +29,12 @@ pub fn collect_similarity_candidates(
         candidates,
         omitted_candidates: 0,
     };
+    let mut path_stack = Vec::new();
     for index in 0..tree.root_children().len() {
-        let path = Path::root_child(index);
-        let view = tree.select_path(&path)?.view();
-        collection.collect_from_view(&view, path);
+        let view = tree.select_path(&Path::root_child(index))?.view();
+        path_stack.push(index);
+        collection.collect_from_view(&view, &mut path_stack);
+        path_stack.pop();
     }
     Ok(collection.omitted_candidates)
 }
@@ -48,8 +50,11 @@ struct CandidateCollection<'a> {
 }
 
 impl CandidateCollection<'_> {
-    fn collect_from_view(&mut self, view: &ExpressionView, path: Path) {
-        let is_top_level = path.indexes().len() == 1;
+    // `path_stack` is pushed/popped in place; a full `Path` is only built for
+    // forms that actually become candidates, instead of cloning the whole
+    // index vector at every recursion step (O(nodes × depth) allocation).
+    fn collect_from_view(&mut self, view: &ExpressionView, path_stack: &mut Vec<usize>) {
+        let is_top_level = path_stack.len() == 1;
         if self.options.form_scope == SimilarityFormScope::TopLevel && !is_top_level {
             return;
         }
@@ -74,7 +79,7 @@ impl CandidateCollection<'_> {
                             form: SimilarityFormReport {
                                 path: self.file.to_path_buf(),
                                 dialect: self.dialect,
-                                form_path: path.to_string(),
+                                form_path: Path::from_indexes(path_stack.clone()).to_string(),
                                 span: view.span,
                                 node_count,
                                 head: head.map(ToOwned::to_owned),
@@ -99,7 +104,9 @@ impl CandidateCollection<'_> {
         }
 
         for (index, child) in view.children.iter().enumerate() {
-            self.collect_from_view(child, path.child(index));
+            path_stack.push(index);
+            self.collect_from_view(child, path_stack);
+            path_stack.pop();
         }
     }
 }
