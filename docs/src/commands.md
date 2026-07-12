@@ -144,10 +144,13 @@ plan/preview/verify/apply lifecycle.
 | `inline-lambda` | Replace a safe, immediately invoked Common Lisp lambda with a parallel `let`. |
 | `inline-local-function` | Inline the sole direct call in a safe, single-binding Common Lisp `flet` form. |
 | `inline-symbol-macro` | Expand a conservative single-binding Common Lisp `symbol-macrolet` form. |
+| `inline-literal-constant` | Inline an immutable self-evaluating Common Lisp `defconstant` value. |
 | `convert-labels-to-flet` | Convert a non-recursive Common Lisp `labels` form into `flet`. |
 | `convert-flet-to-labels` | Convert a Common Lisp `flet` form into `labels` when definition references cannot be captured. |
 | `rename-block` | Rename a selected Common Lisp `block` and matching `return-from` references. |
 | `rename-tag` | Rename one tag in a selected Common Lisp `tagbody` and matching `go` references. |
+| `remove-unused-block` | Remove a selected Common Lisp `block` with no matching `return-from`. |
+| `remove-unused-tag` | Remove an unreferenced tag from a selected Common Lisp `tagbody`. |
 
 ### Parameters and bindings
 
@@ -166,6 +169,9 @@ plan/preview/verify/apply lifecycle.
 | `convert-prog-star-to-prog` | Convert a Common Lisp `prog*` to `prog` when later initializers do not reference earlier bindings. |
 | `merge-nested-let-star` | Merge a directly nested Common Lisp or Emacs Lisp `let*` into one sequential binding form. |
 | `split-let-star` | Split a Common Lisp or Emacs Lisp `let*` into nested sequential binding forms at `--binding-index`. |
+| `merge-nested-let` | Merge directly nested Common Lisp or Emacs Lisp parallel `let` forms when inner initializers are independent. |
+| `merge-nested-flet` | Merge directly nested Common Lisp `flet` forms when inner definitions do not reference outer local functions. |
+| `split-let` | Split a Common Lisp or Emacs Lisp parallel `let` at `--binding-index` without capturing initializer references. |
 | `eliminate-empty-binding-form` | Remove an empty Common Lisp or Emacs Lisp `let` or `let*` from a known expression position. |
 | `flatten-progn` | Flatten directly nested Common Lisp or Emacs Lisp `progn` forms in a safe expression context. |
 | `convert-if-to-cond` | Convert a Common Lisp or Emacs Lisp `(if test then [else])` form to `cond`. |

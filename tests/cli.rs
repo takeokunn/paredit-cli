@@ -43,10 +43,10 @@ mod definition_report;
 mod dependency_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
-#[path = "cli/eliminate_empty_binding_form.rs"]
-mod eliminate_empty_binding_form;
 #[path = "cli/edit_transpose.rs"]
 mod edit_transpose;
+#[path = "cli/eliminate_empty_binding_form.rs"]
+mod eliminate_empty_binding_form;
 #[path = "cli/extract_constant/mod.rs"]
 mod extract_constant;
 #[path = "cli/extract_function/mod.rs"]
@@ -69,14 +69,20 @@ mod impact_report;
 mod inline_function;
 #[path = "cli/inline_lambda.rs"]
 mod inline_lambda;
+#[path = "cli/inline_literal_constant.rs"]
+mod inline_literal_constant;
 #[path = "cli/inline_local_function.rs"]
 mod inline_local_function;
 #[path = "cli/inline_symbol_macro.rs"]
 mod inline_symbol_macro;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/merge_nested_flet.rs"]
+mod merge_nested_flet;
 #[path = "cli/merge_nested_let_star.rs"]
 mod merge_nested_let_star;
+#[path = "cli/merge_split_let.rs"]
+mod merge_split_let;
 #[path = "cli/package/mod.rs"]
 mod package;
 #[path = "cli/package_archive_contract.rs"]
@@ -109,6 +115,8 @@ mod refactor_preview;
 mod refactor_workspace;
 #[path = "cli/remove_unused_binding/mod.rs"]
 mod remove_unused_binding;
+#[path = "cli/remove_unused_control.rs"]
+mod remove_unused_control;
 #[path = "cli/rename/mod.rs"]
 mod rename;
 #[path = "cli/rename_at/mod.rs"]
@@ -121,12 +129,12 @@ mod replace_forms;
 mod signature_report;
 #[path = "cli/similarity_report.rs"]
 mod similarity_report;
-#[path = "cli/split_let_star.rs"]
-mod split_let_star;
 #[path = "cli/sort_definitions.rs"]
 mod sort_definitions;
 #[path = "cli/split_file.rs"]
 mod split_file;
+#[path = "cli/split_let_star.rs"]
+mod split_let_star;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
 #[path = "cli/thread_expression/mod.rs"]

@@ -6,9 +6,10 @@ use super::{
     definition_movement, definition_removal, definition_report, dependency_report,
     duplicate_report, eliminate_empty_binding_form, extract_constant, extract_function,
     extract_local_function, flatten_progn, form_report, function_parameter, impact_report,
-    inline_function, inline_lambda, inline_let, inline_local_function, inline_symbol_macro,
-    introduce_let, let_report, merge_nested_let_star, package, refactor, remove_unused_binding,
-    rename, rename_control, replace_forms, signature_report, similarity_report, split_let_star,
+    inline_function, inline_lambda, inline_let, inline_literal_constant, inline_local_function,
+    inline_symbol_macro, introduce_let, let_report, merge_nested_flet, merge_nested_let,
+    merge_nested_let_star, package, refactor, remove_unused_binding, remove_unused_control, rename,
+    rename_control, replace_forms, signature_report, similarity_report, split_let, split_let_star,
     symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
@@ -153,6 +154,10 @@ pub(super) enum RefactorCommand {
     RenameBlock(rename_control::RenameBlockArgs),
     /// Rename one tag in a selected Common Lisp tagbody and matching go references.
     RenameTag(rename_control::RenameTagArgs),
+    /// Remove a selected Common Lisp block with no matching return-from.
+    RemoveUnusedBlock(remove_unused_control::RemoveUnusedBlockArgs),
+    /// Remove an unreferenced tag from a selected Common Lisp tagbody.
+    RemoveUnusedTag(remove_unused_control::RemoveUnusedTagArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(rename::args::RenameSymbolsArgs),
     /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files, including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names, and definition forms such as define-method-combination.
@@ -189,6 +194,8 @@ pub(super) enum RefactorCommand {
     InlineLocalFunction(inline_local_function::InlineLocalFunctionArgs),
     /// Expand one conservative Common Lisp symbol-macrolet binding.
     InlineSymbolMacro(inline_symbol_macro::InlineSymbolMacroArgs),
+    /// Inline an immutable self-evaluating Common Lisp defconstant value.
+    InlineLiteralConstant(inline_literal_constant::InlineLiteralConstantArgs),
     /// Add a parameter to a selected function and explicit call sites.
     AddFunctionParameter(function_parameter::args::AddFunctionParameterArgs),
     /// Move one positional parameter in a selected function and explicit call sites.
@@ -213,8 +220,14 @@ pub(super) enum RefactorCommand {
     ConvertProgStarToProg(convert_sequential_binding::ConvertProgStarToProgArgs),
     /// Merge a directly nested Common Lisp or Emacs Lisp let* form.
     MergeNestedLetStar(merge_nested_let_star::MergeNestedLetStarArgs),
+    /// Merge directly nested independent Common Lisp or Emacs Lisp let forms.
+    MergeNestedLet(merge_nested_let::MergeNestedLetArgs),
+    /// Merge directly nested Common Lisp flet forms when definition scope is unchanged.
+    MergeNestedFlet(merge_nested_flet::MergeNestedFletArgs),
     /// Split a Common Lisp or Emacs Lisp let* at a binding boundary.
     SplitLetStar(split_let_star::SplitLetStarArgs),
+    /// Split a Common Lisp or Emacs Lisp let without capturing free references.
+    SplitLet(split_let::SplitLetArgs),
     /// Remove an empty Common Lisp or Emacs Lisp let or let* in an expression position.
     EliminateEmptyBindingForm(eliminate_empty_binding_form::EliminateEmptyBindingFormArgs),
     /// Flatten directly nested progn forms in a conservative expression context.

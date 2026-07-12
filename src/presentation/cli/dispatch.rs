@@ -127,6 +127,12 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::RenameBlock(args) => rename_control::rename_block(args)?,
             command::RefactorCommand::RenameTag(args) => rename_control::rename_tag(args)?,
+            command::RefactorCommand::RemoveUnusedBlock(args) => {
+                remove_unused_control::remove_unused_block(args)?
+            }
+            command::RefactorCommand::RemoveUnusedTag(args) => {
+                remove_unused_control::remove_unused_tag(args)?
+            }
             command::RefactorCommand::RenameSymbols(args) => {
                 rename::rename_symbols::rename_symbols(args)?
             }
@@ -177,6 +183,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::InlineSymbolMacro(args) => {
                 inline_symbol_macro::inline_symbol_macro(args)?
             }
+            command::RefactorCommand::InlineLiteralConstant(args) => {
+                inline_literal_constant::inline_literal_constant(args)?
+            }
             command::RefactorCommand::AddFunctionParameter(args) => {
                 function_parameter::add::add_function_parameter(args)?
             }
@@ -209,9 +218,14 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::MergeNestedLetStar(args) => {
                 merge_nested_let_star::merge_nested_let_star(args)?
             }
-            command::RefactorCommand::SplitLetStar(args) => {
-                split_let_star::split_let_star(args)?
+            command::RefactorCommand::MergeNestedLet(args) => {
+                merge_nested_let::merge_nested_let(args)?
             }
+            command::RefactorCommand::MergeNestedFlet(args) => {
+                merge_nested_flet::merge_nested_flet(args)?
+            }
+            command::RefactorCommand::SplitLetStar(args) => split_let_star::split_let_star(args)?,
+            command::RefactorCommand::SplitLet(args) => split_let::split_let(args)?,
             command::RefactorCommand::EliminateEmptyBindingForm(args) => {
                 eliminate_empty_binding_form::eliminate_empty_binding_form(args)?
             }
