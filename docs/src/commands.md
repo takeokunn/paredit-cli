@@ -156,4 +156,5 @@ plan/preview/verify/apply lifecycle.
 | `introduce-let` | Replace the selected expression with a local binding in the enclosing list. |
 | `inline-let` | Inline a single local let binding into its body. |
 | `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. |
+| `convert-if-to-cond` | Convert a Common Lisp or Emacs Lisp `(if test then [else])` form to `cond`. |
 | `remove-unused-binding` | Plan or remove one unused local let binding. |

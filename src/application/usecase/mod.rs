@@ -5,6 +5,7 @@
 
 pub mod call_graph_report;
 pub mod call_report;
+pub mod convert_if_to_cond;
 pub mod convert_let_star_to_let;
 pub(crate) mod callable_scope;
 pub mod definition_report;

@@ -192,6 +192,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::ConvertLetStarToLet(args) => {
                 convert_let_star_to_let::convert_let_star_to_let(args)?
             }
+            command::RefactorCommand::ConvertIfToCond(args) => {
+                convert_if_to_cond::convert_if_to_cond(args)?
+            }
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?
             }
