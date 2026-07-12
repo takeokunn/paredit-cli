@@ -3,13 +3,13 @@ use serde_json::json;
 
 use super::super::super::OutputFormat;
 use super::super::args::WrapFunctionCallsArgs;
-use super::super::types::{WrapFunctionCallsFileReport, WrapFunctionCallsPolicy};
+use super::super::types::{CallSitePolicy, WrapFunctionCallsFileReport};
 use super::shared::wrap_call_sites_json;
 
 pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
     reports: &[WrapFunctionCallsFileReport],
     args: &WrapFunctionCallsArgs,
-    policy: &WrapFunctionCallsPolicy,
+    policy: &CallSitePolicy,
     output: OutputFormat,
 ) -> Result<()> {
     let call_count = reports
@@ -49,6 +49,7 @@ pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "function": args.function.as_str(),
                 "wrapper": args.wrapper.as_str(),
                 "wrapperTemplate": args.wrapper_template.as_deref(),

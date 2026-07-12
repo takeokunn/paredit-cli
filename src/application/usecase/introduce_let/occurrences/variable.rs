@@ -6,7 +6,6 @@ use crate::domain::{
 use super::{
     EquivalentExpressionSpans, collect_equivalent_expression_spans, expressions_equivalent,
     is_path_shadowed_by_binding, is_span_shadowed_by_binding, record_equivalent_span,
-    span_contains_span,
 };
 use crate::application::usecase::introduce_let::syntax::variable_spec_binds_name;
 
@@ -103,7 +102,7 @@ pub(super) fn is_span_shadowed_by_variable_bindings(
     let mut sequential_shadowed = shadowed_by_binding;
 
     for binding in &binding_form.children {
-        if span_contains_span(binding.span, target_span) {
+        if binding.span.contains_span(target_span) {
             return is_span_shadowed_by_variable_binding_spec(
                 dialect,
                 binding,

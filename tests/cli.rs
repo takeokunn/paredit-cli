@@ -11,10 +11,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod action_contract;
 #[path = "cli/analysis_report.rs"]
 mod analysis_report;
+#[path = "cli/basic_edit_write.rs"]
+mod basic_edit_write;
 #[path = "cli/call_graph_report/mod.rs"]
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
 mod call_report;
+#[path = "cli/capabilities_contract.rs"]
+mod capabilities_contract;
+#[path = "cli/completions_contract.rs"]
+mod completions_contract;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
 #[path = "cli/definition_movement.rs"]
@@ -49,6 +55,8 @@ mod let_refactor;
 mod package;
 #[path = "cli/package_archive_contract.rs"]
 mod package_archive_contract;
+#[path = "cli/plan_steps_contract.rs"]
+mod plan_steps_contract;
 #[path = "cli/public_api_docs_contract.rs"]
 mod public_api_docs_contract;
 #[path = "cli/public_module_docs_contract.rs"]
@@ -87,6 +95,8 @@ mod replace_forms;
 mod signature_report;
 #[path = "cli/similarity_report.rs"]
 mod similarity_report;
+#[path = "cli/skill_contract.rs"]
+mod skill_contract;
 #[path = "cli/sort_definitions.rs"]
 mod sort_definitions;
 #[path = "cli/split_file.rs"]
@@ -140,4 +150,78 @@ fn fresh_temp_dir(name: &str) -> PathBuf {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("create temp dir");
     dir
+}
+
+/// Map of "namespace subcommand" → set of long flags, generated from
+/// `paredit inspect capabilities` so contract tests validate against the
+/// real CLI surface.
+fn capability_map() -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
+    let output = paredit()
+        .args(["inspect", "capabilities"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report: serde_json::Value =
+        serde_json::from_slice(&output).expect("capabilities emits valid JSON");
+
+    let mut map = std::collections::BTreeMap::new();
+    for namespace in report["commands"].as_array().expect("commands") {
+        let namespace_name = namespace["name"].as_str().expect("namespace name");
+        let Some(subcommands) = namespace["commands"].as_array() else {
+            map.insert(namespace_name.to_owned(), std::collections::BTreeSet::new());
+            continue;
+        };
+        for command in subcommands {
+            let command_name = command["name"].as_str().expect("command name");
+            let flags = command["args"]
+                .as_array()
+                .expect("command args")
+                .iter()
+                .filter_map(|arg| arg["long"].as_str().map(ToOwned::to_owned))
+                .collect::<std::collections::BTreeSet<_>>();
+            map.insert(format!("{namespace_name} {command_name}"), flags);
+        }
+    }
+    map
+}
+
+/// Validates `paredit <ns> <cmd> --flags...` command strings against the
+/// capability map, returning one problem line per unknown command or flag.
+fn validate_paredit_command_strings(
+    lines: &[String],
+    capabilities: &std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for line in lines {
+        let tokens = line.split_whitespace().collect::<Vec<_>>();
+        let (Some(namespace), Some(subcommand)) = (tokens.get(1), tokens.get(2)) else {
+            continue;
+        };
+
+        let key = if *namespace == "completions" {
+            "completions".to_owned()
+        } else {
+            format!("{namespace} {subcommand}")
+        };
+        let Some(known_flags) = capabilities.get(&key) else {
+            problems.push(format!("unknown command `{key}` in: {line}"));
+            continue;
+        };
+
+        for token in &tokens[2..] {
+            let Some(flag) = token.strip_prefix("--") else {
+                continue;
+            };
+            let flag = flag.split('=').next().unwrap_or(flag);
+            if flag == "help" {
+                continue;
+            }
+            if !known_flags.contains(flag) {
+                problems.push(format!("unknown flag `--{flag}` for `{key}` in: {line}"));
+            }
+        }
+    }
+    problems
 }

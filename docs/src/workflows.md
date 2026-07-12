@@ -8,17 +8,19 @@ rename looks like this:
 # 1. Plan: gates, risk summary, and an ordered step list.
 paredit refactor plan --symbol old-name src/core.lisp src/util.lisp
 
-# 2. Preview: exact rewrites, no files touched.
+# 2. Preview: exact rewrites, no files touched. --manifest-out writes the
+#    manifest file and prints its hash, so no extra `status` call is needed.
 paredit refactor preview --from old-name --to new-name \
-  src/core.lisp src/util.lisp > preview.json
+  --manifest-out preview.json src/core.lisp src/util.lisp
 
 # 3. Review the manifest without writing.
 paredit refactor check --manifest preview.json
 paredit refactor status --manifest preview.json
 paredit refactor diff --manifest preview.json
 
-# 4. Apply the reviewed manifest with hash guards.
-paredit refactor apply --manifest preview.json --write
+# 4. Apply the reviewed manifest with hash guards (hash printed by step 2).
+paredit refactor apply --manifest preview.json \
+  --expect-manifest-hash "$HASH" --write
 
 # 5. Verify post-conditions.
 paredit refactor verify --symbol old-name --new-symbol new-name \

@@ -35,7 +35,9 @@ pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Res
     print_impact_report(&reports, &args.symbol, &policy, args.output)?;
     if !policy.passed {
         let policy_message = policy.violations.join("; ");
-        anyhow::bail!("impact-report policy failed: {policy_message}");
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "impact-report policy failed: {policy_message}"
+        )));
     }
     Ok(())
 }

@@ -64,5 +64,7 @@ pub(in crate::presentation::cli) fn rename_symbol_macro(args: RenameSymbolMacroA
         });
     }
 
-    print_rename_symbol_macro_report(&reports, &args.from, &args.to, args.write, args.output)
+    let changed = reports.iter().any(|report| report.changed);
+    print_rename_symbol_macro_report(&reports, &args.from, &args.to, args.write, args.output)?;
+    super::shared::ensure_rename_changed(args.fail_on_no_change, changed, "rename-symbol-macro")
 }

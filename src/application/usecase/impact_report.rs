@@ -23,7 +23,7 @@ mod tests;
 mod types;
 
 use definitions::{collect_impact_definitions, impact_definition_matches_signature};
-use references::{count_non_call_references, matching_symbol_occurrences, span_contains};
+use references::{count_non_call_references, matching_symbol_occurrences};
 
 pub use policy::evaluate_impact_report_policy;
 pub use summary::{
@@ -56,7 +56,7 @@ pub fn build_impact_reports(
                 span: occurrence.span,
                 context: outline
                     .iter()
-                    .filter(|entry| span_contains(entry.span, occurrence.span))
+                    .filter(|entry| entry.span.contains_span(occurrence.span))
                     .min_by_key(|entry| entry.span.end().get() - entry.span.start().get())
                     .map(|entry| ImpactSymbolOccurrenceContext {
                         path: entry.path.to_string(),

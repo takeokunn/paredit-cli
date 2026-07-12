@@ -1,0 +1,164 @@
+use super::*;
+
+#[test]
+fn edit_wrap_write_updates_file_in_place_and_prints_nothing() {
+    let dir = fresh_temp_dir("edit-wrap-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun foo (x) (+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .args(["edit", "wrap", "--path", "0.2", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(defun foo ((x)) (+ x 1))\n");
+}
+
+#[test]
+fn edit_replace_write_updates_file_in_place() {
+    let dir = fresh_temp_dir("edit-replace-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun foo (x) (+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .args([
+            "edit", "replace", "--path", "0.3", "--with", "(- x 1)", "--write", "--file",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(defun foo (x) (- x 1))\n");
+}
+
+#[test]
+fn edit_format_write_updates_file_in_place() {
+    let dir = fresh_temp_dir("edit-format-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun foo (x)\n(+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .args(["edit", "format", "--write", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert!(rewritten.contains("defun foo"), "{rewritten}");
+    paredit()
+        .args(["inspect", "check", "--file"])
+        .arg(&file)
+        .assert()
+        .success();
+}
+
+#[test]
+fn edit_write_requires_file_input() {
+    paredit()
+        .args(["edit", "kill", "--path", "0", "--write"])
+        .write_stdin("(a b)")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--write requires --file"));
+}
+
+#[test]
+fn edit_diff_prints_unified_diff_and_keeps_file_untouched() {
+    let dir = fresh_temp_dir("edit-wrap-diff");
+    let file = dir.join("source.lisp");
+    let original = "(defun foo (x) (+ x 1))\n";
+    fs::write(&file, original).expect("write source fixture");
+
+    paredit()
+        .args(["edit", "wrap", "--path", "0.2", "--diff", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("-(defun foo (x) (+ x 1))"))
+        .stdout(predicate::str::contains("+(defun foo ((x)) (+ x 1))"));
+
+    let untouched = fs::read_to_string(&file).expect("read source");
+    assert_eq!(untouched, original);
+}
+
+#[test]
+fn edit_diff_with_write_updates_file_and_prints_diff() {
+    let dir = fresh_temp_dir("edit-wrap-diff-write");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun foo (x) (+ x 1))\n").expect("write source fixture");
+
+    paredit()
+        .args([
+            "edit", "wrap", "--path", "0.2", "--diff", "--write", "--file",
+        ])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("+(defun foo ((x)) (+ x 1))"));
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(defun foo ((x)) (+ x 1))\n");
+}
+
+#[test]
+fn edit_without_write_prints_to_stdout_and_keeps_file_untouched() {
+    let dir = fresh_temp_dir("edit-kill-stdout");
+    let file = dir.join("source.lisp");
+    let original = "(a b)\n(c d)\n";
+    fs::write(&file, original).expect("write source fixture");
+
+    paredit()
+        .args(["edit", "kill", "--path", "1", "--file"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(a b)"));
+
+    let untouched = fs::read_to_string(&file).expect("read source");
+    assert_eq!(untouched, original);
+}
+
+fn assert_edit_output(subcommand: &str, path: &str, expected: &str) {
+    paredit()
+        .args(["edit", subcommand, "--path", path])
+        .write_stdin("(a (b c) d e)\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(expected));
+}
+
+#[test]
+fn edit_splice_removes_one_list_pair() {
+    assert_edit_output("splice", "0.1", "(a b c d e)");
+}
+
+#[test]
+fn edit_raise_replaces_parent_with_selection() {
+    assert_edit_output("raise", "0.1.0", "(a b d e)");
+}
+
+#[test]
+fn edit_slurp_forward_pulls_next_sibling_in() {
+    assert_edit_output("slurp-forward", "0.1", "(a (b c d) e)");
+}
+
+#[test]
+fn edit_slurp_backward_pulls_previous_sibling_in() {
+    assert_edit_output("slurp-backward", "0.1", "((a b c) d e)");
+}
+
+#[test]
+fn edit_barf_forward_pushes_last_child_out() {
+    assert_edit_output("barf-forward", "0.1", "(a (b) c d e)");
+}
+
+#[test]
+fn edit_barf_backward_pushes_first_child_out() {
+    assert_edit_output("barf-backward", "0.1", "(a b (c) d e)");
+}

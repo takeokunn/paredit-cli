@@ -6,13 +6,16 @@
 
 All `paredit inspect` commands report information without modifying source files. Prefer these commands for discovery, impact analysis, and preflight checks.
 
-## Edit writes to standard output
+## Edit previews before it writes
 
-`paredit edit` commands return transformed source on standard output. Redirect the output only after reviewing it:
+`paredit edit` commands return transformed source on standard output by default and never touch the file. Preview the change as a diff, then apply it in place with `--write`:
 
 ```sh
-paredit edit format --file source.lisp > source.lisp.new
+paredit edit format --file source.lisp --diff
+paredit edit format --file source.lisp --write
 ```
+
+`--write` refuses to persist a result that no longer parses, and writes are staged with automatic rollback, so a failed write cannot leave a truncated or unbalanced file behind.
 
 ## Refactor is explicit
 
@@ -25,6 +28,9 @@ For workspace operations, start with `paredit inspect workspace` to identify the
 ## Automation guidance
 
 1. Discover with `paredit inspect`.
-2. Review an `edit` result before redirecting it to a file.
+2. Review an `edit` result (`--diff` or stdout) before passing `--write`.
 3. Plan, preview, and verify a `refactor` before applying it.
 4. Treat non-zero exits and validation failures as blockers.
+
+See the [agent interface](agents.md) for exit codes, the JSON output
+contract, and a complete safe editing loop.

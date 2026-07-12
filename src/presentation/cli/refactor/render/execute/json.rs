@@ -17,6 +17,7 @@ pub(super) fn print_workspace_refactor_execute_json(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "command": "refactor workspace-execute",
             "mode": execution.preview.mode.label(),
             "from": execution.preview.from.as_str(),

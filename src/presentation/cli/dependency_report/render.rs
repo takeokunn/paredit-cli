@@ -54,6 +54,7 @@ pub(super) fn print_dependency_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "file_count": reports.len(),
                 "dependency_count": dependency_count,
                 "by_kind": by_kind

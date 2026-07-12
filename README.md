@@ -8,25 +8,33 @@ S-expressions. Its canonical command layout is designed for both people and AI
 coding agents:
 
 - `paredit inspect ...` reads source and produces reports.
-- `paredit edit ...` transforms one selected form and prints source to stdout.
+- `paredit edit ...` transforms one selected form; stdout by default, `--write`
+  to update the file in place, `--diff` to preview a unified diff.
 - `paredit refactor ...` plans, previews, verifies, and applies semantic changes.
 
 ## Commands
 
 ```sh
 paredit inspect <report> [args]    # read-only inventory, validation, analysis
-paredit edit <transform> [args]    # one structural edit, printed to stdout
+paredit edit <transform> [args]    # one structural edit (stdout, --diff, or --write)
 paredit refactor <workflow> [args] # plan, preview, verify, and apply changes
+paredit completions <shell>        # shell completion scripts (bash/zsh/fish/...)
 ```
 
 Run `paredit --help`, then `paredit <namespace> --help` for the complete
-command list. All commands are available only through these three namespaces.
+command list. All source-facing commands live in these three namespaces;
+`completions` is the only meta command. For machine-readable discovery, run:
+
+```sh
+paredit inspect capabilities --output json  # full catalog of commands and flags
+```
 
 ## Quick Start
 
 ```sh
 paredit inspect check --file src/example.lisp
 paredit inspect outline --file src/example.lisp
+paredit edit wrap --file src/example.lisp --path 0.2 --diff
 paredit refactor plan --symbol old-name src/example.lisp
 ```
 

@@ -102,6 +102,7 @@ fn print_inline_function_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": plan.dialect.label(),
                 "definition_path": plan.definition_path.to_string(),
                 "call_path": plan.call_paths.first().map(ToString::to_string),

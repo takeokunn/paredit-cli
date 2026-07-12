@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::args::RenameInFormArgs;
 use super::render::scoped_form::print_rename_in_form_plan;
-use super::shared::rename_target;
+use super::shared::{ensure_rename_changed, rename_target};
 use crate::application::usecase::rename as rename_usecase;
 
 pub(in crate::presentation::cli) fn rename_in_form(args: RenameInFormArgs) -> Result<()> {
@@ -25,5 +25,6 @@ pub(in crate::presentation::cli) fn rename_in_form(args: RenameInFormArgs) -> Re
         write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
 
-    print_rename_in_form_plan(&plan, written, args.output)
+    print_rename_in_form_plan(&plan, written, args.output)?;
+    ensure_rename_changed(args.fail_on_no_change, plan.changed, "rename-in-form")
 }

@@ -93,6 +93,7 @@ fn print_plan(plan: &ExtractConstantPlan, written: bool, output: OutputFormat) -
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": plan.dialect.label(),
                 "path": plan.path.to_string(),
                 "span": { "start": plan.span_start, "end": plan.span_end },

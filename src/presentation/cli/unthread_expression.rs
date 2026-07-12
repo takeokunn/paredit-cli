@@ -107,6 +107,7 @@ fn print_unthread_expression_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": plan.dialect.label(),
                 "path": plan.path.as_ref().map(ToString::to_string),
                 "style": plan.style.label(),

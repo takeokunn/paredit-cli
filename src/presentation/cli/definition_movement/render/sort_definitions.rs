@@ -35,6 +35,7 @@ pub(in crate::presentation::cli::definition_movement) fn print_sort_definitions_
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "command": "sort-definitions",
                 "file": plan.file,
                 "dialect": plan.dialect.label(),

@@ -32,6 +32,7 @@ pub(in crate::presentation::cli::rename) fn print_rename_in_form_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": plan.dialect.label(),
                 "path": plan.path.as_ref().map(ToString::to_string),
                 "scope_span": {

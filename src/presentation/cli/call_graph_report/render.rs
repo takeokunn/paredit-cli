@@ -82,6 +82,7 @@ pub(super) fn print_call_graph_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "symbol": symbol.map(SymbolName::as_str),
                 "includeExternal": include_external,
                 "file_count": reports.len(),

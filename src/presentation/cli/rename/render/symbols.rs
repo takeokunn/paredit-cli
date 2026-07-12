@@ -31,6 +31,7 @@ pub(in crate::presentation::cli::rename) fn print_rename_symbols_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "from": from.as_str(),
                 "to": to.as_str(),
                 "write": write,

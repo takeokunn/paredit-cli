@@ -18,6 +18,7 @@ pub(in crate::presentation::cli::package::render) fn print_merge_package_options
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "path": plan.path.display().to_string(),
             "dialect": plan.dialect.label(),
             "merge_count": merge_count,
@@ -72,6 +73,7 @@ pub(in crate::presentation::cli::package::render) fn print_sort_package_options_
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "path": plan.path.display().to_string(),
             "dialect": plan.dialect.label(),
             "package_count": package_count,
@@ -107,6 +109,7 @@ pub(in crate::presentation::cli::package::render) fn print_sort_package_exports_
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "path": plan.path.display().to_string(),
             "dialect": plan.dialect.label(),
             "export_count": export_count,
@@ -153,6 +156,7 @@ pub(in crate::presentation::cli::package::render) fn print_rename_package_plan(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "from": from.as_str(),
             "to": to.as_str(),
             "write": write,
@@ -194,6 +198,7 @@ pub(in crate::presentation::cli::package::render) fn print_add_export_plan(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "path": plan.path.display().to_string(),
             "dialect": plan.dialect.label(),
             "package": plan.package.as_str(),

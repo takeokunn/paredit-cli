@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
-use super::{DialectArg, SourceInput, TargetArgs};
+use super::{DialectArg, EditTargetArgs, SourceInput};
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
@@ -16,8 +16,8 @@ mod io;
 
 pub(crate) use diff::unified_diff;
 pub(crate) use io::{
-    read_file_or_empty, read_input, read_input_and_dialect, read_input_dialect_and_tree,
-    write_file_with_rollback, write_files_with_rollback,
+    parse_document, read_file_or_empty, read_input, read_input_and_dialect,
+    read_input_dialect_and_tree, write_file_with_rollback, write_files_with_rollback,
 };
 
 pub(crate) fn apply_byte_span_edits(
@@ -122,13 +122,44 @@ pub(crate) fn matching_symbol_occurrences(
 }
 
 pub(crate) fn edit_target(
-    args: TargetArgs,
+    args: EditTargetArgs,
     f: fn(&str, &SyntaxTree, Selection<'_>) -> Result<String>,
 ) -> Result<()> {
-    let input = read_input(args.file)?;
-    let tree = SyntaxTree::parse(&input.text)?;
-    let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-    print!("{}", f(&input.text, &tree, selection)?);
+    let target = args.target;
+    let input = read_input(target.file)?;
+    let tree = parse_document(&input)?;
+    let selection = resolve_target(&tree, target.path.as_ref(), target.at)?;
+    let rewritten = f(&input.text, &tree, selection)?;
+    emit_document(&input, args.write, args.diff, rewritten)
+}
+
+/// Print the rewritten document to stdout, or with `write` persist it back to
+/// the source file after confirming the result still parses as a balanced
+/// document. With `diff`, stdout carries a unified diff against the input
+/// instead of the whole rewritten document.
+pub(crate) fn emit_document(
+    input: &SourceInput,
+    write: bool,
+    diff: bool,
+    rewritten: String,
+) -> Result<()> {
+    if write {
+        let path = require_output_file(input.file.as_ref())?.clone();
+        SyntaxTree::parse(&rewritten)
+            .context("refusing to write: rewritten source does not reparse")?;
+        if diff {
+            print!("{}", unified_diff(&path, &input.text, &rewritten));
+        }
+        return write_file_with_rollback(path, rewritten);
+    }
+
+    if diff {
+        let path = input.file.clone().unwrap_or_else(|| PathBuf::from("stdin"));
+        print!("{}", unified_diff(&path, &input.text, &rewritten));
+        return Ok(());
+    }
+
+    print!("{rewritten}");
     Ok(())
 }
 

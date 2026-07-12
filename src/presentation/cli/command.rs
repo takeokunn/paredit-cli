@@ -1,9 +1,9 @@
 use super::{
-    args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
-    call_graph_report, call_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_report, extract_constant, extract_function, form_report,
-    function_parameter, impact_report, inline_function, inline_let, introduce_let, let_report,
-    package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
+    args::{AnalyzeArgs, EditTargetArgs, FormatArgs, ReplaceArgs, TargetArgs},
+    call_graph_report, call_report, capabilities, definition_movement, definition_removal,
+    definition_report, dependency_report, duplicate_report, extract_constant, extract_function,
+    form_report, function_parameter, impact_report, inline_function, inline_let, introduce_let,
+    let_report, package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
     similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
     workspace_report,
 };
@@ -11,15 +11,20 @@ use clap::Subcommand;
 
 /// Read-only inventory and analysis commands.
 #[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit inspect check --file src/foo.lisp\n  paredit inspect outline --file src/foo.lisp --output json\n  paredit inspect symbols --symbol old-name --output json src/a.lisp src/b.lisp\n  paredit inspect workspace --output json .\n  paredit inspect capabilities --output json"
+)]
 pub(super) enum InspectCommand {
     /// Validate that input is a balanced S-expression document.
-    Check(InputArgs),
+    Check(AnalyzeArgs),
     /// Detect Lisp dialect from --file extension or explicit --dialect.
     Dialect(AnalyzeArgs),
     /// Print parse, dialect, and structural metrics for agent planning.
     Stats(AnalyzeArgs),
     /// Print a complete JSON report for AI coding agent refactor planning.
     AgentReport(AnalyzeArgs),
+    /// Print a machine-readable catalog of every command, flag, default, and enum value.
+    Capabilities(capabilities::CapabilitiesArgs),
     /// Print top-level forms with paths, spans, and definition hints.
     Outline(AnalyzeArgs),
     /// Report one selected form with local structure for agent refactor planning.
@@ -54,8 +59,13 @@ pub(super) enum InspectCommand {
     Lets(let_report::LetReportArgs),
 }
 
-/// Single-document structural editing commands. These print rewritten source to stdout.
+/// Single-document structural editing commands. These print rewritten source
+/// to stdout by default; mutating commands accept --write to update --file in
+/// place with reparse validation and rollback.
 #[derive(Debug, Subcommand)]
+#[command(
+    after_help = "Examples:\n  paredit edit select --file src/foo.lisp --path 0.2\n  paredit edit wrap --file src/foo.lisp --path 0.2 --diff\n  paredit edit wrap --file src/foo.lisp --path 0.2 --write\n  paredit edit replace --file src/foo.lisp --at 120 --with '(new-form)' --write\n\nWithout --write the rewritten document is printed to stdout and the file is untouched.\nUse --diff to print a unified diff instead of the whole rewritten document."
+)]
 pub(super) enum EditCommand {
     /// Print a canonical, indentation-based rendering.
     Format(FormatArgs),
@@ -64,21 +74,21 @@ pub(super) enum EditCommand {
     /// Replace the selected S-expression with replacement text.
     Replace(ReplaceArgs),
     /// Remove the selected S-expression.
-    Kill(TargetArgs),
+    Kill(EditTargetArgs),
     /// Wrap the selected S-expression in a new list.
-    Wrap(TargetArgs),
+    Wrap(EditTargetArgs),
     /// Remove one list pair while keeping its children.
-    Splice(TargetArgs),
+    Splice(EditTargetArgs),
     /// Replace the selected expression's parent list with the selected expression.
-    Raise(TargetArgs),
+    Raise(EditTargetArgs),
     /// Pull the next sibling into the selected list.
-    SlurpForward(TargetArgs),
+    SlurpForward(EditTargetArgs),
     /// Pull the previous sibling into the selected list.
-    SlurpBackward(TargetArgs),
+    SlurpBackward(EditTargetArgs),
     /// Push the last child out of the selected list.
-    BarfForward(TargetArgs),
+    BarfForward(EditTargetArgs),
     /// Push the first child out of the selected list.
-    BarfBackward(TargetArgs),
+    BarfBackward(EditTargetArgs),
 }
 
 #[derive(Debug, Subcommand)]
@@ -194,7 +204,7 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: InspectCommand,
     },
-    /// Structural edits on one selected form. Rewritten source is printed to stdout.
+    /// Structural edits on one selected form. Prints rewritten source to stdout, or updates --file in place with --write.
     Edit {
         #[command(subcommand)]
         command: EditCommand,
@@ -203,5 +213,11 @@ pub(super) enum Command {
     Refactor {
         #[command(subcommand)]
         command: RefactorCommand,
+    },
+    /// Print a shell completion script to stdout.
+    Completions {
+        /// Shell to generate a completion script for.
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
     },
 }

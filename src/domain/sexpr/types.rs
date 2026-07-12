@@ -58,6 +58,11 @@ impl ByteSpan {
         self.start.get() <= offset.get() && offset.get() < self.end.get()
     }
 
+    /// Returns `true` when `inner` lies entirely inside this span.
+    pub fn contains_span(&self, inner: ByteSpan) -> bool {
+        self.start.get() <= inner.start.get() && inner.end.get() <= self.end.get()
+    }
+
     /// Exposes the span as a Rust range over byte indexes.
     pub fn as_range(&self) -> Range<usize> {
         self.start.get()..self.end.get()

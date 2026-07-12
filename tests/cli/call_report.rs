@@ -213,3 +213,24 @@ fn cli_skips_reader_eval_bodies_when_reporting_calls() {
         .stdout(predicate::str::contains("\"head\": \"list\"").not())
         .stdout(predicate::str::contains("\"head\": \"function\"").not());
 }
+
+#[test]
+fn cli_calls_require_calls_gate_fails_on_undermatch() {
+    let dir = fresh_temp_dir("calls-require-calls");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(foo 1)\n(bar (foo 2))\n").expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.args([
+        "inspect",
+        "calls",
+        "--symbol",
+        "foo",
+        "--require-calls",
+        "5",
+    ])
+    .arg(&file)
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("require-calls policy failed"));
+}

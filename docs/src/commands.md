@@ -1,16 +1,25 @@
 # Command model
 
-Every command belongs to one of three namespaces. This gives automation a
-stable first decision: inspect, edit, or refactor.
+Every source-facing command belongs to one of three namespaces. This gives
+automation a stable first decision: inspect, edit, or refactor.
 
 - `paredit inspect` reads and reports without writing.
-- `paredit edit` transforms one selected form and writes source to stdout.
+- `paredit edit` transforms one selected form; stdout by default, `--diff`
+  for a unified diff, `--write` to update the file in place.
 - `paredit refactor` plans, previews, verifies, and applies semantic changes.
 
-There are no top-level command aliases outside these namespaces. Run
-`paredit <namespace> --help` for the authoritative list on your installed
+The only command outside these namespaces is the `paredit completions
+<shell>` meta command, which prints shell completion scripts for bash, zsh,
+fish, elvish, and powershell.
+
+Run `paredit <namespace> --help` for the authoritative list on your installed
 version, and `paredit <namespace> <command> --help` for each command's
-contract, arguments, and output formats.
+contract, arguments, and output formats. For a machine-readable catalog of
+the entire surface in one call, run:
+
+```sh
+paredit inspect capabilities --output json
+```
 
 ## Inspect
 
@@ -23,6 +32,7 @@ discovery, impact analysis, and preflight checks.
 | `dialect` | Detect Lisp dialect from `--file` extension or explicit `--dialect`. |
 | `stats` | Print parse, dialect, and structural metrics for agent planning. |
 | `agent-report` | Print a complete JSON report for AI coding agent refactor planning. |
+| `capabilities` | Print a machine-readable catalog of every command, flag, default, and enum value. |
 | `outline` | Print top-level forms with paths, spans, and definition hints. |
 | `form` | Report one selected form with local structure for refactor planning. |
 | `find-symbol` | Find exact atom occurrences without touching strings or comments. |
@@ -44,9 +54,16 @@ Most reports accept `--output json` for machine-readable results.
 
 ## Edit
 
-`paredit edit` makes one structural transformation and writes the resulting
-source to standard output. Files are never modified in place; review the
-output before redirecting it.
+`paredit edit` makes one structural transformation on the form selected by
+`--path` or `--at` (see [Selecting forms](selectors.md)). By default the
+rewritten document is printed to standard output and the file is untouched.
+Mutating commands also accept:
+
+- `--diff` — print a unified diff against the input instead of the whole
+  rewritten document.
+- `--write` — persist the result back to `--file`. The write is refused if
+  the rewritten document no longer parses, and file writes are staged with
+  automatic rollback.
 
 | Command | Purpose |
 | --- | --- |
@@ -62,10 +79,12 @@ output before redirecting it.
 | `barf-forward` | Push the last child out of the selected list. |
 | `barf-backward` | Push the first child out of the selected list. |
 
-For example:
+For example, preview then apply a wrap of the third child of the first
+top-level form:
 
 ```sh
-paredit edit wrap --file source.lisp --start 0 --end 5 --wrapper list
+paredit edit wrap --file source.lisp --path 0.2 --diff
+paredit edit wrap --file source.lisp --path 0.2 --write
 ```
 
 ## Refactor
@@ -116,6 +135,7 @@ plan/preview/verify/apply lifecycle.
 
 | Command | Purpose |
 | --- | --- |
+| `rename-at` | Rename whatever symbol occupies a byte offset, dispatching to the owning namespace and scope. |
 | `rename-symbol` | Rename exact atom occurrences without touching strings or comments. |
 | `rename-in-form` | Rename exact atom occurrences inside one selected form. |
 | `rename-binding` | Rename one local binding and only the references in its lexical scope. |

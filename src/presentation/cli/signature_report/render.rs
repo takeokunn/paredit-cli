@@ -109,6 +109,7 @@ fn print_json_report(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "symbol": symbol.map(SymbolName::as_str),
             "file_count": reports.len(),
             "definition_count": policy.definition_count,

@@ -32,6 +32,7 @@ pub(in crate::presentation::cli::rename) fn print_rename_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": dialect.label(),
                 "from": from.as_str(),
                 "to": to.as_str(),
