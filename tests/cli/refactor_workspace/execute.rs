@@ -1,6 +1,77 @@
 use super::*;
 
 #[test]
+fn cli_executes_workspace_refactor_with_reference_only_rename_context() {
+    let dir = fresh_temp_dir("workspace refactor-execute-reference-only-rename");
+    let file = dir.join("core.lisp");
+    let original = "(defun demo ()\n  foo)\n";
+    write_fixture(&file, original);
+
+    let mut cmd = paredit();
+    let assert = cmd
+        .args(["refactor", "workspace-execute"])
+        .arg("--from")
+        .arg("foo")
+        .arg("--to")
+        .arg("message-text")
+        .arg("--mode")
+        .arg("symbol")
+        .arg("--write")
+        .arg("--fail-on-no-change")
+        .arg("--fail-on-parse-error")
+        .arg("--require-changed-files")
+        .arg("1")
+        .arg("--require-edits")
+        .arg("1")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "\"command\": \"refactor workspace-execute\"",
+        ))
+        .stdout(predicate::str::contains("\"status\": \"ready-to-write\""))
+        .stdout(predicate::str::contains("\"status\": \"write-applied\""))
+        .stdout(predicate::str::contains(
+            "\"reason\": \"write-and-post-verification-passed\"",
+        ))
+        .stdout(predicate::str::contains("\"write_applied\": true"))
+        .stdout(predicate::str::contains(
+            "\"post_verification_passed\": true",
+        ))
+        .stdout(predicate::str::contains("\"pre_verification\""))
+        .stdout(predicate::str::contains("\"post_verification\""))
+        .stdout(predicate::str::contains("\"code\": \"no-definition\""))
+        .stdout(predicate::str::contains("\"code\": \"new-symbol-present\""))
+        .stdout(predicate::str::contains("\"passed\": true"))
+        .stdout(predicate::str::contains("\"write_blocked\": false"));
+
+    let report = parse_cli_json(&assert.get_output().stdout);
+    assert_eq!(
+        report["outcome"]["summary"]["write_applied"],
+        serde_json::Value::Bool(true)
+    );
+    assert_eq!(
+        report["outcome"]["summary"]["post_verification_passed"],
+        serde_json::Value::Bool(true)
+    );
+    assert_eq!(
+        report["pre_verification"]["phase"],
+        serde_json::Value::String("pre".to_string())
+    );
+    assert_eq!(
+        report["post_verification"]["phase"],
+        serde_json::Value::String("post".to_string())
+    );
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read rewritten reference-only fixture"),
+        "(defun demo ()\n  message-text)\n"
+    );
+}
+
+#[test]
 fn cli_executes_workspace_refactor_with_post_verification() {
     let dir = fresh_temp_dir("workspace refactor-execute");
     let lisp_file = dir.join("src/core.lisp");

@@ -16,14 +16,32 @@ pub(super) fn bind_positional_parameter(
     default_scope: &[(String, String)],
     allow_drop_arguments: bool,
 ) -> Result<ParameterBinding> {
-    if let Some(argument) = argument {
-        return supplied_parameter_binding(dialect, param, argument, allow_drop_arguments);
-    }
-
-    missing_parameter_binding(dialect, param, default_scope, allow_drop_arguments)
+    bind_argument_parameter(
+        dialect,
+        param,
+        argument,
+        default_scope,
+        allow_drop_arguments,
+    )
 }
 
 pub(super) fn bind_keyword_parameter(
+    dialect: Dialect,
+    param: &InlineParameter,
+    argument: Option<String>,
+    default_scope: &[(String, String)],
+    allow_drop_arguments: bool,
+) -> Result<ParameterBinding> {
+    bind_argument_parameter(
+        dialect,
+        param,
+        argument,
+        default_scope,
+        allow_drop_arguments,
+    )
+}
+
+fn bind_argument_parameter(
     dialect: Dialect,
     param: &InlineParameter,
     argument: Option<String>,

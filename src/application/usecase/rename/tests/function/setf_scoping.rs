@@ -52,6 +52,23 @@ fn renames_setf_function_designators_inside_reader_quoted_lambda_bodies() {
 }
 
 #[test]
+fn renames_global_setf_place_accessor_inside_ordinary_flet_binding() {
+    assert_function_rename! {
+        input: "(defun accessor (x) x)\n(defun caller (item) (flet ((accessor (x) x)) (setf (accessor item) 1)))",
+        dialect: Dialect::CommonLisp,
+        from: "accessor",
+        to: "slot-accessor",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun slot-accessor (x) x)",
+            "(flet ((accessor (x) x)) (setf (slot-accessor item) 1))"
+        ]
+    };
+}
+
+#[test]
 fn renames_common_lisp_qualified_define_setf_expander_designators_inside_reader_quoted_lambda_bodies()
  {
     assert_function_rename! {

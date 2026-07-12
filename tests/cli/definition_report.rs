@@ -124,6 +124,39 @@ fn cli_reports_unused_definitions_for_dead_code_planning() {
 }
 
 #[test]
+fn cli_reports_unused_definitions_for_dead_code_planning_from_directory() {
+    let dir = fresh_temp_dir("unused-definition-report-directory");
+    let lisp_file = dir.join("core.lisp");
+    let elisp_file = dir.join("mode.el");
+    fs::write(
+        &lisp_file,
+        "(defun used () :ok)\n\
+         (defun caller () (used))\n\
+         (defun unused () (unused))\n",
+    )
+    .expect("write lisp fixture");
+    fs::write(
+        &elisp_file,
+        "(defun demo-mode () (caller))\n\
+         (defun elisp-unused () (message \"unused\"))\n",
+    )
+    .expect("write elisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("unused-definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 2"))
+        .stdout(predicate::str::contains("\"candidate_count\": 3"))
+        .stdout(predicate::str::contains("\"name\": \"unused\""))
+        .stdout(predicate::str::contains("\"name\": \"elisp-unused\""));
+}
+
+#[test]
 fn cli_treats_a_shadowing_let_binding_as_no_reference_to_the_global_definition() {
     // Regression test: `unused-definition-report` must agree with
     // `remove-unused-definitions` on whether a same-named local binding

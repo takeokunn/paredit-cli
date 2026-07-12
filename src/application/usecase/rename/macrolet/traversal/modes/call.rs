@@ -14,6 +14,26 @@ use super::common::{callable_list_head_target, collect_active_atom_rename};
 
 pub(in crate::application::usecase::rename::macrolet) struct CallTraversal;
 
+enum LambdaAtomReaderContext {
+    ExplicitFunction,
+    BareReaderLambda,
+}
+
+fn collect_lambda_atom_renames(
+    child: &ExpressionView,
+    child_path: &Path,
+    context: TraversalContext<'_>,
+    state: TraversalState,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+    reader_context: LambdaAtomReaderContext,
+) -> bool {
+    let scope = match reader_context {
+        LambdaAtomReaderContext::ExplicitFunction => state.scope,
+        LambdaAtomReaderContext::BareReaderLambda => state.reader_lambda_body_scope,
+    };
+    collect_active_atom_rename(child, child_path, context, state, scope, renames)
+}
+
 impl RenameTraversalMode for CallTraversal {
     fn collect_pre_reader_renames(
         view: &ExpressionView,
@@ -95,7 +115,14 @@ impl RenameTraversalMode for CallTraversal {
         state: TraversalState,
         renames: &mut Vec<RenameFunctionOccurrence>,
     ) -> bool {
-        collect_active_atom_rename(child, child_path, context, state, state.scope, renames)
+        collect_lambda_atom_renames(
+            child,
+            child_path,
+            context,
+            state,
+            renames,
+            LambdaAtomReaderContext::ExplicitFunction,
+        )
     }
 
     fn collect_reader_quoted_lambda_atom_renames(
@@ -105,6 +132,13 @@ impl RenameTraversalMode for CallTraversal {
         state: TraversalState,
         renames: &mut Vec<RenameFunctionOccurrence>,
     ) -> bool {
-        collect_active_atom_rename(child, child_path, context, state, state.scope, renames)
+        collect_lambda_atom_renames(
+            child,
+            child_path,
+            context,
+            state,
+            renames,
+            LambdaAtomReaderContext::BareReaderLambda,
+        )
     }
 }

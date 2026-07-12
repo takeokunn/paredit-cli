@@ -26,7 +26,7 @@ pub(in crate::presentation::cli) struct RemoveDefinitionArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct RemoveUnusedDefinitionsArgs {
-    /// Files to scan and optionally rewrite.
+    /// Files or directories to scan and optionally rewrite.
     #[arg(required = true)]
     pub(in crate::presentation::cli::definition_removal) files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
