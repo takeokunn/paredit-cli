@@ -77,8 +77,9 @@ use crate::application::refactor::plan::{
     refactor_verification_checks as application_refactor_verification_checks,
 };
 use crate::application::refactor::preview::{
-    RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewPolicyOptions,
-    RefactorPreviewSummary, evaluate_refactor_preview_policy, refactor_preview_edits,
+    RefactorPreviewEdit, RefactorPreviewPolicy,
+    RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions, RefactorPreviewSummary,
+    evaluate_refactor_preview_policy, refactor_preview_edits,
 };
 use crate::application::usecase::impact_report::{
     ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,

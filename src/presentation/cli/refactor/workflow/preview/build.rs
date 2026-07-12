@@ -12,7 +12,7 @@ pub(in crate::presentation::cli::refactor::workflow) struct BuildRefactorPreview
     pub(in crate::presentation::cli::refactor::workflow) max_preview_bytes: usize,
     pub(in crate::presentation::cli::refactor::workflow) write: bool,
     pub(in crate::presentation::cli::refactor::workflow) policy_options:
-        RefactorPreviewPolicyOptions,
+        DomainRefactorPreviewPolicyOptions,
     pub(in crate::presentation::cli::refactor::workflow) workspace:
         Option<WorkspaceRefactorPlanDiscovery>,
 }

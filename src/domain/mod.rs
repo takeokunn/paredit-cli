@@ -12,6 +12,7 @@ pub mod impact_report;
 pub mod let_report;
 pub mod lexical_scope;
 pub mod refactor_plan;
+pub mod refactor_preview;
 pub mod rename;
 pub mod report_policy;
 pub mod sexpr;

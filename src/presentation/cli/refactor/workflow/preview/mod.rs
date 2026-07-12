@@ -23,14 +23,14 @@ pub(in crate::presentation::cli) fn refactor_preview(args: RefactorPreviewArgs) 
         mode: args.mode,
         max_preview_bytes: args.max_preview_bytes,
         write: args.write,
-        policy_options: RefactorPreviewPolicyOptions {
-            fail_on_no_change: args.fail_on_no_change,
-            fail_on_parse_error: args.fail_on_parse_error,
-            fail_on_target_conflict: args.fail_on_target_conflict,
-            require_changed_files: args.require_changed_files,
-            require_definitions: args.require_definitions,
-            require_edits: args.require_edits,
-        },
+        policy_options: preview_policy_options(
+            args.fail_on_no_change,
+            args.fail_on_parse_error,
+            args.fail_on_target_conflict,
+            args.require_changed_files,
+            args.require_definitions,
+            args.require_edits,
+        )?,
         workspace: None,
         manifest_out: args.manifest_out,
         output: args.output,
@@ -58,19 +58,38 @@ pub(in crate::presentation::cli) fn workspace_refactor_preview(
         mode: args.mode,
         max_preview_bytes: args.max_preview_bytes,
         write: args.write,
-        policy_options: RefactorPreviewPolicyOptions {
-            fail_on_no_change: args.fail_on_no_change,
-            fail_on_parse_error: args.fail_on_parse_error,
-            fail_on_target_conflict: args.fail_on_target_conflict,
-            require_changed_files: args.require_changed_files,
-            require_definitions: args.require_definitions,
-            require_edits: args.require_edits,
-        },
+        policy_options: preview_policy_options(
+            args.fail_on_no_change,
+            args.fail_on_parse_error,
+            args.fail_on_target_conflict,
+            args.require_changed_files,
+            args.require_definitions,
+            args.require_edits,
+        )?,
         workspace: Some(workspace.workspace),
         manifest_out: args.manifest_out,
         output: args.output,
         failure_label: "refactor workspace-preview",
     })
+}
+
+fn preview_policy_options(
+    fail_on_no_change: bool,
+    fail_on_parse_error: bool,
+    fail_on_target_conflict: bool,
+    require_changed_files: Option<usize>,
+    require_definitions: Option<usize>,
+    require_edits: Option<usize>,
+) -> Result<DomainRefactorPreviewPolicyOptions> {
+    DomainRefactorPreviewPolicyOptions::new(
+        fail_on_no_change,
+        fail_on_parse_error,
+        fail_on_target_conflict,
+        require_changed_files,
+        require_definitions,
+        require_edits,
+    )
+    .map_err(anyhow::Error::msg)
 }
 
 struct RefactorPreviewEmission<'a> {
@@ -81,7 +100,7 @@ struct RefactorPreviewEmission<'a> {
     mode: RefactorPreviewMode,
     max_preview_bytes: usize,
     write: bool,
-    policy_options: RefactorPreviewPolicyOptions,
+    policy_options: DomainRefactorPreviewPolicyOptions,
     workspace: Option<WorkspaceRefactorPlanDiscovery>,
     manifest_out: Option<PathBuf>,
     output: OutputFormat,
