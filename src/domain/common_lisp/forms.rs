@@ -54,7 +54,22 @@ pub(crate) enum CommonLispValueScopeForm {
     Iteration,
     Variable(CommonLispVariableBindingForm),
     Slot,
+    Resource(CommonLispResourceBindingForm),
     LocalCallable(CommonLispLocalCallableForm),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CommonLispResourceBindingForm {
+    OpenFile,
+    OpenStream,
+    InputFromString,
+    OutputToString,
+}
+
+impl CommonLispResourceBindingForm {
+    pub(crate) const fn body_start_index(self) -> usize {
+        2
+    }
 }
 
 /// A form body whose leading declarations apply to every following body form.
@@ -169,7 +184,7 @@ impl CommonLispValueScopeForm {
     /// parsed lambda-list position instead.
     pub(crate) const fn declaration_scope(self) -> Option<CommonLispDeclarationScope> {
         match self {
-            Self::Let(_) | Self::Lambda | Self::LocalCallable(_) => {
+            Self::Let(_) | Self::Lambda | Self::LocalCallable(_) | Self::Resource(_) => {
                 Some(CommonLispDeclarationScope::new(2))
             }
             Self::Definition | Self::Value | Self::Slot => {

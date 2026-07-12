@@ -1,8 +1,12 @@
+use std::iter;
+
+use crate::domain::common_lisp::CommonLispResourceBindingForm;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::bindings::extract_function_binding_entries;
 use super::super::patterns::parameter_names;
+use super::super::super::syntax::atom_text;
 use super::{extend_extract_function_bound_params, slot_spec_bound_name};
 
 pub(super) fn collect_inferred_extract_function_let(
@@ -369,4 +373,46 @@ fn collect_bodies(
             params,
         );
     }
+}
+
+pub(super) fn collect_inferred_extract_function_resource_binding(
+    dialect: Dialect,
+    view: &ExpressionView,
+    explicit_params: &[String],
+    bound_params: &[String],
+    params: &mut Vec<String>,
+    resource_form: CommonLispResourceBindingForm,
+) -> bool {
+    let Some(binding_spec) = view.children.get(1) else {
+        return false;
+    };
+    let Some(binding_name) = binding_spec.children.first().and_then(atom_text) else {
+        return false;
+    };
+
+    for initializer in binding_spec.children.iter().skip(1) {
+        super::super::collect_inferred_extract_function_params(
+            dialect,
+            initializer,
+            false,
+            explicit_params,
+            bound_params,
+            params,
+        );
+    }
+
+    let body_bound_params =
+        extend_extract_function_bound_params(dialect, bound_params, iter::once(binding_name));
+    for body_form in view.children.iter().skip(resource_form.body_start_index()) {
+        super::super::collect_inferred_extract_function_params(
+            dialect,
+            body_form,
+            false,
+            explicit_params,
+            &body_bound_params,
+            params,
+        );
+    }
+
+    true
 }

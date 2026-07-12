@@ -12,8 +12,8 @@ pub(crate) use forms::{
     CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispBindingReferenceScope,
     CommonLispDeclarationScope, CommonLispHandlerBindingForm, CommonLispLambdaListShape,
     CommonLispLetBindingForm, CommonLispLocalCallableForm, CommonLispPackageDeclarationForm,
-    CommonLispRuntimeDependencyForm, CommonLispSlotBindingForm, CommonLispValueScopeForm,
-    CommonLispVariableBindingForm, CommonLispVariableSpecForm,
+    CommonLispResourceBindingForm, CommonLispRuntimeDependencyForm, CommonLispSlotBindingForm,
+    CommonLispValueScopeForm, CommonLispVariableBindingForm, CommonLispVariableSpecForm,
 };
 pub(crate) use operator::{
     CommonLispOperator, common_lisp_binding_refactor_form_for_head, common_lisp_operator_head_eq,
