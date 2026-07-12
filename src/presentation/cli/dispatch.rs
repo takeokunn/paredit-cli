@@ -189,6 +189,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::IntroduceLet(args) => introduce_let::introduce_let(args)?,
             command::RefactorCommand::InlineLet(args) => inline_let::inline_let(args)?,
+            command::RefactorCommand::ConvertLetStarToLet(args) => {
+                convert_let_star_to_let::convert_let_star_to_let(args)?
+            }
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?
             }

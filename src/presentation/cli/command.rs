@@ -1,11 +1,12 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
-    call_graph_report, call_report, definition_movement, definition_removal, definition_report,
-    dependency_report, duplicate_report, extract_constant, extract_function,
-    extract_local_function, form_report, function_parameter, impact_report, inline_function,
-    inline_lambda, inline_let, inline_local_function, introduce_let, let_report, package, refactor,
-    remove_unused_binding, rename, replace_forms, signature_report, similarity_report,
-    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
+    call_graph_report, call_report, convert_let_star_to_let, definition_movement,
+    definition_removal, definition_report, dependency_report, duplicate_report, extract_constant,
+    extract_function, extract_local_function, form_report, function_parameter, impact_report,
+    inline_function, inline_lambda, inline_let, inline_local_function, introduce_let, let_report,
+    package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
+    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -193,6 +194,8 @@ pub(super) enum RefactorCommand {
     IntroduceLet(introduce_let::IntroduceLetArgs),
     /// Inline a single local let binding into its body.
     InlineLet(inline_let::InlineLetArgs),
+    /// Convert an independent Common Lisp let* form into let.
+    ConvertLetStarToLet(convert_let_star_to_let::ConvertLetStarToLetArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }

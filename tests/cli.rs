@@ -15,6 +15,8 @@ mod analysis_report;
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
 mod call_report;
+#[path = "cli/convert_let_star_to_let.rs"]
+mod convert_let_star_to_let;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
 #[path = "cli/definition_movement.rs"]

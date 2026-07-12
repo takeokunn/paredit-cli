@@ -4,6 +4,7 @@ mod basic_edit;
 mod call_graph_report;
 mod call_report;
 mod command;
+mod convert_let_star_to_let;
 mod definition_movement;
 mod definition_removal;
 mod definition_report;
