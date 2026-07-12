@@ -200,9 +200,22 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::ConvertLetStarToLet(args) => {
                 convert_let_star_to_let::convert_let_star_to_let(args)?
             }
+            command::RefactorCommand::ConvertDoStarToDo(args) => {
+                convert_sequential_binding::convert_do_star_to_do(args)?
+            }
+            command::RefactorCommand::ConvertProgStarToProg(args) => {
+                convert_sequential_binding::convert_prog_star_to_prog(args)?
+            }
             command::RefactorCommand::MergeNestedLetStar(args) => {
                 merge_nested_let_star::merge_nested_let_star(args)?
             }
+            command::RefactorCommand::SplitLetStar(args) => {
+                split_let_star::split_let_star(args)?
+            }
+            command::RefactorCommand::EliminateEmptyBindingForm(args) => {
+                eliminate_empty_binding_form::eliminate_empty_binding_form(args)?
+            }
+            command::RefactorCommand::FlattenProgn(args) => flatten_progn::flatten_progn(args)?,
             command::RefactorCommand::ConvertIfToCond(args) => {
                 convert_if_to_cond::convert_if_to_cond(args)?
             }
@@ -223,6 +236,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::ConvertLabelsToFlet(args) => {
                 convert_labels_to_flet::convert_labels_to_flet(args)?
+            }
+            command::RefactorCommand::ConvertFletToLabels(args) => {
+                convert_flet_to_labels::convert_flet_to_labels(args)?
             }
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?

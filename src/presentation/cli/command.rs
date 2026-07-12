@@ -1,14 +1,15 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
-    call_graph_report, call_report, convert_cond_to_if, convert_if_to_cond, convert_if_to_unless,
-    convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let, convert_let_to_let_star,
-    convert_unless_to_if, convert_when_to_if, definition_movement, definition_removal,
-    definition_report, dependency_report, duplicate_report, extract_constant, extract_function,
-    extract_local_function, form_report, function_parameter, impact_report, inline_function,
-    inline_lambda, inline_let, inline_local_function, inline_symbol_macro, introduce_let, let_report,
-    merge_nested_let_star, package, refactor, remove_unused_binding, rename, rename_control,
-    replace_forms, signature_report, similarity_report, symbol_report, thread_expression,
-    unthread_expression, unwrap_call, workspace_report,
+    call_graph_report, call_report, convert_cond_to_if, convert_flet_to_labels, convert_if_to_cond,
+    convert_if_to_unless, convert_if_to_when, convert_labels_to_flet, convert_let_star_to_let,
+    convert_let_to_let_star, convert_sequential_binding, convert_unless_to_if, convert_when_to_if,
+    definition_movement, definition_removal, definition_report, dependency_report,
+    duplicate_report, eliminate_empty_binding_form, extract_constant, extract_function,
+    extract_local_function, flatten_progn, form_report, function_parameter, impact_report,
+    inline_function, inline_lambda, inline_let, inline_local_function, inline_symbol_macro,
+    introduce_let, let_report, merge_nested_let_star, package, refactor, remove_unused_binding,
+    rename, rename_control, replace_forms, signature_report, similarity_report, split_let_star,
+    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
 
@@ -206,8 +207,18 @@ pub(super) enum RefactorCommand {
     ConvertLetToLetStar(convert_let_to_let_star::ConvertLetToLetStarArgs),
     /// Convert an independent Common Lisp let* form into let.
     ConvertLetStarToLet(convert_let_star_to_let::ConvertLetStarToLetArgs),
+    /// Convert an independent Common Lisp do* form into do.
+    ConvertDoStarToDo(convert_sequential_binding::ConvertDoStarToDoArgs),
+    /// Convert an independent Common Lisp prog* form into prog.
+    ConvertProgStarToProg(convert_sequential_binding::ConvertProgStarToProgArgs),
     /// Merge a directly nested Common Lisp or Emacs Lisp let* form.
     MergeNestedLetStar(merge_nested_let_star::MergeNestedLetStarArgs),
+    /// Split a Common Lisp or Emacs Lisp let* at a binding boundary.
+    SplitLetStar(split_let_star::SplitLetStarArgs),
+    /// Remove an empty Common Lisp or Emacs Lisp let or let* in an expression position.
+    EliminateEmptyBindingForm(eliminate_empty_binding_form::EliminateEmptyBindingFormArgs),
+    /// Flatten directly nested progn forms in a conservative expression context.
+    FlattenProgn(flatten_progn::FlattenPrognArgs),
     /// Convert a Common Lisp or Emacs Lisp if form into cond.
     ConvertIfToCond(convert_if_to_cond::ConvertIfToCondArgs),
     /// Convert a Common Lisp or Emacs Lisp cond form into nested if forms.
@@ -222,6 +233,8 @@ pub(super) enum RefactorCommand {
     ConvertIfToUnless(convert_if_to_unless::ConvertIfToUnlessArgs),
     /// Convert a non-recursive Common Lisp labels form into flet.
     ConvertLabelsToFlet(convert_labels_to_flet::ConvertLabelsToFletArgs),
+    /// Convert a Common Lisp flet form into labels when no definition reference can be captured.
+    ConvertFletToLabels(convert_flet_to_labels::ConvertFletToLabelsArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }

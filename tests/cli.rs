@@ -19,6 +19,8 @@ mod call_report;
 mod conditional_conversion;
 #[path = "cli/convert_cond_to_if.rs"]
 mod convert_cond_to_if;
+#[path = "cli/convert_flet_to_labels.rs"]
+mod convert_flet_to_labels;
 #[path = "cli/convert_if_to_cond.rs"]
 mod convert_if_to_cond;
 #[path = "cli/convert_labels_to_flet.rs"]
@@ -27,6 +29,8 @@ mod convert_labels_to_flet;
 mod convert_let_star_to_let;
 #[path = "cli/convert_let_to_let_star.rs"]
 mod convert_let_to_let_star;
+#[path = "cli/convert_sequential_binding.rs"]
+mod convert_sequential_binding;
 #[path = "cli/crate_metadata_contract.rs"]
 mod crate_metadata_contract;
 #[path = "cli/definition_movement.rs"]
@@ -39,6 +43,8 @@ mod definition_report;
 mod dependency_report;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
+#[path = "cli/eliminate_empty_binding_form.rs"]
+mod eliminate_empty_binding_form;
 #[path = "cli/edit_transpose.rs"]
 mod edit_transpose;
 #[path = "cli/extract_constant/mod.rs"]
@@ -47,6 +53,8 @@ mod extract_constant;
 mod extract_function;
 #[path = "cli/extract_local_function/mod.rs"]
 mod extract_local_function;
+#[path = "cli/flatten_progn.rs"]
+mod flatten_progn;
 #[path = "cli/form_report.rs"]
 mod form_report;
 #[path = "cli/format/mod.rs"]
@@ -113,6 +121,8 @@ mod replace_forms;
 mod signature_report;
 #[path = "cli/similarity_report.rs"]
 mod similarity_report;
+#[path = "cli/split_let_star.rs"]
+mod split_let_star;
 #[path = "cli/sort_definitions.rs"]
 mod sort_definitions;
 #[path = "cli/split_file.rs"]
