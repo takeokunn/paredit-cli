@@ -144,6 +144,10 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispLocalCallableForm> {
+        if !matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
+            return None;
+        }
+
         self.common_lisp_operator_for_head(head)?.local_callable_form()
     }
 
@@ -161,6 +165,10 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispVariableBindingForm> {
+        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+            return None;
+        }
+
         self.common_lisp_operator_for_head(head)?.variable_binding_form()
     }
 
@@ -211,6 +219,10 @@ impl Dialect {
     }
 
     pub(crate) fn common_lisp_variable_binding_has_step_forms_for_head(self, head: &str) -> bool {
+        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+            return false;
+        }
+
         self.common_lisp_operator_for_head(head)
             .is_some_and(CommonLispOperator::has_variable_step_forms)
     }
@@ -249,10 +261,18 @@ impl Dialect {
         self,
         head: &str,
     ) -> Option<CommonLispPackageDeclarationForm> {
+        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+            return None;
+        }
+
         self.common_lisp_operator_for_head(head)?.package_declaration_form()
     }
 
     pub(crate) fn is_common_lisp_asdf_system_definition_head(self, head: &str) -> bool {
+        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+            return false;
+        }
+
         self.common_lisp_operator_for_head(head)
             .is_some_and(CommonLispOperator::is_asdf_system_definition)
     }
