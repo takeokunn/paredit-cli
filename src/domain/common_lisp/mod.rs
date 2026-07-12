@@ -17,7 +17,8 @@ pub(crate) use forms::{
 };
 pub(crate) use operator::{
     CommonLispOperator, common_lisp_binding_refactor_form_for_head, common_lisp_operator_head_eq,
-    common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,
+    common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
+    common_lisp_symbol_reference_needle, is_common_lisp_declaration_form,
     is_common_lisp_earmuffed_special_variable_name, normalize_common_lisp_operator_head,
 };
 pub(crate) use reader_condition::{
