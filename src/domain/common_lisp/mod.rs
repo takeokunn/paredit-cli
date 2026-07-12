@@ -4,6 +4,7 @@ mod forms;
 mod function_value_namespace;
 mod lambda_bindings;
 mod operator;
+mod reader_escape;
 mod scope;
 
 pub(crate) use forms::{
@@ -23,6 +24,7 @@ pub(crate) use operator::{
     is_common_lisp_earmuffed_special_variable_name, normalize_common_lisp_operator_head,
     CommonLispOperator,
 };
+pub(crate) use reader_escape::common_lisp_reader_escape_diagnostics;
 pub(crate) use scope::{
     common_lisp_local_callable_form, common_lisp_macro_expander_path, is_local_callable_bound,
     is_macro_callable_form, local_callable_binding_body_scope, local_callable_body_scope,

@@ -7,4 +7,5 @@ pub(super) use crate::domain::sexpr::SyntaxTree;
 mod definition;
 mod function_value_namespace;
 mod operator;
+mod reader_escape;
 mod scope;
