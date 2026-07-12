@@ -158,4 +158,8 @@ plan/preview/verify/apply lifecycle.
 | `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. |
 | `convert-if-to-cond` | Convert a Common Lisp or Emacs Lisp `(if test then [else])` form to `cond`. |
 | `convert-cond-to-if` | Convert simple Common Lisp or Emacs Lisp `cond` clauses to nested `if` forms. |
+| `convert-when-to-if` | Convert a Common Lisp or Emacs Lisp `when` form to `if`. |
+| `convert-unless-to-if` | Convert a Common Lisp or Emacs Lisp `unless` form to `if`. |
+| `convert-if-to-when` | Convert a Common Lisp or Emacs Lisp `if` without a meaningful else to `when`. |
+| `convert-if-to-unless` | Convert a Common Lisp or Emacs Lisp `if` with a literal `nil` then branch to `unless`. |
 | `remove-unused-binding` | Plan or remove one unused local let binding. |

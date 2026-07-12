@@ -15,6 +15,8 @@ mod analysis_report;
 mod call_graph_report;
 #[path = "cli/call_report.rs"]
 mod call_report;
+#[path = "cli/conditional_conversion.rs"]
+mod conditional_conversion;
 #[path = "cli/convert_cond_to_if.rs"]
 mod convert_cond_to_if;
 #[path = "cli/convert_if_to_cond.rs"]

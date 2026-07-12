@@ -1,7 +1,8 @@
 use super::{
     args::{AnalyzeArgs, FormatArgs, InputArgs, ReplaceArgs, TargetArgs},
-    call_graph_report, call_report, convert_cond_to_if, convert_if_to_cond,
-    convert_let_star_to_let, definition_movement,
+    call_graph_report, call_report, convert_cond_to_if, convert_if_to_cond, convert_if_to_unless,
+    convert_if_to_when, convert_let_star_to_let, convert_unless_to_if, convert_when_to_if,
+    definition_movement,
     definition_removal, definition_report, dependency_report, duplicate_report, extract_constant,
     extract_function, extract_local_function, form_report, function_parameter, impact_report,
     inline_function, inline_lambda, inline_let, inline_local_function, introduce_let, let_report,
@@ -201,6 +202,14 @@ pub(super) enum RefactorCommand {
     ConvertIfToCond(convert_if_to_cond::ConvertIfToCondArgs),
     /// Convert a Common Lisp or Emacs Lisp cond form into nested if forms.
     ConvertCondToIf(convert_cond_to_if::ConvertCondToIfArgs),
+    /// Convert a Common Lisp or Emacs Lisp when form into if.
+    ConvertWhenToIf(convert_when_to_if::ConvertWhenToIfArgs),
+    /// Convert a Common Lisp or Emacs Lisp unless form into if.
+    ConvertUnlessToIf(convert_unless_to_if::ConvertUnlessToIfArgs),
+    /// Convert a Common Lisp or Emacs Lisp if form without a meaningful else into when.
+    ConvertIfToWhen(convert_if_to_when::ConvertIfToWhenArgs),
+    /// Convert a Common Lisp or Emacs Lisp if form with a nil then branch into unless.
+    ConvertIfToUnless(convert_if_to_unless::ConvertIfToUnlessArgs),
     /// Plan or remove one unused local let binding.
     RemoveUnusedBinding(remove_unused_binding::RemoveUnusedBindingArgs),
 }

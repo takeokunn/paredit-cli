@@ -198,6 +198,10 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::ConvertCondToIf(args) => {
                 convert_cond_to_if::convert_cond_to_if(args)?
             }
+            command::RefactorCommand::ConvertWhenToIf(args) => convert_when_to_if::convert_when_to_if(args)?,
+            command::RefactorCommand::ConvertUnlessToIf(args) => convert_unless_to_if::convert_unless_to_if(args)?,
+            command::RefactorCommand::ConvertIfToWhen(args) => convert_if_to_when::convert_if_to_when(args)?,
+            command::RefactorCommand::ConvertIfToUnless(args) => convert_if_to_unless::convert_if_to_unless(args)?,
             command::RefactorCommand::RemoveUnusedBinding(args) => {
                 remove_unused_binding::remove_unused_binding(args)?
             }
