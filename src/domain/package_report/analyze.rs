@@ -1,11 +1,7 @@
 use anyhow::Result;
 
-use crate::application::usecase::package_report::syntax::{
-    atom_text, is_package_head, package_option_atoms, package_option_name,
-};
-use crate::application::usecase::package_report::types::{
-    InPackageReport, PackageDefinitionReport, PackageImportReport,
-};
+use super::syntax::{atom_text, is_package_head, package_option_atoms, package_option_name};
+use super::types::{InPackageReport, PackageDefinitionReport, PackageImportReport};
 use crate::domain::{
     common_lisp::CommonLispPackageDeclarationForm,
     dialect::Dialect,

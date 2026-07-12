@@ -14,6 +14,7 @@ pub mod form_similarity;
 pub mod impact_report;
 pub mod let_report;
 pub mod lexical_scope;
+pub mod package_report;
 pub mod refactor_execute;
 pub mod refactor_plan;
 pub mod refactor_preview;

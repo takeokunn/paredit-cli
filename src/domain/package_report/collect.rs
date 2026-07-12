@@ -1,11 +1,7 @@
 use anyhow::Result;
 
-use crate::application::usecase::package_report::analyze::{
-    analyze_defpackage_form, analyze_in_package_form,
-};
-use crate::application::usecase::package_report::types::{
-    InPackageReport, PackageDefinitionReport, PackageReport,
-};
+use super::analyze::{analyze_defpackage_form, analyze_in_package_form};
+use super::types::{InPackageReport, PackageDefinitionReport, PackageReport};
 use crate::domain::{
     dialect::Dialect,
     sexpr::{ExpressionView, Path, SyntaxTree},
