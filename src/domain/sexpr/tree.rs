@@ -56,8 +56,6 @@ pub(in crate::domain::sexpr) struct Node {
     pub(in crate::domain::sexpr) span: ByteSpan,
     pub(in crate::domain::sexpr) open: Option<ByteOffset>,
     pub(in crate::domain::sexpr) close: Option<ByteOffset>,
-    pub(in crate::domain::sexpr) text: Option<String>,
-    pub(in crate::domain::sexpr) source_text: Option<String>,
     /// Byte offset from `span.start()` to where an atom's own symbol content
     /// begins, i.e. past its reader prefixes *and* any trivia (whitespace or
     /// comments) between the last prefix and the symbol. Reader prefixes are
@@ -289,7 +287,6 @@ impl SyntaxTree {
     /// assert_eq!(output, "(let ((count 1)) (+ count count))");
     /// ```
     pub fn rename_symbol(&self, input: &str, from: &SymbolName, to: &SymbolName) -> String {
-        let mut output = input.to_owned();
         let mut occurrences = self
             .atom_occurrences()
             .into_iter()
@@ -297,9 +294,18 @@ impl SyntaxTree {
             .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, from.as_str()))
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.span.start());
-        for occurrence in occurrences.into_iter().rev() {
-            output.replace_range(occurrence.span.as_range(), to.as_str());
+        let mut output = String::with_capacity(input.len());
+        let mut cursor = 0usize;
+        for occurrence in occurrences {
+            let range = occurrence.span.as_range();
+            if range.start < cursor {
+                continue;
+            }
+            output.push_str(&input[cursor..range.start]);
+            output.push_str(to.as_str());
+            cursor = range.end;
         }
+        output.push_str(&input[cursor..]);
         output
     }
 
@@ -369,8 +375,7 @@ impl SyntaxTree {
         if node.kind == NodeKind::Atom {
             let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
             if let Some(symbol_text) = (!is_quoted_literal)
-                .then_some(node.text.as_deref())
-                .flatten()
+                .then(|| node.span.slice(&self.source))
                 .and_then(|text| text.get(node.symbol_offset..))
             {
                 let symbol_span = ByteSpan::new(
@@ -409,9 +414,9 @@ impl SyntaxTree {
         if node.kind == NodeKind::Atom {
             if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
                 if let Some(symbol_text) = node
-                    .text
-                    .as_deref()
-                    .and_then(|text| text.get(node.symbol_offset..))
+                    .span
+                    .slice(&self.source)
+                    .get(node.symbol_offset..)
                 {
                     let symbol_span = ByteSpan::new(
                         ByteOffset::new(node.span.start().get() + node.symbol_offset),
@@ -438,7 +443,7 @@ impl SyntaxTree {
         if node.kind != NodeKind::Atom || !node.reader_prefixes.is_empty() {
             return None;
         }
-        node.text.as_deref()
+        Some(node.span.slice(&self.source))
     }
 
     pub(in crate::domain::sexpr) fn expression_view(&self, node_id: NodeId) -> ExpressionView {
@@ -460,7 +465,7 @@ impl SyntaxTree {
                 },
                 node.span.end(),
             ),
-            text: node.text.clone(),
+            text: (node.kind == NodeKind::Atom).then(|| node.span.slice(&self.source).to_string()),
             symbol_offset: node.symbol_offset,
             children: node
                 .children
