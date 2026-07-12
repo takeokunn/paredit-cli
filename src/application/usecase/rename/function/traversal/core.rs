@@ -1,15 +1,13 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::definition::{definition_shape, is_macro_expander_definition};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
-use crate::application::usecase::callable_scope::{
-    LocalCallableName, is_local_callable_bound, is_local_setf_callable_bound,
-};
+use crate::application::usecase::callable_scope::is_local_callable_bound;
 use crate::application::usecase::rename::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
@@ -32,11 +30,10 @@ pub(in crate::application::usecase::rename::function) struct TraversalContext<'a
 
 pub(in crate::application::usecase::rename::function) struct TraversalState<'a> {
     pub(super) path: Path,
-    pub(super) local_callables: &'a [LocalCallableName],
+    pub(super) local_callables: &'a [String],
     pub(super) quasiquote_depth: usize,
     pub(super) in_macro_expander: bool,
     pub(super) shadowed_depth: usize,
-    pub(super) setf_place_accessor: bool,
 }
 
 impl<'a> TraversalState<'a> {
@@ -47,7 +44,6 @@ impl<'a> TraversalState<'a> {
             quasiquote_depth: self.quasiquote_depth,
             in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
-            setf_place_accessor: false,
         }
     }
 
@@ -58,18 +54,16 @@ impl<'a> TraversalState<'a> {
             quasiquote_depth,
             in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
-            setf_place_accessor: self.setf_place_accessor,
         }
     }
 
-    pub(super) fn with_local_callables(&self, local_callables: &'a [LocalCallableName]) -> Self {
+    pub(super) fn with_local_callables(&self, local_callables: &'a [String]) -> Self {
         Self {
             path: self.path.clone(),
             local_callables,
             quasiquote_depth: self.quasiquote_depth,
             in_macro_expander: self.in_macro_expander,
             shadowed_depth: self.shadowed_depth,
-            setf_place_accessor: self.setf_place_accessor,
         }
     }
 
@@ -80,18 +74,6 @@ impl<'a> TraversalState<'a> {
             quasiquote_depth: self.quasiquote_depth,
             in_macro_expander: true,
             shadowed_depth: self.shadowed_depth,
-            setf_place_accessor: self.setf_place_accessor,
-        }
-    }
-
-    pub(super) fn as_setf_place_accessor(&self) -> Self {
-        Self {
-            path: self.path.clone(),
-            local_callables: self.local_callables,
-            quasiquote_depth: self.quasiquote_depth,
-            in_macro_expander: self.in_macro_expander,
-            shadowed_depth: self.shadowed_depth,
-            setf_place_accessor: true,
         }
     }
 }
@@ -100,11 +82,7 @@ pub(in crate::application::usecase::rename::function) fn allows_function_referen
     state: &TraversalState<'_>,
     target_text: &str,
 ) -> bool {
-    (!(if state.setf_place_accessor {
-        is_local_setf_callable_bound(state.local_callables, target_text)
-    } else {
-        is_local_callable_bound(state.local_callables, target_text)
-    }) && state.shadowed_depth == 0)
+    (!is_local_callable_bound(state.local_callables, target_text) && state.shadowed_depth == 0)
         || is_package_qualified_callable(target_text)
 }
 
@@ -137,7 +115,6 @@ pub fn collect_function_call_head_renames(
                 quasiquote_depth: 0,
                 in_macro_expander: false,
                 shadowed_depth: 0,
-                setf_place_accessor: false,
             },
             &mut renames,
         );
@@ -237,13 +214,6 @@ pub(in crate::application::usecase::rename::function) fn collect_function_call_h
         let child_state = state
             .with_quasiquote_depth(0)
             .with_path(state.path.child(index));
-        let child_state = if index == 1
-            && list_head(view).is_some_and(|head| common_lisp_operator_head_eq(head, "setf"))
-        {
-            child_state.as_setf_place_accessor()
-        } else {
-            child_state
-        };
         let child_state =
             if macro_expander_body_range.is_some_and(|range| range.contains_child(index)) {
                 child_state.in_macro_expander()

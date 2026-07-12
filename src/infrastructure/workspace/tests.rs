@@ -11,7 +11,6 @@ fn discovery_skips_unknown_hidden_and_generated_paths_by_default() -> Result<()>
     fs::create_dir_all(root.join("target"))?;
     fs::write(root.join("main.lisp"), "(defun main () nil)")?;
     fs::write(root.join("README.md"), "not lisp")?;
-    fs::write(root.join("compiled.fasl"), b"\x00\x01binary")?;
     fs::write(
         root.join(".hidden").join("secret.lisp"),
         "(defun secret () nil)",
@@ -33,7 +32,7 @@ fn discovery_skips_unknown_hidden_and_generated_paths_by_default() -> Result<()>
     assert_eq!(discovery.files, vec![root.join("main.lisp")]);
     assert_eq!(discovery.skipped_unknown_count, 1);
     assert_eq!(discovery.skipped_hidden_count, 1);
-    assert_eq!(discovery.skipped_generated_count, 2);
+    assert_eq!(discovery.skipped_generated_count, 1);
 
     fs::remove_dir_all(root)?;
     Ok(())

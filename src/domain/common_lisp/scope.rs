@@ -56,50 +56,26 @@ pub(crate) fn is_macro_callable_form(form: CommonLispLocalCallableForm) -> bool 
     form.is_macro()
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum LocalCallableName {
-    Ordinary(String),
-    Setf(String),
-}
-
-impl LocalCallableName {
-    pub(crate) fn is_ordinary_named(&self, name: &str) -> bool {
-        matches!(self, Self::Ordinary(local_name) if common_lisp_symbol_reference_eq(local_name, name))
-    }
-
-    pub(crate) fn ordinary_name(&self) -> Option<&str> {
-        match self {
-            Self::Ordinary(name) => Some(name),
-            Self::Setf(_) => None,
-        }
-    }
-
-    pub(crate) fn is_setf_named(&self, name: &str) -> bool {
-        matches!(self, Self::Setf(local_name) if common_lisp_symbol_reference_eq(local_name, name))
-    }
-}
-
-pub(crate) fn local_callable_names(view: &ExpressionView) -> Vec<LocalCallableName> {
+pub(crate) fn local_callable_names(view: &ExpressionView) -> Vec<String> {
     view.children
         .get(1)
         .into_iter()
         .flat_map(|bindings| bindings.children.iter())
         .filter_map(local_callable_name)
+        .map(ToOwned::to_owned)
         .collect()
 }
 
-pub(crate) fn is_local_callable_bound(scope: &[LocalCallableName], head: &str) -> bool {
-    scope.iter().any(|name| name.is_ordinary_named(head))
-}
-
-pub(crate) fn is_local_setf_callable_bound(scope: &[LocalCallableName], head: &str) -> bool {
-    scope.iter().any(|name| name.is_setf_named(head))
+pub(crate) fn is_local_callable_bound(scope: &[String], head: &str) -> bool {
+    scope
+        .iter()
+        .any(|name| common_lisp_symbol_reference_eq(name, head))
 }
 
 pub(crate) fn local_callable_body_scope(
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     view: &ExpressionView,
-) -> Vec<LocalCallableName> {
+) -> Vec<String> {
     let mut body_scope = local_callables.to_vec();
     body_scope.extend(local_callable_names(view));
     body_scope
@@ -107,9 +83,9 @@ pub(crate) fn local_callable_body_scope(
 
 pub(crate) fn local_callable_binding_body_scope<'a>(
     form: CommonLispLocalCallableForm,
-    local_callables: &'a [LocalCallableName],
-    body_scope: &'a [LocalCallableName],
-) -> &'a [LocalCallableName] {
+    local_callables: &'a [String],
+    body_scope: &'a [String],
+) -> &'a [String] {
     match form {
         CommonLispLocalCallableForm::Labels => body_scope,
         CommonLispLocalCallableForm::Flet
@@ -120,9 +96,9 @@ pub(crate) fn local_callable_binding_body_scope<'a>(
 
 pub(crate) fn local_callable_definition_reference_scope<'a>(
     form: CommonLispLocalCallableForm,
-    local_callables: &'a [LocalCallableName],
-    body_scope: &'a [LocalCallableName],
-) -> &'a [LocalCallableName] {
+    local_callables: &'a [String],
+    body_scope: &'a [String],
+) -> &'a [String] {
     match form {
         CommonLispLocalCallableForm::Labels => local_callables,
         CommonLispLocalCallableForm::Flet
@@ -135,7 +111,7 @@ pub(crate) fn local_callable_scope_at_path(
     tree: &SyntaxTree,
     dialect: Dialect,
     path: &Path,
-) -> Result<Vec<LocalCallableName>> {
+) -> Result<Vec<String>> {
     let indexes = path.to_raw_indexes();
     let Some((&root_index, descendants)) = indexes.split_first() else {
         return Ok(Vec::new());
@@ -150,12 +126,12 @@ fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-fn local_callable_name(binding: &ExpressionView) -> Option<LocalCallableName> {
+fn local_callable_name(binding: &ExpressionView) -> Option<&str> {
     if binding.kind != ExpressionKind::List {
         return None;
     }
     if let Some(name) = atom_child(binding, 0) {
-        return Some(LocalCallableName::Ordinary(name.to_owned()));
+        return Some(name);
     }
 
     let name = binding.children.first()?;
@@ -168,7 +144,7 @@ fn local_callable_name(binding: &ExpressionView) -> Option<LocalCallableName> {
         return None;
     }
 
-    atom_child(name, 1).map(|name| LocalCallableName::Setf(name.to_owned()))
+    atom_child(name, 1)
 }
 
 fn atom_text(view: &ExpressionView) -> Option<&str> {
@@ -181,8 +157,8 @@ fn local_callable_scope_in_view(
     view: &ExpressionView,
     dialect: Dialect,
     remaining_path: &[usize],
-    current_scope: &[LocalCallableName],
-) -> Option<Vec<LocalCallableName>> {
+    current_scope: &[String],
+) -> Option<Vec<String>> {
     if remaining_path.is_empty() {
         return Some(current_scope.to_vec());
     }
@@ -211,9 +187,9 @@ fn scope_for_local_callable_child(
     view: &ExpressionView,
     form: CommonLispLocalCallableForm,
     child_index: usize,
-    current_scope: &[LocalCallableName],
+    current_scope: &[String],
     remaining_path: &[usize],
-) -> Option<Vec<LocalCallableName>> {
+) -> Option<Vec<String>> {
     if child_index >= 2 {
         return Some(local_callable_body_scope(current_scope, view));
     }

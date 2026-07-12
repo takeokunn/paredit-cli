@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
 use super::calls::{
@@ -21,6 +22,7 @@ pub fn plan_move_function_parameter(
     request: MoveFunctionParameterRequest<'_>,
 ) -> Result<MoveFunctionParameterPlan> {
     let tree = SyntaxTree::parse(request.input)?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target =
         parse_move_function_parameter_definition(request.dialect, &tree, &request.definition_path)?;
     let parameter =

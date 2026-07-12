@@ -1,6 +1,7 @@
 use proptest::prelude::*;
 
 use super::*;
+use crate::domain::dialect::Dialect;
 
 #[test]
 fn plans_multiple_replacements_in_reverse_span_order() {
@@ -10,6 +11,7 @@ fn plans_multiple_replacements_in_reverse_span_order() {
     let plan = plan_replace_forms(ReplaceFormsRequest {
         input,
         tree: &tree,
+        dialect: Dialect::CommonLisp,
         paths: vec![Path::from_indexes(vec![0]), Path::from_indexes(vec![1])],
         replacement: "(bar 0)",
         require_same_shape: true,
@@ -34,6 +36,7 @@ fn rejects_duplicate_paths() {
     let error = plan_replace_forms(ReplaceFormsRequest {
         input,
         tree: &tree,
+        dialect: Dialect::CommonLisp,
         paths: vec![Path::from_indexes(vec![0]), Path::from_indexes(vec![0])],
         replacement: "(bar 0)",
         require_same_shape: false,
@@ -51,6 +54,7 @@ fn rejects_shape_mismatch_when_required() {
     let error = plan_replace_forms(ReplaceFormsRequest {
         input,
         tree: &tree,
+        dialect: Dialect::CommonLisp,
         paths: vec![Path::from_indexes(vec![0]), Path::from_indexes(vec![1])],
         replacement: "(bar 0)",
         require_same_shape: true,
@@ -82,6 +86,7 @@ proptest! {
         let plan = plan_replace_forms(ReplaceFormsRequest {
             input: &input,
             tree: &tree,
+            dialect: Dialect::CommonLisp,
             paths: vec![Path::from_indexes(vec![0]), Path::from_indexes(vec![1])],
             replacement: &replacement_text,
             require_same_shape: false,

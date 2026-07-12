@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
 mod export;
@@ -29,6 +30,7 @@ pub use types::*;
 
 pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edit =
         find_defpackage_export_edit(&tree, request.dialect, request.package, request.symbol)?;
     let rewritten = if edit.already_exported {
@@ -54,6 +56,7 @@ pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
 
 pub fn plan_rename_package(request: RenamePackageRequest<'_>) -> Result<RenamePackagePlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let occurrences = package_rename_occurrences(&tree, request.dialect, request.from, request.to)?;
     let rewritten = rewrite_package_occurrences(request.input, &occurrences);
     SyntaxTree::parse(&rewritten)
@@ -70,6 +73,7 @@ pub fn plan_sort_package_exports(
     request: SortPackageExportsRequest<'_>,
 ) -> Result<SortPackageExportsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits =
         defpackage_export_sort_edits(request.input, &tree, request.dialect, request.package)?;
     let replacements = edits
@@ -110,6 +114,7 @@ pub fn plan_sort_package_options(
     request: SortPackageOptionsRequest<'_>,
 ) -> Result<SortPackageOptionsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits = defpackage_option_sort_edits(
         request.input,
         &tree,
@@ -153,6 +158,7 @@ pub fn plan_merge_package_options(
     request: MergePackageOptionsRequest<'_>,
 ) -> Result<MergePackageOptionsPlan> {
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits =
         defpackage_option_merge_edits(request.input, &tree, request.dialect, request.package)?;
     let replacements = edits

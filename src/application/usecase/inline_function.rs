@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
 use crate::domain::sexpr::{
@@ -44,6 +45,7 @@ struct InlineFunctionParts {
 
 pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<InlineFunctionPlan> {
     let tree = SyntaxTree::parse(request.input)?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let definition_selection = tree.select_path(&request.definition_path)?;
     let definition_span = definition_selection.span();
     // Inlining substitutes parsed parameters into the call site; it never

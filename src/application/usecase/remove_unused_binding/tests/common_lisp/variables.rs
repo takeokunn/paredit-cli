@@ -146,6 +146,69 @@ fn all_bindings_skips_earmuffed_special_variable_rebind_with_zero_references() {
 }
 
 #[test]
+fn all_bindings_skips_non_earmuffed_binding_declared_special_by_declaim() {
+    let input = "(declaim (special dynamic))\n(let ((dynamic 1)) (funcall thunk))";
+    let error =
+        remove_unused_binding_error_for(input, Dialect::CommonLisp, Some("1"), None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_skips_non_earmuffed_binding_declared_special_by_defvar() {
+    let input = "(defvar dynamic 0)\n(let ((dynamic 1)) (funcall thunk))";
+    let error =
+        remove_unused_binding_error_for(input, Dialect::CommonLisp, Some("1"), None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_skips_non_earmuffed_binding_declared_special_by_defparameter() {
+    let input = "(defparameter dynamic 0)\n(let ((dynamic 1)) (funcall thunk))";
+    let error =
+        remove_unused_binding_error_for(input, Dialect::CommonLisp, Some("1"), None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_skips_non_earmuffed_binding_declared_special_by_proclaim() {
+    let input = "(proclaim '(special dynamic))\n(let ((dynamic 1)) (funcall thunk))";
+    let error =
+        remove_unused_binding_error_for(input, Dialect::CommonLisp, Some("1"), None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_skips_non_earmuffed_binding_declared_special_by_locally() {
+    let input = "(locally (declare (special dynamic)) (let ((dynamic 1)) (funcall thunk)))";
+    let error =
+        remove_unused_binding_error_for(input, Dialect::CommonLisp, Some("0.2"), None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_skips_non_earmuffed_binding_declared_special_in_its_own_body() {
+    let input = "(let ((dynamic 1)) (declare (special dynamic)) (funcall thunk))";
+    let error = common_lisp_error(input, None, true, true);
+
+    assert!(error.contains("found no unused bindings"));
+}
+
+#[test]
+fn all_bindings_does_not_protect_local_callable_named_like_special_variable() {
+    let input = "(defvar dynamic 0)\n(flet ((dynamic () 1)) body)";
+    let plan =
+        plan_remove_unused_binding_for(input, Dialect::CommonLisp, Some("1"), None, true, true);
+
+    assert_eq!(plan.bindings[0].binding_name, "dynamic");
+    assert_eq!(plan.replacement, "body");
+}
+
+#[test]
 fn all_bindings_still_removes_a_plain_unused_binding_alongside_a_special_variable_rebind() {
     let input = "(let ((*read-eval* nil) (unused 1)) (read stream))";
     let plan = common_lisp_plan(input, None, true, true);

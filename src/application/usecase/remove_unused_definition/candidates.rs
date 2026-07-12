@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::callable_scope::{
-    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
-    local_callable_binding_body_scope, local_callable_body_scope,
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope,
 };
 use crate::application::usecase::remove_unused_definition::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
@@ -205,7 +205,7 @@ fn collect_function_quote_references_from_view(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     output: &mut Vec<ByteSpan>,
 ) {
     if let Some(head) = list_head(view) {
@@ -246,7 +246,7 @@ fn collect_local_callable_function_quote_references(
     dialect: Dialect,
     view: &ExpressionView,
     symbol: &SymbolName,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     form: CommonLispLocalCallableForm,
     output: &mut Vec<ByteSpan>,
 ) {

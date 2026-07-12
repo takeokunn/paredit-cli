@@ -22,6 +22,6 @@ pub(super) fn is_generated_workspace_path(path: &Path) -> bool {
                     | "result"
                     | "target"
                     | "vendor"
-            ) || name.ends_with(".fasl")
+            )
         })
 }

@@ -75,12 +75,12 @@ mod refactor_manifest;
 mod refactor_preview;
 #[path = "cli/refactor_workspace/mod.rs"]
 mod refactor_workspace;
-#[path = "cli/remove_forms.rs"]
-mod remove_forms;
 #[path = "cli/remove_unused_binding/mod.rs"]
 mod remove_unused_binding;
 #[path = "cli/rename/mod.rs"]
 mod rename;
+#[path = "cli/rename_at/mod.rs"]
+mod rename_at;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
 #[path = "cli/signature_report.rs"]

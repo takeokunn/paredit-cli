@@ -1,9 +1,11 @@
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug)]
 pub struct ReplaceFormsRequest<'a> {
     pub input: &'a str,
     pub tree: &'a SyntaxTree,
+    pub dialect: Dialect,
     pub paths: Vec<Path>,
     pub replacement: &'a str,
     pub require_same_shape: bool,

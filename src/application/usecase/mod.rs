@@ -20,6 +20,7 @@ pub mod inline_let;
 pub mod introduce_let;
 pub(crate) mod leading_trivia;
 pub mod let_report;
+pub(crate) mod mutation_safety;
 pub mod package;
 pub mod package_report;
 pub mod remove_unused_binding;

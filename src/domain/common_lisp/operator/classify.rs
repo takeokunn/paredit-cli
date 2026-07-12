@@ -1,9 +1,10 @@
 use crate::domain::definition::DefinitionCategory;
 
-use super::{
-    CommonLispLambdaListShape, CommonLispLocalCallableForm, CommonLispOperator,
-    CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm,
+use super::super::{
+    CommonLispLambdaListShape, CommonLispLocalCallableForm, CommonLispPackageDeclarationForm,
+    CommonLispRuntimeDependencyForm,
 };
+use super::CommonLispOperator;
 
 pub(super) fn definition_category(operator: CommonLispOperator) -> Option<DefinitionCategory> {
     Some(match operator {

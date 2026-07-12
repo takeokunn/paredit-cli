@@ -139,11 +139,6 @@ fn collect_workspace_file(
         return;
     }
 
-    if !options.include_generated && is_generated_workspace_path(path) {
-        discovery.skipped_generated_count += 1;
-        return;
-    }
-
     let dialect = Dialect::detect(Some(path), None);
     if dialect == Dialect::Unknown && !options.include_unknown {
         discovery.skipped_unknown_count += 1;

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::callable_scope::{
-    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
-    local_callable_binding_body_scope, local_callable_body_scope, local_callable_scope_at_path,
+    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
+    local_callable_body_scope, local_callable_scope_at_path,
 };
 use crate::application::usecase::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,
@@ -103,7 +103,7 @@ fn collect_wrap_call_sites_from_view(
     view: &ExpressionView,
     path: Path,
     parent_head: Option<&str>,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     quasiquote_depth: usize,
     in_macro_expander: bool,
     collection: &mut WrapCallSiteCollection<'_>,
@@ -184,7 +184,7 @@ fn collect_wrap_call_sites_from_view(
 fn collect_local_callable_wrap_call_sites(
     view: &ExpressionView,
     path: Path,
-    local_callables: &[LocalCallableName],
+    local_callables: &[String],
     form: CommonLispLocalCallableForm,
     quasiquote_depth: usize,
     in_macro_expander: bool,

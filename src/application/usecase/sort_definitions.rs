@@ -10,6 +10,7 @@ mod types;
 
 use anyhow::Result;
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 use super::leading_trivia::strip_leading_blank_lines;
@@ -28,6 +29,7 @@ const DEFAULT_ENTRY_SEPARATOR: &str = "\n\n";
 
 pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<SortDefinitionsPlan> {
     let tree = SyntaxTree::parse(request.input)?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let blocks = collect_sortable_blocks(request.input, &tree, request.dialect)?;
     let mut replacements = Vec::new();
     let mut items = Vec::new();

@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::definition::definition_shape;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
@@ -24,12 +25,14 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
 
     let from_tree = SyntaxTree::parse(request.from_input)
         .with_context(|| format!("failed to parse {}", request.from_file.display()))?;
+    reject_common_lisp_reader_conditionals(&from_tree, request.from_dialect)?;
     let to_tree = SyntaxTree::parse(request.to_input).with_context(|| {
         format!(
             "destination file is not a valid S-expression document: {}",
             request.to_file.display()
         )
     })?;
+    reject_common_lisp_reader_conditionals(&to_tree, request.to_dialect)?;
 
     let mut seen_paths = std::collections::BTreeSet::new();
     let mut selected_paths = std::collections::BTreeMap::new();

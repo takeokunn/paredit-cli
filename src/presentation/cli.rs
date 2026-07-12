@@ -21,7 +21,6 @@ mod introduce_let;
 mod let_report;
 mod package;
 mod refactor;
-pub(super) mod remove_forms;
 mod remove_unused_binding;
 mod rename;
 mod replace_forms;

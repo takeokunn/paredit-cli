@@ -12,6 +12,7 @@ pub use types::{
     UnthreadExpressionPlan, UnthreadExpressionRequest, UnthreadExpressionStep, UnthreadStyle,
 };
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, SymbolName, SyntaxTree};
 use anyhow::{Context, Result};
 use pipeline::pipeline_step;
@@ -21,6 +22,8 @@ use syntax::{atom_child, expression_source};
 pub fn plan_unthread_expression(
     request: UnthreadExpressionRequest<'_>,
 ) -> Result<UnthreadExpressionPlan> {
+    reject_common_lisp_reader_conditionals(request.tree, request.dialect)?;
+
     if request.target.kind != ExpressionKind::List
         || request.target.delimiter != Some(Delimiter::Paren)
     {

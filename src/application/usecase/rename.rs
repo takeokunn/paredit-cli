@@ -1,5 +1,6 @@
 //! Use-case helpers for renaming callable definitions and transforming call sites.
 
+mod at;
 mod binding;
 mod function;
 mod macrolet;
@@ -15,11 +16,15 @@ mod wrap;
 
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::ReaderConditionalSafetyError;
 use crate::domain::sexpr::SyntaxTree;
 
 use binding::binding_rename_parts;
 use selection::{apply_byte_span_edits, collect_symbol_atom_spans, select_rename_target};
 
+pub type RenameReaderSafetyError = ReaderConditionalSafetyError;
+
+pub use at::{RenameAtError, RenameAtNamespace, RenameAtPlan, RenameAtRequest, plan_rename_at};
 pub use function::{collect_callable_definition_renames, collect_function_call_head_renames};
 pub use macrolet::{
     collect_local_function_binding_renames, collect_local_function_call_head_renames,

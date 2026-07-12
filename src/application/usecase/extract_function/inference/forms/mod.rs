@@ -113,6 +113,16 @@ pub(super) fn collect_inferred_extract_function_special_form(
             bound_params,
             params,
         ),
+        CommonLispValueScopeForm::Resource(resource_form) => {
+            bindings::collect_inferred_extract_function_resource_binding(
+                dialect,
+                view,
+                explicit_params,
+                bound_params,
+                params,
+                resource_form,
+            )
+        }
         CommonLispValueScopeForm::Lambda | CommonLispValueScopeForm::FunctionLiteral => {
             callable::collect_inferred_extract_function_lambda(
                 dialect,

@@ -54,7 +54,40 @@ pub(crate) enum CommonLispValueScopeForm {
     Iteration,
     Variable(CommonLispVariableBindingForm),
     Slot,
+    Resource(CommonLispResourceBindingForm),
     LocalCallable(CommonLispLocalCallableForm),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CommonLispResourceBindingForm {
+    OpenFile,
+    OpenStream,
+    InputFromString,
+    OutputToString,
+}
+
+impl CommonLispResourceBindingForm {
+    pub(crate) const fn body_start_index(self) -> usize {
+        2
+    }
+}
+
+/// A form body whose leading declarations apply to every following body form.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CommonLispDeclarationScope {
+    declaration_start_index: usize,
+}
+
+impl CommonLispDeclarationScope {
+    pub(crate) const fn new(declaration_start_index: usize) -> Self {
+        Self {
+            declaration_start_index,
+        }
+    }
+
+    pub(crate) const fn declaration_start_index(self) -> usize {
+        self.declaration_start_index
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -145,7 +178,37 @@ impl CommonLispHandlerBindingForm {
     }
 }
 
+impl CommonLispValueScopeForm {
+    /// Returns the first child that may be a body declaration when its index
+    /// is fixed by the form syntax. Method definitions are handled by their
+    /// parsed lambda-list position instead.
+    pub(crate) const fn declaration_scope(self) -> Option<CommonLispDeclarationScope> {
+        match self {
+            Self::Let(_) | Self::Lambda | Self::LocalCallable(_) | Self::Resource(_) => {
+                Some(CommonLispDeclarationScope::new(2))
+            }
+            Self::Definition | Self::Value | Self::Slot => Some(CommonLispDeclarationScope::new(3)),
+            Self::FunctionLiteral
+            | Self::Clause
+            | Self::Handler(_)
+            | Self::Iteration
+            | Self::Variable(_) => None,
+        }
+    }
+}
+
 impl CommonLispBindingRefactorForm {
+    /// Whether this form introduces value bindings that can dynamically bind
+    /// a variable declared special.
+    pub(crate) fn supports_dynamic_special_binding(self) -> bool {
+        matches!(
+            self,
+            Self::Let(CommonLispLetBindingForm::Parallel | CommonLispLetBindingForm::Sequential)
+                | Self::Do(_)
+                | Self::Prog(_)
+        )
+    }
+
     pub(crate) fn supports_remove_unused_binding(self) -> bool {
         matches!(
             self,

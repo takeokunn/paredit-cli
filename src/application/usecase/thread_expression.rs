@@ -10,6 +10,7 @@ mod types;
 
 pub use types::{ThreadExpressionPlan, ThreadExpressionRequest, ThreadExpressionStep, ThreadStyle};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::SyntaxTree;
 use anyhow::{Context, Result};
@@ -20,6 +21,8 @@ use syntax::list_head;
 pub fn plan_thread_expression(
     request: ThreadExpressionRequest<'_>,
 ) -> Result<ThreadExpressionPlan> {
+    reject_common_lisp_reader_conditionals(request.tree, request.dialect)?;
+
     if list_head(&request.target)
         .is_some_and(|head| common_lisp_symbol_reference_eq(head, request.operator.as_str()))
     {
