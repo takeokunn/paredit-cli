@@ -19,6 +19,7 @@ use rewrite::{expand_definition_removal, replace_span};
 // drifting out of sync with it (see candidates.rs doc comments).
 pub(crate) use candidates::{
     collect_function_quote_references, collect_package_form_spans, collect_quoted_data_references,
+    collect_reference_needles,
 };
 
 pub use types::{
