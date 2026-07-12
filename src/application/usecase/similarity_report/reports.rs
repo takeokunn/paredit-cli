@@ -48,12 +48,28 @@ impl PairLike for SimilarityPairReport {
 }
 
 pub fn build_similarity_pairs(
+    candidates: Vec<SimilarityCandidate>,
+    options: &SimilarityReportOptions,
+) -> Result<SimilarityReport> {
+    build_similarity_pairs_with_omissions(candidates, 0, options)
+}
+
+/// Build the report while recording how many eligible candidates were dropped
+/// upstream (e.g. by `--max-candidates`). Threading the count in here keeps the
+/// summary correct by construction, instead of letting callers patch the
+/// `candidate_limit_reached` / `omitted_candidates` fields after the fact.
+pub fn build_similarity_pairs_with_omissions(
     mut candidates: Vec<SimilarityCandidate>,
+    omitted_candidates: usize,
     options: &SimilarityReportOptions,
 ) -> Result<SimilarityReport> {
     options.validate()?;
     if options.max_comparisons().is_some() {
-        return Ok(build_similarity_pairs_sequential(candidates, options));
+        return Ok(build_similarity_pairs_sequential(
+            candidates,
+            omitted_candidates,
+            options,
+        ));
     }
     // 低コストな候補から前に並べると、サイズ差だけで落ちる組を早く打ち切れる。
     candidates.sort_unstable_by(compare_candidates_for_scan);
@@ -70,6 +86,7 @@ pub fn build_similarity_pairs(
             evaluated_pairs,
             pruned_by_size,
             comparison_limit_reached,
+            omitted_candidates,
             options,
         ));
     }
@@ -105,12 +122,14 @@ pub fn build_similarity_pairs(
         evaluated_pairs,
         pruned_by_size,
         comparison_limit_reached,
+        omitted_candidates,
         options,
     ))
 }
 
 fn build_similarity_pairs_sequential(
     mut candidates: Vec<SimilarityCandidate>,
+    omitted_candidates: usize,
     options: &SimilarityReportOptions,
 ) -> SimilarityReport {
     candidates.sort_unstable_by(compare_candidates_for_scan);
@@ -261,6 +280,7 @@ fn build_similarity_pairs_sequential(
         evaluated_pairs,
         pruned_by_size,
         comparison_limit_reached,
+        omitted_candidates,
         options,
     )
 }
@@ -271,6 +291,7 @@ fn finalize_similarity_pairs(
     evaluated_pairs: usize,
     pruned_by_size: usize,
     comparison_limit_reached: bool,
+    omitted_candidates: usize,
     options: &SimilarityReportOptions,
 ) -> SimilarityReport {
     let unprocessed_pairs = possible_pairs - evaluated_pairs - pruned_by_size;
@@ -301,8 +322,8 @@ fn finalize_similarity_pairs(
 
     SimilarityReport {
         summary: SimilarityReportSummary {
-            candidate_limit_reached: false,
-            omitted_candidates: 0,
+            candidate_limit_reached: omitted_candidates > 0,
+            omitted_candidates,
             possible_pairs,
             evaluated_pairs,
             pruned_by_size,
