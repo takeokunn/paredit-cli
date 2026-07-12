@@ -79,6 +79,31 @@ fn cli_reports_workspace_inventory_with_include_flags() {
 }
 
 #[test]
+fn cli_reports_workspace_inventory_for_binary_unknown_files() {
+    let dir = fresh_temp_dir("workspace report-binary");
+
+    let lisp_file = dir.join("core.lisp");
+    let binary_file = dir.join("compiled.fasl");
+    fs::write(&lisp_file, "(defun area (width height) (* width height))\n")
+        .expect("write common lisp fixture");
+    fs::write(&binary_file, [0xff, 0xfe, 0x00]).expect("write binary fixture");
+
+    let mut cmd = paredit();
+    cmd.args(["inspect", "workspace"])
+        .arg("--include-unknown")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 2"))
+        .stdout(predicate::str::contains("\"parsed_count\": 1"))
+        .stdout(predicate::str::contains("\"parse_error_count\": 1"))
+        .stdout(predicate::str::contains(binary_file.display().to_string()))
+        .stdout(predicate::str::contains("\"status\": \"parse-error\""));
+}
+
+#[test]
 fn cli_reports_workspace_inventory_with_max_depth_limit() {
     let dir = fresh_temp_dir("workspace report-max-depth");
     let nested_dir = dir.join("nested");

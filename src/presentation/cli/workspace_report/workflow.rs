@@ -13,6 +13,25 @@ use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;
 use super::types::WorkspaceFileReport;
 
+fn parse_error_report(
+    path: std::path::PathBuf,
+    dialect: Dialect,
+    byte_count: usize,
+    error: impl std::fmt::Display,
+) -> WorkspaceFileReport {
+    WorkspaceFileReport {
+        path,
+        dialect,
+        status: WorkspaceFileStatus::ParseError(error.to_string()),
+        byte_count,
+        top_level_form_count: 0,
+        atom_count: 0,
+        definition_count: 0,
+        call_count: 0,
+        package: None,
+    }
+}
+
 pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
     let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
@@ -25,10 +44,22 @@ pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) 
     let mut reports = Vec::with_capacity(discovery.files.len());
 
     for file in &discovery.files {
-        let text = fs::read_to_string(file)
-            .with_context(|| format!("failed to read {}", file.display()))?;
         let dialect = Dialect::detect(Some(file.as_path()), None);
-        let byte_count = text.len();
+        let bytes = match fs::read(file) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                reports.push(parse_error_report(file.clone(), dialect, 0, error));
+                continue;
+            }
+        };
+        let byte_count = bytes.len();
+        let text = match String::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(error) => {
+                reports.push(parse_error_report(file.clone(), dialect, byte_count, error));
+                continue;
+            }
+        };
 
         match SyntaxTree::parse(&text) {
             Ok(tree) => {
