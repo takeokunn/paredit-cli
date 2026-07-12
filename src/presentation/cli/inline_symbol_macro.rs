@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::inline_symbol_macro::{
-    plan_inline_symbol_macro, InlineSymbolMacroPlan, InlineSymbolMacroRequest,
+    InlineSymbolMacroPlan, InlineSymbolMacroRequest, plan_inline_symbol_macro,
 };
 
 #[derive(Debug, Args)]

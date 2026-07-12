@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::convert_flet_to_labels::{
-    plan_convert_flet_to_labels, ConvertFletToLabelsPlan, ConvertFletToLabelsRequest,
+    ConvertFletToLabelsPlan, ConvertFletToLabelsRequest, plan_convert_flet_to_labels,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

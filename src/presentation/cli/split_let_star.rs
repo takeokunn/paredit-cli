@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::split_let_star::{
-    plan_split_let_star, SplitLetStarPlan, SplitLetStarRequest,
+    SplitLetStarPlan, SplitLetStarRequest, plan_split_let_star,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

@@ -1,6 +1,6 @@
 //! Use case for converting a selected `if` form into `cond`.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;

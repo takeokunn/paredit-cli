@@ -1,6 +1,6 @@
 //! Split a sequential `let*` binding list at an explicit boundary.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -170,12 +170,14 @@ mod tests {
             plan_split_let_star(request("(let* ((a 1) (b 2)) b)", Dialect::CommonLisp, 0)).is_err()
         );
         assert!(plan_split_let_star(request("(let* ((a 1)) a)", Dialect::CommonLisp, 1)).is_err());
-        assert!(plan_split_let_star(request(
-            "(let* ((a 1) (b 2)) (declare (special a)) b)",
-            Dialect::CommonLisp,
-            1
-        ))
-        .is_err());
+        assert!(
+            plan_split_let_star(request(
+                "(let* ((a 1) (b 2)) (declare (special a)) b)",
+                Dialect::CommonLisp,
+                1
+            ))
+            .is_err()
+        );
         assert!(
             plan_split_let_star(request("(let* ((a 'x) (b 2)) b)", Dialect::EmacsLisp, 1)).is_err()
         );

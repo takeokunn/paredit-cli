@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::usecase::eliminate_empty_binding_form::{
-    plan_eliminate_empty_binding_form, EliminateEmptyBindingFormPlan,
-    EliminateEmptyBindingFormRequest,
+    EliminateEmptyBindingFormPlan, EliminateEmptyBindingFormRequest,
+    plan_eliminate_empty_binding_form,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

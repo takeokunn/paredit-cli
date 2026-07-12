@@ -9,7 +9,7 @@ use crate::domain::sexpr::reader::atom_symbol_text;
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 #[derive(Debug, Clone)]
 pub struct ConvertLetToLetStarRequest<'a> {
@@ -200,11 +200,13 @@ mod tests {
         assert!(
             plan_convert_let_to_let_star(req("(let ((x 1)) ; c\n x)", Dialect::EmacsLisp)).is_err()
         );
-        assert!(plan_convert_let_to_let_star(req(
-            "(let ((x 1)) (declare (special x)) x)",
-            Dialect::CommonLisp
-        ))
-        .is_err());
+        assert!(
+            plan_convert_let_to_let_star(req(
+                "(let ((x 1)) (declare (special x)) x)",
+                Dialect::CommonLisp
+            ))
+            .is_err()
+        );
         assert!(plan_convert_let_to_let_star(req("'(let ((x 1)) x)", Dialect::EmacsLisp)).is_err());
     }
 }

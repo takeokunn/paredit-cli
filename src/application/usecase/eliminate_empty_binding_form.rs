@@ -1,6 +1,6 @@
 //! Eliminate an empty `let` or `let*` in a known expression context.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -208,23 +208,25 @@ mod tests {
 
     #[test]
     fn rejects_top_level_unknown_context_and_declarations() {
-        assert!(plan_eliminate_empty_binding_form(request(
-            "(let () value)",
-            Dialect::CommonLisp,
-            "0"
-        ))
-        .is_err());
-        assert!(plan_eliminate_empty_binding_form(request(
-            "(unknown (let () value))",
-            Dialect::EmacsLisp,
-            "0.1"
-        ))
-        .is_err());
-        assert!(plan_eliminate_empty_binding_form(request(
-            "(progn (let () (declare (special x)) x))",
-            Dialect::CommonLisp,
-            "0.1"
-        ))
-        .is_err());
+        assert!(
+            plan_eliminate_empty_binding_form(request("(let () value)", Dialect::CommonLisp, "0"))
+                .is_err()
+        );
+        assert!(
+            plan_eliminate_empty_binding_form(request(
+                "(unknown (let () value))",
+                Dialect::EmacsLisp,
+                "0.1"
+            ))
+            .is_err()
+        );
+        assert!(
+            plan_eliminate_empty_binding_form(request(
+                "(progn (let () (declare (special x)) x))",
+                Dialect::CommonLisp,
+                "0.1"
+            ))
+            .is_err()
+        );
     }
 }

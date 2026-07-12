@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::flatten_progn::{
-    plan_flatten_progn, FlattenPrognPlan, FlattenPrognRequest,
+    FlattenPrognPlan, FlattenPrognRequest, plan_flatten_progn,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

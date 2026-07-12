@@ -1,8 +1,8 @@
 //! Use case for expanding one conservative Common Lisp `symbol-macrolet` binding.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
-use super::inline_let::{plan_inline_let, InlineLetRequest};
+use super::inline_let::{InlineLetRequest, plan_inline_let};
 use super::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::common_lisp::{
     common_lisp_symbol_reference_eq, is_common_lisp_declaration_form,

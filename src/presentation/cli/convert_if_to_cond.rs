@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::convert_if_to_cond::{
-    plan_convert_if_to_cond, ConvertIfToCondPlan, ConvertIfToCondRequest,
+    ConvertIfToCondPlan, ConvertIfToCondRequest, plan_convert_if_to_cond,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

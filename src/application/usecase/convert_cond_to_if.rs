@@ -1,6 +1,6 @@
 //! Use case for converting a selected `cond` form into nested `if` forms.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -145,11 +145,10 @@ mod tests {
 
     #[test]
     fn rejects_comments_reader_conditionals_and_non_plain_cond() {
-        assert!(plan_convert_cond_to_if(request(
-            "(cond ; keep\n (test body))",
-            Dialect::CommonLisp
-        ))
-        .is_err());
+        assert!(
+            plan_convert_cond_to_if(request("(cond ; keep\n (test body))", Dialect::CommonLisp))
+                .is_err()
+        );
         assert!(
             plan_convert_cond_to_if(request("(cond (#+sbcl test body))", Dialect::CommonLisp))
                 .is_err()

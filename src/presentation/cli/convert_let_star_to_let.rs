@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::usecase::convert_let_star_to_let::{
-    plan_convert_let_star_to_let, ConvertLetStarToLetPlan, ConvertLetStarToLetRequest,
+    ConvertLetStarToLetPlan, ConvertLetStarToLetRequest, plan_convert_let_star_to_let,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

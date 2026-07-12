@@ -1,6 +1,6 @@
 //! Use case for converting a capture-free Common Lisp `flet` form into `labels`.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -215,10 +215,11 @@ mod tests {
                 "unexpectedly accepted {input}"
             );
         }
-        assert!(plan_convert_flet_to_labels(request(
-            "(flet ((work () 1)) (work))",
-            Dialect::EmacsLisp,
-        ))
-        .is_err());
+        assert!(
+            plan_convert_flet_to_labels(
+                request("(flet ((work () 1)) (work))", Dialect::EmacsLisp,)
+            )
+            .is_err()
+        );
     }
 }

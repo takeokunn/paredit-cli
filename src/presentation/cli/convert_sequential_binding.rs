@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::usecase::convert_sequential_binding::{
-    plan_convert_do_star_to_do, plan_convert_prog_star_to_prog, ConvertSequentialBindingPlan,
-    ConvertSequentialBindingRequest,
+    ConvertSequentialBindingPlan, ConvertSequentialBindingRequest, plan_convert_do_star_to_do,
+    plan_convert_prog_star_to_prog,
 };
 use crate::presentation::cli::shared::read_input_dialect_and_tree;
 

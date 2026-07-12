@@ -39,7 +39,9 @@ fn converts_emacs_lisp_if_without_else() {
         .output()
         .expect("run conversion");
     assert!(output.status.success());
-    assert!(String::from_utf8_lossy(&output.stdout).contains("(cond (ready (message \\\"ok\\\")))"));
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("(cond (ready (message \\\"ok\\\")))")
+    );
 }
 
 #[test]

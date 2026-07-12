@@ -1,6 +1,6 @@
 //! Use case for converting a non-recursive Common Lisp `labels` form into `flet`.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -188,21 +188,27 @@ mod tests {
 
     #[test]
     fn rejects_self_and_mutual_recursion() {
-        assert!(plan_convert_labels_to_flet(request(
-            "(labels ((walk (x) (walk x))) (walk value))",
-            Dialect::CommonLisp,
-        ))
-        .is_err());
-        assert!(plan_convert_labels_to_flet(request(
-            "(labels ((walk () (function walk))) (walk))",
-            Dialect::CommonLisp,
-        ))
-        .is_err());
-        assert!(plan_convert_labels_to_flet(request(
-            "(labels ((left () (right)) (right () 1)) (left))",
-            Dialect::CommonLisp,
-        ))
-        .is_err());
+        assert!(
+            plan_convert_labels_to_flet(request(
+                "(labels ((walk (x) (walk x))) (walk value))",
+                Dialect::CommonLisp,
+            ))
+            .is_err()
+        );
+        assert!(
+            plan_convert_labels_to_flet(request(
+                "(labels ((walk () (function walk))) (walk))",
+                Dialect::CommonLisp,
+            ))
+            .is_err()
+        );
+        assert!(
+            plan_convert_labels_to_flet(request(
+                "(labels ((left () (right)) (right () 1)) (left))",
+                Dialect::CommonLisp,
+            ))
+            .is_err()
+        );
     }
 
     #[test]
@@ -224,15 +230,19 @@ mod tests {
 
     #[test]
     fn rejects_non_labels_and_other_dialects() {
-        assert!(plan_convert_labels_to_flet(request(
-            "(flet ((work () 1)) (work))",
-            Dialect::CommonLisp,
-        ))
-        .is_err());
-        assert!(plan_convert_labels_to_flet(request(
-            "(labels ((work () 1)) (work))",
-            Dialect::EmacsLisp,
-        ))
-        .is_err());
+        assert!(
+            plan_convert_labels_to_flet(request(
+                "(flet ((work () 1)) (work))",
+                Dialect::CommonLisp,
+            ))
+            .is_err()
+        );
+        assert!(
+            plan_convert_labels_to_flet(request(
+                "(labels ((work () 1)) (work))",
+                Dialect::EmacsLisp,
+            ))
+            .is_err()
+        );
     }
 }

@@ -20,9 +20,11 @@ fn converts_independent_let_in_both_dialects() {
             "stderr={}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(String::from_utf8(output.stdout)
-            .unwrap()
-            .contains("(let* ((x 1) (y 2)) (+ x y))"));
+        assert!(
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .contains("(let* ((x 1) (y 2)) (+ x y))")
+        );
     }
 }
 

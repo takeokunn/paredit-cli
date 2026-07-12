@@ -1,6 +1,6 @@
 //! Safe conversion of sequential Common Lisp iteration/binding forms.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::application::usecase::extract_shared::replace_span;
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
@@ -303,10 +303,12 @@ mod tests {
             plan_convert_prog_star_to_prog(request("(prog* ((x 1) (y (+ x 1))) (return y))"))
                 .is_err()
         );
-        assert!(plan_convert_prog_star_to_prog(request(
-            "(prog* ((x 1)) (declare (special x)) (return x))"
-        ))
-        .is_err());
+        assert!(
+            plan_convert_prog_star_to_prog(request(
+                "(prog* ((x 1)) (declare (special x)) (return x))"
+            ))
+            .is_err()
+        );
         assert!(plan_convert_do_star_to_do(request("(do* ((x '#.(value))) ((done-p)))")).is_err());
     }
 }
