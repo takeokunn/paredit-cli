@@ -1,3 +1,4 @@
+use super::super::shared::expand_input_paths;
 use super::super::*;
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
@@ -7,9 +8,10 @@ use crate::application::usecase::definition_report::{
 };
 
 pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs) -> Result<()> {
-    let mut reports = Vec::with_capacity(args.files.len());
+    let files = expand_input_paths(&args.files)?;
+    let mut reports = Vec::with_capacity(files.len());
 
-    for file in &args.files {
+    for file in files {
         let input = read_input(Some(file.clone()))?;
         let dialect = detect_dialect(&input, args.dialect);
         let tree = SyntaxTree::parse(&input.text)
@@ -23,9 +25,10 @@ pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs
 pub(in crate::presentation::cli) fn unused_definition_report(
     args: UnusedDefinitionReportArgs,
 ) -> Result<()> {
-    let mut parsed = Vec::with_capacity(args.files.len());
+    let files = expand_input_paths(&args.files)?;
+    let mut parsed = Vec::with_capacity(files.len());
 
-    for file in &args.files {
+    for file in files {
         let input = read_input(Some(file.clone()))?;
         let dialect = detect_dialect(&input, args.dialect);
         let tree = SyntaxTree::parse(&input.text)

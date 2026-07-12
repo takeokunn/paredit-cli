@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 
-use super::super::shared::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::shared::{
+    detect_dialect, expand_input_paths, read_input, write_files_with_rollback,
+};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
 use crate::application::usecase::definition_report::{
@@ -16,12 +18,31 @@ use crate::domain::sexpr::SyntaxTree;
 pub(in crate::presentation::cli) fn remove_unused_definitions(
     args: RemoveUnusedDefinitionsArgs,
 ) -> Result<()> {
-    let mut input_files = Vec::with_capacity(args.files.len());
+    let files = expand_input_paths(&args.files)?;
+    remove_unused_definitions_from_files(
+        files,
+        args.dialect,
+        args.include_protected,
+        args.include_exported,
+        args.write,
+        args.output,
+    )
+}
+
+pub(in crate::presentation::cli) fn remove_unused_definitions_from_files(
+    files: Vec<std::path::PathBuf>,
+    dialect: Option<super::super::DialectArg>,
+    include_protected: bool,
+    include_exported: bool,
+    write: bool,
+    output: super::super::OutputFormat,
+) -> Result<()> {
+    let mut input_files = Vec::with_capacity(files.len());
     let mut package_definitions = Vec::new();
 
-    for file in &args.files {
+    for file in files {
         let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
+        let dialect = detect_dialect(&input, dialect);
         let tree = SyntaxTree::parse(&input.text)
             .with_context(|| format!("failed to parse {}", file.display()))?;
         let (package, definitions) = collect_definition_forms(&tree, dialect)?;
@@ -45,11 +66,11 @@ pub(in crate::presentation::cli) fn remove_unused_definitions(
     let plan = plan_remove_unused_definitions(RemoveUnusedDefinitionsRequest {
         files: input_files,
         package_definitions,
-        include_protected: args.include_protected,
-        include_exported: args.include_exported,
+        include_protected,
+        include_exported,
     })?;
 
-    let written = args.write && plan.changed;
+    let written = write && plan.changed;
     if written {
         let mut written_files = Vec::new();
         for file in &plan.files {
@@ -60,7 +81,7 @@ pub(in crate::presentation::cli) fn remove_unused_definitions(
         write_files_with_rollback(written_files)?;
     }
 
-    print_remove_unused_definitions_plan(&plan, written, args.output)
+    print_remove_unused_definitions_plan(&plan, written, output)
 }
 
 fn to_unused_definition_definition(

@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use crate::application::usecase::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope,
+    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
+    local_callable_binding_body_scope, local_callable_body_scope,
 };
 use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
@@ -49,7 +49,7 @@ fn collect_function_call_paths(
     view: &ExpressionView,
     path: Path,
     context: &InlineCallTraversal,
-    local_callables: &[String],
+    local_callables: &[LocalCallableName],
     output: &mut Vec<Path>,
 ) {
     if let Some(head) = list_head(view) {
@@ -86,7 +86,7 @@ fn collect_local_callable_function_call_paths(
     view: &ExpressionView,
     path: Path,
     context: &InlineCallTraversal,
-    local_callables: &[String],
+    local_callables: &[LocalCallableName],
     form: CommonLispLocalCallableForm,
     output: &mut Vec<Path>,
 ) {

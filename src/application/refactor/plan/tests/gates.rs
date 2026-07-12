@@ -118,6 +118,53 @@ fn rename_plan_still_blocks_signature_mismatch_for_callable_targets() {
 }
 
 #[test]
+fn rename_plan_allows_reference_only_context_without_blocking_no_definition_or_signature_mismatch()
+{
+    let summary = RefactorPlanSummary {
+        file_count: 1,
+        definition_count: 0,
+        reference_count: 2,
+        call_count: 1,
+        inbound_edge_count: 0,
+        outbound_edge_count: 0,
+        non_call_reference_count: 0,
+        signature_mismatch_count: 1,
+        safe_to_automate: false,
+    };
+
+    let gates = refactor_plan_gates(
+        RefactorOperation::Rename,
+        RefactorPlanTargetKind::Callable,
+        &summary,
+        vec![
+            RawRefactorRisk {
+                level: RefactorRiskLevel::Error,
+                code: "no-definition",
+                message: "no definition discovered".to_owned(),
+                count: 0,
+            },
+            RawRefactorRisk {
+                level: RefactorRiskLevel::Warning,
+                code: "signature-mismatch",
+                message: "reference-only rename".to_owned(),
+                count: 1,
+            },
+        ],
+    );
+
+    assert!(
+        gates
+            .iter()
+            .all(|gate| gate.code != "no-definition" || !gate.blocks_automation)
+    );
+    assert!(
+        gates
+            .iter()
+            .all(|gate| gate.code != "signature-mismatch" || !gate.blocks_automation)
+    );
+}
+
+#[test]
 fn risk_summary_counts_gate_occurrences_by_level_and_blocking_status() {
     let gates = vec![
         RefactorPlanGate {

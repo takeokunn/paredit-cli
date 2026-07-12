@@ -97,6 +97,18 @@ fn cli_writes_labels_rename_with_function_designators() {
 }
 
 #[test]
+fn cli_writes_flet_rename_across_symbol_macrolet_callable_references_only() {
+    assert_cli_local_function_write(
+        "rename-local-function-symbol-macrolet-callable-references-write",
+        "lisp",
+        "(flet ((old-name (x) x)) (symbol-macrolet ((old-name 42)) (old-name 1) #'old-name (function old-name) old-name))\n",
+        1,
+        3,
+        "(flet ((new-name (x) x)) (symbol-macrolet ((old-name 42)) (new-name 1) #'new-name (function new-name) old-name))\n",
+    );
+}
+
+#[test]
 fn cli_writes_flet_rename_inside_reader_quoted_lambda_bodies() {
     assert_cli_local_function_write(
         "rename-local-function-reader-quoted-lambda-write",

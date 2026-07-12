@@ -7,6 +7,17 @@ use crate::domain::common_lisp::{
 use super::Dialect;
 
 impl Dialect {
+    fn common_lisp_operator_for_head(self, head: &str) -> Option<CommonLispOperator> {
+        if matches!(
+            self,
+            Self::CommonLisp | Self::EmacsLisp | Self::Scheme | Self::Unknown
+        ) {
+            common_lisp_operator(head)
+        } else {
+            None
+        }
+    }
+
     pub fn is_definition_head(self, head: &str) -> bool {
         match self {
             Self::CommonLisp => common_lisp_operator(head)
@@ -56,7 +67,8 @@ impl Dialect {
 
     pub(crate) fn supports_function_parameter_refactor_head(self, head: &str) -> bool {
         match self {
-            Self::CommonLisp => common_lisp_operator(head)
+            Self::CommonLisp => self
+                .common_lisp_operator_for_head(head)
                 .is_some_and(CommonLispOperator::supports_function_parameter_refactor),
             Self::EmacsLisp => matches!(
                 head,
@@ -92,7 +104,8 @@ impl Dialect {
 
     pub(crate) fn supports_inline_function_refactor_head(self, head: &str) -> bool {
         match self {
-            Self::CommonLisp => common_lisp_operator(head)
+            Self::CommonLisp => self
+                .common_lisp_operator_for_head(head)
                 .is_some_and(CommonLispOperator::is_inline_function_definition),
             Self::EmacsLisp => matches!(head, "defun" | "cl-defun" | "defsubst"),
             Self::Scheme => head == "define",
@@ -134,7 +147,9 @@ impl Dialect {
         if !matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
             return None;
         }
-        common_lisp_operator(head)?.local_callable_form()
+
+        self.common_lisp_operator_for_head(head)?
+            .local_callable_form()
     }
 
     pub(crate) fn let_binding_form_for_head(self, head: &str) -> Option<CommonLispLetBindingForm> {
@@ -144,7 +159,7 @@ impl Dialect {
         ) {
             return None;
         }
-        common_lisp_operator(head)?.let_binding_form()
+        self.common_lisp_operator_for_head(head)?.let_binding_form()
     }
 
     pub(crate) fn variable_binding_form_for_head(
@@ -154,7 +169,9 @@ impl Dialect {
         if !matches!(self, Self::CommonLisp | Self::Unknown) {
             return None;
         }
-        common_lisp_operator(head)?.variable_binding_form()
+
+        self.common_lisp_operator_for_head(head)?
+            .variable_binding_form()
     }
 
     pub(crate) fn common_lisp_value_scope_form_for_head(
@@ -162,7 +179,7 @@ impl Dialect {
         head: &str,
     ) -> Option<CommonLispValueScopeForm> {
         if matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
-            return common_lisp_operator(head)?.value_scope_form();
+            return self.common_lisp_operator_for_head(head)?.value_scope_form();
         }
 
         match self {
@@ -179,7 +196,9 @@ impl Dialect {
         head: &str,
     ) -> Option<CommonLispBindingRefactorForm> {
         if matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
-            return common_lisp_operator(head)?.binding_refactor_form();
+            return self
+                .common_lisp_operator_for_head(head)?
+                .binding_refactor_form();
         }
 
         match self {
@@ -204,8 +223,12 @@ impl Dialect {
     }
 
     pub(crate) fn common_lisp_variable_binding_has_step_forms_for_head(self, head: &str) -> bool {
-        matches!(self, Self::CommonLisp | Self::Unknown)
-            && common_lisp_operator(head).is_some_and(CommonLispOperator::has_variable_step_forms)
+        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+            return false;
+        }
+
+        self.common_lisp_operator_for_head(head)
+            .is_some_and(CommonLispOperator::has_variable_step_forms)
     }
 
     pub(crate) fn common_lisp_runtime_dependency_form_for_head(
@@ -213,7 +236,8 @@ impl Dialect {
         head: &str,
     ) -> Option<CommonLispRuntimeDependencyForm> {
         let form = if matches!(self, Self::CommonLisp | Self::Unknown) {
-            common_lisp_operator(head)?.runtime_dependency_form()?
+            self.common_lisp_operator_for_head(head)?
+                .runtime_dependency_form()?
         } else if self == Self::EmacsLisp {
             // `require`/`provide`/`load`/`load-file`/`load-library` are the
             // same functions with the same load-order semantics in Emacs
@@ -245,12 +269,18 @@ impl Dialect {
         if !matches!(self, Self::CommonLisp | Self::Unknown) {
             return None;
         }
-        common_lisp_operator(head)?.package_declaration_form()
+
+        self.common_lisp_operator_for_head(head)?
+            .package_declaration_form()
     }
 
     pub(crate) fn is_common_lisp_asdf_system_definition_head(self, head: &str) -> bool {
-        matches!(self, Self::CommonLisp | Self::Unknown)
-            && common_lisp_operator(head).is_some_and(CommonLispOperator::is_asdf_system_definition)
+        if !matches!(self, Self::CommonLisp | Self::Unknown) {
+            return false;
+        }
+
+        self.common_lisp_operator_for_head(head)
+            .is_some_and(CommonLispOperator::is_asdf_system_definition)
     }
 
     pub(crate) fn supports_inline_let_refactor_head(self, head: &str) -> bool {

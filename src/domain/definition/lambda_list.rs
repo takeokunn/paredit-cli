@@ -36,10 +36,7 @@ pub(super) fn definition_body_start_child_index(
     category: Option<DefinitionCategory>,
     lambda_list_index: Option<usize>,
 ) -> usize {
-    if matches!(
-        CommonLispOperator::from_head(head),
-        Some(CommonLispOperator::Defsetf)
-    ) {
+    if CommonLispOperator::from_head(head).is_some_and(CommonLispOperator::is_defsetf) {
         return match lambda_list_index {
             Some(index) => (index + 2).min(view.children.len()),
             None => view.children.len(),

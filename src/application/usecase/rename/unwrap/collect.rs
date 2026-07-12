@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use crate::application::usecase::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope, local_callable_scope_at_path,
+    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
+    local_callable_binding_body_scope, local_callable_body_scope, local_callable_scope_at_path,
 };
 use crate::application::usecase::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,
@@ -117,7 +117,7 @@ impl<'a> UnwrapCollection<'a> {
         &mut self,
         view: &ExpressionView,
         path: Path,
-        local_callables: &[String],
+        local_callables: &[LocalCallableName],
         quasiquote_depth: usize,
         in_macro_expander: bool,
     ) {
@@ -188,7 +188,7 @@ impl<'a> UnwrapCollection<'a> {
         &mut self,
         view: &ExpressionView,
         path: Path,
-        local_callables: &[String],
+        local_callables: &[LocalCallableName],
         form: CommonLispLocalCallableForm,
         quasiquote_depth: usize,
         in_macro_expander: bool,

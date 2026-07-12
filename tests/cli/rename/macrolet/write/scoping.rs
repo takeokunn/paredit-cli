@@ -19,6 +19,15 @@ macrolet_write_case!(
 );
 
 macrolet_write_case!(
+    cli_writes_macrolet_rename_across_symbol_macrolet_callable_references_only,
+    "rename-macrolet-symbol-macrolet-callable-references-write",
+    "core.lisp",
+    "(macrolet ((old-name (x) x)) (symbol-macrolet ((old-name 42)) (old-name 1) #'old-name (function old-name) old-name))\n",
+    "(macrolet ((new-name (x) x)) (symbol-macrolet ((old-name 42)) (new-name 1) #'old-name (function old-name) old-name))\n",
+    1
+);
+
+macrolet_write_case!(
     cli_writes_macrolet_rename_across_same_name_nested_macrolet_expander_body,
     "rename-macrolet-nested-shadow-write",
     "core.lisp",

@@ -93,6 +93,38 @@ fn cli_plans_unused_definition_removal_without_writing() {
 }
 
 #[test]
+fn cli_plans_unused_definition_removal_from_directory_without_writing() {
+    let dir = fresh_temp_dir("remove-unused-definitions-directory-plan");
+    let file = dir.join("core.lisp");
+    let original = "(defun used () :ok)\n\
+                    (defun caller () (used))\n\
+                    (caller)\n\
+                    (defun stale-helper () :stale)\n\
+                    (deftest stale-test () :test)\n";
+    fs::write(&file, original).expect("write fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("refactor")
+        .arg("remove-unused-definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"candidate_count\": 2"))
+        .stdout(predicate::str::contains("\"removal_count\": 1"))
+        .stdout(predicate::str::contains("\"skipped_count\": 1"))
+        .stdout(predicate::str::contains("\"written\": false"))
+        .stdout(predicate::str::contains("\"name\": \"stale-helper\""))
+        .stdout(predicate::str::contains("\"name\": \"stale-test\""));
+
+    assert_eq!(
+        fs::read_to_string(&file).expect("read unchanged fixture"),
+        original
+    );
+}
+
+#[test]
 fn cli_writes_unused_definition_removal() {
     let dir = fresh_temp_dir("remove-unused-definitions-write");
     let file = dir.join("core.lisp");

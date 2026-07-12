@@ -55,7 +55,9 @@ fn computes_labels_scope_for_binding_and_body_paths() {
 
 #[test]
 fn matches_local_callable_names_after_package_prefix_normalization() {
-    let scope = vec!["COMMON-LISP-USER:FOO".to_owned()];
+    let scope = vec![LocalCallableName::Ordinary(
+        "COMMON-LISP-USER:FOO".to_owned(),
+    )];
 
     assert!(is_local_callable_bound(&scope, "foo"));
     assert!(is_local_callable_bound(&scope, "cl-user:foo"));
@@ -113,11 +115,16 @@ fn extends_local_callable_body_scope_with_binding_names() {
         .expect("select form")
         .view();
 
-    let scope = local_callable_body_scope(&["outer".to_owned()], &view);
+    let scope =
+        local_callable_body_scope(&[LocalCallableName::Ordinary("outer".to_owned())], &view);
 
     assert_eq!(
         scope,
-        vec!["outer".to_owned(), "foo".to_owned(), "bar".to_owned()]
+        vec![
+            LocalCallableName::Ordinary("outer".to_owned()),
+            LocalCallableName::Ordinary("foo".to_owned()),
+            LocalCallableName::Ordinary("bar".to_owned()),
+        ]
     );
 }
 
@@ -133,15 +140,25 @@ fn extracts_setf_local_callable_names_from_flet_bindings() {
 
     let names = local_callable_names(&view);
 
-    assert_eq!(names, vec!["foo".to_owned(), "bar".to_owned()]);
-    assert!(is_local_callable_bound(&names, "cl-user:foo"));
+    assert_eq!(
+        names,
+        vec![
+            LocalCallableName::Setf("foo".to_owned()),
+            LocalCallableName::Ordinary("bar".to_owned()),
+        ]
+    );
+    assert!(!is_local_callable_bound(&names, "cl-user:foo"));
+    assert!(is_local_setf_callable_bound(&names, "cl-user:foo"));
     assert!(is_local_callable_bound(&names, "bar"));
 }
 
 #[test]
 fn distinguishes_labels_and_flet_binding_body_scope() {
-    let local_scope = vec!["outer".to_owned()];
-    let body_scope = vec!["outer".to_owned(), "foo".to_owned()];
+    let local_scope = vec![LocalCallableName::Ordinary("outer".to_owned())];
+    let body_scope = vec![
+        LocalCallableName::Ordinary("outer".to_owned()),
+        LocalCallableName::Ordinary("foo".to_owned()),
+    ];
 
     assert_eq!(
         local_callable_binding_body_scope(
@@ -171,8 +188,11 @@ fn distinguishes_labels_and_flet_binding_body_scope() {
 
 #[test]
 fn distinguishes_definition_reference_scope_for_labels_and_flet() {
-    let local = vec!["outer".to_owned()];
-    let body = vec!["outer".to_owned(), "helper".to_owned()];
+    let local = vec![LocalCallableName::Ordinary("outer".to_owned())];
+    let body = vec![
+        LocalCallableName::Ordinary("outer".to_owned()),
+        LocalCallableName::Ordinary("helper".to_owned()),
+    ];
 
     assert_eq!(
         local_callable_definition_reference_scope(
