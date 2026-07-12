@@ -28,9 +28,27 @@ pub struct ByteSpan {
 }
 
 impl ByteSpan {
-    /// Creates a span from byte offsets without revalidating ordering.
+    /// Creates a span from byte offsets.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `start` is after `end`. Use [`Self::try_new`] when input
+    /// ordering is not trusted.
     pub const fn new(start: ByteOffset, end: ByteOffset) -> Self {
+        assert!(
+            start.get() <= end.get(),
+            "byte span start must not exceed end"
+        );
         Self { start, end }
+    }
+
+    /// Attempts to create a span from byte offsets.
+    pub const fn try_new(start: ByteOffset, end: ByteOffset) -> Option<Self> {
+        if start.get() <= end.get() {
+            Some(Self { start, end })
+        } else {
+            None
+        }
     }
 
     /// Returns the inclusive start boundary as a byte offset.
@@ -71,6 +89,25 @@ impl ByteSpan {
     /// Borrows the substring covered by this byte span.
     pub fn slice<'a>(&self, input: &'a str) -> &'a str {
         &input[self.as_range()]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_new_rejects_reversed_offsets() {
+        assert_eq!(
+            ByteSpan::try_new(ByteOffset::new(8), ByteOffset::new(3)),
+            None
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "byte span start must not exceed end")]
+    fn new_rejects_reversed_offsets() {
+        let _ = ByteSpan::new(ByteOffset::new(8), ByteOffset::new(3));
     }
 }
 
