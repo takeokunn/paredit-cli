@@ -6,7 +6,7 @@ use crate::domain::common_lisp::{
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ExpressionPath, SyntaxTree};
 
 use super::types::DependencyReportItem;
 
@@ -21,7 +21,7 @@ pub(super) fn collect_dependency_items(
     let mut dependencies = Vec::new();
 
     for index in 0..tree.root_children().len() {
-        let path = Path::root_child(index);
+        let path = ExpressionPath::root_child(index);
         let view = tree.select_path(&path)?.view();
         collect_dependency_items_from_view(&view, dialect, path, &[], 0, &mut dependencies);
     }
@@ -32,7 +32,7 @@ pub(super) fn collect_dependency_items(
 fn collect_dependency_items_from_view(
     view: &ExpressionView,
     dialect: Dialect,
-    path: Path,
+    path: ExpressionPath,
     local_bindings: &[String],
     quasiquote_depth: usize,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -100,7 +100,7 @@ fn collect_dependency_items_from_view(
 fn collect_local_callable_dependency_items(
     view: &ExpressionView,
     dialect: Dialect,
-    path: &Path,
+    path: &ExpressionPath,
     local_bindings: &[String],
     quasiquote_depth: usize,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -171,7 +171,7 @@ fn collect_local_callable_dependency_items(
 fn collect_symbol_macrolet_dependency_items(
     view: &ExpressionView,
     dialect: Dialect,
-    path: &Path,
+    path: &ExpressionPath,
     local_bindings: &[String],
     quasiquote_depth: usize,
     dependencies: &mut Vec<DependencyReportItem>,
@@ -190,7 +190,7 @@ fn collect_symbol_macrolet_dependency_items(
     else {
         return false;
     };
-    if CommonLispOperator::from_head(head) != Some(CommonLispOperator::SymbolMacrolet) {
+    if !CommonLispOperator::from_head(head).is_some_and(CommonLispOperator::is_symbol_macrolet) {
         return false;
     }
 

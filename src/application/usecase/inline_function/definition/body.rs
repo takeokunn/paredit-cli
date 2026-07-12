@@ -9,7 +9,9 @@ pub(super) fn unsupported_inline_function_definition_message(
     head: &str,
 ) -> String {
     if matches!(dialect, Dialect::CommonLisp | Dialect::Unknown)
-        && CommonLispOperator::from_head(head) == Some(CommonLispOperator::DefineSetfExpander)
+        && CommonLispOperator::from_head(head).is_some_and(
+            CommonLispOperator::is_setf_expander_definition,
+        )
     {
         return format!(
             "inline-function does not support definition head: {head} (setf expanders rewrite places, not ordinary call expressions)"

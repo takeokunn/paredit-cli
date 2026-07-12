@@ -217,6 +217,26 @@ impl CommonLispOperator {
         )
     }
 
+    pub(crate) fn is_setf_expander_definition(self) -> bool {
+        self == Self::DefineSetfExpander
+    }
+
+    pub(crate) fn is_macro_expander_definition(self) -> bool {
+        matches!(self, Self::DefineSetfExpander | Self::DefineCompilerMacro)
+    }
+
+    pub(crate) fn is_symbol_macrolet(self) -> bool {
+        self == Self::SymbolMacrolet
+    }
+
+    pub(crate) fn is_locally(self) -> bool {
+        self == Self::Locally
+    }
+
+    pub(crate) fn is_defsetf(self) -> bool {
+        self == Self::Defsetf
+    }
+
     pub(crate) fn is_method_definition(self) -> bool {
         matches!(self, Self::Defmethod | Self::ClDefmethod)
     }
