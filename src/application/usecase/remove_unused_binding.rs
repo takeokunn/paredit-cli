@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 
 use super::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::common_lisp::{
-    CommonLispBindingRefactorForm, common_lisp_symbol_reference_eq,
-    is_common_lisp_earmuffed_special_variable_name,
+    CommonLispBindingRefactorForm, common_lisp_dynamic_binding_is_declared,
+    common_lisp_symbol_reference_eq, is_common_lisp_earmuffed_special_variable_name,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
@@ -125,6 +125,8 @@ fn remove_unused_binding_parts(
 
     let binding_form = &target.children[1];
     let candidates = binding_removal_candidates(dialect, refactor_form, binding_form)?;
+    let input_tree = SyntaxTree::parse(input)
+        .context("remove-unused-binding input is not a valid S-expression document")?;
     let selected = if all_bindings {
         let mut unused = Vec::new();
         for candidate in &candidates {
@@ -148,9 +150,23 @@ fn remove_unused_binding_parts(
             // not silently delete that: doing so can change program
             // behavior instead of removing dead code. Skip it from bulk
             // selection; `--name` still allows removing it explicitly.
+            // The same holds for a value binding whose name is dynamically
+            // declared special elsewhere in the document, even without the
+            // earmuff naming convention. This is restricted to forms that
+            // actually introduce dynamic-scopeable value bindings (let/do/
+            // prog) so a same-named local function or macro binding (e.g.
+            // `(flet ((dynamic () 1)) ...)`) is never mistaken for a
+            // rebind of a `defvar`'d variable of the same name — those live
+            // in separate namespaces.
             if reference_spans.is_empty()
                 && !(dialect == Dialect::CommonLisp
-                    && is_common_lisp_earmuffed_special_variable_name(&candidate.name))
+                    && (is_common_lisp_earmuffed_special_variable_name(&candidate.name)
+                        || (refactor_form.supports_dynamic_special_binding()
+                            && common_lisp_dynamic_binding_is_declared(
+                                &input_tree.root_view(),
+                                target,
+                                &symbol,
+                            ))))
             {
                 unused.push(RemovedBindingParts {
                     name: candidate.name.clone(),

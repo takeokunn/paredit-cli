@@ -6,6 +6,7 @@ mod basic;
 mod property;
 mod rejection;
 mod shadowing;
+mod special;
 
 fn request_with_dialect<'a>(
     input: &'a str,

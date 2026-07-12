@@ -14,8 +14,12 @@ fn symbol(name: &str) -> SymbolName {
 }
 
 fn target(input: &str) -> ExpressionView {
+    target_at(input, "0")
+}
+
+fn target_at(input: &str, path: &str) -> ExpressionView {
     let tree = SyntaxTree::parse(input).expect("parse");
-    tree.select_path(&"0".parse::<Path>().expect("path"))
+    tree.select_path(&path.parse::<Path>().expect("path"))
         .expect("select")
         .view()
 }
@@ -34,7 +38,7 @@ fn plan_remove_unused_binding_for(
         input,
         dialect,
         path: parsed_path,
-        target: target(input),
+        target: target_at(input, path.unwrap_or("0")),
         name: symbol.as_ref(),
         all_bindings,
         allow_drop_value,
@@ -55,6 +59,29 @@ fn remove_unused_binding_error(
         dialect,
         path: None,
         target: target(input),
+        name: symbol.as_ref(),
+        all_bindings,
+        allow_drop_value,
+    })
+    .expect_err("expected remove-unused-binding to fail")
+    .to_string()
+}
+
+fn remove_unused_binding_error_for(
+    input: &str,
+    dialect: Dialect,
+    path: Option<&str>,
+    name: Option<&str>,
+    all_bindings: bool,
+    allow_drop_value: bool,
+) -> String {
+    let parsed_path = path.map(|path| path.parse().expect("path"));
+    let symbol = name.map(symbol);
+    plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input,
+        dialect,
+        path: parsed_path,
+        target: target_at(input, path.unwrap_or("0")),
         name: symbol.as_ref(),
         all_bindings,
         allow_drop_value,

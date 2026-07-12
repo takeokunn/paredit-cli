@@ -6,13 +6,14 @@ mod reader_condition;
 mod reader_label;
 mod reader_literal;
 mod scope;
+mod special_binding;
 
 pub(crate) use forms::{
     CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispBindingReferenceScope,
-    CommonLispHandlerBindingForm, CommonLispLambdaListShape, CommonLispLetBindingForm,
-    CommonLispLocalCallableForm, CommonLispPackageDeclarationForm, CommonLispRuntimeDependencyForm,
-    CommonLispSlotBindingForm, CommonLispValueScopeForm, CommonLispVariableBindingForm,
-    CommonLispVariableSpecForm,
+    CommonLispDeclarationScope, CommonLispHandlerBindingForm, CommonLispLambdaListShape,
+    CommonLispLetBindingForm, CommonLispLocalCallableForm, CommonLispPackageDeclarationForm,
+    CommonLispRuntimeDependencyForm, CommonLispSlotBindingForm, CommonLispValueScopeForm,
+    CommonLispVariableBindingForm, CommonLispVariableSpecForm,
 };
 pub(crate) use operator::{
     CommonLispOperator, common_lisp_binding_refactor_form_for_head, common_lisp_operator_head_eq,
@@ -36,6 +37,9 @@ pub(crate) use scope::{
     is_local_callable_bound, is_macro_callable_form, local_callable_binding_body_scope,
     local_callable_body_scope, local_callable_definition_reference_scope, local_callable_names,
     local_callable_scope_at_path, reader_execution_context_at_path,
+};
+pub(crate) use special_binding::{
+    common_lisp_dynamic_binding_is_declared, common_lisp_special_declaration_body_start,
 };
 
 #[cfg(test)]

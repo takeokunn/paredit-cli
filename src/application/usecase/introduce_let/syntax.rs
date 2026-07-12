@@ -2,6 +2,10 @@ use crate::domain::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_re
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionView};
 
+mod special;
+
+use special::special_declaration_shadows_child;
+
 pub(super) fn binding_form_binds_name(dialect: Dialect, view: &ExpressionView, name: &str) -> bool {
     let Some(head) = list_head(view) else {
         return false;
@@ -58,6 +62,10 @@ pub(super) fn child_shadowed_by_binding(
     };
 
     let form = dialect.common_lisp_value_scope_form_for_head(head);
+
+    if special_declaration_shadows_child(dialect, view, form, name, child_index) {
+        return true;
+    }
 
     match form {
         Some(CommonLispValueScopeForm::Let(_)) => {
