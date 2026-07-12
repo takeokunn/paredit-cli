@@ -157,3 +157,89 @@ fn expression_head(view: &ExpressionView) -> Option<&str> {
         })
         .flatten()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::sexpr::{ByteOffset, Path, SyntaxTree};
+
+    fn report(input: &str, path: Path, include_source: bool) -> FormReport {
+        let tree = SyntaxTree::parse(input).expect("parse input");
+        let target = tree.select_path(&path).expect("select target").view();
+        build_form_report(FormReportRequest {
+            input,
+            dialect: Dialect::CommonLisp,
+            path: Some(path),
+            target,
+            include_source,
+        })
+    }
+
+    #[test]
+    fn reports_nested_list_statistics_and_first_symbol_spans() {
+        let result = report("(foo bar (foo baz))", Path::root_child(0), true);
+
+        assert_eq!(result.kind, FormKind::List);
+        assert_eq!(result.delimiter, Some(Delimiter::Paren));
+        assert_eq!(result.head.as_deref(), Some("foo"));
+        assert!(!result.definition_like);
+        assert_eq!(result.child_count, 3);
+        assert_eq!(result.atom_count, 4);
+        assert_eq!(result.list_count, 2);
+        assert_eq!(result.max_depth, 2);
+        assert_eq!(result.source.as_deref(), Some("(foo bar (foo baz))"));
+        assert_eq!(
+            result.symbols,
+            vec![
+                FormSymbolReport {
+                    symbol: "bar".to_owned(),
+                    count: 1,
+                    first_span: ByteSpan::new(ByteOffset::new(5), ByteOffset::new(8)),
+                },
+                FormSymbolReport {
+                    symbol: "baz".to_owned(),
+                    count: 1,
+                    first_span: ByteSpan::new(ByteOffset::new(14), ByteOffset::new(17)),
+                },
+                FormSymbolReport {
+                    symbol: "foo".to_owned(),
+                    count: 2,
+                    first_span: ByteSpan::new(ByteOffset::new(1), ByteOffset::new(4)),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn excludes_source_when_not_requested_and_handles_atom_targets() {
+        let result = report("(foo)", Path::root_child(0).child(0), false);
+
+        assert_eq!(result.kind, FormKind::Atom);
+        assert_eq!(result.delimiter, None);
+        assert_eq!(result.head, None);
+        assert_eq!(result.child_count, 0);
+        assert_eq!(result.atom_count, 1);
+        assert_eq!(result.list_count, 0);
+        assert_eq!(result.max_depth, 0);
+        assert!(result.source.is_none());
+        assert_eq!(result.symbols.len(), 1);
+        assert_eq!(result.symbols[0].symbol, "foo");
+    }
+
+    #[test]
+    fn string_atoms_are_not_counted_as_symbols() {
+        let result = report("(print \"foo\" foo)", Path::root_child(0), true);
+
+        assert_eq!(result.atom_count, 3);
+        assert_eq!(
+            result
+                .symbols
+                .iter()
+                .map(|symbol| symbol.symbol.as_str())
+                .collect::<Vec<_>>(),
+            ["foo", "print"]
+        );
+        assert_eq!(result.symbols[0].count, 1);
+        assert_eq!(result.symbols[1].count, 1);
+    }
+}

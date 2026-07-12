@@ -6,7 +6,7 @@ use crate::domain::lexical_scope::value_capture;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SymbolName};
 
 use super::super::syntax::{atom_text, view_at_span};
-use super::super::types::{LetBindingReport, LetFormReport};
+use super::super::{LetBindingReport, LetFormReport};
 use super::bindings::let_binding_candidates;
 use super::references::{fallback_reference_count, let_binding_reference_spans};
 

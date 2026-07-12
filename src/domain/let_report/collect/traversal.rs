@@ -4,10 +4,10 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
 use crate::domain::sexpr::{ExpressionView, Path};
 
-use super::super::types::LetFormReport;
+use super::super::LetFormReport;
 use super::report::analyze_let_form;
 
-pub(in crate::application::usecase::let_report) fn collect_let_reports_from_view(
+pub(in crate::domain::let_report) fn collect_let_reports_from_view(
     dialect: Dialect,
     input: &str,
     view: &ExpressionView,

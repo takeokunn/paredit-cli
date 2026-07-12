@@ -80,6 +80,25 @@ impl ByteSpan {
         self.start.get()..self.end.get()
     }
 
+    /// Validates that this span can safely index `input`.
+    pub fn validate_against(&self, input: &str) -> Result<()> {
+        let start = self.start.get();
+        let end = self.end.get();
+        if start > end {
+            return Err(anyhow!("span start {start} exceeds end {end}"));
+        }
+        if end > input.len() {
+            return Err(anyhow!(
+                "span end {end} exceeds input length {}",
+                input.len()
+            ));
+        }
+        if !input.is_char_boundary(start) || !input.is_char_boundary(end) {
+            return Err(anyhow!("span is not aligned to UTF-8 character boundaries"));
+        }
+        Ok(())
+    }
+
     /// Borrows the substring covered by this byte span.
     pub fn slice<'a>(&self, input: &'a str) -> &'a str {
         &input[self.as_range()]
@@ -104,6 +123,31 @@ mod tests {
             ByteSpan::new(ByteOffset::new(8), ByteOffset::new(3)),
             ByteSpan::new(ByteOffset::new(8), ByteOffset::new(3))
         );
+    }
+
+    #[test]
+    fn validate_against_rejects_invalid_ranges() {
+        let input = "a\u{00e9}b";
+        assert!(ByteSpan::new(ByteOffset::new(4), ByteOffset::new(2))
+            .validate_against(input)
+            .is_err());
+        assert!(ByteSpan::new(ByteOffset::new(0), ByteOffset::new(99))
+            .validate_against(input)
+            .is_err());
+        assert!(ByteSpan::new(ByteOffset::new(2), ByteOffset::new(3))
+            .validate_against(input)
+            .is_err());
+    }
+
+    #[test]
+    fn validate_against_accepts_empty_and_unicode_boundaries() {
+        let input = "a\u{00e9}b";
+        assert!(ByteSpan::new(ByteOffset::new(1), ByteOffset::new(3))
+            .validate_against(input)
+            .is_ok());
+        assert!(ByteSpan::new(ByteOffset::new(3), ByteOffset::new(3))
+            .validate_against(input)
+            .is_ok());
     }
 }
 
