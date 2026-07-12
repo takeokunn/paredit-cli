@@ -264,10 +264,7 @@ impl SyntaxTree {
                             .is_some(),
                 );
             }
-            node.children
-                .iter()
-                .map(|child| count(tree, *child))
-                .sum()
+            node.children.iter().map(|child| count(tree, *child)).sum()
         }
         self.node(NodeId::ROOT)
             .children
@@ -449,11 +446,7 @@ impl SyntaxTree {
         }
         if node.kind == NodeKind::Atom {
             if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
-                if let Some(symbol_text) = node
-                    .span
-                    .slice(&self.source)
-                    .get(node.symbol_offset..)
-                {
+                if let Some(symbol_text) = node.span.slice(&self.source).get(node.symbol_offset..) {
                     let symbol_span = ByteSpan::new(
                         ByteOffset::new(node.span.start().get() + node.symbol_offset),
                         node.span.end(),
