@@ -69,10 +69,8 @@ fn maps_dependency_and_package_declaration_forms_to_domain_types() {
             .and_then(CommonLispOperator::package_declaration_form),
         Some(CommonLispPackageDeclarationForm::InPackage)
     );
-    assert!(
-        CommonLispOperator::from_head("asdf:defsystem")
-            .is_some_and(CommonLispOperator::is_asdf_system_definition)
-    );
+    assert!(CommonLispOperator::from_head("asdf:defsystem")
+        .is_some_and(CommonLispOperator::is_asdf_system_definition));
     assert_eq!(
         CommonLispOperator::from_head("defun")
             .and_then(CommonLispOperator::runtime_dependency_form),
