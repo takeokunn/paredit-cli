@@ -30,7 +30,8 @@ pub(in crate::presentation::cli) fn call_graph(args: CallGraphArgs) -> Result<()
             args.fail_on_inbound_callers,
             args.require_edges,
             args.require_internal_edges,
-        ),
+        )
+        .map_err(anyhow::Error::msg)?,
     );
     print_call_graph_report(
         &report.files,

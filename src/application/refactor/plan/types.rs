@@ -95,6 +95,16 @@ impl RefactorRiskLevel {
     }
 }
 
+impl From<crate::domain::impact_report::ImpactRiskLevel> for RefactorRiskLevel {
+    fn from(value: crate::domain::impact_report::ImpactRiskLevel) -> Self {
+        match value {
+            crate::domain::impact_report::ImpactRiskLevel::Info => Self::Info,
+            crate::domain::impact_report::ImpactRiskLevel::Warning => Self::Warning,
+            crate::domain::impact_report::ImpactRiskLevel::Error => Self::Error,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct RefactorPlanSummary {
     pub file_count: usize,
