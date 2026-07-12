@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::application::refactor::plan::RefactorRiskLevel;
 use crate::application::usecase::impact_report::ImpactRiskLevel as ApplicationImpactRiskLevel;
 
 #[derive(Debug, Args)]
@@ -37,6 +38,16 @@ pub(in crate::presentation::cli) enum ImpactRiskLevel {
 }
 
 impl From<ImpactRiskLevel> for ApplicationImpactRiskLevel {
+    fn from(level: ImpactRiskLevel) -> Self {
+        match level {
+            ImpactRiskLevel::Info => Self::Info,
+            ImpactRiskLevel::Warning => Self::Warning,
+            ImpactRiskLevel::Error => Self::Error,
+        }
+    }
+}
+
+impl From<ImpactRiskLevel> for RefactorRiskLevel {
     fn from(level: ImpactRiskLevel) -> Self {
         match level {
             ImpactRiskLevel::Info => Self::Info,

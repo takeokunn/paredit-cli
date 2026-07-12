@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
+pub use crate::domain::report_policy::UnusedDefinitionPolicyOptions;
 use crate::domain::sexpr::{AtomOccurrence, ByteSpan};
 
 #[derive(Debug)]
@@ -53,12 +54,6 @@ pub struct UnusedDefinitionFile {
     pub dialect: Dialect,
     pub package: Option<String>,
     pub definitions: Vec<UnusedDefinitionItem>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct UnusedDefinitionPolicyOptions {
-    pub fail_on_unused: bool,
-    pub require_unused_definitions: Option<usize>,
 }
 
 #[derive(Debug)]

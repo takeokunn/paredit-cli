@@ -82,20 +82,22 @@ impl From<ImpactRiskLevel> for RefactorRiskLevel {
     }
 }
 
+impl From<RefactorRiskLevel> for ImpactRiskLevel {
+    fn from(value: RefactorRiskLevel) -> Self {
+        match value {
+            RefactorRiskLevel::Info => Self::Info,
+            RefactorRiskLevel::Warning => Self::Warning,
+            RefactorRiskLevel::Error => Self::Error,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ImpactRisk {
     pub level: ImpactRiskLevel,
     pub code: &'static str,
     pub message: String,
     pub count: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ImpactReportPolicyOptions {
-    pub fail_on_risk_level: Option<ImpactRiskLevel>,
-    pub require_definitions: Option<usize>,
-    pub require_references: Option<usize>,
-    pub require_calls: Option<usize>,
 }
 
 #[derive(Debug)]

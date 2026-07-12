@@ -49,7 +49,11 @@ fn policy_counts_inbound_edges_without_self_recursive_calls() {
     )
     .unwrap();
 
-    let policy = evaluate_call_graph_policy(&report.files, Some(&symbol), true, Some(2), Some(2));
+    let policy = evaluate_call_graph_policy(
+        &report.files,
+        Some(&symbol),
+        CallGraphPolicyOptions::new(true, Some(2), Some(2)),
+    );
 
     assert_eq!(policy.edge_count, 2);
     assert_eq!(policy.internal_edge_count, 2);

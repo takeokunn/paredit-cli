@@ -1,19 +1,17 @@
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::SymbolName;
 
-use super::types::{CallGraphFile, CallGraphPolicy};
+use super::types::{CallGraphFile, CallGraphPolicy, CallGraphPolicyOptions};
 
 pub fn evaluate_call_graph_policy(
     reports: &[CallGraphFile],
     symbol: Option<&SymbolName>,
-    fail_on_inbound_callers: bool,
-    require_edges: Option<usize>,
-    require_internal_edges: Option<usize>,
+    options: CallGraphPolicyOptions,
 ) -> CallGraphPolicy {
     let mut policy = CallGraphPolicy {
-        fail_on_inbound_callers,
-        require_edges,
-        require_internal_edges,
+        fail_on_inbound_callers: options.fail_on_inbound_callers(),
+        require_edges: options.require_edges(),
+        require_internal_edges: options.require_internal_edges(),
         passed: true,
         ..CallGraphPolicy::default()
     };
@@ -49,7 +47,7 @@ pub fn evaluate_call_graph_policy(
         }
     }
 
-    if fail_on_inbound_callers && !policy.inbound_callers.is_empty() {
+    if options.fail_on_inbound_callers() && !policy.inbound_callers.is_empty() {
         policy.passed = false;
         policy.violations.push(format!(
             "focused symbol has inbound callers: {}",
@@ -62,7 +60,7 @@ pub fn evaluate_call_graph_policy(
         ));
     }
 
-    if let Some(required) = require_edges {
+    if let Some(required) = options.require_edges() {
         if policy.edge_count < required {
             policy.passed = false;
             policy.violations.push(format!(
@@ -72,7 +70,7 @@ pub fn evaluate_call_graph_policy(
         }
     }
 
-    if let Some(required) = require_internal_edges {
+    if let Some(required) = options.require_internal_edges() {
         if policy.internal_edge_count < required {
             policy.passed = false;
             policy.violations.push(format!(

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 
 use crate::application::refactor::plan::RefactorPlanSummary;
+use crate::application::refactor::plan::RefactorRiskLevel;
 use crate::application::usecase::signature_report::SignatureCallStatus;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{SymbolName, SyntaxTree};
@@ -70,7 +71,7 @@ fn evaluates_policy_failures() {
 
     let policy = evaluate_impact_report_policy(
         ImpactReportPolicyOptions {
-            fail_on_risk_level: Some(ImpactRiskLevel::Warning),
+            fail_on_risk_level: Some(RefactorRiskLevel::Warning),
             require_definitions: Some(1),
             require_references: Some(2),
             require_calls: Some(1),
