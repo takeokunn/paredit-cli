@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 
-use crate::application::form_shape::duplicate_shape;
 use crate::application::usecase::mutation_safety::{
     reject_common_lisp_reader_conditionals, reject_overlapping_common_lisp_reader_time_forms,
 };
+use crate::domain::form_shape::duplicate_shape;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 mod rewrite;

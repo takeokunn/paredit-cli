@@ -2,9 +2,9 @@ use std::path::Path as FsPath;
 
 use anyhow::Result;
 
-use crate::application::form_similarity::StructuralTree;
 use crate::domain::common_lisp::normalize_common_lisp_operator_head;
 use crate::domain::dialect::Dialect;
+use crate::domain::form_similarity::StructuralTree;
 use crate::domain::sexpr::{ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::types::{

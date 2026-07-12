@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::application::form_similarity::StructuralTree;
 use crate::domain::dialect::Dialect;
+use crate::domain::form_similarity::StructuralTree;
 use crate::domain::sexpr::ByteSpan;
 
 #[allow(unused_imports)]

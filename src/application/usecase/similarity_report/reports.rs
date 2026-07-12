@@ -4,7 +4,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::thread;
 
-use crate::application::form_similarity::{
+use crate::domain::form_similarity::{
     TreeSimilarityWorkspace, similarity_upper_bound, tree_similarity_with_workspace,
 };
 use anyhow::Result;
