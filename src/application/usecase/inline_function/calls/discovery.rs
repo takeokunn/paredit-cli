@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use crate::application::usecase::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope, LocalCallableName,
+    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
+    local_callable_binding_body_scope, local_callable_body_scope,
 };
 use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;

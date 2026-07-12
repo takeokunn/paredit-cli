@@ -1,7 +1,7 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, ErrorKind, Read};
 use std::path::{Path, PathBuf};
-use std::collections::BTreeSet;
 
 use anyhow::{Context, Result};
 
@@ -114,20 +114,31 @@ pub(crate) fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
 }
 
 pub(crate) fn expand_input_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    expand_input_paths_with_unknown(paths, false)
+}
+
+pub(crate) fn expand_input_paths_with_unknown(
+    paths: &[PathBuf],
+    include_unknown: bool,
+) -> Result<Vec<PathBuf>> {
     let mut files = BTreeSet::new();
 
     for path in paths {
-        expand_input_path(path.as_path(), &mut files)?;
+        expand_input_path(path.as_path(), include_unknown, &mut files)?;
     }
 
     Ok(files.into_iter().collect())
 }
 
-fn expand_input_path(path: &Path, files: &mut BTreeSet<PathBuf>) -> Result<()> {
+fn expand_input_path(
+    path: &Path,
+    include_unknown: bool,
+    files: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
     if path.is_dir() {
         let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
             roots: vec![path.to_path_buf()],
-            include_unknown: false,
+            include_unknown,
             include_hidden: false,
             include_generated: false,
             max_depth: None,

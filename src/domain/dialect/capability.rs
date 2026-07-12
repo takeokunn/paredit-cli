@@ -148,7 +148,8 @@ impl Dialect {
             return None;
         }
 
-        self.common_lisp_operator_for_head(head)?.local_callable_form()
+        self.common_lisp_operator_for_head(head)?
+            .local_callable_form()
     }
 
     pub(crate) fn let_binding_form_for_head(self, head: &str) -> Option<CommonLispLetBindingForm> {
@@ -169,7 +170,8 @@ impl Dialect {
             return None;
         }
 
-        self.common_lisp_operator_for_head(head)?.variable_binding_form()
+        self.common_lisp_operator_for_head(head)?
+            .variable_binding_form()
     }
 
     pub(crate) fn common_lisp_value_scope_form_for_head(
@@ -194,7 +196,9 @@ impl Dialect {
         head: &str,
     ) -> Option<CommonLispBindingRefactorForm> {
         if matches!(self, Self::CommonLisp | Self::EmacsLisp | Self::Unknown) {
-            return self.common_lisp_operator_for_head(head)?.binding_refactor_form();
+            return self
+                .common_lisp_operator_for_head(head)?
+                .binding_refactor_form();
         }
 
         match self {
@@ -232,7 +236,8 @@ impl Dialect {
         head: &str,
     ) -> Option<CommonLispRuntimeDependencyForm> {
         let form = if matches!(self, Self::CommonLisp | Self::Unknown) {
-            self.common_lisp_operator_for_head(head)?.runtime_dependency_form()?
+            self.common_lisp_operator_for_head(head)?
+                .runtime_dependency_form()?
         } else if self == Self::EmacsLisp {
             // `require`/`provide`/`load`/`load-file`/`load-library` are the
             // same functions with the same load-order semantics in Emacs
@@ -265,7 +270,8 @@ impl Dialect {
             return None;
         }
 
-        self.common_lisp_operator_for_head(head)?.package_declaration_form()
+        self.common_lisp_operator_for_head(head)?
+            .package_declaration_form()
     }
 
     pub(crate) fn is_common_lisp_asdf_system_definition_head(self, head: &str) -> bool {

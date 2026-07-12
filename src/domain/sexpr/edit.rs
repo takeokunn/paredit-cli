@@ -12,8 +12,54 @@ impl Edit {
     }
 
     pub fn kill(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
-        let span = expand_removal(input, tree, selection.span());
+        let span = Self::removal_span(input, tree, selection);
         Ok(replace_span(input, span, ""))
+    }
+
+    pub fn removal_span(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> ByteSpan {
+        expand_removal(input, tree, selection.span())
+    }
+
+    pub fn kill_many(
+        input: &str,
+        tree: &SyntaxTree,
+        selections: &[Selection<'_>],
+    ) -> Result<String> {
+        let mut selected_spans = selections
+            .iter()
+            .map(|selection| selection.span())
+            .collect::<Vec<_>>();
+        selected_spans.sort_by_key(|span| span.start());
+        for pair in selected_spans.windows(2) {
+            if pair[0].end() > pair[1].start() {
+                anyhow::bail!("paths must not overlap");
+            }
+        }
+
+        let mut removals = selections
+            .iter()
+            .map(|selection| Self::removal_span(input, tree, *selection))
+            .collect::<Vec<_>>();
+        removals.sort_by_key(|span| span.start());
+
+        // Adjacent form removals can claim the same separating whitespace.
+        // Coalesce those spans before applying them from right to left.
+        let mut merged: Vec<ByteSpan> = Vec::with_capacity(removals.len());
+        for span in removals {
+            if let Some(previous) = merged.last_mut()
+                && span.start() <= previous.end()
+            {
+                *previous = ByteSpan::new(previous.start(), previous.end().max(span.end()));
+            } else {
+                merged.push(span);
+            }
+        }
+
+        let mut output = input.to_owned();
+        for span in merged.into_iter().rev() {
+            output = replace_span(&output, span, "");
+        }
+        Ok(output)
     }
 
     pub fn wrap(input: &str, _tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {

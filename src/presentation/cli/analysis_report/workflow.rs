@@ -2,7 +2,7 @@ use crate::domain::common_lisp::{
     common_lisp_reader_escape_diagnostics, function_value_namespace_diagnostics,
 };
 use crate::domain::sexpr::SyntaxTree;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::presentation::cli::args::{AnalyzeArgs, InputArgs};
 use crate::presentation::cli::{detect_dialect, read_input};

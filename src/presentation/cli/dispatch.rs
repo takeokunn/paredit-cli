@@ -76,6 +76,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::WorkspaceExecute(args) => {
                 refactor::workflow::workspace_refactor_execute(args)?
             }
+            command::RefactorCommand::WorkspaceRemoveUnusedDefinitions(args) => {
+                refactor::workflow::workspace_remove_unused_definitions(args)?
+            }
             command::RefactorCommand::RemoveDefinition(args) => {
                 definition_removal::remove_definition::remove_definition(args)?
             }
@@ -98,6 +101,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 duplicate_report::workflow::replacement_plan(args)?
             }
             command::RefactorCommand::ReplaceForms(args) => replace_forms::replace_forms(args)?,
+            command::RefactorCommand::RemoveForms(args) => remove_forms::remove_forms(args)?,
             command::RefactorCommand::AddExport(args) => package::add_export::add_export(args)?,
             command::RefactorCommand::SortPackageExports(args) => {
                 package::sort_exports::sort_package_exports(args)?

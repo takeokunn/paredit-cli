@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope, local_callable_scope_at_path, LocalCallableName,
+    LocalCallableName, common_lisp_local_callable_form, is_local_callable_bound,
+    local_callable_binding_body_scope, local_callable_body_scope, local_callable_scope_at_path,
 };
 use crate::application::usecase::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,

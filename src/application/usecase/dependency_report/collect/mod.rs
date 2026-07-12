@@ -5,7 +5,7 @@ use crate::domain::common_lisp::{
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ExpressionPath, SyntaxTree};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionPath, ExpressionView, SyntaxTree};
 
 use super::types::DependencyReportItem;
 
@@ -138,7 +138,10 @@ fn collect_local_callable_dependency_items(
     );
 
     if let Some(bindings) = view.children.get(1) {
-        let binding_body_scope = if matches!(form, crate::domain::common_lisp::CommonLispLocalCallableForm::Labels) {
+        let binding_body_scope = if matches!(
+            form,
+            crate::domain::common_lisp::CommonLispLocalCallableForm::Labels
+        ) {
             body_scope.as_slice()
         } else {
             local_bindings

@@ -3,6 +3,7 @@ pub(in crate::presentation::cli) mod manifest;
 pub(in crate::presentation::cli) mod plan;
 pub(in crate::presentation::cli) mod preview;
 pub(in crate::presentation::cli) mod verification;
+pub(in crate::presentation::cli) mod workspace_remove_unused_definitions;
 
 pub(in crate::presentation::cli) use execute::WorkspaceRefactorExecuteArgs;
 pub(in crate::presentation::cli) use manifest::{
@@ -15,3 +16,4 @@ pub(in crate::presentation::cli) use preview::{
     RefactorPreviewArgs, RefactorPreviewMode, WorkspaceRefactorPreviewArgs,
 };
 pub(in crate::presentation::cli) use verification::{VerificationPhase, VerifyRefactorArgs};
+pub(in crate::presentation::cli) use workspace_remove_unused_definitions::WorkspaceRemoveUnusedDefinitionsArgs;

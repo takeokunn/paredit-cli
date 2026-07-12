@@ -4,12 +4,12 @@ use crate::domain::sexpr::{ExpressionView, Path, SymbolName};
 
 use crate::application::usecase::rename::reader::apply_reader_prefix_context;
 
-use super::super::scope::{
-    symbol_macrolet_binds_name, symbol_macrolet_shadowing_scope, LocalCallableRenameKind,
-    MacroletRenameScope,
-};
 use super::super::RenameFunctionOccurrence;
-use super::local_callable::{collect_local_callable_or_definition, LocalCallableTraversal};
+use super::super::scope::{
+    LocalCallableRenameKind, MacroletRenameScope, symbol_macrolet_binds_name,
+    symbol_macrolet_shadowing_scope,
+};
+use super::local_callable::{LocalCallableTraversal, collect_local_callable_or_definition};
 use super::reader::{collect_explicit_reader_form_renames, collect_reader_lambda_renames};
 use super::state::{TraversalContext, TraversalState};
 
