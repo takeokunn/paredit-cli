@@ -135,3 +135,118 @@ fn keeps_macros_referenced_through_callable_accessors() {
     assert_eq!(plan.skipped_count, 0);
     assert_eq!(plan.files[0].rewritten, text);
 }
+
+#[test]
+fn ignores_reader_conditionals_that_do_not_overlap_the_removal_spans() {
+    let text = "(in-package #:app)\n\
+                (defun stale-helper () 1)\n\
+                #+sbcl (defun guarded-helper () 2)\n\
+                (defun live () 3)\n\
+                (live)\n";
+    let stale_form = "(defun stale-helper () 1)";
+    let guarded_form = "(defun guarded-helper () 2)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![definition(
+            text,
+            stale_form,
+            "stale-helper",
+            DefinitionCategory::Function,
+        )],
+    ))
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert_eq!(plan.skipped_count, 0);
+    assert!(!plan.files[0].rewritten.contains(stale_form));
+    assert!(plan.files[0].rewritten.contains(guarded_form));
+}
+
+#[test]
+fn rejects_removing_a_definition_inside_a_reader_conditional() {
+    let text = "#+sbcl (defun stale-helper () 1)\n";
+    let stale_form = "(defun stale-helper () 1)";
+    let request = request_for(
+        text,
+        vec![definition(
+            text,
+            stale_form,
+            "stale-helper",
+            DefinitionCategory::Function,
+        )],
+    );
+
+    let error = plan_remove_unused_definitions(request).expect_err("plan must reject");
+
+    assert!(
+        error.to_string().contains(
+            "cannot safely modify Common Lisp source containing reader conditional #+ at byte 0"
+        ),
+        "unexpected error: {error:#}"
+    );
+}
+
+#[test]
+fn ignores_vector_literals_that_do_not_overlap_the_removal_span() {
+    let text = "(in-package #:app)\n(defun stale-helper () 1)\n(defparameter *values* #(1 2 3))\n(defun live () 2)\n(live)\n";
+    let stale_form = "(defun stale-helper () 1)";
+    let vector_form = "#(1 2 3)";
+    let plan = plan_remove_unused_definitions(request_for(
+        text,
+        vec![
+            definition(
+                text,
+                stale_form,
+                "stale-helper",
+                DefinitionCategory::Function,
+            ),
+            definition(
+                text,
+                "(defun live () 2)",
+                "live",
+                DefinitionCategory::Function,
+            ),
+        ],
+    ))
+    .expect("plan should build with unrelated vector literals present");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert!(!plan.files[0].rewritten.contains(stale_form));
+    assert!(plan.files[0].rewritten.contains(vector_form));
+    SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
+}
+
+#[test]
+fn keeps_definitions_referenced_from_another_input_file() {
+    let definition_text = "(in-package #:app)\n(defun shared-helper () 1)\n";
+    let consumer_text = "(in-package #:app)\n(defun call-shared () (shared-helper))\n";
+    let shared_form = "(defun shared-helper () 1)";
+
+    let plan = plan_remove_unused_definitions(RemoveUnusedDefinitionsRequest {
+        files: vec![
+            file_with_text(
+                PathBuf::from("library.lisp"),
+                definition_text,
+                vec![definition(
+                    definition_text,
+                    shared_form,
+                    "shared-helper",
+                    DefinitionCategory::Function,
+                )],
+            ),
+            file_with_text(PathBuf::from("consumer.lisp"), consumer_text, Vec::new()),
+        ],
+        package_definitions: Vec::new(),
+        include_protected: false,
+        include_exported: false,
+    })
+    .expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 0);
+    assert_eq!(plan.removal_count, 0);
+    assert_eq!(plan.skipped_count, 0);
+    assert!(plan.files[0].rewritten.contains(shared_form));
+    assert_eq!(plan.files[1].rewritten, consumer_text);
+}

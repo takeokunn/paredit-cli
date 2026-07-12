@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use crate::application::usecase::extract_shared::{
     TopLevelInsert, insert_top_level_form, replace_span,
 };
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
+use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, ReaderPrefix, Selection, SymbolName, SyntaxTree,
@@ -51,7 +51,13 @@ pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result
 pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<ExtractConstantPlan> {
     validate_dialect(request.dialect)?;
     validate_target(request.tree, &request.path, request.dialect)?;
-    reject_common_lisp_reader_conditionals(request.tree, request.dialect)?;
+    if request.dialect == Dialect::CommonLisp {
+        reject_overlapping_common_lisp_reader_time_forms(
+            request.tree,
+            request.dialect,
+            [request.selection.span()],
+        )?;
+    }
 
     let span = request.selection.span();
     let selected = request.selection.text(request.input).to_owned();

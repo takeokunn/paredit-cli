@@ -23,6 +23,28 @@ fn plans_common_lisp_dry_run_and_replaces_only_the_selection() {
 }
 
 #[test]
+fn plans_common_lisp_vector_literal_constant() {
+    let mut cmd = paredit();
+    cmd.args([
+        "refactor",
+        "extract-constant",
+        "--dialect",
+        "common-lisp",
+        "--path",
+        "0.1",
+        "--name",
+        "+helper-vector+",
+    ])
+    .write_stdin("(render #(helper value))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"written\": false"))
+    .stdout(predicate::str::contains(
+        "(render +helper-vector+)\\n\\n(defconstant +helper-vector+ #(helper value))",
+    ));
+}
+
+#[test]
 fn plans_emacs_lisp_from_byte_offset() {
     let input = "(defun f () (+ 40 2))";
     let offset = input.find("40").unwrap();

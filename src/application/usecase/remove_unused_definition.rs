@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
+use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::sexpr::SyntaxTree;
 
 mod candidates;
@@ -30,12 +30,6 @@ pub use types::{
 pub fn plan_remove_unused_definitions(
     request: RemoveUnusedDefinitionsRequest,
 ) -> Result<RemoveUnusedDefinitionsPlan> {
-    for file in &request.files {
-        let tree = SyntaxTree::parse(&file.text)
-            .with_context(|| format!("failed to parse {}", file.path.display()))?;
-        reject_common_lisp_reader_conditionals(&tree, file.dialect)?;
-    }
-
     let exported_symbols = collect_exported_symbol_index(&request.package_definitions);
     let unused_reports = collect_unused_definition_candidates(&request.files)?;
     let mut files = Vec::with_capacity(request.files.len());
@@ -150,6 +144,13 @@ fn rewrite_file_without_unused_definitions(
     for removal in removals {
         let expanded = expand_definition_removal(&rewritten, removal.definition.span);
         removal.removal_span = expanded;
+        let tree = SyntaxTree::parse(&rewritten).with_context(|| {
+            format!(
+                "file would become invalid before removing unused definitions: {}",
+                file.path.display()
+            )
+        })?;
+        reject_overlapping_common_lisp_reader_time_forms(&tree, file.dialect, [expanded])?;
         rewritten = replace_span(&rewritten, expanded, "");
     }
 

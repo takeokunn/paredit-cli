@@ -18,9 +18,17 @@ fn file_with_definitions(
     text: &str,
     definitions: Vec<UnusedDefinitionDefinition>,
 ) -> RemoveUnusedDefinitionInputFile {
+    file_with_text(PathBuf::from("core.lisp"), text, definitions)
+}
+
+fn file_with_text(
+    path: PathBuf,
+    text: &str,
+    definitions: Vec<UnusedDefinitionDefinition>,
+) -> RemoveUnusedDefinitionInputFile {
     let tree = SyntaxTree::parse(text).expect("fixture must parse");
     RemoveUnusedDefinitionInputFile {
-        path: PathBuf::from("core.lisp"),
+        path,
         dialect: Dialect::CommonLisp,
         package: Some("app".to_owned()),
         definitions,

@@ -52,11 +52,12 @@ pub(crate) fn reject_common_lisp_reader_conditionals(
     })
 }
 
-/// Rejects only edits that overlap a Common Lisp reader-time form.
+/// Rejects only edits that partially overlap a Common Lisp reader-time form.
 ///
 /// This is for transformations whose behavior depends solely on their explicit
-/// target spans. Semantic transformations must keep using the document-wide
-/// guard above because a reader conditional can change their lexical context.
+/// target spans. Structural whole-span rewrites may safely delete or replace a
+/// reader-time form when the mutation fully covers it, but edits that cut
+/// through the form remain unsafe.
 pub(crate) fn reject_overlapping_common_lisp_reader_time_forms(
     tree: &SyntaxTree,
     dialect: Dialect,
@@ -71,7 +72,7 @@ pub(crate) fn reject_overlapping_common_lisp_reader_time_forms(
         if mutation_spans
             .iter()
             .copied()
-            .any(|span| spans_overlap(span, form.span))
+            .any(|span| overlaps_partially(span, form.span))
         {
             return Err(ReaderConditionalSafetyError::CommonLispReaderConditional {
                 kind: form.kind,
@@ -84,7 +85,7 @@ pub(crate) fn reject_overlapping_common_lisp_reader_time_forms(
         if mutation_spans
             .iter()
             .copied()
-            .any(|span| spans_overlap(span, form.span))
+            .any(|span| overlaps_partially(span, form.span))
         {
             return Err(ReaderConditionalSafetyError::CommonLispReaderLabel {
                 kind: form.kind,
@@ -97,7 +98,7 @@ pub(crate) fn reject_overlapping_common_lisp_reader_time_forms(
         if mutation_spans
             .iter()
             .copied()
-            .any(|span| spans_overlap(span, literal.span))
+            .any(|span| overlaps_partially(span, literal.span))
         {
             return Err(ReaderConditionalSafetyError::CommonLispReaderLiteral {
                 kind: literal.kind,
@@ -106,7 +107,9 @@ pub(crate) fn reject_overlapping_common_lisp_reader_time_forms(
         }
     }
 
-    if let Some(span) = first_overlapping_read_time_evaluation(&tree.root_view(), &mutation_spans) {
+    if let Some(span) =
+        first_partially_overlapping_read_time_evaluation(&tree.root_view(), &mutation_spans)
+    {
         return Err(ReaderConditionalSafetyError::CommonLispReadTimeEvaluation { span });
     }
 
@@ -183,7 +186,7 @@ fn first_read_time_evaluation(view: &ExpressionView) -> Option<ByteSpan> {
     view.children.iter().find_map(first_read_time_evaluation)
 }
 
-fn first_overlapping_read_time_evaluation(
+fn first_partially_overlapping_read_time_evaluation(
     view: &ExpressionView,
     mutation_spans: &[ByteSpan],
 ) -> Option<ByteSpan> {
@@ -191,23 +194,32 @@ fn first_overlapping_read_time_evaluation(
         && mutation_spans
             .iter()
             .copied()
-            .any(|span| spans_overlap(span, view.span))
+            .any(|span| overlaps_partially(span, view.span))
     {
         return Some(view.span);
     }
 
     view.children
         .iter()
-        .find_map(|child| first_overlapping_read_time_evaluation(child, mutation_spans))
+        .find_map(|child| first_partially_overlapping_read_time_evaluation(child, mutation_spans))
+}
+
+fn overlaps_partially(left: ByteSpan, right: ByteSpan) -> bool {
+    spans_overlap(left, right) && !span_contains(left, right)
 }
 
 fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
     left.start().get() < right.end().get() && right.start().get() < left.end().get()
 }
 
+fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::sexpr::ByteOffset;
 
     #[test]
     fn rejects_common_lisp_vector_literals_for_semantic_mutations() {
@@ -215,6 +227,44 @@ mod tests {
 
         let error = reject_common_lisp_reader_conditionals(&tree, Dialect::CommonLisp)
             .expect_err("vector literals must reject semantic mutations");
+
+        assert!(matches!(
+            error,
+            ReaderConditionalSafetyError::CommonLispReaderLiteral {
+                kind: CommonLispReaderLiteralKind::Vector,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn allows_whole_span_removal_of_reader_literals() {
+        let input = "(render #(helper value))";
+        let tree = SyntaxTree::parse(input).expect("parse succeeds");
+        let literal_start = input.find("#(").expect("vector literal exists");
+        let literal_end = input[literal_start..]
+            .find(')')
+            .map(|offset| literal_start + offset + 1)
+            .expect("vector literal closes");
+        let removal = ByteSpan::new(ByteOffset::new(literal_start), ByteOffset::new(literal_end));
+
+        reject_overlapping_common_lisp_reader_time_forms(&tree, Dialect::CommonLisp, [removal])
+            .expect("whole literal removal must be allowed");
+    }
+
+    #[test]
+    fn rejects_partial_overlaps_with_reader_literals() {
+        let input = "(render #(helper value))";
+        let tree = SyntaxTree::parse(input).expect("parse succeeds");
+        let helper_start = input.find("helper").expect("helper exists");
+        let removal = ByteSpan::new(
+            ByteOffset::new(helper_start),
+            ByteOffset::new(helper_start + "helper".len()),
+        );
+
+        let error =
+            reject_overlapping_common_lisp_reader_time_forms(&tree, Dialect::CommonLisp, [removal])
+                .expect_err("partial overlap must reject");
 
         assert!(matches!(
             error,
