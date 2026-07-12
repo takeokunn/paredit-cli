@@ -1,8 +1,21 @@
+use std::cmp::Ordering;
+
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPrefix};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralTree {
+    /// Order-sensitive digest of `labels`. Placed first so the derived
+    /// `PartialEq` rejects unequal trees after one integer comparison instead
+    /// of walking both label vectors.
+    tree_hash: u64,
     labels: Vec<NodeLabel>,
+    /// FNV-1a digest of each label, parallel to `labels`. Lets the edit
+    /// distance inner loop and the multiset intersection compare labels
+    /// without touching atom text.
+    label_hashes: Vec<u64>,
+    /// `label_hashes` sorted, for merge-based multiset intersection in
+    /// `similarity_upper_bound`.
+    sorted_label_hashes: Vec<u64>,
     leftmost: Vec<usize>,
     keyroots: Vec<usize>,
 }
@@ -89,9 +102,19 @@ impl StructuralTree {
             .collect::<Vec<_>>();
         keyroots.sort_unstable();
 
+        let label_hashes: Vec<u64> = labels.iter().map(hash_label).collect();
+        let mut sorted_label_hashes = label_hashes.clone();
+        sorted_label_hashes.sort_unstable();
+        let tree_hash = label_hashes
+            .iter()
+            .fold(FNV_OFFSET, |hash, &label| fnv_u64(hash, label));
+
         (
             Self {
+                tree_hash,
                 labels,
+                label_hashes,
+                sorted_label_hashes,
                 leftmost,
                 keyroots,
             },
@@ -102,6 +125,90 @@ impl StructuralTree {
     pub fn node_count(&self) -> usize {
         self.labels.len()
     }
+}
+
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+#[inline]
+fn fnv_byte(hash: u64, byte: u8) -> u64 {
+    (hash ^ u64::from(byte)).wrapping_mul(FNV_PRIME)
+}
+
+#[inline]
+fn fnv_u64(hash: u64, value: u64) -> u64 {
+    value.to_le_bytes().iter().fold(hash, |hash, &byte| fnv_byte(hash, byte))
+}
+
+fn hash_label(label: &NodeLabel) -> u64 {
+    fn hash_prefixes(mut hash: u64, prefixes: &[ReaderPrefix]) -> u64 {
+        for prefix in prefixes {
+            hash = fnv_byte(hash, *prefix as u8 + 1);
+        }
+        hash
+    }
+
+    match label {
+        NodeLabel::Root(prefixes) => hash_prefixes(fnv_byte(FNV_OFFSET, 0), prefixes),
+        NodeLabel::List(delimiter, prefixes) => {
+            let delimiter_byte = match delimiter {
+                None => 0,
+                Some(Delimiter::Paren) => 1,
+                Some(Delimiter::Bracket) => 2,
+                Some(Delimiter::Brace) => 3,
+            };
+            hash_prefixes(fnv_byte(fnv_byte(FNV_OFFSET, 1), delimiter_byte), prefixes)
+        }
+        NodeLabel::Atom(text, prefixes) => {
+            let mut hash = fnv_byte(FNV_OFFSET, 2);
+            for byte in text.bytes() {
+                hash = fnv_byte(hash, byte);
+            }
+            // Terminator keeps `("ab", [Quote])` and `("ab\x01", [])`-style
+            // field boundaries from colliding.
+            hash_prefixes(fnv_byte(hash, 0xff), prefixes)
+        }
+    }
+}
+
+/// Counts the multiset intersection of two sorted hash sequences by merging.
+fn sorted_intersection_count(left: &[u64], right: &[u64]) -> usize {
+    let mut shared = 0;
+    let mut left_index = 0;
+    let mut right_index = 0;
+    while left_index < left.len() && right_index < right.len() {
+        match left[left_index].cmp(&right[right_index]) {
+            Ordering::Less => left_index += 1,
+            Ordering::Greater => right_index += 1,
+            Ordering::Equal => {
+                shared += 1;
+                left_index += 1;
+                right_index += 1;
+            }
+        }
+    }
+    shared
+}
+
+/// Cheap upper bound on `tree_similarity` derived from label multisets.
+///
+/// Any edit mapping matches `k <= min(n, m)` node pairs, deletes the other
+/// `n - k` left nodes, and inserts the other `m - k` right nodes. Matched
+/// pairs with identical labels cost 0, and there can be at most
+/// `|multiset intersection|` of those; every other matched pair costs at
+/// least `ATOM_RENAME_COST`. The bound below minimizes that total over `k`,
+/// so the true edit distance can never be smaller and the true similarity
+/// can never be larger. Distinct labels that collide in the hash only make
+/// the intersection look bigger, which loosens the bound but keeps it sound.
+pub(crate) fn similarity_upper_bound(left: &StructuralTree, right: &StructuralTree) -> f64 {
+    let left_count = left.labels.len();
+    let right_count = right.labels.len();
+    let matched = left_count.min(right_count);
+    let shared =
+        sorted_intersection_count(&left.sorted_label_hashes, &right.sorted_label_hashes);
+    let lower_bound_scaled = EDIT_COST_SCALE * (left_count + right_count - 2 * matched)
+        + ATOM_RENAME_COST * matched.saturating_sub(shared);
+    1.0 - lower_bound_scaled as f64 / (EDIT_COST_SCALE * left_count.max(right_count)) as f64
 }
 
 pub fn tree_similarity(left: &StructuralTree, right: &StructuralTree) -> f64 {
@@ -197,10 +304,7 @@ fn forest_distance(
                 && right.leftmost[right_node - 1] == right_start
             {
                 let rename = forest_distances[index(row - 1, column - 1, width)]
-                    + rename_cost_scaled(
-                        &left.labels[left_node - 1],
-                        &right.labels[right_node - 1],
-                    );
+                    + rename_cost_scaled(left, left_node - 1, right, right_node - 1);
                 let distance = delete.min(insert).min(rename);
                 forest_distances[index(row, column, width)] = distance;
                 tree_distances[index(left_node, right_node, width)] = distance;
@@ -220,11 +324,21 @@ fn index(row: usize, column: usize, width: usize) -> usize {
     row * width + column
 }
 
-fn rename_cost_scaled(left: &NodeLabel, right: &NodeLabel) -> usize {
-    if left == right {
+fn rename_cost_scaled(
+    left: &StructuralTree,
+    left_node: usize,
+    right: &StructuralTree,
+    right_node: usize,
+) -> usize {
+    // Hash check first: unequal labels (the common case in this hot loop)
+    // are rejected without comparing atom text; the full comparison then
+    // guards against hash collisions.
+    if left.label_hashes[left_node] == right.label_hashes[right_node]
+        && left.labels[left_node] == right.labels[right_node]
+    {
         0
     } else if matches!(
-        (left, right),
+        (&left.labels[left_node], &right.labels[right_node]),
         (NodeLabel::Atom(_, _), NodeLabel::Atom(_, _))
     ) {
         ATOM_RENAME_COST
