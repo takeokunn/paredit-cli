@@ -9,7 +9,7 @@ use crate::application::usecase::remove_unused_definition::types::{
 };
 use crate::domain::common_lisp::{
     CommonLispLocalCallableForm, CommonLispPackageDeclarationForm, common_lisp_operator_head_eq,
-    common_lisp_symbol_reference_eq,
+    common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
 };
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
@@ -53,47 +53,117 @@ pub(super) fn collect_unused_definition_candidates(
         })
         .collect();
 
-    files
+    // See `collect_reference_needles`: a file whose atom set lacks a
+    // symbol's normalized name cannot reference it, so the three per-symbol
+    // tree walks below can skip that file after one hash lookup.
+    let atom_needles: Vec<std::collections::HashSet<String>> = parsed_files
         .iter()
-        .enumerate()
-        .map(|(file_index, file)| -> Result<_> {
-            let named_definitions = file
-                .definitions
-                .iter()
-                .filter_map(|definition| {
-                    let name = definition.name.as_ref()?;
-                    Some((definition, name))
-                })
-                // A category outside `is_bulk_removable` (`System` for
-                // `asdf:defsystem`'s string-literal system name `"cl-cli"`,
-                // ...) is expected to sometimes report a name that isn't a
-                // valid bare symbol, and such a name can never be searched
-                // for as a value/function-namespace reference anyway — skip
-                // it rather than aborting the whole command, matching how
-                // `definition_report::references` (`unused-definition-
-                // report`) already treats the same case via `.ok()?`. A
-                // bulk-removable category (`Function`, `Macro`, ...)
-                // reporting an invalid name instead indicates corrupted
-                // upstream metadata, so that case still surfaces loudly.
-                .filter_map(|(definition, name)| match SymbolName::new(name.clone()) {
-                    Ok(symbol) => Some(Ok((definition, symbol))),
-                    Err(_) if !definition.category.is_bulk_removable() => None,
-                    Err(error) => Some(Err(error.context(format!(
-                        "remove-unused-definition found invalid symbol '{name}' in {}",
-                        file.path.display()
-                    )))),
-                })
-                .collect::<Result<Vec<_>>>()?;
+        .map(|(_, view)| {
+            let mut needles = std::collections::HashSet::new();
+            collect_reference_needles(view, &mut needles);
+            needles
+        })
+        .collect();
 
-            let definitions = named_definitions
-                .into_iter()
-                .map(|(definition, symbol)| {
-                    let references = files
+    // Each file's report depends only on the shared read-only parses above,
+    // so the per-definition reference scans (the dominant cost on large
+    // workspaces) fan out across workers; results are reassembled by index
+    // so output order and first-error selection stay deterministic.
+    let worker_count = std::thread::available_parallelism()
+        .map(|parallelism| parallelism.get())
+        .unwrap_or(1)
+        .clamp(1, files.len().max(1));
+    let mut ordered: Vec<Option<Result<UnusedDefinitionFile>>> =
+        (0..files.len()).map(|_| None).collect();
+    std::thread::scope(|scope| {
+        let parsed_files = &parsed_files;
+        let package_form_spans = &package_form_spans;
+        let atom_needles = &atom_needles;
+        let handles: Vec<_> = (0..worker_count)
+            .map(|worker| {
+                scope.spawn(move || {
+                    files
                         .iter()
                         .enumerate()
-                        .flat_map(|(other_index, other)| {
-                            let (_, other_view) = &parsed_files[other_index];
-                            let mut spans = Vec::new();
+                        .skip(worker)
+                        .step_by(worker_count)
+                        .map(|(file_index, file)| {
+                            (
+                                file_index,
+                                file_unused_definition_candidates(
+                                    files,
+                                    parsed_files,
+                                    package_form_spans,
+                                    atom_needles,
+                                    file_index,
+                                    file,
+                                ),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        for handle in handles {
+            for (file_index, report) in handle
+                .join()
+                .expect("unused-definition candidate worker thread panicked")
+            {
+                ordered[file_index] = Some(report);
+            }
+        }
+    });
+    ordered.into_iter().flatten().collect()
+}
+
+fn file_unused_definition_candidates(
+    files: &[RemoveUnusedDefinitionInputFile],
+    parsed_files: &[(&RemoveUnusedDefinitionInputFile, ExpressionView)],
+    package_form_spans: &[Vec<ByteSpan>],
+    atom_needles: &[std::collections::HashSet<String>],
+    file_index: usize,
+    file: &RemoveUnusedDefinitionInputFile,
+) -> Result<UnusedDefinitionFile> {
+    {
+        let named_definitions = file
+            .definitions
+            .iter()
+            .filter_map(|definition| {
+                let name = definition.name.as_ref()?;
+                Some((definition, name))
+            })
+            // A category outside `is_bulk_removable` (`System` for
+            // `asdf:defsystem`'s string-literal system name `"cl-cli"`,
+            // ...) is expected to sometimes report a name that isn't a
+            // valid bare symbol, and such a name can never be searched
+            // for as a value/function-namespace reference anyway — skip
+            // it rather than aborting the whole command, matching how
+            // `definition_report::references` (`unused-definition-
+            // report`) already treats the same case via `.ok()?`. A
+            // bulk-removable category (`Function`, `Macro`, ...)
+            // reporting an invalid name instead indicates corrupted
+            // upstream metadata, so that case still surfaces loudly.
+            .filter_map(|(definition, name)| match SymbolName::new(name.clone()) {
+                Ok(symbol) => Some(Ok((definition, symbol))),
+                Err(_) if !definition.category.is_bulk_removable() => None,
+                Err(error) => Some(Err(error.context(format!(
+                    "remove-unused-definition found invalid symbol '{name}' in {}",
+                    file.path.display()
+                )))),
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let definitions = named_definitions
+            .into_iter()
+            .map(|(definition, symbol)| {
+                let needle = common_lisp_symbol_reference_needle(symbol.as_str());
+                let references = files
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(other_index, other)| {
+                        let (_, other_view) = &parsed_files[other_index];
+                        let mut spans = Vec::new();
+                        if atom_needles[other_index].contains(&needle) {
                             collect_unshadowed_symbol_references(
                                 other.dialect,
                                 other_view,
@@ -125,26 +195,48 @@ pub(super) fn collect_unused_definition_candidates(
                                     .iter()
                                     .any(|package| package.contains_span(*span))
                             });
-                            spans
-                                .into_iter()
-                                .filter(move |span| {
-                                    !(other_index == file_index
-                                        && definition.span.contains_span(*span))
-                                })
-                                .map(|_span| DefinitionReference)
-                        })
-                        .collect();
+                        }
+                        spans
+                            .into_iter()
+                            .filter(move |span| {
+                                !(other_index == file_index && definition.span.contains_span(*span))
+                            })
+                            .map(|_span| DefinitionReference)
+                    })
+                    .collect();
 
-                    UnusedDefinitionItem {
-                        definition: definition.clone(),
-                        references,
-                    }
-                })
-                .collect::<Vec<_>>();
+                UnusedDefinitionItem {
+                    definition: definition.clone(),
+                    references,
+                }
+            })
+            .collect::<Vec<_>>();
 
-            Ok(UnusedDefinitionFile { definitions })
-        })
-        .collect()
+        Ok(UnusedDefinitionFile { definitions })
+    }
+}
+
+/// Collects the normalized (`common_lisp_symbol_reference_needle`) symbol
+/// text of every atom in `view`. Every reference matcher used by the
+/// unused-definition scans accepts only atoms whose symbol text normalizes
+/// to the searched name, so a file whose needle set lacks that name cannot
+/// contain any reference — the per-symbol tree walks can skip it entirely.
+///
+/// `pub(crate)`: also used by `definition_report::references` so both
+/// unused-definition entry points share one prefilter definition.
+pub(crate) fn collect_reference_needles(
+    view: &ExpressionView,
+    output: &mut std::collections::HashSet<String>,
+) {
+    if view.kind == ExpressionKind::Atom {
+        if let Some(text) = atom_symbol_text(view) {
+            output.insert(common_lisp_symbol_reference_needle(text));
+        }
+        return;
+    }
+    for child in &view.children {
+        collect_reference_needles(child, output);
+    }
 }
 
 /// Collects the span of every `defpackage` form. Symbols named inside one —

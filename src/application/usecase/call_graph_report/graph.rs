@@ -1,21 +1,33 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::application::usecase::call_report::CallReportItem;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::common_lisp::{
+    common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
+};
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::sexpr::SymbolName;
 
 use super::types::{CallGraphEdge, CallGraphNode};
 
+/// Maps each node's `common_lisp_symbol_reference_needle` to its key in
+/// `nodes_by_name`, so node lookups cost one hash probe instead of a linear
+/// scan with per-entry qualifier stripping. `insert_call_graph_node` keeps at
+/// most one `nodes_by_name` entry per needle equivalence class, which makes
+/// the index lookup equivalent to the linear "first match" search it
+/// replaces.
+pub type CallGraphNodeIndex = HashMap<String, String>;
+
 pub fn insert_call_graph_node(
     nodes_by_name: &mut BTreeMap<String, CallGraphNode>,
+    node_index: &mut CallGraphNodeIndex,
     name: Option<&str>,
     category: DefinitionCategory,
 ) {
     if let Some(name) = name {
-        if let Some((_, node)) = nodes_by_name
-            .iter_mut()
-            .find(|(existing, _)| common_lisp_symbol_reference_eq(existing, name))
+        let needle = common_lisp_symbol_reference_needle(name);
+        if let Some(node) = node_index
+            .get(&needle)
+            .and_then(|key| nodes_by_name.get_mut(key))
         {
             node.definition_count += 1;
             node.categories.insert(category);
@@ -28,6 +40,7 @@ pub fn insert_call_graph_node(
                     categories: BTreeSet::from([category]),
                 },
             );
+            node_index.insert(needle, name.to_string());
         }
     }
 }
@@ -35,11 +48,11 @@ pub fn insert_call_graph_node(
 pub fn build_call_graph_edge(
     call: CallReportItem,
     nodes_by_name: &BTreeMap<String, CallGraphNode>,
+    node_index: &CallGraphNodeIndex,
 ) -> CallGraphEdge {
-    let categories = nodes_by_name
-        .iter()
-        .find(|(name, _)| common_lisp_symbol_reference_eq(name, &call.head))
-        .map(|(_, node)| node)
+    let categories = node_index
+        .get(&common_lisp_symbol_reference_needle(&call.head))
+        .and_then(|key| nodes_by_name.get(key))
         .map(|node| node.categories.clone())
         .unwrap_or_default();
 

@@ -13,7 +13,9 @@ mod syntax;
 mod tests;
 mod types;
 
-pub use graph::{build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node};
+pub use graph::{
+    CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node,
+};
 pub use policy::evaluate_call_graph_policy;
 pub use types::{
     CallGraphDefinitionItem, CallGraphEdge, CallGraphFile, CallGraphNode, CallGraphPolicy,
@@ -27,6 +29,7 @@ pub fn build_call_graph_report(
 ) -> Result<CallGraphReport> {
     let mut parsed = Vec::with_capacity(sources.len());
     let mut nodes_by_name = BTreeMap::<String, CallGraphNode>::new();
+    let mut node_index = CallGraphNodeIndex::new();
 
     for source in sources {
         let definitions =
@@ -36,6 +39,7 @@ pub fn build_call_graph_report(
         for definition in &definitions {
             insert_call_graph_node(
                 &mut nodes_by_name,
+                &mut node_index,
                 definition.name.as_deref(),
                 definition.category,
             );
@@ -49,7 +53,7 @@ pub fn build_call_graph_report(
         .map(|(path, dialect, definitions, calls)| {
             let edges = calls
                 .into_iter()
-                .map(|call| build_call_graph_edge(call, &nodes_by_name))
+                .map(|call| build_call_graph_edge(call, &nodes_by_name, &node_index))
                 .filter(|edge| include_external || edge.internal)
                 .filter(|edge| call_graph_edge_matches(edge, symbol))
                 .collect::<Vec<_>>();

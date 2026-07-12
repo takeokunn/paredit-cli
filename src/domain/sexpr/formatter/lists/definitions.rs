@@ -50,7 +50,7 @@ impl Formatter {
     fn compact_form(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
         let node = tree.node(node_id);
         if self.is_opaque_reader_form(node) {
-            return node.source_text.clone();
+            return Some(node.span.slice(&tree.source).to_owned());
         }
         let delimiter = self.list_delimiter(node);
         let mut output = String::new();

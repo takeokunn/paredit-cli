@@ -74,7 +74,7 @@ pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) 
                     status: WorkspaceFileStatus::Parsed,
                     byte_count,
                     top_level_form_count: tree.root_children().len(),
-                    atom_count: tree.atom_occurrences().len(),
+                    atom_count: tree.atom_occurrence_count(),
                     definition_count: definitions.len(),
                     call_count: calls.len(),
                     package,

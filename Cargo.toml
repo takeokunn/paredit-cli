@@ -25,6 +25,10 @@ include = [
 name = "paredit"
 path = "src/main.rs"
 
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.6", features = ["derive"] }

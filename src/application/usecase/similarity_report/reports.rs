@@ -1,10 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::ops::Range;
 use std::path::Path;
 use std::thread;
 
 use crate::application::form_similarity::{
-    TreeSimilarityWorkspace, tree_similarity_with_workspace,
+    TreeSimilarityWorkspace, similarity_upper_bound, tree_similarity_with_workspace,
 };
 
 use super::types::{
@@ -74,16 +75,15 @@ pub fn build_similarity_pairs(
     let worker_count = thread::available_parallelism()
         .map(|parallelism| parallelism.get())
         .unwrap_or(1)
-        .max(1)
-        .min(groups.len());
-    let worker_groups =
-        partition_groups_for_workers(&groups, options.comparison_scope, worker_count);
+        .max(1);
+    let work_items = build_work_items(&groups, options.comparison_scope, worker_count);
+    let worker_items = partition_items_for_workers(work_items, worker_count);
 
     thread::scope(|scope| {
         let mut handles = Vec::new();
-        for chunk in worker_groups {
+        for chunk in worker_items {
             handles.push(scope.spawn(move || {
-                compare_group_chunk(&chunk, options.threshold, options.comparison_scope)
+                compare_work_items(&chunk, options.threshold, options.comparison_scope)
             }));
         }
 
@@ -144,6 +144,9 @@ fn build_similarity_pairs_sequential(
                             break 'pairs;
                         }
                         evaluated_pairs += 1;
+                        if similarity_upper_bound(&left.tree, &right.tree) < options.threshold {
+                            continue;
+                        }
                         let similarity =
                             tree_similarity_with_workspace(&left.tree, &right.tree, &mut workspace);
                         if similarity >= options.threshold {
@@ -193,6 +196,9 @@ fn build_similarity_pairs_sequential(
                                 break 'pairs;
                             }
                             evaluated_pairs += 1;
+                            if similarity_upper_bound(&left.tree, &right.tree) < options.threshold {
+                                continue;
+                            }
                             let similarity = tree_similarity_with_workspace(
                                 &left.tree,
                                 &right.tree,
@@ -248,6 +254,11 @@ fn build_similarity_pairs_sequential(
                                     break 'pairs;
                                 }
                                 evaluated_pairs += 1;
+                                if similarity_upper_bound(&left.tree, &right.tree)
+                                    < options.threshold
+                                {
+                                    continue;
+                                }
                                 let similarity = tree_similarity_with_workspace(
                                     &left.tree,
                                     &right.tree,
@@ -331,30 +342,90 @@ fn finalize_similarity_pairs(
     }
 }
 
-fn partition_groups_for_workers<'a>(
+/// One schedulable unit of pair comparison. `Group` covers a whole
+/// comparison bucket; `AllRange` covers only the left indexes in `left_range`
+/// of one bucket under the `All` scope, so a single dominant bucket (for
+/// example thousands of `defun` forms) can still spread across every worker
+/// instead of pinning one thread while the rest idle.
+enum WorkItem<'a> {
+    Group(&'a [SimilarityCandidate]),
+    AllRange {
+        group: &'a [SimilarityCandidate],
+        left_range: Range<usize>,
+    },
+}
+
+/// Minimum estimated pair count before a bucket is worth splitting.
+const SPLIT_MIN_PAIRS: usize = 2048;
+
+fn build_work_items<'a>(
     groups: &[&'a [SimilarityCandidate]],
     scope: SimilarityComparisonScope,
     worker_count: usize,
-) -> Vec<Vec<&'a [SimilarityCandidate]>> {
-    if worker_count <= 1 || groups.len() <= 1 {
-        return vec![groups.to_vec()];
+) -> Vec<(WorkItem<'a>, usize)> {
+    let mut items = Vec::new();
+    for &group in groups {
+        let cost = estimated_group_cost(group, scope);
+        let splittable = matches!(scope, SimilarityComparisonScope::All)
+            && worker_count > 1
+            && cost > SPLIT_MIN_PAIRS;
+        if !splittable {
+            items.push((WorkItem::Group(group), cost));
+            continue;
+        }
+        let chunk_count = (cost / SPLIT_MIN_PAIRS).clamp(1, worker_count * 4);
+        for left_range in split_triangle_ranges(group.len(), chunk_count) {
+            let chunk_cost = triangle_range_cost(group.len(), &left_range);
+            items.push((WorkItem::AllRange { group, left_range }, chunk_cost));
+        }
+    }
+    items
+}
+
+/// Splits the left indexes of a triangular all-pairs loop into `chunk_count`
+/// ranges of roughly equal pair count. Index `i` contributes `len - 1 - i`
+/// inner iterations, so equal-width ranges would front-load the work.
+fn split_triangle_ranges(len: usize, chunk_count: usize) -> Vec<Range<usize>> {
+    let total = pair_count(len);
+    if chunk_count <= 1 || total == 0 {
+        return std::iter::once(0..len).collect();
+    }
+    let target = total.div_ceil(chunk_count);
+    let mut ranges = Vec::with_capacity(chunk_count);
+    let mut start = 0;
+    let mut accumulated = 0;
+    for index in 0..len {
+        accumulated += len - 1 - index;
+        if accumulated >= target {
+            ranges.push(start..index + 1);
+            start = index + 1;
+            accumulated = 0;
+        }
+    }
+    if start < len {
+        ranges.push(start..len);
+    }
+    ranges
+}
+
+fn triangle_range_cost(len: usize, left_range: &Range<usize>) -> usize {
+    left_range.clone().map(|index| len - 1 - index).sum()
+}
+
+fn partition_items_for_workers(
+    items: Vec<(WorkItem<'_>, usize)>,
+    worker_count: usize,
+) -> Vec<Vec<WorkItem<'_>>> {
+    if worker_count <= 1 || items.len() <= 1 {
+        return vec![items.into_iter().map(|(item, _)| item).collect()];
     }
 
-    let mut weighted_groups: Vec<_> = groups
-        .iter()
-        .copied()
-        .map(|group| (group, estimated_group_cost(group, scope)))
-        .collect();
-    weighted_groups.sort_unstable_by(|left, right| {
-        right
-            .1
-            .cmp(&left.1)
-            .then_with(|| left.0.len().cmp(&right.0.len()))
-    });
+    let mut weighted_items = items;
+    weighted_items.sort_unstable_by_key(|item| std::cmp::Reverse(item.1));
 
-    let mut assignments: Vec<(usize, Vec<&'a [SimilarityCandidate]>)> =
+    let mut assignments: Vec<(usize, Vec<WorkItem<'_>>)> =
         (0..worker_count).map(|_| (0, Vec::new())).collect();
-    for (group, weight) in weighted_groups {
+    for (item, weight) in weighted_items {
         let target_index = assignments
             .iter()
             .enumerate()
@@ -362,12 +433,12 @@ fn partition_groups_for_workers<'a>(
             .map(|(index, _)| index)
             .unwrap();
         assignments[target_index].0 += weight;
-        assignments[target_index].1.push(group);
+        assignments[target_index].1.push(item);
     }
 
     assignments
         .into_iter()
-        .filter_map(|(_, groups)| (!groups.is_empty()).then_some(groups))
+        .filter_map(|(_, items)| (!items.is_empty()).then_some(items))
         .collect()
 }
 
@@ -411,8 +482,8 @@ struct GroupComparisonOutput<'a> {
     pruned_by_size: usize,
 }
 
-fn compare_group_chunk<'a>(
-    groups: &[&'a [SimilarityCandidate]],
+fn compare_work_items<'a>(
+    items: &[WorkItem<'a>],
     threshold: f64,
     scope: SimilarityComparisonScope,
 ) -> GroupComparisonOutput<'a> {
@@ -422,11 +493,16 @@ fn compare_group_chunk<'a>(
         evaluated_pairs: 0,
         pruned_by_size: 0,
     };
-    for group in groups {
-        let group_output = compare_group(group, threshold, scope, &mut workspace);
-        output.evaluated_pairs += group_output.evaluated_pairs;
-        output.pruned_by_size += group_output.pruned_by_size;
-        output.pairs.extend(group_output.pairs);
+    for item in items {
+        let item_output = match item {
+            WorkItem::Group(group) => compare_group(group, threshold, scope, &mut workspace),
+            WorkItem::AllRange { group, left_range } => {
+                compare_group_all_range(group, left_range.clone(), threshold, &mut workspace)
+            }
+        };
+        output.evaluated_pairs += item_output.evaluated_pairs;
+        output.pruned_by_size += item_output.pruned_by_size;
+        output.pairs.extend(item_output.pairs);
     }
     output
 }
@@ -438,7 +514,9 @@ fn compare_group<'a>(
     workspace: &mut TreeSimilarityWorkspace,
 ) -> GroupComparisonOutput<'a> {
     match scope {
-        SimilarityComparisonScope::All => compare_group_all(group, threshold, workspace),
+        SimilarityComparisonScope::All => {
+            compare_group_all_range(group, 0..group.len(), threshold, workspace)
+        }
         SimilarityComparisonScope::SameFile => compare_group_same_file(group, threshold, workspace),
         SimilarityComparisonScope::CrossFile => {
             compare_group_cross_file(group, threshold, workspace)
@@ -446,8 +524,9 @@ fn compare_group<'a>(
     }
 }
 
-fn compare_group_all<'a>(
+fn compare_group_all_range<'a>(
     group: &'a [SimilarityCandidate],
+    left_range: Range<usize>,
     threshold: f64,
     workspace: &mut TreeSimilarityWorkspace,
 ) -> GroupComparisonOutput<'a> {
@@ -457,7 +536,7 @@ fn compare_group_all<'a>(
         pruned_by_size: 0,
     };
 
-    for left_index in 0..group.len() {
+    for left_index in left_range {
         for right_index in left_index + 1..group.len() {
             let left = &group[left_index];
             let right = &group[right_index];
@@ -467,6 +546,9 @@ fn compare_group_all<'a>(
             }
 
             output.evaluated_pairs += 1;
+            if similarity_upper_bound(&left.tree, &right.tree) < threshold {
+                continue;
+            }
             let similarity = tree_similarity_with_workspace(&left.tree, &right.tree, workspace);
             if similarity >= threshold {
                 let average_node_count =
@@ -514,6 +596,9 @@ fn compare_group_same_file<'a>(
                 }
 
                 output.evaluated_pairs += 1;
+                if similarity_upper_bound(&left.tree, &right.tree) < threshold {
+                    continue;
+                }
                 let similarity = tree_similarity_with_workspace(&left.tree, &right.tree, workspace);
                 if similarity >= threshold {
                     let average_node_count =
@@ -564,6 +649,9 @@ fn compare_group_cross_file<'a>(
                     }
 
                     output.evaluated_pairs += 1;
+                    if similarity_upper_bound(&left.tree, &right.tree) < threshold {
+                        continue;
+                    }
                     let similarity =
                         tree_similarity_with_workspace(&left.tree, &right.tree, workspace);
                     if similarity >= threshold {

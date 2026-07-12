@@ -8,7 +8,10 @@ use crate::application::usecase::signature_report::syntax::list_head;
 use crate::application::usecase::signature_report::types::{
     SignatureCallItem, SignatureDefinitionItem, SignatureReportFile, SignatureReportSource,
 };
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::{
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+    common_lisp_symbol_reference_needle,
+};
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
@@ -33,7 +36,7 @@ pub fn build_signature_reports(
                 continue;
             };
             definitions_by_name
-                .entry(name.clone())
+                .entry(common_lisp_symbol_reference_needle(name))
                 .or_default()
                 .push(arity);
         }

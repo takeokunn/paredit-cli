@@ -29,14 +29,55 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
     };
 
     if args.files.len() > 1 {
+        type FileLetReport = (PathBuf, Dialect, Vec<LetFormReport>);
+        // Per-file read+parse+analysis is independent, so it fans out across
+        // workers; results are reassembled by index so both the per-file
+        // output order and first-error selection match the sequential loop.
+        let worker_count = std::thread::available_parallelism()
+            .map(|parallelism| parallelism.get())
+            .unwrap_or(1)
+            .clamp(1, args.files.len());
+        let mut ordered: Vec<Option<Result<FileLetReport>>> =
+            (0..args.files.len()).map(|_| None).collect();
+        std::thread::scope(|scope| {
+            let files = &args.files;
+            let explicit = args.dialect;
+            let handles: Vec<_> = (0..worker_count)
+                .map(|worker| {
+                    scope.spawn(move || {
+                        files
+                            .iter()
+                            .enumerate()
+                            .skip(worker)
+                            .step_by(worker_count)
+                            .map(|(index, file)| {
+                                let report =
+                                    read_input_dialect_and_tree(Some(file.clone()), explicit)
+                                        .and_then(|(input, dialect, tree)| {
+                                            Ok((
+                                                file.clone(),
+                                                dialect,
+                                                build_let_report(dialect, &input.text, &tree)?,
+                                            ))
+                                        });
+                                (index, report)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+            for handle in handles {
+                for (index, report) in handle.join().expect("let-report worker thread panicked") {
+                    ordered[index] = Some(report);
+                }
+            }
+        });
         let mut per_file = Vec::with_capacity(args.files.len());
         let mut all_reports = Vec::new();
-        for file in &args.files {
-            let (input, dialect, tree) =
-                read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
-            let reports = build_let_report(dialect, &input.text, &tree)?;
+        for entry in ordered.into_iter().flatten() {
+            let (file, dialect, reports) = entry?;
             all_reports.extend(reports.iter().cloned());
-            per_file.push((file.clone(), dialect, reports));
+            per_file.push((file, dialect, reports));
         }
         let policy = evaluate_let_report_policy(&all_reports, &options);
         print_multi_file_let_report(&per_file, &policy, args.output)?;
