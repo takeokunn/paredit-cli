@@ -2,18 +2,21 @@ use std::collections::BTreeMap;
 
 use crate::application::usecase::call_report::CallReportItem;
 use crate::application::usecase::signature_report::types::SignatureCallStatus;
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 
+/// `definitions_by_name` is keyed by `common_lisp_symbol_reference_needle`,
+/// so all definitions whose names are `common_lisp_symbol_reference_eq`-equal
+/// share one entry and each call classifies with one map lookup instead of a
+/// linear scan over every definition.
 pub fn classify_signature_call(
     definitions_by_name: &BTreeMap<String, Vec<(usize, Option<usize>)>>,
     call: &CallReportItem,
 ) -> (Option<(usize, Option<usize>)>, SignatureCallStatus) {
     let arities = definitions_by_name
-        .iter()
-        .filter(|(name, _)| common_lisp_symbol_reference_eq(name, &call.head))
-        .flat_map(|(_, arities)| arities.iter().copied())
-        .collect::<Vec<_>>();
-    let [(min, max)] = arities.as_slice() else {
+        .get(&common_lisp_symbol_reference_needle(&call.head))
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    let [(min, max)] = arities else {
         return if arities.is_empty() {
             (None, SignatureCallStatus::UnknownDefinition)
         } else {
