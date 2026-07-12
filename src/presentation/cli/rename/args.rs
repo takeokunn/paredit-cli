@@ -297,3 +297,25 @@ pub(in crate::presentation::cli) struct UnwrapFunctionCallsArgs {
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
 }
+
+#[derive(Debug, Args)]
+pub(in crate::presentation::cli) struct RenameAtArgs {
+    /// Input file. Required when --write is used; reads stdin otherwise.
+    #[arg(short, long)]
+    pub(super) file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
+    /// Byte offset inside the symbol atom to rename.
+    #[arg(long)]
+    pub(super) at: usize,
+    /// Replacement symbol atom.
+    #[arg(long)]
+    pub(super) to: SymbolName,
+    /// Rewrite the input file in place. Without this flag, only prints a plan.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub(super) output: OutputFormat,
+}

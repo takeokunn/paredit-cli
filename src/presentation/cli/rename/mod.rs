@@ -1,4 +1,5 @@
 pub(in crate::presentation::cli) mod args;
+pub(in crate::presentation::cli) mod rename_at;
 pub(in crate::presentation::cli) mod rename_binding;
 pub(in crate::presentation::cli) mod rename_function;
 pub(in crate::presentation::cli) mod rename_in_form;

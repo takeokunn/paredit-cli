@@ -3,9 +3,9 @@ use super::{
     call_graph_report, call_report, definition_movement, definition_removal, definition_report,
     dependency_report, duplicate_report, extract_constant, extract_function, form_report,
     function_parameter, impact_report, inline_function, inline_let, introduce_let, let_report,
-    package, refactor, remove_forms, remove_unused_binding, rename, replace_forms,
-    signature_report, similarity_report, symbol_report, thread_expression, unthread_expression,
-    unwrap_call, workspace_report,
+    package, refactor, remove_unused_binding, rename, replace_forms, signature_report,
+    similarity_report, symbol_report, thread_expression, unthread_expression, unwrap_call,
+    workspace_report,
 };
 use clap::Subcommand;
 
@@ -106,8 +106,6 @@ pub(super) enum RefactorCommand {
     WorkspacePreview(refactor::args::WorkspaceRefactorPreviewArgs),
     /// Execute a workspace refactor with preview gates and post-write verification.
     WorkspaceExecute(refactor::args::WorkspaceRefactorExecuteArgs),
-    /// Plan or remove unused top-level definitions discovered under workspace roots.
-    WorkspaceRemoveUnusedDefinitions(refactor::args::WorkspaceRemoveUnusedDefinitionsArgs),
     /// Plan or remove a top-level definition from one file.
     RemoveDefinition(definition_removal::args::RemoveDefinitionArgs),
     /// Plan or remove unused top-level definitions across explicit files.
@@ -124,8 +122,6 @@ pub(super) enum RefactorCommand {
     ReplacementPlan(duplicate_report::args::ReplacementPlanArgs),
     /// Plan or replace multiple reviewed forms in one file.
     ReplaceForms(replace_forms::ReplaceFormsArgs),
-    /// Plan or remove multiple selected top-level forms from one document.
-    RemoveForms(remove_forms::RemoveFormsArgs),
     /// Plan or add a symbol to a Common Lisp defpackage :export option.
     AddExport(package::types::AddExportArgs),
     /// Plan or sort Common Lisp defpackage :export symbol designators.
@@ -136,6 +132,9 @@ pub(super) enum RefactorCommand {
     MergePackageOptions(package::types::MergePackageOptionsArgs),
     /// Plan or rename Common Lisp package designators and qualified prefixes.
     RenamePackage(package::types::RenamePackageArgs),
+    /// Rename whatever symbol occupies a byte offset, dispatching to
+    /// whichever namespace and lexical scope actually own it.
+    RenameAt(rename::args::RenameAtArgs),
     /// Rename exact atom occurrences without touching strings or comments.
     RenameSymbol(rename::args::RenameSymbolArgs),
     /// Rename exact atom occurrences inside one selected form.
