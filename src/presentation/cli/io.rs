@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, ErrorKind, Read};
+use std::io::{self, ErrorKind, IsTerminal, Read};
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 
 use super::{DialectArg, SourceInput};
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
+use crate::domain::sexpr::{ParseError, SyntaxTree};
 
 static STAGED_WRITE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -22,8 +22,15 @@ pub(crate) fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
             })
         }
         None => {
+            let mut stdin = io::stdin();
+            if stdin.is_terminal() {
+                anyhow::bail!(
+                    "no input: pass --file <path> or pipe source into stdin \
+                     (refusing to wait on an interactive terminal)"
+                );
+            }
             let mut text = String::new();
-            io::stdin()
+            stdin
                 .read_to_string(&mut text)
                 .context("failed to read stdin")?;
             Ok(SourceInput { text, file: None })
@@ -45,11 +52,44 @@ pub(crate) fn read_input_dialect_and_tree(
     explicit: Option<DialectArg>,
 ) -> Result<(SourceInput, Dialect, SyntaxTree)> {
     let (input, dialect) = read_input_and_dialect(file, explicit)?;
-    let tree = SyntaxTree::parse(&input.text).with_context(|| match input.file.as_deref() {
-        Some(path) => format!("failed to parse {}", path.display()),
-        None => "failed to parse stdin".to_string(),
-    })?;
+    let tree = parse_document(&input)?;
     Ok((input, dialect, tree))
+}
+
+/// Parses a source document, naming the input and the error's line/column in
+/// the context. The underlying [`ParseError`] keeps the raw byte offset,
+/// which feeds directly into `--at`.
+pub(crate) fn parse_document(input: &SourceInput) -> Result<SyntaxTree> {
+    SyntaxTree::parse(&input.text).map_err(|error| {
+        let location = parse_error_line_column(&input.text, &error);
+        let source = match input.file.as_deref() {
+            Some(path) => path.display().to_string(),
+            None => "stdin".to_owned(),
+        };
+        anyhow::Error::new(error).context(format!("failed to parse {source} ({location})"))
+    })
+}
+
+fn parse_error_line_column(text: &str, error: &ParseError) -> String {
+    let position = match error {
+        ParseError::UnexpectedClose { position, .. }
+        | ParseError::MismatchedClose { position, .. } => *position,
+        ParseError::UnclosedList(position)
+        | ParseError::UnterminatedString(position)
+        | ParseError::UnterminatedBlockComment(position)
+        | ParseError::UnterminatedSymbol(position) => *position,
+    };
+    let clamped = position.min(text.len());
+    let line = text[..clamped]
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
+        + 1;
+    let column = match text[..clamped].rfind('\n') {
+        Some(newline) => clamped - newline,
+        None => clamped + 1,
+    };
+    format!("line {line}, column {column}")
 }
 
 pub(crate) fn read_file_or_empty(path: &PathBuf) -> Result<(SourceInput, bool)> {
@@ -76,6 +116,18 @@ pub(crate) fn write_files_with_rollback<I>(files: I) -> Result<()>
 where
     I: IntoIterator<Item = (PathBuf, String)>,
 {
+    let files = files.into_iter().collect::<Vec<_>>();
+    // Central invariant: paredit never persists an unbalanced document, no
+    // matter which command produced the rewrite.
+    for (path, content) in &files {
+        SyntaxTree::parse(content).with_context(|| {
+            format!(
+                "refusing to write {}: rewritten source does not reparse",
+                path.display()
+            )
+        })?;
+    }
+
     let staged = files
         .into_iter()
         .map(|(path, content)| stage_write_target(path, content))

@@ -39,5 +39,7 @@ pub(in crate::presentation::cli) fn rename_symbols(args: RenameSymbolsArgs) -> R
         write_files_with_rollback(written_files)?;
     }
 
-    print_rename_symbols_report(&reports, &args.from, &args.to, args.write, args.output)
+    let changed = reports.iter().any(|report| report.changed);
+    print_rename_symbols_report(&reports, &args.from, &args.to, args.write, args.output)?;
+    super::shared::ensure_rename_changed(args.fail_on_no_change, changed, "rename-symbols")
 }

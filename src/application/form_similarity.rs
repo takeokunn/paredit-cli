@@ -137,7 +137,10 @@ fn fnv_byte(hash: u64, byte: u8) -> u64 {
 
 #[inline]
 fn fnv_u64(hash: u64, value: u64) -> u64 {
-    value.to_le_bytes().iter().fold(hash, |hash, &byte| fnv_byte(hash, byte))
+    value
+        .to_le_bytes()
+        .iter()
+        .fold(hash, |hash, &byte| fnv_byte(hash, byte))
 }
 
 fn hash_label(label: &NodeLabel) -> u64 {
@@ -204,8 +207,7 @@ pub(crate) fn similarity_upper_bound(left: &StructuralTree, right: &StructuralTr
     let left_count = left.labels.len();
     let right_count = right.labels.len();
     let matched = left_count.min(right_count);
-    let shared =
-        sorted_intersection_count(&left.sorted_label_hashes, &right.sorted_label_hashes);
+    let shared = sorted_intersection_count(&left.sorted_label_hashes, &right.sorted_label_hashes);
     let lower_bound_scaled = EDIT_COST_SCALE * (left_count + right_count - 2 * matched)
         + ATOM_RENAME_COST * matched.saturating_sub(shared);
     1.0 - lower_bound_scaled as f64 / (EDIT_COST_SCALE * left_count.max(right_count)) as f64

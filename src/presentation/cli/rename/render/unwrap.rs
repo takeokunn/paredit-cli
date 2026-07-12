@@ -3,13 +3,13 @@ use serde_json::json;
 
 use super::super::super::OutputFormat;
 use super::super::args::UnwrapFunctionCallsArgs;
-use super::super::types::{UnwrapFunctionCallsFileReport, UnwrapFunctionCallsPolicy};
+use super::super::types::{CallSitePolicy, UnwrapFunctionCallsFileReport};
 use super::shared::unwrap_call_sites_json;
 
 pub(in crate::presentation::cli::rename) fn print_unwrap_function_calls_report(
     reports: &[UnwrapFunctionCallsFileReport],
     args: &UnwrapFunctionCallsArgs,
-    policy: &UnwrapFunctionCallsPolicy,
+    policy: &CallSitePolicy,
     output: OutputFormat,
 ) -> Result<()> {
     let call_count = reports
@@ -46,6 +46,7 @@ pub(in crate::presentation::cli::rename) fn print_unwrap_function_calls_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "function": args.function.as_str(),
                 "wrapper": args.wrapper.as_str(),
                 "allCalls": args.all_calls,

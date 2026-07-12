@@ -264,10 +264,7 @@ impl SyntaxTree {
                             .is_some(),
                 );
             }
-            node.children
-                .iter()
-                .map(|child| count(tree, *child))
-                .sum()
+            node.children.iter().map(|child| count(tree, *child)).sum()
         }
         self.node(NodeId::ROOT)
             .children
@@ -348,12 +345,28 @@ impl SyntaxTree {
     /// Resolves a zero-based expression path into a non-root selection.
     pub fn select_path(&self, path: &ExpressionPath) -> Result<Selection<'_>> {
         let mut node_id = NodeId::ROOT;
-        for index in path.indexes() {
+        for (depth, index) in path.indexes().iter().enumerate() {
             let node = self.node(node_id);
-            node_id = *node
-                .children
-                .get(index.get())
-                .ok_or_else(|| anyhow!("path segment {} is out of range", index.get()))?;
+            node_id = *node.children.get(index.get()).ok_or_else(|| {
+                let resolved = path.indexes()[..depth]
+                    .iter()
+                    .map(|resolved| resolved.get().to_string())
+                    .collect::<Vec<_>>()
+                    .join(".");
+                let location = if resolved.is_empty() {
+                    "the top level".to_owned()
+                } else {
+                    format!("the form at path {resolved}")
+                };
+                let arity = match node.children.len() {
+                    0 => format!("{location} has no child expressions"),
+                    len => format!(
+                        "{location} has {len} child expressions (valid indexes 0..={})",
+                        len - 1
+                    ),
+                };
+                anyhow!("path segment {} is out of range: {arity}", index.get())
+            })?;
         }
         if node_id == NodeId::ROOT {
             anyhow::bail!("root document cannot be edited directly");
@@ -449,11 +462,7 @@ impl SyntaxTree {
         }
         if node.kind == NodeKind::Atom {
             if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
-                if let Some(symbol_text) = node
-                    .span
-                    .slice(&self.source)
-                    .get(node.symbol_offset..)
-                {
+                if let Some(symbol_text) = node.span.slice(&self.source).get(node.symbol_offset..) {
                     let symbol_span = ByteSpan::new(
                         ByteOffset::new(node.span.start().get() + node.symbol_offset),
                         node.span.end(),

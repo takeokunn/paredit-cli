@@ -30,6 +30,7 @@ pub(super) fn print_remove_definition_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "file": plan.file,
                 "dialect": plan.dialect.label(),
                 "path": plan.path.to_string(),
@@ -107,6 +108,7 @@ pub(super) fn print_remove_unused_definitions_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "file_count": plan.files.len(),
                 "candidate_count": plan.candidate_count,
                 "removal_count": plan.removal_count,

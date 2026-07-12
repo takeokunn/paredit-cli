@@ -205,15 +205,11 @@ fn first_partially_overlapping_read_time_evaluation(
 }
 
 fn overlaps_partially(left: ByteSpan, right: ByteSpan) -> bool {
-    spans_overlap(left, right) && !span_contains(left, right)
+    spans_overlap(left, right) && !left.contains_span(right)
 }
 
 fn spans_overlap(left: ByteSpan, right: ByteSpan) -> bool {
     left.start().get() < right.end().get() && right.start().get() < left.end().get()
-}
-
-fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
 #[cfg(test)]

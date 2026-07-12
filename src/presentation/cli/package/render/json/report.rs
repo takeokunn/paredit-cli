@@ -19,6 +19,7 @@ pub(in crate::presentation::cli::package::render) fn print_package_report(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "file_count": reports.len(),
             "defpackage_count": defpackage_count,
             "in_package_count": in_package_count,

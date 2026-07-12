@@ -16,6 +16,9 @@ pub(in crate::presentation::cli) struct SymbolQueryArgs {
     /// Exact symbol atom to find.
     #[arg(long)]
     pub(super) symbol: SymbolName,
+    /// Exit non-zero unless at least this many occurrences are found.
+    #[arg(long)]
+    pub(super) require_occurrences: Option<usize>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
     pub(super) output: OutputFormat,
@@ -32,6 +35,9 @@ pub(in crate::presentation::cli) struct SymbolReportArgs {
     /// Exact symbol atom to report.
     #[arg(long)]
     pub(super) symbol: SymbolName,
+    /// Exit non-zero unless at least this many occurrences are found.
+    #[arg(long)]
+    pub(super) require_occurrences: Option<usize>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,

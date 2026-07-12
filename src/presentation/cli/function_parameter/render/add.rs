@@ -43,6 +43,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_add_function_param
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": plan.dialect.label(),
                 "definition_path": plan.definition_path.to_string(),
                 "call_paths": plan.call_paths.iter().map(ToString::to_string).collect::<Vec<_>>(),

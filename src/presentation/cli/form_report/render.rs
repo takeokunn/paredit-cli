@@ -44,6 +44,7 @@ pub(super) fn print_form_report(report: &FormReport, output: OutputFormat) -> Re
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": report.dialect.label(),
                 "path": report.path.as_ref().map(ToString::to_string),
                 "span": {

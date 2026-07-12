@@ -59,6 +59,9 @@ pub(in crate::presentation::cli) struct WorkspaceRefactorPreviewArgs {
     /// Require at least this many total edits.
     #[arg(long)]
     pub(in crate::presentation::cli) require_edits: Option<usize>,
+    /// Write the JSON preview manifest to this file and print a summary with its hash instead of the manifest itself.
+    #[arg(long)]
+    pub(in crate::presentation::cli) manifest_out: Option<PathBuf>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(in crate::presentation::cli) output: OutputFormat,
@@ -108,6 +111,9 @@ pub(in crate::presentation::cli) struct RefactorPreviewArgs {
     /// Require at least this many total edits.
     #[arg(long)]
     pub(in crate::presentation::cli) require_edits: Option<usize>,
+    /// Write the JSON preview manifest to this file and print a summary with its hash instead of the manifest itself.
+    #[arg(long)]
+    pub(in crate::presentation::cli) manifest_out: Option<PathBuf>,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(in crate::presentation::cli) output: OutputFormat,

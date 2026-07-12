@@ -11,10 +11,13 @@ fn top_level_help_routes_new_automation_to_grouped_namespaces() {
             "`paredit inspect ...` reads and reports without writing.",
         ))
         .stdout(predicate::str::contains(
-            "`paredit edit ...` transforms one selected form and writes source to stdout.",
+            "`paredit edit ...` transforms one selected form; stdout by default, --write to update the file.",
         ))
         .stdout(predicate::str::contains(
             "`paredit refactor ...` plans, previews, verifies, and applies semantic changes.",
+        ))
+        .stdout(predicate::str::contains(
+            "paredit inspect capabilities --output json",
         ));
 }
 

@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 
 use crate::application::usecase::call_graph_report::{
     CallGraphReportSource, build_call_graph_report, evaluate_call_graph_policy,
@@ -38,7 +38,9 @@ pub(in crate::presentation::cli) fn call_graph(args: CallGraphArgs) -> Result<()
         args.output,
     )?;
     if !policy.passed {
-        bail!("call-graph policy failed");
+        return Err(crate::presentation::cli::gate::gate_failure(
+            "call-graph policy failed",
+        ));
     }
     Ok(())
 }

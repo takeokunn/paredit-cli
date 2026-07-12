@@ -3,9 +3,8 @@ use anyhow::{Context, Result};
 use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::UnwrapFunctionCallsArgs;
 use super::render::unwrap::print_unwrap_function_calls_report;
-use super::types::{
-    PendingUnwrapFunctionCallsFile, UnwrapFunctionCallsFileReport, UnwrapFunctionCallsPolicy,
-};
+use super::shared::evaluate_call_site_policy;
+use super::types::{PendingUnwrapFunctionCallsFile, UnwrapFunctionCallsFileReport};
 use crate::application::usecase::rename::{self as rename_usecase, UnwrapFunctionCallsScope};
 
 pub(in crate::presentation::cli) fn unwrap_function_calls(
@@ -50,12 +49,16 @@ pub(in crate::presentation::cli) fn unwrap_function_calls(
     }
 
     let selected_call_count = pending.iter().map(|file| file.calls.len()).sum::<usize>();
-    let policy = evaluate_unwrap_function_calls_policy(selected_call_count, &args);
+    let policy = evaluate_call_site_policy(
+        selected_call_count,
+        args.fail_on_no_change,
+        args.require_calls,
+    );
     if !policy.passed {
-        anyhow::bail!(
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
             "unwrap-function-calls policy failed: {}",
             policy.violations.join("; ")
-        );
+        )));
     }
 
     let written_files = pending
@@ -83,27 +86,4 @@ pub(in crate::presentation::cli) fn unwrap_function_calls(
     }
 
     print_unwrap_function_calls_report(&reports, &args, &policy, args.output)
-}
-
-fn evaluate_unwrap_function_calls_policy(
-    selected_call_count: usize,
-    args: &UnwrapFunctionCallsArgs,
-) -> UnwrapFunctionCallsPolicy {
-    let mut violations = Vec::new();
-    if args.fail_on_no_change && selected_call_count == 0 {
-        violations.push("no selected call site changed".to_owned());
-    }
-    if let Some(required) = args.require_calls {
-        if selected_call_count < required {
-            violations.push(format!(
-                "expected at least {required} changed call sites but found {selected_call_count}"
-            ));
-        }
-    }
-    UnwrapFunctionCallsPolicy {
-        fail_on_no_change: args.fail_on_no_change,
-        require_calls: args.require_calls,
-        passed: violations.is_empty(),
-        violations,
-    }
 }

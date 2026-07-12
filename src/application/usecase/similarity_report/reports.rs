@@ -196,8 +196,7 @@ fn build_similarity_pairs_sequential(
                                 break 'pairs;
                             }
                             evaluated_pairs += 1;
-                            if similarity_upper_bound(&left.tree, &right.tree) < options.threshold
-                            {
+                            if similarity_upper_bound(&left.tree, &right.tree) < options.threshold {
                                 continue;
                             }
                             let similarity = tree_similarity_with_workspace(
@@ -410,10 +409,7 @@ fn split_triangle_ranges(len: usize, chunk_count: usize) -> Vec<Range<usize>> {
 }
 
 fn triangle_range_cost(len: usize, left_range: &Range<usize>) -> usize {
-    left_range
-        .clone()
-        .map(|index| len - 1 - index)
-        .sum()
+    left_range.clone().map(|index| len - 1 - index).sum()
 }
 
 fn partition_items_for_workers(

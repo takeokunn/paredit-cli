@@ -65,7 +65,7 @@ pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan
     let child_index = request
         .argument_index
         .checked_add(1)
-        .context("argument index overflow")?;
+        .context("--argument-index is too large to address any call argument")?;
     let argument = request.target.children.get(child_index).with_context(|| {
         format!(
             "argument index {} is out of range for {} argument(s)",

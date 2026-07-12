@@ -59,3 +59,46 @@ fn cli_reports_unqualified_query_for_package_qualified_common_lisp_symbol() {
         .stdout(predicate::str::contains("\"total_count\": 4"))
         .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""));
 }
+
+#[test]
+fn cli_find_symbol_require_occurrences_gate_fails_on_undermatch() {
+    let mut cmd = paredit();
+    cmd.args([
+        "inspect",
+        "find-symbol",
+        "--symbol",
+        "foo",
+        "--require-occurrences",
+        "3",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(foo 1)\n(bar (foo 2))\n")
+    .assert()
+    .failure()
+    .stdout(predicate::str::contains("\"symbol\": \"foo\""))
+    .stderr(predicate::str::contains(
+        "require-occurrences policy failed",
+    ));
+}
+
+#[test]
+fn cli_symbols_require_occurrences_gate_passes_when_met() {
+    let dir = fresh_temp_dir("symbols-require-occurrences");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(foo 1)\n(bar (foo 2))\n").expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.args([
+        "inspect",
+        "symbols",
+        "--symbol",
+        "foo",
+        "--require-occurrences",
+        "2",
+    ])
+    .arg(&file)
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"total_count\": 2"));
+}

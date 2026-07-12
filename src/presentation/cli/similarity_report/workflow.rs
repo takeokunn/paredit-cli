@@ -79,10 +79,10 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
     print_similarity_report(&report, &discovery, &errors, &args)?;
 
     if args.fail_on_duplicates && report.summary.matched_pairs > 0 {
-        bail!(
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
             "similarity-report policy failed: {} duplicate pair(s) found",
             report.summary.matched_pairs
-        );
+        )));
     }
     if args.fail_on_duplicates && report.summary.comparison_limit_reached {
         bail!(

@@ -3,6 +3,7 @@ mod args;
 mod basic_edit;
 mod call_graph_report;
 mod call_report;
+mod capabilities;
 mod command;
 mod conditional_conversion;
 mod convert_cond_to_if;
@@ -29,6 +30,7 @@ mod extract_local_function;
 mod flatten_progn;
 mod form_report;
 mod function_parameter;
+mod gate;
 mod impact_report;
 mod inline_function;
 mod inline_lambda;
@@ -100,10 +102,11 @@ pub(crate) use shared::{
 
 #[derive(Debug, Parser)]
 #[command(
+    name = "paredit",
     version,
     about,
     long_about = None,
-    after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form and writes source to stdout.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll commands are available only through these namespaces."
+    after_help = "Canonical namespaces:\n  `paredit inspect ...` reads and reports without writing.\n  `paredit edit ...` transforms one selected form; stdout by default, --write to update the file.\n  `paredit refactor ...` plans, previews, verifies, and applies semantic changes.\n\nAll source-facing commands live in these three namespaces.\n`paredit completions <shell>` prints a shell completion script.\nRun `paredit inspect capabilities --output json` for a machine-readable catalog of every command and flag."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -112,5 +115,11 @@ struct Cli {
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-    dispatch::dispatch(cli.command)
+    match dispatch::dispatch(cli.command) {
+        Err(error) if error.downcast_ref::<gate::GateFailure>().is_some() => {
+            eprintln!("Error: {error:#}");
+            std::process::exit(gate::GATE_FAILURE_EXIT_CODE);
+        }
+        result => result,
+    }
 }

@@ -37,6 +37,7 @@ pub(in crate::presentation::cli::definition_movement) fn print_split_file_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "command": "split-file",
                 "from_file": plan.from_file,
                 "to_file": plan.to_file,

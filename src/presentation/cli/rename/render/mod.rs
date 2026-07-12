@@ -1,8 +1,6 @@
 pub(super) mod at;
 pub(super) mod binding;
-pub(super) mod function;
-pub(super) mod local_function;
-pub(super) mod macrolet;
+pub(super) mod callable;
 pub(super) mod replace_call;
 pub(super) mod scoped_form;
 mod shared;

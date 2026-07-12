@@ -193,14 +193,13 @@ fn file_unused_definition_candidates(
                             spans.retain(|span| {
                                 !package_spans
                                     .iter()
-                                    .any(|package| span_contains(*package, *span))
+                                    .any(|package| package.contains_span(*span))
                             });
                         }
                         spans
                             .into_iter()
                             .filter(move |span| {
-                                !(other_index == file_index
-                                    && span_contains(definition.span, *span))
+                                !(other_index == file_index && definition.span.contains_span(*span))
                             })
                             .map(|_span| DefinitionReference)
                     })
@@ -215,10 +214,6 @@ fn file_unused_definition_candidates(
 
         Ok(UnusedDefinitionFile { definitions })
     }
-}
-
-fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
 /// Collects the normalized (`common_lisp_symbol_reference_needle`) symbol

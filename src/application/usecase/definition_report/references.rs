@@ -160,14 +160,13 @@ fn file_unused_definition_report(
                         spans.retain(|span| {
                             !other_package_spans
                                 .iter()
-                                .any(|package| span_contains(*package, *span))
+                                .any(|package| package.contains_span(*span))
                         });
 
                         spans
                             .into_iter()
                             .filter(move |span| {
-                                !(other_index == file_index
-                                    && span_contains(definition.span, *span))
+                                !(other_index == file_index && definition.span.contains_span(*span))
                             })
                             .map(move |span| DefinitionReference {
                                 file_index: other_index,
@@ -206,8 +205,4 @@ pub fn unused_definition_actionable_candidate_count(reports: &[UnusedDefinitionF
         .flat_map(|report| &report.definitions)
         .filter(|item| item.references.is_empty() && item.definition.category.is_bulk_removable())
         .count()
-}
-
-fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start() <= inner.start() && inner.end() <= outer.end()
 }

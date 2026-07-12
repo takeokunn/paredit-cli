@@ -1,13 +1,16 @@
+//! Shared renderer for the callable rename family (rename-function,
+//! rename-macrolet, rename-local-function): identical report shape,
+//! identical text/JSON output keys.
 use anyhow::Result;
 use serde_json::json;
 
 use super::super::super::OutputFormat;
-use super::super::types::RenameFunctionFileReport;
+use super::super::types::CallableRenameFileReport;
 use super::shared::rename_occurrences_json;
 use crate::domain::sexpr::SymbolName;
 
-pub(in crate::presentation::cli::rename) fn print_rename_function_report(
-    reports: &[RenameFunctionFileReport],
+pub(in crate::presentation::cli::rename) fn print_callable_rename_report(
+    reports: &[CallableRenameFileReport],
     from: &SymbolName,
     to: &SymbolName,
     write: bool,
@@ -43,6 +46,7 @@ pub(in crate::presentation::cli::rename) fn print_rename_function_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "from": from.as_str(),
                 "to": to.as_str(),
                 "write": write,

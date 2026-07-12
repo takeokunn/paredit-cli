@@ -89,6 +89,7 @@ fn print_json_workspace_report(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "roots": roots
                 .iter()
                 .map(|root| root.display().to_string())

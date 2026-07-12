@@ -35,6 +35,7 @@ pub(in crate::presentation::cli) fn print_duplicate_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "group_count": reports.len(),
                 "form_count": form_count,
                 "groups": reports
@@ -119,6 +120,7 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "batch_count": batches.len(),
                 "form_count": form_count,
                 "candidate_form_count": candidate_form_count,

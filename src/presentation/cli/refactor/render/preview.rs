@@ -99,13 +99,28 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
             }
         }
         OutputFormat::Json => {
-            let write_plan = preview.write_plan();
-            let writable_files = preview.writable_paths_for_write_plan(&write_plan);
-            let refused_files = preview.refused_paths_for_write_plan(&write_plan);
-            let decision = preview.decision_for_write_plan(&write_plan);
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({
+                serde_json::to_string_pretty(&refactor_preview_manifest_json(preview))?
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Builds the preview manifest exactly as `refactor preview --output json`
+/// prints it; `--manifest-out` persists these bytes so the file hash matches
+/// a shell redirect of the same run.
+pub(in crate::presentation::cli) fn refactor_preview_manifest_json(
+    preview: &RefactorPreview,
+) -> Value {
+    let write_plan = preview.write_plan();
+    let writable_files = preview.writable_paths_for_write_plan(&write_plan);
+    let refused_files = preview.refused_paths_for_write_plan(&write_plan);
+    let decision = preview.decision_for_write_plan(&write_plan);
+    json!({
+        "schema_version": 1,
                     "mode": preview.mode.label(),
                     "from": preview.from.as_str(),
                     "to": preview.to.as_str(),
@@ -153,38 +168,33 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
                         "summary": refactor_preview_policy_summary_json(preview),
                         "violations": preview.policy.violations.as_slice(),
                     },
-                    "files": preview
-                        .files
-                        .iter()
-                        .map(|file| json!({
-                            "path": file.path.display().to_string(),
-                            "dialect": file.dialect.label(),
-                            "changed": file.changed,
-                            "written": file.written,
-                            "edit_count": file.edit_count,
-                            "input_bytes": file.input_bytes,
-                            "output_bytes": file.output_bytes,
-                            "output_parse_ok": file.output_parse_ok,
-                            "input_hash": file.input_hash.as_str(),
-                            "output_hash": file.output_hash.as_str(),
-                            "edits": file
-                                .edits
-                                .iter()
-                                .map(|edit| json!({
-                                    "start": edit.start,
-                                    "end": edit.end,
-                                    "replacement": edit.replacement.as_str(),
-                                }))
-                                .collect::<Vec<_>>(),
-                            "preview": file.preview.as_str(),
-                        }))
-                        .collect::<Vec<_>>(),
-                }))?
-            );
-        }
-    }
-
-    Ok(())
+        "files": preview
+            .files
+            .iter()
+            .map(|file| json!({
+                "path": file.path.display().to_string(),
+                "dialect": file.dialect.label(),
+                "changed": file.changed,
+                "written": file.written,
+                "edit_count": file.edit_count,
+                "input_bytes": file.input_bytes,
+                "output_bytes": file.output_bytes,
+                "output_parse_ok": file.output_parse_ok,
+                "input_hash": file.input_hash.as_str(),
+                "output_hash": file.output_hash.as_str(),
+                "edits": file
+                    .edits
+                    .iter()
+                    .map(|edit| json!({
+                        "start": edit.start,
+                        "end": edit.end,
+                        "replacement": edit.replacement.as_str(),
+                    }))
+                    .collect::<Vec<_>>(),
+                "preview": file.preview.as_str(),
+            }))
+            .collect::<Vec<_>>(),
+    })
 }
 
 fn refactor_preview_policy_summary_json(preview: &RefactorPreview) -> Value {

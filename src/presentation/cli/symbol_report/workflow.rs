@@ -1,6 +1,5 @@
 use anyhow::Result;
 
-use crate::domain::sexpr::ByteSpan;
 use crate::presentation::cli::shared::{matching_symbol_occurrences, read_input_dialect_and_tree};
 
 use super::args::{SymbolQueryArgs, SymbolReportArgs};
@@ -9,7 +8,20 @@ use super::types::{SymbolOccurrenceContext, SymbolReportFile, SymbolReportOccurr
 
 pub(in crate::presentation::cli) fn find_symbol(args: SymbolQueryArgs) -> Result<()> {
     let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
-    print_symbol_occurrences(&tree, dialect, &args.symbol, args.output)
+    let occurrence_count = matching_symbol_occurrences(&tree, &args.symbol).len();
+    print_symbol_occurrences(&tree, dialect, &args.symbol, args.output)?;
+    require_occurrences(occurrence_count, args.require_occurrences)
+}
+
+fn require_occurrences(found: usize, required: Option<usize>) -> Result<()> {
+    match required {
+        Some(minimum) if found < minimum => {
+            Err(crate::presentation::cli::gate::gate_failure(format!(
+                "require-occurrences policy failed: found {found} occurrences, required at least {minimum}"
+            )))
+        }
+        _ => Ok(()),
+    }
 }
 
 pub(in crate::presentation::cli) fn symbol_report(args: SymbolReportArgs) -> Result<()> {
@@ -25,7 +37,7 @@ pub(in crate::presentation::cli) fn symbol_report(args: SymbolReportArgs) -> Res
                 span: occurrence.span,
                 context: outline
                     .iter()
-                    .filter(|entry| span_contains(entry.span, occurrence.span))
+                    .filter(|entry| entry.span.contains_span(occurrence.span))
                     .min_by_key(|entry| entry.span.end().get() - entry.span.start().get())
                     .map(|entry| SymbolOccurrenceContext {
                         path: entry.path.to_string(),
@@ -43,9 +55,10 @@ pub(in crate::presentation::cli) fn symbol_report(args: SymbolReportArgs) -> Res
         });
     }
 
-    print_symbol_report(&reports, &args.symbol, args.output)
-}
-
-fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
+    let occurrence_count = reports
+        .iter()
+        .map(|report| report.occurrences.len())
+        .sum::<usize>();
+    print_symbol_report(&reports, &args.symbol, args.output)?;
+    require_occurrences(occurrence_count, args.require_occurrences)
 }

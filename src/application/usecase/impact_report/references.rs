@@ -21,14 +21,14 @@ pub(super) fn count_non_call_references(
         let reference_span = reference.span;
         if definitions
             .iter()
-            .any(|definition| span_contains(definition.span, reference_span))
+            .any(|definition| definition.span.contains_span(reference_span))
         {
             excluded.insert(symbol_occurrence_key(path, reference_span));
             continue;
         }
         if calls
             .iter()
-            .any(|call| span_contains(call.call.span, reference_span))
+            .any(|call| call.call.span.contains_span(reference_span))
         {
             excluded.insert(symbol_occurrence_key(path, reference_span));
         }
@@ -91,8 +91,4 @@ fn matching_common_lisp_symbol_occurrences(
                     .contains(&(occurrence.span.start().get(), occurrence.span.end().get()))
         })
         .collect()
-}
-
-pub(super) fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
