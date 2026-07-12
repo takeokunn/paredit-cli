@@ -125,6 +125,8 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::RenameBinding(args) => {
                 rename::rename_binding::rename_binding(args)?
             }
+            command::RefactorCommand::RenameBlock(args) => rename_control::rename_block(args)?,
+            command::RefactorCommand::RenameTag(args) => rename_control::rename_tag(args)?,
             command::RefactorCommand::RenameSymbols(args) => {
                 rename::rename_symbols::rename_symbols(args)?
             }
@@ -172,6 +174,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::RefactorCommand::InlineLocalFunction(args) => {
                 inline_local_function::inline_local_function(args)?
             }
+            command::RefactorCommand::InlineSymbolMacro(args) => {
+                inline_symbol_macro::inline_symbol_macro(args)?
+            }
             command::RefactorCommand::AddFunctionParameter(args) => {
                 function_parameter::add::add_function_parameter(args)?
             }
@@ -194,6 +199,9 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             }
             command::RefactorCommand::ConvertLetStarToLet(args) => {
                 convert_let_star_to_let::convert_let_star_to_let(args)?
+            }
+            command::RefactorCommand::MergeNestedLetStar(args) => {
+                merge_nested_let_star::merge_nested_let_star(args)?
             }
             command::RefactorCommand::ConvertIfToCond(args) => {
                 convert_if_to_cond::convert_if_to_cond(args)?

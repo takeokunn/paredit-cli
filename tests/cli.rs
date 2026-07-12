@@ -63,8 +63,12 @@ mod inline_function;
 mod inline_lambda;
 #[path = "cli/inline_local_function.rs"]
 mod inline_local_function;
+#[path = "cli/inline_symbol_macro.rs"]
+mod inline_symbol_macro;
 #[path = "cli/let_refactor/mod.rs"]
 mod let_refactor;
+#[path = "cli/merge_nested_let_star.rs"]
+mod merge_nested_let_star;
 #[path = "cli/package/mod.rs"]
 mod package;
 #[path = "cli/package_archive_contract.rs"]
@@ -101,6 +105,8 @@ mod remove_unused_binding;
 mod rename;
 #[path = "cli/rename_at/mod.rs"]
 mod rename_at;
+#[path = "cli/rename_control.rs"]
+mod rename_control;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
 #[path = "cli/signature_report.rs"]

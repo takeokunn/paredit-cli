@@ -143,7 +143,10 @@ plan/preview/verify/apply lifecycle.
 | `inline-function` | Inline one selected function call using a selected function definition. |
 | `inline-lambda` | Replace a safe, immediately invoked Common Lisp lambda with a parallel `let`. |
 | `inline-local-function` | Inline the sole direct call in a safe, single-binding Common Lisp `flet` form. |
+| `inline-symbol-macro` | Expand a conservative single-binding Common Lisp `symbol-macrolet` form. |
 | `convert-labels-to-flet` | Convert a non-recursive Common Lisp `labels` form into `flet`. |
+| `rename-block` | Rename a selected Common Lisp `block` and matching `return-from` references. |
+| `rename-tag` | Rename one tag in a selected Common Lisp `tagbody` and matching `go` references. |
 
 ### Parameters and bindings
 
@@ -158,6 +161,7 @@ plan/preview/verify/apply lifecycle.
 | `inline-let` | Inline a single local let binding into its body. |
 | `convert-let-to-let-star` | Convert a Common Lisp or Emacs Lisp `let` to `let*` when later initializers do not reference earlier bindings. |
 | `convert-let-star-to-let` | Convert a Common Lisp `let*` to `let` when later initializers do not reference earlier bindings. |
+| `merge-nested-let-star` | Merge a directly nested Common Lisp or Emacs Lisp `let*` into one sequential binding form. |
 | `convert-if-to-cond` | Convert a Common Lisp or Emacs Lisp `(if test then [else])` form to `cond`. |
 | `convert-cond-to-if` | Convert simple Common Lisp or Emacs Lisp `cond` clauses to nested `if` forms. |
 | `convert-when-to-if` | Convert a Common Lisp or Emacs Lisp `when` form to `if`. |

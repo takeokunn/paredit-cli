@@ -5,9 +5,10 @@ use super::{
     convert_unless_to_if, convert_when_to_if, definition_movement, definition_removal,
     definition_report, dependency_report, duplicate_report, extract_constant, extract_function,
     extract_local_function, form_report, function_parameter, impact_report, inline_function,
-    inline_lambda, inline_let, inline_local_function, introduce_let, let_report, package, refactor,
-    remove_unused_binding, rename, replace_forms, signature_report, similarity_report,
-    symbol_report, thread_expression, unthread_expression, unwrap_call, workspace_report,
+    inline_lambda, inline_let, inline_local_function, inline_symbol_macro, introduce_let, let_report,
+    merge_nested_let_star, package, refactor, remove_unused_binding, rename, rename_control,
+    replace_forms, signature_report, similarity_report, symbol_report, thread_expression,
+    unthread_expression, unwrap_call, workspace_report,
 };
 use clap::Subcommand;
 
@@ -147,6 +148,10 @@ pub(super) enum RefactorCommand {
     RenameInForm(rename::args::RenameInFormArgs),
     /// Rename one local binding and only the references in its lexical scope.
     RenameBinding(rename::args::RenameBindingArgs),
+    /// Rename a selected Common Lisp block and matching return-from references.
+    RenameBlock(rename_control::RenameBlockArgs),
+    /// Rename one tag in a selected Common Lisp tagbody and matching go references.
+    RenameTag(rename_control::RenameTagArgs),
     /// Plan or apply an exact atom rename across explicit files.
     RenameSymbols(rename::args::RenameSymbolsArgs),
     /// Plan or apply a Common Lisp callable definition and callable-designator rename across explicit files, including function, macro-function, compiler-macro-function, symbol-function, fdefinition, setf names, and definition forms such as define-method-combination.
@@ -181,6 +186,8 @@ pub(super) enum RefactorCommand {
     InlineLambda(inline_lambda::InlineLambdaArgs),
     /// Inline the sole direct call in a single-binding Common Lisp flet form.
     InlineLocalFunction(inline_local_function::InlineLocalFunctionArgs),
+    /// Expand one conservative Common Lisp symbol-macrolet binding.
+    InlineSymbolMacro(inline_symbol_macro::InlineSymbolMacroArgs),
     /// Add a parameter to a selected function and explicit call sites.
     AddFunctionParameter(function_parameter::args::AddFunctionParameterArgs),
     /// Move one positional parameter in a selected function and explicit call sites.
@@ -199,6 +206,8 @@ pub(super) enum RefactorCommand {
     ConvertLetToLetStar(convert_let_to_let_star::ConvertLetToLetStarArgs),
     /// Convert an independent Common Lisp let* form into let.
     ConvertLetStarToLet(convert_let_star_to_let::ConvertLetStarToLetArgs),
+    /// Merge a directly nested Common Lisp or Emacs Lisp let* form.
+    MergeNestedLetStar(merge_nested_let_star::MergeNestedLetStarArgs),
     /// Convert a Common Lisp or Emacs Lisp if form into cond.
     ConvertIfToCond(convert_if_to_cond::ConvertIfToCondArgs),
     /// Convert a Common Lisp or Emacs Lisp cond form into nested if forms.
