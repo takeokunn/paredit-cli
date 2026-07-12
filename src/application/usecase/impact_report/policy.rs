@@ -1,6 +1,7 @@
 use crate::application::refactor::plan::RefactorPlanSummary;
+use crate::domain::report_policy::ImpactReportPolicyOptions;
 
-use super::types::{ImpactReportPolicy, ImpactReportPolicyOptions, ImpactRiskLevel};
+use super::types::{ImpactReportPolicy, ImpactRiskLevel};
 
 pub fn evaluate_impact_report_policy(
     options: ImpactReportPolicyOptions,
@@ -10,7 +11,7 @@ pub fn evaluate_impact_report_policy(
     let mut violations = Vec::new();
 
     if let Some(threshold) = options.fail_on_risk_level {
-        if risk_level >= threshold {
+        if risk_level >= threshold.into() {
             violations.push(format!(
                 "--fail-on-risk-level {} failed with {} risk",
                 threshold.label(),
@@ -44,7 +45,7 @@ pub fn evaluate_impact_report_policy(
     }
 
     ImpactReportPolicy {
-        fail_on_risk_level: options.fail_on_risk_level,
+        fail_on_risk_level: options.fail_on_risk_level.map(Into::into),
         require_definitions: options.require_definitions,
         require_references: options.require_references,
         require_calls: options.require_calls,

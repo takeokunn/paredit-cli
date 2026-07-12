@@ -19,7 +19,7 @@ pub use graph::{
 pub use policy::evaluate_call_graph_policy;
 pub use types::{
     CallGraphDefinitionItem, CallGraphEdge, CallGraphFile, CallGraphNode, CallGraphPolicy,
-    CallGraphReport, CallGraphReportSource,
+    CallGraphPolicyOptions, CallGraphReport, CallGraphReportSource,
 };
 
 pub fn build_call_graph_report(

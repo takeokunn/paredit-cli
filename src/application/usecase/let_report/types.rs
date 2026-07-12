@@ -1,3 +1,4 @@
+pub use crate::domain::report_policy::LetReportPolicyOptions;
 use crate::domain::sexpr::{ByteSpan, Path};
 
 #[derive(Debug, Clone)]
@@ -19,13 +20,6 @@ pub struct LetBindingReport {
     pub reference_count: usize,
     pub can_inline_without_duplication: bool,
     pub risks: Vec<&'static str>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct LetReportPolicyOptions {
-    pub fail_on_duplicate_evaluation: bool,
-    pub fail_on_unused_binding: bool,
-    pub require_inlineable_bindings: Option<usize>,
 }
 
 #[derive(Debug, Clone)]

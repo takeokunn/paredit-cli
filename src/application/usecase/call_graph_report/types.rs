@@ -5,6 +5,8 @@ use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 
+pub use crate::domain::call_graph_report::CallGraphPolicyOptions;
+
 #[derive(Debug)]
 pub struct CallGraphReportSource {
     pub path: PathBuf,
