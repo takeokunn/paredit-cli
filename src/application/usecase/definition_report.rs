@@ -2,7 +2,6 @@
 
 mod collect;
 mod references;
-mod syntax;
 #[cfg(test)]
 mod tests;
 mod types;
