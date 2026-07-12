@@ -1,9 +1,8 @@
 use anyhow::{Context, Result};
 
 use crate::application::usecase::package_report::build_package_report;
-use crate::domain::sexpr::SyntaxTree;
 
-use super::super::{detect_dialect, read_input};
+use super::super::read_input_dialect_and_tree;
 use super::{
     render::print_package_report,
     types::{PackageReportArgs, PackageReportFile},
@@ -13,10 +12,7 @@ pub(in crate::presentation::cli) fn package_report(args: PackageReportArgs) -> R
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let report = build_package_report(&tree, dialect)
             .with_context(|| format!("failed to inspect packages in {}", file.display()))?;
 

@@ -48,10 +48,8 @@ pub(in crate::presentation::cli) fn collect_impact_reports(
     let mut sources = Vec::with_capacity(files.len());
 
     for file in files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, dialect_override);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (_input, dialect, tree) =
+            read_input_dialect_and_tree(Some(file.clone()), dialect_override)?;
         sources.push(ImpactReportSource {
             path: file.clone(),
             dialect,

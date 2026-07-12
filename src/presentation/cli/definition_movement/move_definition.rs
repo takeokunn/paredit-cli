@@ -8,8 +8,8 @@ use crate::domain::definition::definition_shape;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use super::super::shared::{
-    detect_dialect, list_head, package_context_before_top_level, read_file_or_empty, read_input,
-    write_files_with_rollback,
+    detect_dialect, list_head, package_context_before_top_level, read_file_or_empty,
+    read_input_dialect_and_tree, write_files_with_rollback,
 };
 use super::args::MoveDefinitionArgs;
 use super::render::move_definition::print_move_definition_plan;
@@ -28,11 +28,10 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         anyhow::bail!("--from-file and --to-file must refer to different files");
     }
 
-    let from_input = read_input(Some(args.from_file.clone()))?;
+    let (from_input, from_dialect, from_tree) =
+        read_input_dialect_and_tree(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
-    let from_dialect = detect_dialect(&from_input, args.dialect);
     let to_dialect = detect_dialect(&to_input, args.dialect);
-    let from_tree = SyntaxTree::parse(&from_input.text)?;
     SyntaxTree::parse(&to_input.text).with_context(|| {
         format!(
             "destination file is not a valid S-expression document: {}",

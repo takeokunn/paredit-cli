@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::super::shared::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::shared::{read_input_dialect_and_tree, write_files_with_rollback};
 use super::args::RemoveUnusedDefinitionsArgs;
 use super::render::print_remove_unused_definitions_plan;
 use crate::application::usecase::definition_report::{
@@ -11,7 +11,6 @@ use crate::application::usecase::remove_unused_definition::{
     RemoveUnusedDefinitionInputFile, RemoveUnusedDefinitionsRequest, UnusedDefinitionDefinition,
     plan_remove_unused_definitions,
 };
-use crate::domain::sexpr::SyntaxTree;
 
 pub(in crate::presentation::cli) fn remove_unused_definitions(
     args: RemoveUnusedDefinitionsArgs,
@@ -20,10 +19,7 @@ pub(in crate::presentation::cli) fn remove_unused_definitions(
     let mut package_definitions = Vec::new();
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let (package, definitions) = collect_definition_forms(&tree, dialect)?;
         let package_report = build_package_report(&tree, dialect)
             .with_context(|| format!("failed to inspect packages in {}", file.display()))?;

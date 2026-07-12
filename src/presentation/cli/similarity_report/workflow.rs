@@ -10,7 +10,7 @@ use crate::application::usecase::similarity_report::{
 use crate::domain::sexpr::SyntaxTree;
 use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
-use super::super::{detect_dialect, read_input};
+use super::super::read_input_and_dialect;
 use super::args::SimilarityReportArgs;
 use super::render::print_similarity_report;
 use super::types::{ErrorPolicy, FileProcessingError};
@@ -196,12 +196,14 @@ fn process_file(
     dialect: Option<super::super::DialectArg>,
     options: &SimilarityReportOptions,
 ) -> std::result::Result<FileProcessingOutput, ProcessingError> {
-    let input = read_input(Some(file.to_path_buf())).map_err(|source| ProcessingError {
-        path: file.to_path_buf(),
-        stage: "read",
-        source,
-    })?;
-    let dialect = detect_dialect(&input, dialect);
+    let (input, dialect) =
+        read_input_and_dialect(Some(file.to_path_buf()), dialect).map_err(|source| {
+            ProcessingError {
+                path: file.to_path_buf(),
+                stage: "read",
+                source,
+            }
+        })?;
     let tree = SyntaxTree::parse(&input.text).map_err(|source| ProcessingError {
         path: file.to_path_buf(),
         stage: "parse",

@@ -1,20 +1,16 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
-use super::super::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::{read_input_dialect_and_tree, write_files_with_rollback};
 use super::args::RenameSymbolsArgs;
 use super::render::symbols::print_rename_symbols_report;
 use super::types::RenameFileReport;
-use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::shared::{apply_byte_span_edits, matching_symbol_occurrences};
 
 pub(in crate::presentation::cli) fn rename_symbols(args: RenameSymbolsArgs) -> Result<()> {
     let mut reports = Vec::with_capacity(args.files.len());
     let mut written_files = Vec::new();
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let occurrences = matching_symbol_occurrences(&tree, &args.from)
             .into_iter()
             .map(|occurrence| occurrence.span)

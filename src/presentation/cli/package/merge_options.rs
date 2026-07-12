@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 
 use crate::application::usecase::package as package_usecase;
 
-use super::super::{detect_dialect, read_input, write_file_with_rollback};
+use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::{
     render::print_merge_package_options_plan,
     types::{MergePackageOptionsArgs, MergePackageOptionsPlan},
@@ -11,8 +11,7 @@ use super::{
 pub(in crate::presentation::cli) fn merge_package_options(
     args: MergePackageOptionsArgs,
 ) -> Result<()> {
-    let input = read_input(Some(args.file.clone()))?;
-    let dialect = detect_dialect(&input, args.dialect);
+    let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let usecase_plan =
         package_usecase::plan_merge_package_options(package_usecase::MergePackageOptionsRequest {
             input: &input.text,

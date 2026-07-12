@@ -2,28 +2,24 @@ use anyhow::{Context, Result};
 
 use crate::domain::sexpr::{Edit, Formatter, SyntaxTree};
 use crate::presentation::cli::args::{FormatArgs, ReplaceArgs, TargetArgs};
-use crate::presentation::cli::shared::{detect_dialect, edit_target, read_input, resolve_target};
+use crate::presentation::cli::shared::{edit_target, read_input_dialect_and_tree, resolve_target};
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let _dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (_, _, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     print!("{}", Formatter::new(args.indent).format(&tree));
     Ok(())
 }
 
 pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, _, tree) = read_input_dialect_and_tree(args.file, None)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     print!("{}", selection.text(&input.text));
     Ok(())
 }
 
 pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
-    let input = read_input(args.file)?;
+    let (input, _, tree) = read_input_dialect_and_tree(args.file, None)?;
     SyntaxTree::parse(&args.with).context("replacement is not a valid S-expression document")?;
-    let tree = SyntaxTree::parse(&input.text)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     print!("{}", Edit::replace(&input.text, selection, &args.with));
     Ok(())

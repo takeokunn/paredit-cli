@@ -3,6 +3,7 @@ use crate::application::usecase::thread_expression::{
     ThreadExpressionPlan, ThreadExpressionRequest, ThreadStyle as ApplicationThreadStyle,
     plan_thread_expression,
 };
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
 pub(super) struct ThreadExpressionArgs {
@@ -42,9 +43,7 @@ impl ThreadStyleArg {
 }
 
 pub(super) fn thread_expression(args: ThreadExpressionArgs) -> Result<()> {
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let selected = selection.view();
     let path = args.path.clone();

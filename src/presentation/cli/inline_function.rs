@@ -42,8 +42,7 @@ pub(super) fn inline_function(args: InlineFunctionArgs) -> Result<()> {
         anyhow::bail!("--write requires --file");
     }
 
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
+    let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;
     let plan = plan_inline_function(InlineFunctionRequest {
         input: &input.text,
         dialect,

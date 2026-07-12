@@ -5,7 +5,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::{Context, Result};
 
-use super::SourceInput;
+use super::{DialectArg, SourceInput};
+use crate::domain::dialect::Dialect;
+use crate::domain::sexpr::SyntaxTree;
 
 static STAGED_WRITE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -27,6 +29,27 @@ pub(crate) fn read_input(file: Option<PathBuf>) -> Result<SourceInput> {
             Ok(SourceInput { text, file: None })
         }
     }
+}
+
+pub(crate) fn read_input_and_dialect(
+    file: Option<PathBuf>,
+    explicit: Option<DialectArg>,
+) -> Result<(SourceInput, Dialect)> {
+    let input = read_input(file)?;
+    let dialect = super::detect_dialect(&input, explicit);
+    Ok((input, dialect))
+}
+
+pub(crate) fn read_input_dialect_and_tree(
+    file: Option<PathBuf>,
+    explicit: Option<DialectArg>,
+) -> Result<(SourceInput, Dialect, SyntaxTree)> {
+    let (input, dialect) = read_input_and_dialect(file, explicit)?;
+    let tree = SyntaxTree::parse(&input.text).with_context(|| match input.file.as_deref() {
+        Some(path) => format!("failed to parse {}", path.display()),
+        None => "failed to parse stdin".to_string(),
+    })?;
+    Ok((input, dialect, tree))
 }
 
 pub(crate) fn read_file_or_empty(path: &PathBuf) -> Result<(SourceInput, bool)> {

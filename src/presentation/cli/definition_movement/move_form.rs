@@ -4,7 +4,8 @@ use crate::domain::sexpr::{Edit, SyntaxTree};
 
 use super::super::MoveInsert;
 use super::super::shared::{
-    detect_dialect, list_head, read_file_or_empty, read_input, write_files_with_rollback,
+    detect_dialect, list_head, read_file_or_empty, read_input_dialect_and_tree,
+    write_files_with_rollback,
 };
 use super::args::MoveFormArgs;
 use super::render::move_form::print_move_form_plan;
@@ -23,12 +24,10 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
         anyhow::bail!("--insert before/after requires --anchor-path");
     }
 
-    let from_input = read_input(Some(args.from_file.clone()))?;
+    let (from_input, from_dialect, from_tree) =
+        read_input_dialect_and_tree(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
-    let from_dialect = detect_dialect(&from_input, args.dialect);
     let to_dialect = detect_dialect(&to_input, args.dialect);
-    let from_tree = SyntaxTree::parse(&from_input.text)
-        .with_context(|| format!("failed to parse {}", args.from_file.display()))?;
     let to_tree = SyntaxTree::parse(&to_input.text).with_context(|| {
         format!(
             "destination file is not a valid S-expression document: {}",

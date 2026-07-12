@@ -16,7 +16,8 @@ mod io;
 
 pub(crate) use diff::unified_diff;
 pub(crate) use io::{
-    read_file_or_empty, read_input, write_file_with_rollback, write_files_with_rollback,
+    read_file_or_empty, read_input, read_input_and_dialect, read_input_dialect_and_tree,
+    write_file_with_rollback, write_files_with_rollback,
 };
 
 pub(crate) fn apply_byte_span_edits(

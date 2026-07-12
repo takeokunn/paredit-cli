@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use super::super::shared::{
-    detect_dialect, list_head, package_context_before_top_level, read_input,
+    list_head, package_context_before_top_level, read_input_dialect_and_tree,
     write_file_with_rollback,
 };
 use super::args::RemoveDefinitionArgs;
@@ -12,10 +12,8 @@ use crate::domain::definition::definition_shape;
 use crate::domain::sexpr::{Edit, SyntaxTree};
 
 pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs) -> Result<()> {
-    let input = read_input(Some(args.file.clone()))?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)
-        .with_context(|| format!("failed to parse {}", args.file.display()))?;
+    let (input, dialect, tree) =
+        read_input_dialect_and_tree(Some(args.file.clone()), args.dialect)?;
 
     let target_index = match args.path.indexes() {
         [index] => index.get(),

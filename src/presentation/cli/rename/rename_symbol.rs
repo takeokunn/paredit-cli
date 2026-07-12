@@ -1,14 +1,11 @@
 use anyhow::Result;
 
-use super::super::{detect_dialect, read_input};
+use super::super::read_input_dialect_and_tree;
 use super::args::RenameSymbolArgs;
 use super::render::symbol::print_rename_plan;
-use crate::domain::sexpr::SyntaxTree;
 
 pub(in crate::presentation::cli) fn rename_symbol(args: RenameSymbolArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     if args.plan {
         print_rename_plan(&tree, dialect, &args.from, &args.to, args.output)?;
     } else {

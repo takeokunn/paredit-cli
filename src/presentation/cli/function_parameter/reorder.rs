@@ -4,7 +4,7 @@ use crate::application::usecase::function_parameter::{
     ReorderFunctionParametersRequest, plan_reorder_function_parameters,
 };
 use crate::presentation::cli::{
-    detect_dialect, read_input, require_output_file, write_file_with_rollback,
+    read_input_and_dialect, require_output_file, write_file_with_rollback,
 };
 
 use super::args::ReorderFunctionParametersArgs;
@@ -17,8 +17,7 @@ pub(in crate::presentation::cli) fn reorder_function_parameters(
         anyhow::bail!("--write requires --file");
     }
 
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
+    let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;
     let plan = plan_reorder_function_parameters(ReorderFunctionParametersRequest {
         input: &input.text,
         dialect,

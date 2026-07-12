@@ -2,6 +2,7 @@ use super::*;
 use crate::application::usecase::extract_function::{
     ExtractFunctionPlan, ExtractFunctionRequest, plan_extract_function,
 };
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
 pub(super) struct ExtractFunctionArgs {
@@ -51,9 +52,7 @@ pub(super) fn extract_function(args: ExtractFunctionArgs) -> Result<()> {
         anyhow::bail!("--insert before/after requires --anchor-path");
     }
 
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let explicit_params = args
         .params

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::RenameFunctionArgs;
 use super::render::function::print_rename_function_report;
 use super::types::{PendingRenameFunctionFile, RenameFunctionFileReport};
@@ -11,8 +11,7 @@ pub(in crate::presentation::cli) fn rename_function(args: RenameFunctionArgs) ->
     let mut definition_count = 0usize;
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
+        let (input, dialect) = read_input_and_dialect(Some(file.clone()), args.dialect)?;
         let plan = rename_usecase::plan_rename_function(rename_usecase::RenameFunctionRequest {
             input: &input.text,
             dialect,

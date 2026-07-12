@@ -1,16 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
-use crate::domain::sexpr::{ByteSpan, SyntaxTree};
-use crate::presentation::cli::shared::{detect_dialect, matching_symbol_occurrences, read_input};
+use crate::domain::sexpr::ByteSpan;
+use crate::presentation::cli::shared::{matching_symbol_occurrences, read_input_dialect_and_tree};
 
 use super::args::{SymbolQueryArgs, SymbolReportArgs};
 use super::render::{print_symbol_occurrences, print_symbol_report};
 use super::types::{SymbolOccurrenceContext, SymbolReportFile, SymbolReportOccurrence};
 
 pub(in crate::presentation::cli) fn find_symbol(args: SymbolQueryArgs) -> Result<()> {
-    let input = read_input(args.file)?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (_, dialect, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     print_symbol_occurrences(&tree, dialect, &args.symbol, args.output)
 }
 
@@ -18,10 +16,7 @@ pub(in crate::presentation::cli) fn symbol_report(args: SymbolReportArgs) -> Res
     let mut reports = Vec::with_capacity(args.files.len());
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         let outline = tree.outline(|head| dialect.is_definition_head(head));
         let occurrences = matching_symbol_occurrences(&tree, &args.symbol)
             .into_iter()

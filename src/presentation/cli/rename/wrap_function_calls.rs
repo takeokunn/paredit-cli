@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::WrapFunctionCallsArgs;
 use super::render::wrap::print_wrap_function_calls_report;
 use super::types::{
@@ -15,8 +15,7 @@ pub(in crate::presentation::cli) fn wrap_function_calls(args: WrapFunctionCallsA
 
     let mut pending = Vec::with_capacity(args.files.len());
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
+        let (input, dialect) = read_input_and_dialect(Some(file.clone()), args.dialect)?;
         let scope = if args.all_calls {
             WrapFunctionCallsScope::AllCalls
         } else {

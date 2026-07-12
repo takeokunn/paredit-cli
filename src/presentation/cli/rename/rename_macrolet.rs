@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::RenameMacroletArgs;
 use super::render::macrolet::print_rename_macrolet_report;
 use super::types::{PendingRenameMacroletFile, RenameMacroletFileReport};
@@ -11,8 +11,7 @@ pub(in crate::presentation::cli) fn rename_macrolet(args: RenameMacroletArgs) ->
     let mut definition_count = 0usize;
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
+        let (input, dialect) = read_input_and_dialect(Some(file.clone()), args.dialect)?;
         let plan = rename_usecase::plan_rename_macrolet(rename_usecase::RenameMacroletRequest {
             input: &input.text,
             dialect,

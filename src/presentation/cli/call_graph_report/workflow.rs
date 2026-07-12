@@ -1,22 +1,18 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 
 use crate::application::usecase::call_graph_report::{
     CallGraphReportSource, build_call_graph_report, evaluate_call_graph_policy,
 };
-use crate::domain::sexpr::SyntaxTree;
 use crate::presentation::cli::call_graph_report::args::CallGraphArgs;
 use crate::presentation::cli::call_graph_report::render::print_call_graph_report;
-use crate::presentation::cli::shared::{detect_dialect, read_input};
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 pub(in crate::presentation::cli) fn call_graph(args: CallGraphArgs) -> Result<()> {
     let symbol = args.symbol.as_ref();
     let mut sources = Vec::with_capacity(args.files.len());
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (_, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
 
         sources.push(CallGraphReportSource {
             path: file.clone(),

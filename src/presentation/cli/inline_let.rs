@@ -1,5 +1,6 @@
 use super::*;
 use crate::application::usecase::inline_let::{InlineLetPlan, InlineLetRequest, plan_inline_let};
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
 pub(super) struct InlineLetArgs {
@@ -24,9 +25,7 @@ pub(super) fn inline_let(args: InlineLetArgs) -> Result<()> {
         anyhow::bail!("--write requires --file");
     }
 
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let plan = plan_inline_let(InlineLetRequest {
         input: &input.text,

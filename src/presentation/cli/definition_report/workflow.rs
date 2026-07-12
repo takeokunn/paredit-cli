@@ -99,10 +99,7 @@ fn load_definition_input(
     file: &Path,
     dialect: Option<super::super::DialectArg>,
 ) -> Result<(PathBuf, SourceInput, super::super::Dialect, SyntaxTree)> {
-    let input = read_input(Some(file.to_path_buf()))?;
-    let dialect = detect_dialect(&input, dialect);
-    let tree = SyntaxTree::parse(&input.text)
-        .with_context(|| format!("failed to parse {}", file.display()))?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.to_path_buf()), dialect)?;
 
     Ok((file.to_path_buf(), input, dialect, tree))
 }

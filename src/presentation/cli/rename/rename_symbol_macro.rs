@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input, write_files_with_rollback};
+use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::RenameSymbolMacroArgs;
 use super::render::symbol_macro::print_rename_symbol_macro_report;
 use super::types::{PendingRenameSymbolMacroFile, RenameSymbolMacroFileReport};
@@ -11,8 +11,7 @@ pub(in crate::presentation::cli) fn rename_symbol_macro(args: RenameSymbolMacroA
     let mut definition_count = 0usize;
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
+        let (input, dialect) = read_input_and_dialect(Some(file.clone()), args.dialect)?;
         let plan =
             rename_usecase::plan_rename_symbol_macro(rename_usecase::RenameSymbolMacroRequest {
                 input: &input.text,

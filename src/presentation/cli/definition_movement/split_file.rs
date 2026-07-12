@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use crate::application::usecase::split_file::{SplitFileRequest, plan_split_file};
 
 use super::super::shared::{
-    detect_dialect, read_file_or_empty, read_input, write_files_with_rollback,
+    detect_dialect, read_file_or_empty, read_input_and_dialect, write_files_with_rollback,
 };
 use super::args::SplitFileArgs;
 use super::render::split_file::print_split_file_plan;
@@ -17,7 +17,8 @@ pub(in crate::presentation::cli) fn split_file(args: SplitFileArgs) -> Result<()
         anyhow::bail!("--from-file and --to-file must refer to different files");
     }
 
-    let from_input = read_input(Some(args.from_file.clone()))?;
+    let (from_input, from_dialect) =
+        read_input_and_dialect(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
     let to_parent_existed = args
         .to_file
@@ -25,7 +26,6 @@ pub(in crate::presentation::cli) fn split_file(args: SplitFileArgs) -> Result<()
         .filter(|parent| !parent.as_os_str().is_empty())
         .map(FsPath::exists)
         .unwrap_or(true);
-    let from_dialect = detect_dialect(&from_input, args.dialect);
     let to_dialect = detect_dialect(&to_input, args.dialect);
 
     let plan = plan_split_file(SplitFileRequest {

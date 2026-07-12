@@ -2,6 +2,7 @@ use super::*;
 use crate::application::usecase::unwrap_call::{
     UnwrapCallPlan, UnwrapCallRequest, plan_unwrap_call,
 };
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
 pub(super) struct UnwrapCallArgs {
@@ -32,9 +33,7 @@ pub(super) struct UnwrapCallArgs {
 }
 
 pub(super) fn unwrap_call(args: UnwrapCallArgs) -> Result<()> {
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let selected = selection.view();
     let plan = plan_unwrap_call(UnwrapCallRequest {

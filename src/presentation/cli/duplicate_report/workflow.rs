@@ -5,6 +5,7 @@ use crate::application::usecase::duplicate_report::{
     DuplicateCandidateGroups, build_duplicate_shape_reports, collect_duplicate_candidates,
     collect_replacement_plan_batches,
 };
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 pub(in crate::presentation::cli) fn duplicate_report(args: DuplicateReportArgs) -> Result<()> {
     ensure_thresholds(args.min_group_size, args.min_node_count)?;
@@ -12,10 +13,7 @@ pub(in crate::presentation::cli) fn duplicate_report(args: DuplicateReportArgs) 
     let mut grouped = DuplicateCandidateGroups::new();
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         collect_duplicate_candidates(
             &tree,
             &input.text,
@@ -37,10 +35,7 @@ pub(in crate::presentation::cli) fn replacement_plan(args: ReplacementPlanArgs) 
     let mut grouped = DuplicateCandidateGroups::new();
 
     for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (input, dialect, tree) = read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
         collect_duplicate_candidates(
             &tree,
             &input.text,

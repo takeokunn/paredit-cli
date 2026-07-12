@@ -25,10 +25,8 @@ pub(in crate::presentation::cli::refactor::workflow) fn build_refactor_preview(
     let mut total_target_occurrences = 0usize;
 
     for file in request.paths {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, request.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+        let (input, dialect, tree) =
+            read_input_dialect_and_tree(Some(file.clone()), request.dialect)?;
         total_target_occurrences += matching_symbol_occurrences(&tree, request.to).len();
         let (rewritten, edits, definition_count) = match request.mode {
             RefactorPreviewMode::Symbol => {

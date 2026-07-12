@@ -44,9 +44,7 @@ pub(super) fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
         anyhow::bail!("replace-forms --write requires --file");
     }
 
-    let input = read_input(file.clone())?;
-    let dialect = detect_dialect(&input, dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(file.clone(), dialect)?;
     let plan = plan_replace_forms(ReplaceFormsRequest {
         input: &input.text,
         tree: &tree,

@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 
 use crate::application::usecase::package as package_usecase;
 
-use super::super::{detect_dialect, read_input, write_file_with_rollback};
+use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::{
     render::print_sort_package_exports_plan,
     types::{SortPackageExportsArgs, SortPackageExportsPlan},
@@ -11,8 +11,7 @@ use super::{
 pub(in crate::presentation::cli) fn sort_package_exports(
     args: SortPackageExportsArgs,
 ) -> Result<()> {
-    let input = read_input(Some(args.file.clone()))?;
-    let dialect = detect_dialect(&input, args.dialect);
+    let (input, dialect) = read_input_and_dialect(Some(args.file.clone()), args.dialect)?;
     let usecase_plan =
         package_usecase::plan_sort_package_exports(package_usecase::SortPackageExportsRequest {
             input: &input.text,

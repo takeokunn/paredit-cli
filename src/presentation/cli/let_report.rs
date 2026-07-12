@@ -32,10 +32,8 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
         let mut per_file = Vec::with_capacity(args.files.len());
         let mut all_reports = Vec::new();
         for file in &args.files {
-            let input = read_input(Some(file.clone()))?;
-            let dialect = detect_dialect(&input, args.dialect);
-            let tree = SyntaxTree::parse(&input.text)
-                .with_context(|| format!("failed to parse {}", file.display()))?;
+            let (input, dialect, tree) =
+                read_input_dialect_and_tree(Some(file.clone()), args.dialect)?;
             let reports = build_let_report(dialect, &input.text, &tree)?;
             all_reports.extend(reports.iter().cloned());
             per_file.push((file.clone(), dialect, reports));
@@ -48,9 +46,8 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
         return Ok(());
     }
 
-    let input = read_input(args.files.into_iter().next())?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) =
+        read_input_dialect_and_tree(args.files.into_iter().next(), args.dialect)?;
     let reports = build_let_report(dialect, &input.text, &tree)?;
     let policy = evaluate_let_report_policy(&reports, &options);
     print_let_report(dialect, &reports, &policy, args.output)?;

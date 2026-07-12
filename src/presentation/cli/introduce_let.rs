@@ -2,6 +2,7 @@ use super::*;
 use crate::application::usecase::introduce_let::{
     IntroduceLetPlan, IntroduceLetRequest, plan_introduce_let,
 };
+use crate::presentation::cli::shared::read_input_dialect_and_tree;
 
 #[derive(Debug, Args)]
 pub(super) struct IntroduceLetArgs {
@@ -28,9 +29,7 @@ pub(super) fn introduce_let(args: IntroduceLetArgs) -> Result<()> {
         anyhow::bail!("--write requires --file");
     }
 
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
-    let tree = SyntaxTree::parse(&input.text)?;
+    let (input, dialect, tree) = read_input_dialect_and_tree(args.file.clone(), args.dialect)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let enclosing_span = selection.enclosing_list_span()?;
     let plan = plan_introduce_let(IntroduceLetRequest {

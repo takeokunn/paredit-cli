@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use super::super::{detect_dialect, read_input, write_file_with_rollback};
+use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::args::RenameInFormArgs;
 use super::render::scoped_form::print_rename_in_form_plan;
 use super::shared::rename_target;
@@ -11,8 +11,7 @@ pub(in crate::presentation::cli) fn rename_in_form(args: RenameInFormArgs) -> Re
         anyhow::bail!("--write requires --file");
     }
 
-    let input = read_input(args.file.clone())?;
-    let dialect = detect_dialect(&input, args.dialect);
+    let (input, dialect) = read_input_and_dialect(args.file.clone(), args.dialect)?;
     let plan = rename_usecase::plan_rename_in_form(rename_usecase::RenameInFormRequest {
         input: &input.text,
         dialect,
