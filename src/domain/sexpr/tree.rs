@@ -240,6 +240,42 @@ impl SyntaxTree {
         occurrences
     }
 
+    /// Counts the atoms `atom_occurrences` would report without materializing
+    /// their paths and text. Callers that only need the total (e.g. workspace
+    /// inventory reports) avoid one `String` and one path `Vec` per atom.
+    pub fn atom_occurrence_count(&self) -> usize {
+        fn count(tree: &SyntaxTree, node_id: NodeId) -> usize {
+            let node = tree.node(node_id);
+            if node
+                .reader_prefixes
+                .iter()
+                .any(|prefix| prefix.is_opaque_reader_form())
+            {
+                return 0;
+            }
+            if node.kind == NodeKind::Atom {
+                let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
+                return usize::from(
+                    !is_quoted_literal
+                        && node
+                            .span
+                            .slice(&tree.source)
+                            .get(node.symbol_offset..)
+                            .is_some(),
+                );
+            }
+            node.children
+                .iter()
+                .map(|child| count(tree, *child))
+                .sum()
+        }
+        self.node(NodeId::ROOT)
+            .children
+            .iter()
+            .map(|child| count(self, *child))
+            .sum()
+    }
+
     /// Collects bare quoted-symbol designators (`'foo`, i.e. an atom whose own
     /// reader prefix is `'`), which `atom_occurrences` deliberately treats as
     /// inert data and excludes (see `does_not_rename_quoted_atom_occurrences`).
