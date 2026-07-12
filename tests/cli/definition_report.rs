@@ -83,6 +83,50 @@ fn cli_reports_unrecognized_define_style_macros_as_unknown_macro_category() {
 }
 
 #[test]
+fn cli_recursively_discovers_definition_inputs_from_directories() {
+    let dir = fresh_temp_dir("definition-report-directories");
+    let nested_dir = dir.join("src");
+    fs::create_dir_all(&nested_dir).expect("create nested dir");
+    let lisp_file = nested_dir.join("core.lisp");
+    fs::write(&lisp_file, "(defun render-pane () :ok)\n").expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 1"))
+        .stdout(predicate::str::contains("\"definition_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"render-pane\""))
+        .stdout(predicate::str::contains("\"category\": \"function\""));
+}
+
+#[test]
+fn cli_deduplicates_definition_inputs_from_mixed_directory_and_file_roots() {
+    let dir = fresh_temp_dir("definition-report-mixed-inputs");
+    let nested_dir = dir.join("src");
+    fs::create_dir_all(&nested_dir).expect("create nested dir");
+    let lisp_file = nested_dir.join("core.lisp");
+    fs::write(&lisp_file, "(defun render-pane () :ok)\n").expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 1"))
+        .stdout(predicate::str::contains("\"definition_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"render-pane\""));
+}
+
+#[test]
 fn cli_reports_unused_definitions_for_dead_code_planning() {
     let dir = fresh_temp_dir("unused-definition-report");
     let lisp_file = dir.join("core.lisp");
@@ -121,6 +165,34 @@ fn cli_reports_unused_definitions_for_dead_code_planning() {
         .stdout(predicate::str::contains("\"unused\": true"))
         .stdout(predicate::str::contains("\"name\": \"used\""))
         .stdout(predicate::str::contains("\"reference_count\": 1"));
+}
+
+#[test]
+fn cli_recursively_discovers_unused_definition_inputs_from_directories() {
+    let dir = fresh_temp_dir("unused-definition-report-directories");
+    let nested_dir = dir.join("src");
+    fs::create_dir_all(&nested_dir).expect("create nested dir");
+    let lisp_file = nested_dir.join("core.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun used () :ok)\n\
+         (defun unused () (used))\n",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("unused-definitions")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 1"))
+        .stdout(predicate::str::contains("\"definition_count\": 2"))
+        .stdout(predicate::str::contains("\"candidate_count\": 1"))
+        .stdout(predicate::str::contains("\"name\": \"unused\""))
+        .stdout(predicate::str::contains("\"unused\": true"));
 }
 
 #[test]

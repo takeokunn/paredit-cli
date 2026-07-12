@@ -1,3 +1,7 @@
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use super::super::*;
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
@@ -5,16 +9,15 @@ use crate::application::usecase::definition_report::{
     UnusedDefinitionPolicyOptions, build_definition_report, build_parsed_definition_file,
     collect_unused_definition_candidates, evaluate_unused_definition_policy,
 };
+use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs) -> Result<()> {
-    let mut reports = Vec::with_capacity(args.files.len());
+    let files = expand_definition_report_inputs(&args.files, args.dialect)?;
+    let mut reports = Vec::with_capacity(files.len());
 
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
-        reports.push(build_definition_report(file.clone(), dialect, &tree)?);
+    for file in &files {
+        let (file, _input, dialect, tree) = load_definition_input(file, args.dialect)?;
+        reports.push(build_definition_report(file, dialect, &tree)?);
     }
 
     print_definition_report(&reports, args.output)
@@ -23,15 +26,13 @@ pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs
 pub(in crate::presentation::cli) fn unused_definition_report(
     args: UnusedDefinitionReportArgs,
 ) -> Result<()> {
-    let mut parsed = Vec::with_capacity(args.files.len());
+    let files = expand_definition_report_inputs(&args.files, args.dialect)?;
+    let mut parsed = Vec::with_capacity(files.len());
 
-    for file in &args.files {
-        let input = read_input(Some(file.clone()))?;
-        let dialect = detect_dialect(&input, args.dialect);
-        let tree = SyntaxTree::parse(&input.text)
-            .with_context(|| format!("failed to parse {}", file.display()))?;
+    for file in &files {
+        let (file, input, dialect, tree) = load_definition_input(file, args.dialect)?;
         parsed.push(build_parsed_definition_file(
-            file.clone(),
+            file,
             dialect,
             &tree,
             &input.text,
@@ -56,4 +57,52 @@ pub(in crate::presentation::cli) fn unused_definition_report(
     }
 
     Ok(())
+}
+
+fn expand_definition_report_inputs(
+    files: &[PathBuf],
+    dialect: Option<super::super::DialectArg>,
+) -> Result<Vec<PathBuf>> {
+    let mut expanded = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for file in files {
+        if file.is_dir() {
+            let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+                roots: vec![file.clone()],
+                include_unknown: dialect.is_some(),
+                include_hidden: false,
+                include_generated: false,
+                max_depth: None,
+                exclude: Vec::new(),
+            })?;
+
+            for discovered in discovery.files {
+                push_unique(&mut expanded, &mut seen, discovered);
+            }
+        } else {
+            push_unique(&mut expanded, &mut seen, file.clone());
+        }
+    }
+
+    Ok(expanded)
+}
+
+fn push_unique(expanded: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>, path: PathBuf) {
+    let canonical = fs::canonicalize(&path).unwrap_or(path.clone());
+    if seen.insert(canonical) {
+        expanded.push(path);
+    }
+}
+
+fn load_definition_input(
+    file: &Path,
+    dialect: Option<super::super::DialectArg>,
+) -> Result<(PathBuf, SourceInput, super::super::Dialect, SyntaxTree)> {
+    let input = read_input(Some(file.to_path_buf()))?;
+    let dialect = detect_dialect(&input, dialect);
+    let tree = SyntaxTree::parse(&input.text)
+        .with_context(|| format!("failed to parse {}", file.display()))?;
+
+    Ok((file.to_path_buf(), input, dialect, tree))
 }

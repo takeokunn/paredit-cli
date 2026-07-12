@@ -2,7 +2,7 @@ use super::super::*;
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct DefinitionReportArgs {
-    /// Files to scan.
+    /// Files or directories to scan recursively.
     #[arg(required = true)]
     pub(super) files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
@@ -15,7 +15,7 @@ pub(in crate::presentation::cli) struct DefinitionReportArgs {
 
 #[derive(Debug, Args)]
 pub(in crate::presentation::cli) struct UnusedDefinitionReportArgs {
-    /// Files to scan.
+    /// Files or directories to scan recursively.
     #[arg(required = true)]
     pub(super) files: Vec<PathBuf>,
     /// Override extension-based dialect detection for every file.
