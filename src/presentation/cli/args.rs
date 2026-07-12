@@ -8,13 +8,6 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::Path;
 
 #[derive(Debug, Args)]
-pub(super) struct InputArgs {
-    /// Input file. Reads stdin when omitted.
-    #[arg(short, long)]
-    pub(super) file: Option<PathBuf>,
-}
-
-#[derive(Debug, Args)]
 pub(super) struct AnalyzeArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
@@ -38,6 +31,12 @@ pub(super) struct FormatArgs {
     /// Number of spaces per nesting level.
     #[arg(long, default_value_t = 2)]
     pub(super) indent: usize,
+    /// Write the rewritten document back to --file instead of stdout.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Print a unified diff against the input instead of the rewritten document.
+    #[arg(long)]
+    pub(super) diff: bool,
 }
 
 #[derive(Debug, Args)]
@@ -51,6 +50,20 @@ pub(crate) struct TargetArgs {
     /// Select the smallest expression containing byte offset.
     #[arg(long, conflicts_with = "path")]
     pub(super) at: Option<usize>,
+}
+
+/// Target selection plus in-place write support for mutating edit commands.
+/// `select` keeps the plain [`TargetArgs`] because it never rewrites source.
+#[derive(Debug, Args)]
+pub(crate) struct EditTargetArgs {
+    #[command(flatten)]
+    pub(super) target: TargetArgs,
+    /// Write the rewritten document back to --file instead of stdout.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Print a unified diff against the input instead of the rewritten document.
+    #[arg(long)]
+    pub(super) diff: bool,
 }
 
 #[derive(Debug, Args)]
@@ -67,6 +80,12 @@ pub(super) struct ReplaceArgs {
     /// Replacement S-expression text.
     #[arg(long)]
     pub(super) with: String,
+    /// Write the rewritten document back to --file instead of stdout.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Print a unified diff against the input instead of the rewritten document.
+    #[arg(long)]
+    pub(super) diff: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

@@ -70,6 +70,7 @@ pub(in crate::presentation::cli) fn print_impact_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "symbol": symbol.as_str(),
                 "riskLevel": policy.risk_level.label(),
                 "file_count": reports.len(),

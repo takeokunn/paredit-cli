@@ -77,10 +77,6 @@ pub(super) fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
     view.children.get(index).and_then(atom_text)
 }
 
-pub(super) fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
-}
-
 pub(super) trait SpannedCallSite {
     fn span(&self) -> ByteSpan;
 }
@@ -102,7 +98,7 @@ pub(super) fn select_outermost_call_sites<T: SpannedCallSite>(
     let mut skipped_nested = Vec::new();
     for site in candidates {
         if selected.iter().any(|selected: &T| {
-            span_contains(selected.span(), site.span()) && selected.span() != site.span()
+            selected.span().contains_span(site.span()) && selected.span() != site.span()
         }) {
             skipped_nested.push(site);
         } else {

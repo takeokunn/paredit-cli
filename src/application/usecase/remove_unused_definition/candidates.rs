@@ -123,13 +123,13 @@ pub(super) fn collect_unused_definition_candidates(
                             spans.retain(|span| {
                                 !package_spans
                                     .iter()
-                                    .any(|package| span_contains(*package, *span))
+                                    .any(|package| package.contains_span(*span))
                             });
                             spans
                                 .into_iter()
                                 .filter(move |span| {
                                     !(other_index == file_index
-                                        && span_contains(definition.span, *span))
+                                        && definition.span.contains_span(*span))
                                 })
                                 .map(|_span| DefinitionReference)
                         })
@@ -145,10 +145,6 @@ pub(super) fn collect_unused_definition_candidates(
             Ok(UnusedDefinitionFile { definitions })
         })
         .collect()
-}
-
-fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
-    outer.start().get() <= inner.start().get() && inner.end().get() <= outer.end().get()
 }
 
 /// Collects the span of every `defpackage` form. Symbols named inside one —

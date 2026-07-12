@@ -3,9 +3,8 @@ use anyhow::{Context, Result};
 use super::super::{read_input_and_dialect, write_files_with_rollback};
 use super::args::ReplaceFunctionCallsArgs;
 use super::render::replace_call::print_replace_function_calls_report;
-use super::types::{
-    PendingReplaceFunctionCallsFile, ReplaceFunctionCallsFileReport, ReplaceFunctionCallsPolicy,
-};
+use super::shared::evaluate_call_site_policy;
+use super::types::{PendingReplaceFunctionCallsFile, ReplaceFunctionCallsFileReport};
 use crate::application::usecase::rename::{self as rename_usecase, ReplaceFunctionCallsScope};
 
 pub(in crate::presentation::cli) fn replace_function_calls(
@@ -48,12 +47,16 @@ pub(in crate::presentation::cli) fn replace_function_calls(
     }
 
     let selected_call_count = pending.iter().map(|file| file.calls.len()).sum::<usize>();
-    let policy = evaluate_replace_function_calls_policy(selected_call_count, &args);
+    let policy = evaluate_call_site_policy(
+        selected_call_count,
+        args.fail_on_no_change,
+        args.require_calls,
+    );
     if !policy.passed {
-        anyhow::bail!(
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
             "replace-function-calls policy failed: {}",
             policy.violations.join("; ")
-        );
+        )));
     }
 
     let written_files = pending
@@ -79,27 +82,4 @@ pub(in crate::presentation::cli) fn replace_function_calls(
     }
 
     print_replace_function_calls_report(&reports, &args, &policy, args.output)
-}
-
-fn evaluate_replace_function_calls_policy(
-    selected_call_count: usize,
-    args: &ReplaceFunctionCallsArgs,
-) -> ReplaceFunctionCallsPolicy {
-    let mut violations = Vec::new();
-    if args.fail_on_no_change && selected_call_count == 0 {
-        violations.push("no selected call site changed".to_owned());
-    }
-    if let Some(required) = args.require_calls {
-        if selected_call_count < required {
-            violations.push(format!(
-                "expected at least {required} changed call sites but found {selected_call_count}"
-            ));
-        }
-    }
-    ReplaceFunctionCallsPolicy {
-        fail_on_no_change: args.fail_on_no_change,
-        require_calls: args.require_calls,
-        passed: violations.is_empty(),
-        violations,
-    }
 }

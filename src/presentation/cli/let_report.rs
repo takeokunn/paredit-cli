@@ -41,7 +41,10 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
         let policy = evaluate_let_report_policy(&all_reports, &options);
         print_multi_file_let_report(&per_file, &policy, args.output)?;
         if !policy.passed {
-            anyhow::bail!("let-report policy failed: {}", policy.violations.join("; "));
+            return Err(crate::presentation::cli::gate::gate_failure(format!(
+                "let-report policy failed: {}",
+                policy.violations.join("; ")
+            )));
         }
         return Ok(());
     }
@@ -52,7 +55,10 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
     let policy = evaluate_let_report_policy(&reports, &options);
     print_let_report(dialect, &reports, &policy, args.output)?;
     if !policy.passed {
-        anyhow::bail!("let-report policy failed: {}", policy.violations.join("; "));
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "let-report policy failed: {}",
+            policy.violations.join("; ")
+        )));
     }
     Ok(())
 }
@@ -73,6 +79,7 @@ fn print_let_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": dialect.label(),
                 "let_form_count": reports.len(),
                 "summary": policy_summary_json(policy),
@@ -106,6 +113,7 @@ fn print_multi_file_let_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "file_count": per_file.len(),
                 "summary": policy_summary_json(policy),
                 "policy": policy_json(policy),

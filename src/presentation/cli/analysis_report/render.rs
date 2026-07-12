@@ -11,6 +11,7 @@ pub(super) fn print_dialect(dialect: Dialect, output: OutputFormat) -> Result<()
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": dialect.label(),
                 "family": dialect.family(),
             }))?
@@ -32,6 +33,7 @@ pub(super) fn print_stats(tree: &SyntaxTree, dialect: Dialect, output: OutputFor
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": dialect.label(),
                 "topLevelForms": tree.root_children().len(),
                 "outlineEntries": outline.len(),
@@ -50,6 +52,7 @@ pub(super) fn print_agent_report(
     let atoms = tree.atom_occurrences();
     let outline = tree.outline(|head| dialect.is_definition_head(head));
     let payload = json!({
+        "schema_version": 1,
         "dialect": {
             "label": dialect.label(),
             "family": dialect.family(),

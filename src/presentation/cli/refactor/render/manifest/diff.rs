@@ -85,6 +85,7 @@ pub(in crate::presentation::cli) fn print_refactor_diff_result(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "manifest": {
                     "path": result.manifest.path.display().to_string(),
                     "hash": result.manifest.hash.as_str(),

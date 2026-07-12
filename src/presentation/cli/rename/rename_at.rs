@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use super::super::{read_input_and_dialect, write_file_with_rollback};
 use super::args::RenameAtArgs;
 use super::render::at::print_rename_at_plan;
+use super::shared::ensure_rename_changed;
 use crate::application::usecase::rename::{RenameAtRequest, plan_rename_at};
 use crate::domain::sexpr::ByteOffset;
 
@@ -22,5 +23,6 @@ pub(in crate::presentation::cli) fn rename_at(args: RenameAtArgs) -> Result<()> 
         let file = args.file.as_ref().context("--write requires --file")?;
         write_file_with_rollback(file.clone(), plan.rewritten.clone())?;
     }
-    print_rename_at_plan(&plan, written, args.output)
+    print_rename_at_plan(&plan, written, args.output)?;
+    ensure_rename_changed(args.fail_on_no_change, plan.changed, "rename-at")
 }

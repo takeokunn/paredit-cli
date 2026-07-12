@@ -1,7 +1,7 @@
 ---
 name: paredit-cli
 description: This skill should be used when refactoring Common Lisp, Emacs Lisp, Scheme, Clojure, Janet, or Fennel source files, or any other Lisp-like S-expression code. Use when renaming symbols, functions, macrolet/flet/labels bindings, or packages; moving or splitting definitions between files; extracting, inlining, or reparametrizing functions; threading/unthreading call chains; or removing unused definitions. Use whenever an edit to balanced-parenthesis code is needed and the `paredit` binary is available, instead of hand-editing delimiters.
-version: 1.1.0
+version: 1.2.0
 ---
 
 <purpose>
@@ -22,11 +22,15 @@ version: 1.1.0
   Grouped entrypoints:
   - `paredit refactor ...` — plan, preview, verify, apply/diff flows for a rename or move.
   - `paredit inspect workspace ...` — directory-root discovery and inventory across many files.
+
+  Discovery: `paredit inspect capabilities --output json` prints a machine-readable catalog of
+  every command, flag, default, and enum value in one call — use it instead of crawling --help.
 </overview>
 
 <command_groups>
   <group name="inspect">
     <description>Read-only structural inspection; always safe, never writes.</description>
+    <command>paredit inspect capabilities --output json</command>
     <command>paredit inspect check --file f.lisp</command>
     <command>paredit inspect dialect --file f.lisp</command>
     <command>paredit inspect stats --file f.lisp</command>
@@ -40,8 +44,8 @@ version: 1.1.0
   <group name="search_across_files">
     <description>Exact atom/call/definition inventories across explicit file lists; ignores comments and strings.</description>
     <command>paredit inspect find-symbol --file f.lisp --symbol old-name --output json</command>
-    <command>paredit inspect symbols --symbol old-name --output json src/*.lisp elisp/*.el</command>
-    <command>paredit inspect calls --symbol old-name --output json src/*.lisp</command>
+    <command>paredit inspect symbols --symbol old-name --require-occurrences 1 --output json src/*.lisp elisp/*.el</command>
+    <command>paredit inspect calls --symbol old-name --require-calls 1 --output json src/*.lisp</command>
     <command>paredit inspect signature --symbol old-name --require-definitions 1 --require-calls 1 --output json src/*.lisp</command>
     <command>paredit inspect call-graph --symbol old-name --require-edges 1 --output json src/*.lisp</command>
     <command>paredit inspect impact --symbol old-name --fail-on-risk-level warning --output json src/*.lisp</command>
@@ -55,10 +59,10 @@ version: 1.1.0
 
   <group name="rename">
     <description>Rename operations, narrowest scope first. Prefer the scope-aware command over the generic atom rename when the binding kind is known.</description>
-    <command>paredit refactor rename-symbol --file f.lisp --from old --to new --plan --output json</command>
-    <command>paredit refactor rename-in-form --file f.lisp --path 0.3 --from old --to new --output json</command>
-    <command>paredit refactor rename-binding --file f.lisp --path 0.3 --from old --to new --output json</command>
-    <command>paredit refactor rename-function --from old --to new --output json src/*.lisp elisp/*.el</command>
+    <command>paredit refactor rename-symbol --file f.lisp --from old --to new --fail-on-no-change --plan --output json</command>
+    <command>paredit refactor rename-in-form --file f.lisp --path 0.3 --from old --to new --fail-on-no-change --output json</command>
+    <command>paredit refactor rename-binding --file f.lisp --path 0.3 --from old --to new --fail-on-no-change --output json</command>
+    <command>paredit refactor rename-function --from old --to new --fail-on-no-change --output json src/*.lisp elisp/*.el</command>
     <command>paredit refactor rename-local-function --from old --to new --output json src/*.lisp</command>
     <command>paredit refactor rename-macrolet --from old --to new --output json src/*.lisp</command>
     <command>paredit refactor rename-symbol-macro --from old --to new --output json src/*.lisp</command>
@@ -76,7 +80,7 @@ version: 1.1.0
     <command>paredit refactor remove-definition --file a.lisp --path 2 --output json</command>
     <command>paredit refactor remove-unused-definitions --output json system.asd src/*.lisp</command>
     <command>paredit refactor replacement-plan --replacement '(run-case)' --output json src/*.lisp</command>
-    <command>paredit edit replace-forms --file a.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json</command>
+    <command>paredit refactor replace-forms --file a.lisp --path 0 --path 1 --with '(run-case)' --require-same-shape --output json</command>
   </group>
 
   <group name="function_shape">
@@ -100,20 +104,24 @@ version: 1.1.0
   <group name="structural_primitives">
     <description>
       Low-level paredit-style structural edits on one selected form (--path or --at).
-      None of these accept --write: each prints the whole rewritten document to stdout.
-      Review the output, then redirect into the file, for example
-      `paredit edit wrap --file f.lisp --path 0.3 > /tmp/out && mv /tmp/out f.lisp`.
+      By default each prints the whole rewritten document to stdout and leaves the file
+      untouched. Preview with --diff (unified diff on stdout), then re-run with --write to
+      update --file in place: the write is reparse-validated and staged with rollback, so a
+      failed write never leaves an unbalanced file. Do not use shell redirection into the
+      source file.
     </description>
-    <command>paredit edit format --file f.lisp</command>
-    <command>paredit edit replace --file f.lisp --path 0.3 --with '(new-form)'</command>
-    <command>paredit edit kill --file f.lisp --path 0.3</command>
-    <command>paredit edit wrap --file f.lisp --path 0.3</command>
-    <command>paredit edit splice --file f.lisp --path 0.3</command>
-    <command>paredit edit raise --file f.lisp --path 0.3</command>
-    <command>paredit edit slurp-forward --file f.lisp --path 0.3</command>
-    <command>paredit edit slurp-backward --file f.lisp --path 0.3</command>
-    <command>paredit edit barf-forward --file f.lisp --path 0.3</command>
-    <command>paredit edit barf-backward --file f.lisp --path 0.3</command>
+    <command>paredit edit format --file f.lisp --diff</command>
+    <command>paredit edit format --file f.lisp --write</command>
+    <command>paredit edit replace --file f.lisp --path 0.3 --with '(new-form)' --diff</command>
+    <command>paredit edit replace --file f.lisp --path 0.3 --with '(new-form)' --write</command>
+    <command>paredit edit kill --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit wrap --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit splice --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit raise --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit slurp-forward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit slurp-backward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit barf-forward --file f.lisp --path 0.3 --write</command>
+    <command>paredit edit barf-backward --file f.lisp --path 0.3 --write</command>
   </group>
 </command_groups>
 
@@ -130,11 +138,9 @@ paredit refactor verify --symbol old-name --new-symbol new-name --operation rena
   </pattern>
 
   <pattern name="manifest_based_apply">
-    <description>Hash-guarded apply flow when the preview is saved as a manifest file, for larger or riskier edits.</description>
+    <description>Hash-guarded apply flow when the preview is saved as a manifest file, for larger or riskier edits. --manifest-out writes the manifest and prints its hash in one call.</description>
     <example>
-paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --output json src/*.lisp > rename.preview.json
-paredit refactor status --manifest rename.preview.json --root . --output json
-HASH=$(paredit refactor status --manifest rename.preview.json --root . --output json | jq -r '.manifest.hash')
+HASH=$(paredit refactor preview --from old-name --to new-name --mode function --fail-on-no-change --manifest-out rename.preview.json --output json src/*.lisp | jq -r '.manifest_hash')
 paredit refactor diff --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --output json
 paredit refactor apply --manifest rename.preview.json --expect-manifest-hash "$HASH" --root . --write --output json
     </example>
@@ -174,9 +180,11 @@ paredit refactor remove-unused-definitions --write system.asd src/*.lisp
 
 <best_practices>
   <practice priority="critical">Run a plan/preview command without --write first, inspect the JSON, then re-run with --write</practice>
+  <practice priority="critical">For structural primitives (`paredit edit ...`), preview with --diff, then re-run with --write; never redirect stdout into the source file</practice>
   <practice priority="critical">Prefer --output json for anything other than a single human-inspected file; it is the stable, parseable contract</practice>
   <practice priority="high">Use --path for deterministic scripted edits; use --at (byte offset) when a prior report or grep result already gives an offset</practice>
   <practice priority="high">Use --fail-on-* and --require-* gates (e.g. --fail-on-blocking-gate, --require-definitions 1) so a plan command exits non-zero instead of silently under-matching</practice>
+  <practice priority="high">Branch on exit codes: 0 success, 1 hard failure (parse/IO/refused write), 2 usage error, 3 policy gate tripped after the report was printed — on 3, read the report and decide; on 1-2, fix the invocation</practice>
   <practice priority="medium">Run refactor verify with --phase pre before editing and --phase post after, to catch regressions the preview step could not predict</practice>
   <practice priority="medium">Wrap every invocation in a command timeout in automated pipelines; a hang should not block the surrounding agent loop</practice>
 </best_practices>

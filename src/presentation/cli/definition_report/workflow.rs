@@ -53,7 +53,9 @@ pub(in crate::presentation::cli) fn unused_definition_report(
     print_unused_definition_report(&reports, &policy, args.output)?;
 
     if !policy_passed {
-        anyhow::bail!("unused-definition-report policy failed: {policy_message}");
+        return Err(crate::presentation::cli::gate::gate_failure(format!(
+            "unused-definition-report policy failed: {policy_message}"
+        )));
     }
 
     Ok(())

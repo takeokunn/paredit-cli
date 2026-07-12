@@ -268,11 +268,6 @@ fn record_equivalent_span(
     }
 }
 
-fn span_contains_span(container: ByteSpan, contained: ByteSpan) -> bool {
-    container.start().get() <= contained.start().get()
-        && contained.end().get() <= container.end().get()
-}
-
 fn expressions_equivalent(left: &ExpressionView, right: &ExpressionView) -> bool {
     left.kind == right.kind
         && left.delimiter == right.delimiter

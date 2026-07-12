@@ -61,6 +61,7 @@ pub(in crate::presentation::cli) fn print_refactor_verification(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "operation": verification.operation.label(),
                 "phase": verification.phase.label(),
                 "symbol": verification.symbol.as_str(),

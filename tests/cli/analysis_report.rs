@@ -100,3 +100,52 @@ fn cli_reports_form_by_byte_offset() {
         .stdout(predicate::str::contains("\"head\": \"+\""))
         .stdout(predicate::str::contains("\"childCount\": 3"));
 }
+
+#[test]
+fn cli_check_reports_ok_as_json() {
+    let mut cmd = paredit();
+    cmd.args([
+        "inspect",
+        "check",
+        "--dialect",
+        "common-lisp",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun add (x y) (+ x y))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"status\": \"ok\""))
+    .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
+    .stdout(predicate::str::contains("\"error\": null"));
+}
+
+#[test]
+fn cli_check_reports_parse_error_as_json_and_exits_nonzero() {
+    let mut cmd = paredit();
+    cmd.args(["inspect", "check", "--output", "json"])
+        .write_stdin("(defun broken (")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\": \"error\""))
+        .stdout(predicate::str::contains("unclosed list"));
+}
+
+#[test]
+fn cli_stats_reports_structural_metrics_as_json() {
+    let mut cmd = paredit();
+    cmd.args([
+        "inspect",
+        "stats",
+        "--dialect",
+        "common-lisp",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(defun add (x y) (+ x y))\n(defvar *limit* 10)\n")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
+    .stdout(predicate::str::contains("\"topLevelForms\": 2"))
+    .stdout(predicate::str::contains("\"outlineEntries\": 2"));
+}

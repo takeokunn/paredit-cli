@@ -123,6 +123,7 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "operation": plan.operation.label(),
                 "symbol": plan.symbol.as_str(),
                 "target_kind": plan.target_kind.label(),

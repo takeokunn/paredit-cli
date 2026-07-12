@@ -22,6 +22,9 @@ pub(in crate::presentation::cli) struct RenameSymbolArgs {
     /// Print occurrence metadata instead of rewritten source.
     #[arg(long)]
     pub(super) plan: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for --plan.
     #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
     pub(super) output: OutputFormat,
@@ -50,6 +53,9 @@ pub(in crate::presentation::cli) struct RenameInFormArgs {
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -78,6 +84,9 @@ pub(in crate::presentation::cli) struct RenameBindingArgs {
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -100,6 +109,9 @@ pub(in crate::presentation::cli) struct RenameSymbolsArgs {
     /// Rewrite changed files in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -122,6 +134,9 @@ pub(in crate::presentation::cli) struct RenameFunctionArgs {
     /// Rewrite changed files in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -144,6 +159,9 @@ pub(in crate::presentation::cli) struct RenameMacroletArgs {
     /// Rewrite changed files in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -166,6 +184,9 @@ pub(in crate::presentation::cli) struct RenameSymbolMacroArgs {
     /// Rewrite changed files in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -188,6 +209,9 @@ pub(in crate::presentation::cli) struct RenameLocalFunctionArgs {
     /// Rewrite changed files in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
@@ -315,6 +339,9 @@ pub(in crate::presentation::cli) struct RenameAtArgs {
     /// Rewrite the input file in place. Without this flag, only prints a plan.
     #[arg(long)]
     pub(super) write: bool,
+    /// Exit non-zero when no occurrence changes.
+    #[arg(long)]
+    pub(super) fail_on_no_change: bool,
     /// Output format for agent consumption.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,

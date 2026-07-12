@@ -7,6 +7,7 @@ pub(super) fn print_definition_report(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "file_count": reports.len(),
             "definition_count": summary.definition_count,
             "by_category": summary
@@ -56,6 +57,7 @@ pub(super) fn print_unused_definition_report(
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
+            "schema_version": 1,
             "file_count": reports.len(),
             "definition_count": policy.definition_count,
             "candidate_count": policy.candidate_count,

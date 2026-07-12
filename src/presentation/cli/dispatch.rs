@@ -9,6 +9,7 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
             command::InspectCommand::AgentReport(args) => {
                 analysis_report::workflow::agent_report(args)?
             }
+            command::InspectCommand::Capabilities(args) => capabilities::capabilities(args)?,
             command::InspectCommand::Outline(args) => analysis_report::workflow::outline(args)?,
             command::InspectCommand::Form(args) => form_report::workflow::form_report(args)?,
             command::InspectCommand::FindSymbol(args) => {
@@ -180,6 +181,11 @@ pub(super) fn dispatch(command: Command) -> Result<()> {
                 remove_unused_binding::remove_unused_binding(args)?
             }
         },
+        Command::Completions { shell } => {
+            use clap::CommandFactory;
+            let mut root = super::Cli::command();
+            clap_complete::generate(shell, &mut root, "paredit", &mut std::io::stdout());
+        }
     }
     Ok(())
 }

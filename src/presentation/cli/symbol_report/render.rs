@@ -31,6 +31,7 @@ pub(super) fn print_symbol_occurrences(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "dialect": dialect.label(),
                 "symbol": symbol.as_str(),
                 "occurrences": occurrences
@@ -91,6 +92,7 @@ pub(super) fn print_symbol_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "symbol": symbol.as_str(),
                 "file_count": reports.len(),
                 "total_count": total_count,

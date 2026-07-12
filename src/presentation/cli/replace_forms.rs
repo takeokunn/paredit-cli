@@ -102,6 +102,7 @@ fn print_replace_forms_plan(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "file": path.map(|path| path.display().to_string()),
                 "dialect": dialect.label(),
                 "path_count": plan.targets.len(),

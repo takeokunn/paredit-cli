@@ -52,6 +52,7 @@ pub(super) fn print_call_report(
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "symbol": symbol.map(SymbolName::as_str),
                 "includeDefinitions": include_definitions,
                 "file_count": reports.len(),

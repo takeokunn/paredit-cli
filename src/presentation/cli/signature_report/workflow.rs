@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 
 use crate::application::usecase::signature_report::{
     SignatureReportSource, build_signature_reports, evaluate_signature_report_policy,
@@ -29,7 +29,9 @@ pub(in crate::presentation::cli) fn signature_report(args: SignatureReportArgs) 
     );
     print_signature_report(&reports, symbol, &policy, args.output)?;
     if !policy.passed {
-        bail!("signature-report policy failed");
+        return Err(crate::presentation::cli::gate::gate_failure(
+            "signature-report policy failed",
+        ));
     }
     Ok(())
 }

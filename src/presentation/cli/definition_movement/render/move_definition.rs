@@ -32,6 +32,7 @@ pub(in crate::presentation::cli::definition_movement) fn print_move_definition_p
         OutputFormat::Json => println!(
             "{}",
             serde_json::to_string_pretty(&json!({
+                "schema_version": 1,
                 "from_file": plan.from_file,
                 "to_file": plan.to_file,
                 "from_dialect": plan.from_dialect.label(),

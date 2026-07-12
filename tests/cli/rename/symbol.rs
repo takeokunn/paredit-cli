@@ -179,3 +179,41 @@ fn cli_renames_unqualified_occurrences_of_package_qualified_common_lisp_symbol()
         "(defun new-name () new-name)\n(new-name new-name)"
     );
 }
+
+#[test]
+fn cli_rename_symbol_fail_on_no_change_gate_fails_when_symbol_absent() {
+    let mut cmd = paredit();
+    cmd.args([
+        "refactor",
+        "rename-symbol",
+        "--from",
+        "missing-name",
+        "--to",
+        "new-name",
+        "--fail-on-no-change",
+    ])
+    .write_stdin("(defun keep (x) x)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "rename-symbol policy failed: no occurrence changed",
+    ));
+}
+
+#[test]
+fn cli_rename_symbol_fail_on_no_change_gate_passes_on_rewrite() {
+    let mut cmd = paredit();
+    cmd.args([
+        "refactor",
+        "rename-symbol",
+        "--from",
+        "keep",
+        "--to",
+        "hold",
+        "--fail-on-no-change",
+    ])
+    .write_stdin("(defun keep (x) x)")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("(defun hold (x) x)"));
+}
