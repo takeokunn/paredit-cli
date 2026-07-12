@@ -16,19 +16,20 @@ pub(crate) use forms::{
     CommonLispValueScopeForm, CommonLispVariableBindingForm, CommonLispVariableSpecForm,
 };
 pub(crate) use operator::{
-    CommonLispOperator, common_lisp_binding_refactor_form_for_head, common_lisp_operator_head_eq,
+    common_lisp_binding_refactor_form_for_head, common_lisp_operator_head_eq,
     common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
     common_lisp_symbol_reference_needle, is_common_lisp_declaration_form,
     is_common_lisp_earmuffed_special_variable_name, normalize_common_lisp_operator_head,
+    CommonLispOperator,
 };
 pub(crate) use reader_condition::{
-    CommonLispReaderConditionalKind, common_lisp_reader_conditional_dispatches,
-    common_lisp_reader_conditional_forms,
+    common_lisp_reader_conditional_dispatches, common_lisp_reader_conditional_forms,
+    CommonLispReaderConditionalKind,
 };
 pub(crate) use reader_label::{
-    CommonLispReaderLabelKind, common_lisp_reader_label_dispatches, common_lisp_reader_label_forms,
+    common_lisp_reader_label_dispatches, common_lisp_reader_label_forms, CommonLispReaderLabelKind,
 };
-pub(crate) use reader_literal::{CommonLispReaderLiteralKind, common_lisp_reader_literals};
+pub(crate) use reader_literal::{common_lisp_reader_literals, CommonLispReaderLiteralKind};
 pub(crate) use scope::{
     common_lisp_local_callable_form, common_lisp_macro_expander_path, is_local_callable_bound,
     is_macro_callable_form, local_callable_binding_body_scope, local_callable_body_scope,

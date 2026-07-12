@@ -1,8 +1,9 @@
 use super::*;
 
 use crate::application::usecase::replace_forms::{
-    ReplaceFormsPlan, ReplaceFormsRequest, plan_replace_forms,
+    plan_replace_forms, ReplaceFormsPlan, ReplaceFormsRequest,
 };
+use crate::domain::form_shape::FormShape;
 
 #[derive(Debug, Args)]
 pub(super) struct ReplaceFormsArgs {
@@ -83,7 +84,10 @@ fn print_replace_forms_plan(
             println!("require_same_shape\t{}", plan.require_same_shape);
             println!(
                 "original_shape\t{}",
-                plan.original_shape.as_deref().unwrap_or("")
+                plan.original_shape
+                    .as_ref()
+                    .map(FormShape::as_str)
+                    .unwrap_or("")
             );
             println!("replacement_shape\t{}", plan.replacement_shape);
             println!("changed\t{}", plan.changed);
@@ -107,7 +111,7 @@ fn print_replace_forms_plan(
                 "dialect": dialect.label(),
                 "path_count": plan.targets.len(),
                 "require_same_shape": plan.require_same_shape,
-                "original_shape": plan.original_shape.as_deref(),
+                "original_shape": plan.original_shape.as_ref().map(FormShape::as_str),
                 "replacement": plan.replacement.as_str(),
                 "replacement_shape": plan.replacement_shape.as_str(),
                 "changed": plan.changed,

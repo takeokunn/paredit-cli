@@ -1,4 +1,5 @@
 use crate::domain::dialect::Dialect;
+use crate::domain::form_shape::FormShape;
 use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
 
 #[derive(Debug)]
@@ -15,9 +16,9 @@ pub struct ReplaceFormsRequest<'a> {
 pub struct ReplaceFormsPlan {
     pub targets: Vec<ReplaceFormsTarget>,
     pub replacement: String,
-    pub replacement_shape: String,
+    pub replacement_shape: FormShape,
     pub require_same_shape: bool,
-    pub original_shape: Option<String>,
+    pub original_shape: Option<FormShape>,
     pub changed: bool,
     pub rewritten: String,
 }
@@ -26,6 +27,6 @@ pub struct ReplaceFormsPlan {
 pub struct ReplaceFormsTarget {
     pub form_path: Path,
     pub span: ByteSpan,
-    pub shape: String,
+    pub shape: FormShape,
     pub text: String,
 }

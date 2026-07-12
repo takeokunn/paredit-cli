@@ -69,12 +69,8 @@ fn evaluates_policy_failures() {
     };
 
     let policy = evaluate_impact_report_policy(
-        ImpactReportPolicyOptions {
-            fail_on_risk_level: Some(ImpactRiskLevel::Warning),
-            require_definitions: Some(1),
-            require_references: Some(2),
-            require_calls: Some(1),
-        },
+        ImpactReportPolicyOptions::new(Some(ImpactRiskLevel::Warning), Some(1), Some(2), Some(1))
+            .unwrap(),
         &summary,
         ImpactRiskLevel::Error,
     );
@@ -102,12 +98,10 @@ fn counts_common_lisp_setf_place_calls_and_edges() {
     assert_eq!(summary.inbound_edge_count, 2);
     assert_eq!(summary.non_call_reference_count, 1);
     assert_eq!(reports[0].calls.len(), 2);
-    assert!(
-        reports[0]
-            .calls
-            .iter()
-            .all(|call| call.status == SignatureCallStatus::Exact)
-    );
+    assert!(reports[0]
+        .calls
+        .iter()
+        .all(|call| call.status == SignatureCallStatus::Exact));
 }
 
 #[test]

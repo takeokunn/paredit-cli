@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::usecase::let_report::{
-    LetFormReport, LetReportPolicy, LetReportPolicyOptions, build_let_report,
-    evaluate_let_report_policy,
+    build_let_report, evaluate_let_report_policy, LetFormReport, LetReportPolicy,
+    LetReportPolicyOptions,
 };
 
 #[derive(Debug, Args)]
@@ -22,11 +22,12 @@ pub(super) struct LetReportArgs {
 }
 
 pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
-    let options = LetReportPolicyOptions {
-        fail_on_duplicate_evaluation: args.fail_on_duplicate_evaluation,
-        fail_on_unused_binding: args.fail_on_unused_binding,
-        require_inlineable_bindings: args.require_inlineable_bindings,
-    };
+    let options = LetReportPolicyOptions::new(
+        args.fail_on_duplicate_evaluation,
+        args.fail_on_unused_binding,
+        args.require_inlineable_bindings,
+    )
+    .map_err(crate::presentation::cli::gate::gate_failure)?;
 
     if args.files.len() > 1 {
         type FileLetReport = (PathBuf, Dialect, Vec<LetFormReport>);

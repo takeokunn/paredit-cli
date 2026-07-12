@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, ensure};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+pub use crate::domain::rename::WrapFunctionCallsScope;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -26,12 +27,6 @@ impl super::selection::SpannedCallSite for WrapFunctionCallSite {
     fn span(&self) -> ByteSpan {
         self.span
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum WrapFunctionCallsScope {
-    AllCalls,
-    ExplicitPaths(Vec<Path>),
 }
 
 #[derive(Debug, Clone)]

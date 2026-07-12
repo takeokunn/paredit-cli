@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 
+pub use crate::domain::rename::UnwrapFunctionCallsScope;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
 
 mod call_site;
 mod choose;
@@ -23,12 +24,6 @@ impl super::selection::SpannedCallSite for UnwrapFunctionCallSite {
     fn span(&self) -> ByteSpan {
         self.span
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum UnwrapFunctionCallsScope {
-    AllCalls,
-    ExplicitPaths(Vec<Path>),
 }
 
 #[derive(Debug, Clone)]

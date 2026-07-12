@@ -1,4 +1,4 @@
-use super::{CommonLispOperator, normalize_common_lisp_operator_head};
+use super::{normalize_common_lisp_operator_head, CommonLispOperator};
 
 pub(super) fn common_lisp_operator_from_head(head: &str) -> Option<CommonLispOperator> {
     let normalized_head = normalize_common_lisp_operator_head(head).to_ascii_lowercase();

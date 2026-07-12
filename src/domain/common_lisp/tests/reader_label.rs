@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::common_lisp::{
-    CommonLispReaderLabelKind, common_lisp_reader_label_dispatches, common_lisp_reader_label_forms,
+    common_lisp_reader_label_dispatches, common_lisp_reader_label_forms, CommonLispReaderLabelKind,
 };
 
 #[test]

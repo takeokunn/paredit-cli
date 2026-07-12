@@ -23,18 +23,14 @@ fn counts_common_lisp_macro_and_method_lambda_lists() {
 
     assert_eq!(fast_add.parameter_count, 2);
     assert_eq!(render.parameter_count, 2);
-    assert!(
-        !report.files[0]
-            .edges
-            .iter()
-            .any(|edge| edge.caller.as_deref() == Some("render") && edge.callee == "node")
-    );
-    assert!(
-        report.files[0]
-            .edges
-            .iter()
-            .any(|edge| edge.caller.as_deref() == Some("render") && edge.callee == "draw")
-    );
+    assert!(!report.files[0]
+        .edges
+        .iter()
+        .any(|edge| edge.caller.as_deref() == Some("render") && edge.callee == "node"));
+    assert!(report.files[0]
+        .edges
+        .iter()
+        .any(|edge| edge.caller.as_deref() == Some("render") && edge.callee == "draw"));
 }
 
 #[test]
@@ -49,7 +45,11 @@ fn policy_counts_inbound_edges_without_self_recursive_calls() {
     )
     .unwrap();
 
-    let policy = evaluate_call_graph_policy(&report.files, Some(&symbol), true, Some(2), Some(2));
+    let policy = evaluate_call_graph_policy(
+        &report.files,
+        Some(&symbol),
+        CallGraphPolicyOptions::new(true, Some(2), Some(2)).unwrap(),
+    );
 
     assert_eq!(policy.edge_count, 2);
     assert_eq!(policy.internal_edge_count, 2);
@@ -72,21 +72,15 @@ fn reports_common_lisp_setf_place_edges_for_setf_callables() {
     let edges = &report.files[0].edges;
 
     assert_eq!(edges.len(), 2);
-    assert!(
-        edges
-            .iter()
-            .all(|edge| edge.callee == "accessor" && edge.internal)
-    );
-    assert!(
-        edges
-            .iter()
-            .any(|edge| edge.caller.as_deref() == Some("render") && edge.argument_count == 1)
-    );
-    assert!(
-        edges
-            .iter()
-            .any(|edge| edge.caller.as_deref() == Some("wrapper") && edge.argument_count == 1)
-    );
+    assert!(edges
+        .iter()
+        .all(|edge| edge.callee == "accessor" && edge.internal));
+    assert!(edges
+        .iter()
+        .any(|edge| edge.caller.as_deref() == Some("render") && edge.argument_count == 1));
+    assert!(edges
+        .iter()
+        .any(|edge| edge.caller.as_deref() == Some("wrapper") && edge.argument_count == 1));
 }
 
 #[test]
@@ -128,11 +122,9 @@ fn records_common_lisp_symbol_macrolet_expansion_and_body_edges_without_binding_
     let edges = &report.files[0].edges;
 
     assert_eq!(edges.len(), 2);
-    assert!(
-        edges
-            .iter()
-            .all(|edge| edge.caller.as_deref() == Some("render"))
-    );
+    assert!(edges
+        .iter()
+        .all(|edge| edge.caller.as_deref() == Some("render")));
     assert!(edges.iter().all(|edge| edge.callee == "target"));
     assert!(!edges.iter().any(|edge| edge.callee == "helper"));
     assert!(edges.iter().any(|edge| edge.argument_count == 1));

@@ -6,10 +6,10 @@ use super::super::*;
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
 use crate::application::usecase::definition_report::{
-    UnusedDefinitionPolicyOptions, build_definition_report, build_parsed_definition_file,
-    collect_unused_definition_candidates, evaluate_unused_definition_policy,
+    build_definition_report, build_parsed_definition_file, collect_unused_definition_candidates,
+    evaluate_unused_definition_policy, UnusedDefinitionPolicyOptions,
 };
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
 
 pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs) -> Result<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;
@@ -41,10 +41,8 @@ pub(in crate::presentation::cli) fn unused_definition_report(
 
     let reports = collect_unused_definition_candidates(&parsed);
     let policy = evaluate_unused_definition_policy(
-        UnusedDefinitionPolicyOptions {
-            fail_on_unused: args.fail_on_unused,
-            require_unused_definitions: args.require_unused_definitions,
-        },
+        UnusedDefinitionPolicyOptions::new(args.fail_on_unused, args.require_unused_definitions)
+            .map_err(crate::presentation::cli::gate::gate_failure)?,
         &reports,
     );
     let policy_passed = policy.passed;

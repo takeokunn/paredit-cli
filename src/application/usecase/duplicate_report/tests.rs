@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use proptest::prelude::*;
 
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
+use crate::domain::form_shape::FormShape;
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Path as ExpressionPath, SyntaxTree};
 
 use super::*;
 
@@ -26,13 +27,19 @@ fn groups_duplicate_forms_by_shape() {
     let reports = build_duplicate_shape_reports(grouped, 2);
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].count, 2);
-    assert_eq!(reports[0].forms[0].form_path, "0");
-    assert_eq!(reports[0].forms[1].form_path, "1");
+    assert_eq!(
+        reports[0].forms[0].form_path,
+        ExpressionPath::from_indexes(vec![0])
+    );
+    assert_eq!(
+        reports[0].forms[1].form_path,
+        ExpressionPath::from_indexes(vec![1])
+    );
 }
 
 #[test]
 fn replacement_batches_are_partitioned_per_file() {
-    let shape = "(+ _ _)".to_owned();
+    let shape = FormShape::from("(+ _ _)");
     let span = ByteSpan::new(ByteOffset::new(0), ByteOffset::new(7));
     let mut grouped = DuplicateCandidateGroups::new();
     grouped.insert(
@@ -41,7 +48,7 @@ fn replacement_batches_are_partitioned_per_file() {
             DuplicateFormReport {
                 path: PathBuf::from("a.lisp"),
                 dialect: Dialect::CommonLisp,
-                form_path: "1".to_owned(),
+                form_path: ExpressionPath::from_indexes(vec![1]),
                 span,
                 node_count: 4,
                 head: Some("+".to_owned()),
@@ -50,7 +57,7 @@ fn replacement_batches_are_partitioned_per_file() {
             DuplicateFormReport {
                 path: PathBuf::from("a.lisp"),
                 dialect: Dialect::CommonLisp,
-                form_path: "0".to_owned(),
+                form_path: ExpressionPath::from_indexes(vec![0]),
                 span: ByteSpan::new(ByteOffset::new(8), ByteOffset::new(15)),
                 node_count: 4,
                 head: Some("+".to_owned()),
@@ -59,7 +66,7 @@ fn replacement_batches_are_partitioned_per_file() {
             DuplicateFormReport {
                 path: PathBuf::from("b.lisp"),
                 dialect: Dialect::CommonLisp,
-                form_path: "0".to_owned(),
+                form_path: ExpressionPath::from_indexes(vec![0]),
                 span,
                 node_count: 4,
                 head: Some("+".to_owned()),

@@ -4,13 +4,12 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 mod collect;
-mod policy;
 mod syntax;
 #[cfg(test)]
 mod tests;
 mod types;
 
-pub use policy::evaluate_let_report_policy;
+pub use crate::domain::let_report::evaluate_let_report_policy;
 pub use types::{LetBindingReport, LetFormReport, LetReportPolicy, LetReportPolicyOptions};
 
 pub fn build_let_report(

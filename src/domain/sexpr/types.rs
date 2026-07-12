@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops::Range;
 use std::str::FromStr;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 /// A byte offset into the original source text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -104,7 +104,7 @@ impl ChildIndex {
 /// assert_eq!(path.child(1).to_string(), "0.2.1");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExpressionPath(Vec<ChildIndex>);
 
 /// Backwards-compatible alias for tree paths used by the CLI and API.

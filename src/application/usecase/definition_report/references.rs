@@ -184,25 +184,3 @@ fn file_unused_definition_report(
             .collect(),
     }
 }
-
-pub fn unused_definition_candidate_count(reports: &[UnusedDefinitionFile]) -> usize {
-    reports
-        .iter()
-        .flat_map(|report| &report.definitions)
-        .filter(|item| item.references.is_empty())
-        .count()
-}
-
-/// Counts only candidates whose category `DefinitionCategory::is_bulk_removable`
-/// accepts. `Test`, `Package`, `Struct`, and the other protected categories are
-/// normally unreferenced by symbol from other code by design (an `ert-deftest`
-/// is invoked by name from a test runner, a `provide` form by the module
-/// loader, ...), so counting them toward "unused" would make `--fail-on-unused`
-/// trip on a healthy codebase's ordinary test suite.
-pub fn unused_definition_actionable_candidate_count(reports: &[UnusedDefinitionFile]) -> usize {
-    reports
-        .iter()
-        .flat_map(|report| &report.definitions)
-        .filter(|item| item.references.is_empty() && item.definition.category.is_bulk_removable())
-        .count()
-}

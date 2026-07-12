@@ -49,7 +49,7 @@ pub(in crate::presentation::cli) fn print_duplicate_report(
                             .map(|form| json!({
                                 "path": form.path.display().to_string(),
                                 "dialect": form.dialect.label(),
-                                "form_path": form.form_path.as_str(),
+                                "form_path": form.form_path.to_string(),
                                 "span": {
                                     "start": form.span.start().get(),
                                     "end": form.span.end().get(),
@@ -138,7 +138,7 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
                             "replacement_count": targets.len(),
                             "keep_first": batch.keep_first,
                             "kept_form": kept_form(batch).map(|form| json!({
-                                "form_path": form.form_path.as_str(),
+                                "form_path": form.form_path.to_string(),
                                 "span": {
                                     "start": form.span.start().get(),
                                     "end": form.span.end().get(),
@@ -150,7 +150,7 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
                             "replacement": batch.replacement.as_str(),
                             "paths": targets
                                 .iter()
-                                .map(|form| form.form_path.as_str())
+                                .map(|form| form.form_path.to_string())
                                 .collect::<Vec<_>>(),
                             "replace_forms_args": command_args,
                             "command": format_command(&replace_forms_command_args(batch)),
@@ -158,7 +158,7 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
                                 .forms
                                 .iter()
                                 .map(|form| json!({
-                                    "form_path": form.form_path.as_str(),
+                                    "form_path": form.form_path.to_string(),
                                     "span": {
                                         "start": form.span.start().get(),
                                         "end": form.span.end().get(),
@@ -188,7 +188,7 @@ fn replace_forms_command_args(batch: &ReplacementPlanBatch) -> Vec<String> {
 
     for form in replacement_forms(batch) {
         args.push("--path".to_owned());
-        args.push(form.form_path.clone());
+        args.push(form.form_path.to_string());
     }
 
     args.extend([

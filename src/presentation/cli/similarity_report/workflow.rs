@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::thread;
 
-use anyhow::{Result, bail};
+use anyhow::{Error, Result, bail};
 
 use crate::application::usecase::similarity_report::{
     SimilarityCandidate, SimilarityReportOptions, build_similarity_pairs,
@@ -16,15 +16,6 @@ use super::render::print_similarity_report;
 use super::types::{ErrorPolicy, FileProcessingError};
 
 pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
-    ensure_options(
-        args.threshold,
-        args.min_node_count,
-        args.min_line_span,
-        args.max_candidates,
-        args.max_comparisons,
-        args.max_results,
-    )?;
-
     let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
         roots: args.roots.clone(),
         include_unknown: args.include_unknown || args.dialect.is_some(),
@@ -34,17 +25,18 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         exclude: args.exclude.clone(),
     })?;
 
-    let options = SimilarityReportOptions {
-        threshold: args.threshold,
-        min_node_count: args.min_node_count,
-        min_line_span: args.min_line_span,
-        comparison_scope: args.comparison_scope,
-        form_scope: args.form_scope,
-        overlap_policy: args.overlap_policy,
-        max_candidates: args.max_candidates,
-        max_comparisons: args.max_comparisons,
-        max_results: args.max_results,
-    };
+    let options = SimilarityReportOptions::new(
+        args.threshold,
+        args.min_node_count,
+        args.min_line_span,
+        args.comparison_scope,
+        args.form_scope,
+        args.overlap_policy,
+        args.max_candidates,
+        args.max_comparisons,
+        args.max_results,
+    )
+    .map_err(Error::msg)?;
     let output = process_workspace_files(
         discovery.files.clone(),
         args.dialect,
@@ -222,33 +214,4 @@ fn process_file(
         candidates,
         omitted_candidates,
     })
-}
-
-fn ensure_options(
-    threshold: f64,
-    min_node_count: usize,
-    min_line_span: usize,
-    max_candidates: Option<usize>,
-    max_comparisons: Option<usize>,
-    max_results: Option<usize>,
-) -> Result<()> {
-    if !(0.0..=1.0).contains(&threshold) {
-        bail!("--threshold must be between 0.0 and 1.0");
-    }
-    if min_node_count < 2 {
-        bail!("--min-node-count must be at least 2");
-    }
-    if min_line_span == 0 {
-        bail!("--min-line-span must be at least 1");
-    }
-    if max_results == Some(0) {
-        bail!("--max-results must be at least 1");
-    }
-    if max_comparisons == Some(0) {
-        bail!("--max-comparisons must be at least 1");
-    }
-    if max_candidates == Some(0) {
-        bail!("--max-candidates must be at least 1");
-    }
-    Ok(())
 }

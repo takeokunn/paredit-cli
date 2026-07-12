@@ -366,21 +366,15 @@ fn classifies_refactor_capabilities() {
     assert!(CommonLispOperator::ClDefmethod.supports_function_parameter_refactor());
     assert!(CommonLispOperator::Defgeneric.supports_function_parameter_refactor());
     assert!(CommonLispOperator::DefineModifyMacro.supports_function_parameter_refactor());
-    assert!(
-        CommonLispOperator::Let
-            .let_binding_form()
-            .is_some_and(CommonLispLetBindingForm::supports_inline_refactor)
-    );
-    assert!(
-        CommonLispOperator::LetStar
-            .let_binding_form()
-            .is_some_and(CommonLispLetBindingForm::supports_inline_refactor)
-    );
-    assert!(
-        CommonLispOperator::SymbolMacrolet
-            .let_binding_form()
-            .is_some_and(CommonLispLetBindingForm::supports_inline_refactor)
-    );
+    assert!(CommonLispOperator::Let
+        .let_binding_form()
+        .is_some_and(CommonLispLetBindingForm::supports_inline_refactor));
+    assert!(CommonLispOperator::LetStar
+        .let_binding_form()
+        .is_some_and(CommonLispLetBindingForm::supports_inline_refactor));
+    assert!(CommonLispOperator::SymbolMacrolet
+        .let_binding_form()
+        .is_some_and(CommonLispLetBindingForm::supports_inline_refactor));
     assert_eq!(
         CommonLispOperator::Flet.binding_refactor_form(),
         Some(CommonLispBindingRefactorForm::LocalCallable(
@@ -393,13 +387,11 @@ fn classifies_refactor_capabilities() {
             CommonLispLocalCallableForm::Labels
         ))
     );
-    assert!(
-        CommonLispOperator::Macrolet
-            .binding_refactor_form()
-            .is_some_and(|form| matches!(
-                form,
-                CommonLispBindingRefactorForm::LocalCallable(local_form)
-                    if local_form.is_macro()
-            ))
-    );
+    assert!(CommonLispOperator::Macrolet
+        .binding_refactor_form()
+        .is_some_and(|form| matches!(
+            form,
+            CommonLispBindingRefactorForm::LocalCallable(local_form)
+                if local_form.is_macro()
+        )));
 }

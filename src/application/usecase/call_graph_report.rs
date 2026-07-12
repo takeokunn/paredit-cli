@@ -7,19 +7,18 @@ use crate::domain::sexpr::SymbolName;
 
 mod definitions;
 mod graph;
-mod policy;
 mod syntax;
 #[cfg(test)]
 mod tests;
 mod types;
 
+pub use crate::domain::call_graph_report::evaluate_call_graph_policy;
 pub use graph::{
     CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node,
 };
-pub use policy::evaluate_call_graph_policy;
 pub use types::{
     CallGraphDefinitionItem, CallGraphEdge, CallGraphFile, CallGraphNode, CallGraphPolicy,
-    CallGraphReport, CallGraphReportSource,
+    CallGraphPolicyOptions, CallGraphReport, CallGraphReportSource,
 };
 
 pub fn build_call_graph_report(

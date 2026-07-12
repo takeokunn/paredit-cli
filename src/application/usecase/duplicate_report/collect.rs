@@ -2,8 +2,8 @@ use std::path::Path as FsPath;
 
 use anyhow::Result;
 
-use crate::application::form_shape::duplicate_shape;
 use crate::domain::dialect::Dialect;
+use crate::domain::form_shape::duplicate_shape;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path, SyntaxTree};
 
 use super::syntax::{atom_text, expression_node_count};
@@ -55,7 +55,7 @@ fn collect_duplicate_candidates_from_view(
             grouped.entry(shape).or_default().push(DuplicateFormReport {
                 path: file.to_path_buf(),
                 dialect,
-                form_path: Path::from_indexes(path_stack.clone()).to_string(),
+                form_path: Path::from_indexes(path_stack.clone()),
                 span: view.span,
                 node_count,
                 head: view

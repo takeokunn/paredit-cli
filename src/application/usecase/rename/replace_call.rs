@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 
+pub use crate::domain::rename::ReplaceFunctionCallsScope;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
 
 mod call_site;
 mod collect;
@@ -17,12 +18,6 @@ pub struct ReplaceFunctionCallSite {
     pub span: ByteSpan,
     pub replacement: String,
     pub text: String,
-}
-
-#[derive(Debug, Clone)]
-pub enum ReplaceFunctionCallsScope {
-    AllCalls,
-    ExplicitPaths(Vec<Path>),
 }
 
 #[derive(Debug, Clone)]

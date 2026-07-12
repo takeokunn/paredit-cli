@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 

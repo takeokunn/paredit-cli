@@ -2,8 +2,8 @@ use super::super::*;
 use super::args::ImpactReportArgs;
 use super::render::print_impact_report;
 use crate::application::usecase::impact_report::{
-    ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource, build_impact_reports,
-    evaluate_impact_report_policy, impact_risks, impact_status_counts, summarize_impact_reports,
+    build_impact_reports, evaluate_impact_report_policy, impact_risks, impact_status_counts,
+    summarize_impact_reports, ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource,
 };
 
 pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Result<()> {
@@ -22,12 +22,13 @@ pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Res
         .max()
         .unwrap_or(ApplicationImpactRiskLevel::Info);
     let policy = evaluate_impact_report_policy(
-        ImpactReportPolicyOptions {
-            fail_on_risk_level: args.fail_on_risk_level.map(Into::into),
-            require_definitions: args.require_definitions,
-            require_references: args.require_references,
-            require_calls: args.require_calls,
-        },
+        ImpactReportPolicyOptions::new(
+            args.fail_on_risk_level.map(Into::into),
+            args.require_definitions,
+            args.require_references,
+            args.require_calls,
+        )
+        .map_err(anyhow::Error::msg)?,
         &summary,
         risk_level,
     );

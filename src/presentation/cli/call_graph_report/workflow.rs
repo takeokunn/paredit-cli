@@ -1,7 +1,8 @@
 use anyhow::Result;
 
 use crate::application::usecase::call_graph_report::{
-    CallGraphReportSource, build_call_graph_report, evaluate_call_graph_policy,
+    build_call_graph_report, evaluate_call_graph_policy, CallGraphPolicyOptions,
+    CallGraphReportSource,
 };
 use crate::presentation::cli::call_graph_report::args::CallGraphArgs;
 use crate::presentation::cli::call_graph_report::render::print_call_graph_report;
@@ -25,9 +26,12 @@ pub(in crate::presentation::cli) fn call_graph(args: CallGraphArgs) -> Result<()
     let policy = evaluate_call_graph_policy(
         &report.files,
         symbol,
-        args.fail_on_inbound_callers,
-        args.require_edges,
-        args.require_internal_edges,
+        CallGraphPolicyOptions::new(
+            args.fail_on_inbound_callers,
+            args.require_edges,
+            args.require_internal_edges,
+        )
+        .map_err(anyhow::Error::msg)?,
     );
     print_call_graph_report(
         &report.files,

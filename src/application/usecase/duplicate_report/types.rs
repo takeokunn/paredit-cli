@@ -2,13 +2,14 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::ByteSpan;
+use crate::domain::form_shape::FormShape;
+use crate::domain::sexpr::{ByteSpan, Path};
 
 #[derive(Debug, Clone)]
 pub struct DuplicateFormReport {
     pub path: PathBuf,
     pub dialect: Dialect,
-    pub form_path: String,
+    pub form_path: Path,
     pub span: ByteSpan,
     pub node_count: usize,
     pub head: Option<String>,
@@ -17,7 +18,7 @@ pub struct DuplicateFormReport {
 
 #[derive(Debug)]
 pub struct DuplicateShapeReport {
-    pub shape: String,
+    pub shape: FormShape,
     pub count: usize,
     pub forms: Vec<DuplicateFormReport>,
 }
@@ -26,10 +27,10 @@ pub struct DuplicateShapeReport {
 pub struct ReplacementPlanBatch {
     pub file: PathBuf,
     pub dialect: Dialect,
-    pub shape: String,
+    pub shape: FormShape,
     pub replacement: String,
     pub keep_first: bool,
     pub forms: Vec<DuplicateFormReport>,
 }
 
-pub type DuplicateCandidateGroups = BTreeMap<String, Vec<DuplicateFormReport>>;
+pub type DuplicateCandidateGroups = BTreeMap<FormShape, Vec<DuplicateFormReport>>;

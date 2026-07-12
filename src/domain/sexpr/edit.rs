@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use super::tree::{Node, NodeKind, Selection, SyntaxTree};
 use super::types::{ByteOffset, ByteSpan, NodeId};

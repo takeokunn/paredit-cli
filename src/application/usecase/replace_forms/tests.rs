@@ -2,6 +2,7 @@ use proptest::prelude::*;
 
 use super::*;
 use crate::domain::dialect::Dialect;
+use crate::domain::form_shape::FormShape;
 
 #[test]
 fn plans_multiple_replacements_in_reverse_span_order() {
@@ -22,10 +23,10 @@ fn plans_multiple_replacements_in_reverse_span_order() {
     assert_eq!(plan.targets.len(), 2);
     assert_eq!(plan.rewritten, "(bar 0)\n(bar 0)\n");
     assert_eq!(
-        plan.original_shape.as_deref(),
+        plan.original_shape.as_ref().map(FormShape::as_str),
         Some("(paren head:foo _atom)")
     );
-    assert_eq!(plan.replacement_shape, "(paren head:bar _atom)");
+    assert_eq!(plan.replacement_shape.as_str(), "(paren head:bar _atom)");
 }
 
 #[test]
@@ -61,11 +62,9 @@ fn rejects_shape_mismatch_when_required() {
     })
     .unwrap_err();
 
-    assert!(
-        error
-            .to_string()
-            .contains("expected all selected forms to share shape")
-    );
+    assert!(error
+        .to_string()
+        .contains("expected all selected forms to share shape"));
 }
 
 fn lisp_symbol_strategy() -> impl Strategy<Value = String> {
