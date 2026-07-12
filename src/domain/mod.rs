@@ -16,4 +16,5 @@ pub mod refactor_preview;
 pub mod rename;
 pub mod report_policy;
 pub mod sexpr;
+pub mod signature_report;
 pub mod similarity_report;

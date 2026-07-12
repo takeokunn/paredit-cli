@@ -1,5 +1,7 @@
-use crate::application::usecase::signature_report::types::{
-    SignatureCallStatus, SignatureReportFile, SignatureReportPolicy,
+use crate::application::usecase::signature_report::types::SignatureReportFile;
+use crate::domain::signature_report::{
+    SignatureCallStatus, SignatureReportPolicy,
+    evaluate_signature_report_policy as evaluate_domain_policy,
 };
 
 pub fn evaluate_signature_report_policy(
@@ -12,50 +14,16 @@ pub fn evaluate_signature_report_policy(
         .iter()
         .map(|report| report.definitions.len())
         .sum::<usize>();
-    let call_count = reports
-        .iter()
-        .map(|report| report.calls.len())
-        .sum::<usize>();
-    let mismatch_count = reports
+    let statuses = reports
         .iter()
         .flat_map(|report| &report.calls)
-        .filter(|item| {
-            matches!(
-                item.status,
-                SignatureCallStatus::MissingArguments | SignatureCallStatus::ExtraArguments
-            )
-        })
-        .count();
-    let mut violations = Vec::new();
-
-    if fail_on_mismatch && mismatch_count > 0 {
-        violations.push(format!(
-            "--fail-on-mismatch found {mismatch_count} incompatible call(s)"
-        ));
-    }
-    if let Some(required) = require_definitions {
-        if definition_count < required {
-            violations.push(format!(
-                "--require-definitions expected at least {required}, found {definition_count}"
-            ));
-        }
-    }
-    if let Some(required) = require_calls {
-        if call_count < required {
-            violations.push(format!(
-                "--require-calls expected at least {required}, found {call_count}"
-            ));
-        }
-    }
-
-    SignatureReportPolicy {
+        .map(|item| item.status)
+        .collect::<Vec<SignatureCallStatus>>();
+    evaluate_domain_policy(
+        definition_count,
+        &statuses,
         fail_on_mismatch,
         require_definitions,
         require_calls,
-        definition_count,
-        call_count,
-        mismatch_count,
-        passed: violations.is_empty(),
-        violations,
-    }
+    )
 }

@@ -4,6 +4,7 @@ use crate::application::usecase::call_report::CallReportItem;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
+pub use crate::domain::signature_report::{SignatureCallStatus, SignatureReportPolicy};
 
 #[derive(Debug)]
 pub struct SignatureReportSource {
@@ -44,37 +45,4 @@ pub struct SignatureCallItem {
     /// or ambiguous.
     pub expected_parameter_arity: Option<(usize, Option<usize>)>,
     pub status: SignatureCallStatus,
-}
-
-#[derive(Debug)]
-pub struct SignatureReportPolicy {
-    pub fail_on_mismatch: bool,
-    pub require_definitions: Option<usize>,
-    pub require_calls: Option<usize>,
-    pub definition_count: usize,
-    pub call_count: usize,
-    pub mismatch_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SignatureCallStatus {
-    Exact,
-    MissingArguments,
-    ExtraArguments,
-    UnknownDefinition,
-    AmbiguousDefinition,
-}
-
-impl SignatureCallStatus {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Exact => "exact",
-            Self::MissingArguments => "missing-arguments",
-            Self::ExtraArguments => "extra-arguments",
-            Self::UnknownDefinition => "unknown-definition",
-            Self::AmbiguousDefinition => "ambiguous-definition",
-        }
-    }
 }
