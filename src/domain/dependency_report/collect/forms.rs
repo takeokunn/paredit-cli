@@ -2,10 +2,8 @@ use crate::domain::common_lisp::CommonLispRuntimeDependencyForm;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path};
 
-use crate::application::usecase::dependency_report::syntax::{
-    dependency_designator_text, list_head,
-};
-use crate::application::usecase::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::domain::dependency_report::syntax::{dependency_designator_text, list_head};
+use crate::domain::dependency_report::types::{DependencyKind, DependencyReportItem};
 
 pub(super) fn collect_list_dependency_items(
     view: &ExpressionView,

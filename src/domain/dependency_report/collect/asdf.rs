@@ -1,10 +1,10 @@
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};
 
-use crate::application::usecase::dependency_report::syntax::{
+use crate::domain::dependency_report::syntax::{
     atom_child, atom_text, dependency_designator_text, list_head,
 };
-use crate::application::usecase::dependency_report::types::{DependencyKind, DependencyReportItem};
+use crate::domain::dependency_report::types::{DependencyKind, DependencyReportItem};
 
 pub(super) fn collect_system_dependency_items(
     view: &ExpressionView,

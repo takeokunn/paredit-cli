@@ -6,6 +6,7 @@ pub mod call_report;
 pub mod common_lisp;
 pub mod definition;
 pub mod definition_report;
+pub mod dependency_report;
 pub mod dialect;
 pub mod duplicate_report;
 pub mod form_report;

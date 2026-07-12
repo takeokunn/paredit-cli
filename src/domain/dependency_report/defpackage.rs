@@ -1,4 +1,4 @@
-use crate::application::usecase::package_report::PackageDefinitionReport;
+use crate::domain::package_report::PackageDefinitionReport;
 
 use super::types::{DependencyKind, DependencyReportItem};
 
