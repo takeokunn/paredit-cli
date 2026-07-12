@@ -9,6 +9,7 @@ mod types;
 
 use anyhow::{Context, Result};
 
+use super::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
 use parts::inline_let_parts;
@@ -16,6 +17,10 @@ use rewrite::{replace_body_references, replace_span};
 pub use types::{InlineLetPlan, InlineLetRequest};
 
 pub fn plan_inline_let(request: InlineLetRequest<'_>) -> Result<InlineLetPlan> {
+    let input_tree = SyntaxTree::parse(request.input)
+        .context("inline-let input is not a valid S-expression document")?;
+    reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
+
     let parts = inline_let_parts(request.dialect, request.input, &request.target)?;
     let reference_count = parts.reference_spans.len();
     if reference_count == 0 {

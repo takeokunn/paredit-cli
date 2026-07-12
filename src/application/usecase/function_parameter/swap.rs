@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
 use super::calls::{
@@ -29,6 +30,7 @@ pub fn plan_swap_function_parameters(
     }
 
     let tree = SyntaxTree::parse(request.input)?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target = parse_swap_function_parameters_definition(
         request.dialect,
         &tree,

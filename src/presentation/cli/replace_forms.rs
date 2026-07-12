@@ -50,6 +50,7 @@ pub(super) fn replace_forms(args: ReplaceFormsArgs) -> Result<()> {
     let plan = plan_replace_forms(ReplaceFormsRequest {
         input: &input.text,
         tree: &tree,
+        dialect,
         paths,
         replacement: &with,
         require_same_shape,

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
 use super::calls::{FunctionCallPathRequest, resolve_function_call_paths};
@@ -17,6 +18,7 @@ pub fn plan_remove_function_parameter(
     request: RemoveFunctionParameterRequest<'_>,
 ) -> Result<RemoveFunctionParameterPlan> {
     let tree = SyntaxTree::parse(request.input)?;
+    reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target = parse_remove_function_parameter_definition(
         request.dialect,
         &tree,

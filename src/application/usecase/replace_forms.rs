@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 
 use crate::application::form_shape::duplicate_shape;
+use crate::application::usecase::mutation_safety::{
+    reject_common_lisp_reader_conditionals, reject_overlapping_common_lisp_reader_time_forms,
+};
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 mod rewrite;
@@ -18,6 +21,9 @@ use validation::{
 pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFormsPlan> {
     let replacement_tree = SyntaxTree::parse(request.replacement)
         .context("--with must be a valid S-expression document")?;
+    // The replacement becomes source code in the rewritten document, so it
+    // must satisfy the same reader-time safety contract as the input tree.
+    reject_common_lisp_reader_conditionals(&replacement_tree, request.dialect)?;
     anyhow::ensure!(
         replacement_tree.root_children().len() == 1,
         "--with must contain exactly one top-level S-expression"
@@ -26,6 +32,11 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
     let replacement_shape = duplicate_shape(&replacement_view, true);
 
     let targets = collect_replace_targets(request.input, request.tree, &request.paths)?;
+    reject_overlapping_common_lisp_reader_time_forms(
+        request.tree,
+        request.dialect,
+        targets.iter().map(|target| target.span),
+    )?;
     let original_shape = original_shape_for_targets(&targets);
     ensure_same_shape_when_required(
         &targets,

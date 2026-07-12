@@ -9,6 +9,7 @@ mod types;
 
 use anyhow::{Context, Result, bail};
 
+use super::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use occurrences::{
@@ -19,6 +20,10 @@ use rewrite::{introduced_let, replace_span, replace_spans_within_span};
 pub use types::{IntroduceLetPlan, IntroduceLetRequest};
 
 pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceLetPlan> {
+    let input_tree = SyntaxTree::parse(request.input)
+        .context("introduce-let input is not a valid S-expression document")?;
+    reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
+
     let selected_span = request.target.span;
     let binding_value = selected_span.slice(request.input).to_owned();
     let enclosing = request.enclosing_span.slice(request.input);

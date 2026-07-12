@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{ExpressionView, SyntaxTree};
 
 mod inference;
@@ -17,6 +18,10 @@ use rewrite::{extracted_call, extracted_definition};
 pub use types::{ExtractFunctionInsert, ExtractFunctionPlan, ExtractFunctionRequest};
 
 pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<ExtractFunctionPlan> {
+    let input_tree = SyntaxTree::parse(request.input)
+        .context("extract-function input is not a valid S-expression document")?;
+    reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
+
     let span = request.selection.span();
     let selected = request.selection.text(request.input).to_owned();
     let mut params = request.explicit_params;

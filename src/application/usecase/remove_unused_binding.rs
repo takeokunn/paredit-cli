@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use super::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::common_lisp::{
     CommonLispBindingRefactorForm, common_lisp_symbol_reference_eq,
     is_common_lisp_earmuffed_special_variable_name,
@@ -35,6 +36,10 @@ pub fn plan_remove_unused_binding(
     if request.name.is_none() && !request.all_bindings {
         anyhow::bail!("remove-unused-binding requires --name or --all-bindings");
     }
+
+    let input_tree = SyntaxTree::parse(request.input)
+        .context("remove-unused-binding input is not a valid S-expression document")?;
+    reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
 
     let parts = remove_unused_binding_parts(
         request.dialect,

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
@@ -30,6 +31,13 @@ pub struct UnwrapCallPlan {
 }
 
 pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan> {
+    let tree = SyntaxTree::parse(request.input).context("unwrap-call input does not parse")?;
+    reject_overlapping_common_lisp_reader_time_forms(
+        &tree,
+        request.dialect,
+        [request.target.span],
+    )?;
+
     if request.target.kind != ExpressionKind::List
         || request.target.delimiter != Some(Delimiter::Paren)
     {

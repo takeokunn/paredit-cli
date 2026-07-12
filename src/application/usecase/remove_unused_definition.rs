@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
 mod candidates;
@@ -29,6 +30,12 @@ pub use types::{
 pub fn plan_remove_unused_definitions(
     request: RemoveUnusedDefinitionsRequest,
 ) -> Result<RemoveUnusedDefinitionsPlan> {
+    for file in &request.files {
+        let tree = SyntaxTree::parse(&file.text)
+            .with_context(|| format!("failed to parse {}", file.path.display()))?;
+        reject_common_lisp_reader_conditionals(&tree, file.dialect)?;
+    }
+
     let exported_symbols = collect_exported_symbol_index(&request.package_definitions);
     let unused_reports = collect_unused_definition_candidates(&request.files)?;
     let mut files = Vec::with_capacity(request.files.len());
