@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::application::usecase::call_report::CallReportItem;
 use crate::application::usecase::signature_report::types::SignatureCallStatus;
+use crate::domain::call_report::CallReportItem;
 use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 
 /// `definitions_by_name` is keyed by `common_lisp_symbol_reference_needle`,

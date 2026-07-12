@@ -3,11 +3,11 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 
 use crate::application::usecase::call_graph_report::{
-    CallGraphNode, CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches,
-    insert_call_graph_node,
+    build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node, CallGraphNode,
+    CallGraphNodeIndex,
 };
-use crate::application::usecase::call_report::build_call_report;
-use crate::application::usecase::signature_report::{SignatureCallItem, classify_signature_call};
+use crate::application::usecase::signature_report::{classify_signature_call, SignatureCallItem};
+use crate::domain::call_report::build_call_report;
 use crate::domain::common_lisp::{
     common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
 };

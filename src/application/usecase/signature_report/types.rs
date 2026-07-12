@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::application::usecase::call_report::CallReportItem;
+use crate::domain::call_report::CallReportItem;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};

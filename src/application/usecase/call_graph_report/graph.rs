@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use crate::application::usecase::call_report::CallReportItem;
+use crate::domain::call_report::CallReportItem;
 use crate::domain::common_lisp::{
     common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
 };

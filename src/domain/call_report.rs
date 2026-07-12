@@ -1,22 +1,44 @@
 use anyhow::Result;
 
-use crate::application::usecase::call_report::syntax::list_head;
-use crate::application::usecase::call_report::types::CallReportItem;
-use crate::application::usecase::callable_scope::{
+use crate::domain::common_lisp::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope,
 };
 use crate::domain::common_lisp::{
-    CommonLispBindingListShape, CommonLispBindingRefactorForm, CommonLispLocalCallableForm,
-    CommonLispOperator, CommonLispSlotBindingForm, common_lisp_symbol_reference_eq,
-    is_common_lisp_declaration_form,
+    common_lisp_symbol_reference_eq, is_common_lisp_declaration_form, CommonLispBindingListShape,
+    CommonLispBindingRefactorForm, CommonLispLocalCallableForm, CommonLispOperator,
+    CommonLispSlotBindingForm,
 };
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::apply_reader_prefix_context;
 use crate::domain::sexpr::{
-    Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
+
+#[derive(Debug, Clone)]
+pub struct CallReportItem {
+    pub path: String,
+    pub span: ByteSpan,
+    pub head: String,
+    pub argument_count: usize,
+    pub category: Option<crate::domain::definition::DefinitionCategory>,
+    pub enclosing_definition: Option<String>,
+}
+
+fn list_head(view: &ExpressionView) -> Option<&str> {
+    atom_child(view, 0)
+}
+
+fn atom_child(view: &ExpressionView, index: usize) -> Option<&str> {
+    view.children.get(index).and_then(atom_text)
+}
+
+fn atom_text(view: &ExpressionView) -> Option<&str> {
+    (view.kind == ExpressionKind::Atom)
+        .then_some(view.text.as_deref())
+        .flatten()
+}
 
 pub fn build_call_report(
     tree: &SyntaxTree,

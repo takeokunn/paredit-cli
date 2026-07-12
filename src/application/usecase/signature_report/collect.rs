@@ -2,18 +2,18 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 
-use crate::application::usecase::call_report::build_call_report;
 use crate::application::usecase::signature_report::calls::classify_signature_call;
 use crate::application::usecase::signature_report::syntax::list_head;
 use crate::application::usecase::signature_report::types::{
     SignatureCallItem, SignatureDefinitionItem, SignatureReportFile, SignatureReportSource,
 };
+use crate::domain::call_report::build_call_report;
 use crate::domain::common_lisp::{
     common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
     common_lisp_symbol_reference_needle,
 };
-use crate::domain::definition::DefinitionCategory;
 use crate::domain::definition::definition_shape;
+use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
 

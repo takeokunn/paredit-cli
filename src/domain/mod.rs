@@ -2,10 +2,12 @@
 //! independent from CLI delivery and filesystem adapters.
 
 pub mod call_graph_report;
+pub mod call_report;
 pub mod common_lisp;
 pub mod definition;
 pub mod definition_report;
 pub mod dialect;
+pub mod form_report;
 pub mod form_shape;
 pub mod form_similarity;
 pub mod impact_report;

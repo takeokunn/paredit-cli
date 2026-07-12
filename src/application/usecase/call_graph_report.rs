@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 
-use crate::application::usecase::call_report::build_call_report;
+use crate::domain::call_report::build_call_report;
 use crate::domain::sexpr::SymbolName;
 
 mod definitions;
@@ -14,7 +14,7 @@ mod types;
 
 pub use crate::domain::call_graph_report::evaluate_call_graph_policy;
 pub use graph::{
-    CallGraphNodeIndex, build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node,
+    build_call_graph_edge, call_graph_edge_matches, insert_call_graph_node, CallGraphNodeIndex,
 };
 pub use types::{
     CallGraphDefinitionItem, CallGraphEdge, CallGraphFile, CallGraphNode, CallGraphPolicy,
