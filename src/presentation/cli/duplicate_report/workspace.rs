@@ -43,7 +43,8 @@ mod tests {
         fs::write(root.join("a.lisp"), "(foo a b)\n").expect("write root file");
         fs::write(nested.join("b.lisp"), "(foo c d)\n").expect("write nested file");
 
-        let files = discover_duplicate_report_files(&[root.clone()]).expect("discover files");
+        let files =
+            discover_duplicate_report_files(std::slice::from_ref(&root)).expect("discover files");
 
         assert_eq!(files, vec![root.join("a.lisp"), nested.join("b.lisp")]);
 
