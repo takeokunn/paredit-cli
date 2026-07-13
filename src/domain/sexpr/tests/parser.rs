@@ -327,6 +327,34 @@ fn rejects_unbalanced_document() {
 }
 
 #[test]
+fn repairs_unclosed_lists_using_matching_delimiters() {
+    assert_eq!(
+        SyntaxTree::repair_unclosed_lists("(outer [inner {leaf}").expect("repair"),
+        "(outer [inner {leaf}])"
+    );
+}
+
+#[test]
+fn repair_unclosed_lists_leaves_balanced_input_unchanged() {
+    assert_eq!(
+        SyntaxTree::repair_unclosed_lists("(outer [inner])").expect("balanced input"),
+        "(outer [inner])"
+    );
+}
+
+#[test]
+fn repair_unclosed_lists_rejects_other_parse_errors() {
+    assert_eq!(
+        SyntaxTree::repair_unclosed_lists("(alpha]").unwrap_err(),
+        ParseError::MismatchedClose {
+            found: ']',
+            expected: ')',
+            position: 6
+        }
+    );
+}
+
+#[test]
 fn rejects_mismatched_delimiter() {
     assert_eq!(
         SyntaxTree::parse("(alpha]").unwrap_err(),

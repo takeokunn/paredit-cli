@@ -1,5 +1,5 @@
 use super::{
-    args::{AnalyzeArgs, EditTargetArgs, FormatArgs, ReplaceArgs, TargetArgs},
+    args::{AnalyzeArgs, EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs},
     call_graph_report, call_report, capabilities, convert_cond_to_if, convert_flet_to_labels,
     convert_if_to_cond, convert_if_to_unless, convert_if_to_when, convert_labels_to_flet,
     convert_let_star_to_let, convert_let_to_let_star, convert_sequential_binding,
@@ -75,6 +75,8 @@ pub(super) enum InspectCommand {
 pub(super) enum EditCommand {
     /// Print a canonical, indentation-based rendering.
     Format(FormatArgs),
+    /// Append required closing delimiters only when input has unclosed lists.
+    RepairUnclosedLists(RepairArgs),
     /// Print the S-expression selected by --path or --at.
     Select(TargetArgs),
     /// Replace the selected S-expression with replacement text.

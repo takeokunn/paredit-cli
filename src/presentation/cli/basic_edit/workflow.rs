@@ -1,15 +1,27 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::domain::sexpr::{Edit, Formatter, SyntaxTree};
-use crate::presentation::cli::args::{EditTargetArgs, FormatArgs, ReplaceArgs, TargetArgs};
+use crate::presentation::cli::args::{
+    EditTargetArgs, FormatArgs, RepairArgs, ReplaceArgs, TargetArgs,
+};
 use crate::presentation::cli::shared::{
-    edit_target, emit_document, read_input_dialect_and_tree, resolve_target,
+    edit_target, emit_document, read_input, read_input_dialect_and_tree, resolve_target,
 };
 
 pub(in crate::presentation::cli) fn format(args: FormatArgs) -> Result<()> {
     let (input, _, tree) = read_input_dialect_and_tree(args.file, args.dialect)?;
     let rendered = Formatter::new(args.indent).format(&tree);
     emit_document(&input, args.write, args.diff, rendered)
+}
+
+pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> Result<()> {
+    let input = read_input(args.file)?;
+    let repaired = SyntaxTree::repair_unclosed_lists(&input.text)
+        .context("repair-unclosed-lists only repairs unclosed lists")?;
+    if repaired == input.text {
+        bail!("input is already balanced");
+    }
+    emit_document(&input, args.write, args.diff, repaired)
 }
 
 pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {

@@ -131,6 +131,8 @@ mod rename;
 mod rename_at;
 #[path = "cli/rename_control.rs"]
 mod rename_control;
+#[path = "cli/repair_unclosed_lists.rs"]
+mod repair_unclosed_lists;
 #[path = "cli/replace_forms.rs"]
 mod replace_forms;
 #[path = "cli/signature_report.rs"]
