@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::thread;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::{DefinitionCategory, definition_shape};
@@ -160,7 +160,7 @@ pub fn build_parsed_definition_file(
 
 pub fn collect_unused_definition_candidates(
     files: &[ParsedDefinitionFile],
-) -> Vec<UnusedDefinitionFile> {
+) -> Result<Vec<UnusedDefinitionFile>> {
     let views: Vec<_> = files
         .iter()
         .map(|file| {
@@ -197,7 +197,7 @@ pub fn collect_unused_definition_candidates(
         .unwrap_or(1)
         .clamp(1, files.len().max(1));
     let mut ordered: Vec<Option<UnusedDefinitionFile>> = (0..files.len()).map(|_| None).collect();
-    thread::scope(|scope| {
+    thread::scope(|scope| -> Result<()> {
         let views = &views;
         let package_form_spans = &package_form_spans;
         let atom_needles = &atom_needles;
@@ -229,13 +229,14 @@ pub fn collect_unused_definition_candidates(
         for handle in handles {
             for (file_index, report) in handle
                 .join()
-                .expect("unused-definition reference worker thread panicked")
+                .map_err(|_| anyhow!("unused-definition reference worker thread panicked"))?
             {
                 ordered[file_index] = Some(report);
             }
         }
-    });
-    ordered.into_iter().flatten().collect()
+        Ok(())
+    })?;
+    Ok(ordered.into_iter().flatten().collect())
 }
 
 fn file_unused_definition_report(

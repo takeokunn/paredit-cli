@@ -14,7 +14,8 @@ fn unused_candidates_ignore_self_references_and_count_external_references() {
     )
     .expect("build parsed file");
 
-    let reports = collect_unused_definition_candidates(&[parsed]);
+    let reports = collect_unused_definition_candidates(&[parsed])
+        .expect("collect unused definition candidates");
     let used = reports[0]
         .definitions
         .iter()
@@ -44,7 +45,8 @@ fn unused_candidates_count_unqualified_references_to_package_qualified_common_li
     )
     .expect("build parsed file");
 
-    let reports = collect_unused_definition_candidates(&[parsed]);
+    let reports = collect_unused_definition_candidates(&[parsed])
+        .expect("collect unused definition candidates");
     let used = reports[0]
         .definitions
         .iter()
@@ -76,7 +78,8 @@ fn unused_candidates_count_function_quote_and_quoted_dispatch_table_references()
     )
     .expect("build parsed file");
 
-    let reports = collect_unused_definition_candidates(&[parsed]);
+    let reports = collect_unused_definition_candidates(&[parsed])
+        .expect("collect unused definition candidates");
     let handler = reports[0]
         .definitions
         .iter()
@@ -103,7 +106,8 @@ fn policy_reports_fail_on_unused_and_required_minimum() {
         input,
     )
     .expect("build parsed file");
-    let reports = collect_unused_definition_candidates(&[parsed]);
+    let reports = collect_unused_definition_candidates(&[parsed])
+        .expect("collect unused definition candidates");
 
     let policy = evaluate_unused_definition_policy(
         UnusedDefinitionPolicyOptions::new(true, Some(2)).unwrap(),
@@ -133,7 +137,8 @@ fn policy_ignores_protected_category_candidates_for_fail_on_unused() {
         input,
     )
     .expect("build parsed file");
-    let reports = collect_unused_definition_candidates(&[parsed]);
+    let reports = collect_unused_definition_candidates(&[parsed])
+        .expect("collect unused definition candidates");
 
     assert_eq!(unused_definition_candidate_count(&reports), 2);
     assert_eq!(unused_definition_actionable_candidate_count(&reports), 1);
@@ -161,7 +166,8 @@ fn policy_passes_fail_on_unused_when_only_protected_category_is_unreferenced() {
         input,
     )
     .expect("build parsed file");
-    let reports = collect_unused_definition_candidates(&[parsed]);
+    let reports = collect_unused_definition_candidates(&[parsed])
+        .expect("collect unused definition candidates");
 
     assert_eq!(unused_definition_candidate_count(&reports), 1);
     assert_eq!(unused_definition_actionable_candidate_count(&reports), 0);

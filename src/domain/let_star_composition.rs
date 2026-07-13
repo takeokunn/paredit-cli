@@ -1,5 +1,6 @@
 //! Pure planning rules for splitting sequential `let*` bindings.
 
+use crate::domain::binding_index::BindingIndex;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::reader::atom_symbol_text;
@@ -11,14 +12,14 @@ pub(crate) struct Request<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
-    pub binding_index: usize,
+    pub binding_index: BindingIndex,
 }
 #[derive(Debug, Clone)]
 pub(crate) struct Plan {
     pub dialect: Dialect,
     pub path: Path,
     pub form_span: ByteSpan,
-    pub binding_index: usize,
+    pub binding_index: BindingIndex,
     pub outer_binding_count: usize,
     pub inner_binding_count: usize,
     pub rewritten: String,
@@ -49,19 +50,20 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
     if bindings.kind != ExpressionKind::List || !bindings.reader_prefixes.is_empty() {
         bail!("split-let-star requires a plain binding list");
     }
-    if request.binding_index == 0 || request.binding_index >= bindings.children.len() {
+    let binding_index = request.binding_index.get();
+    if binding_index >= bindings.children.len() {
         bail!(
             "split-let-star --binding-index must be between 1 and {}",
             bindings.children.len().saturating_sub(1)
         );
     }
     let head = form.children[0].span.slice(request.input);
-    let outer = bindings.children[..request.binding_index]
+    let outer = bindings.children[..binding_index]
         .iter()
         .map(|b| b.span.slice(request.input))
         .collect::<Vec<_>>()
         .join(" ");
-    let inner = bindings.children[request.binding_index..]
+    let inner = bindings.children[binding_index..]
         .iter()
         .map(|b| b.span.slice(request.input))
         .collect::<Vec<_>>()
@@ -75,8 +77,8 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         path: request.path,
         form_span: form.span,
         binding_index: request.binding_index,
-        outer_binding_count: request.binding_index,
-        inner_binding_count: bindings.children.len() - request.binding_index,
+        outer_binding_count: binding_index,
+        inner_binding_count: bindings.children.len() - binding_index,
         changed: rewritten != request.input,
         rewritten,
     })
@@ -141,7 +143,7 @@ mod tests {
                 input: "(let* ((a 1) (b (+ a 1)) (c (+ b 1))) (+ a b c))",
                 dialect,
                 path: "0".parse().unwrap(),
-                binding_index: 1,
+                binding_index: BindingIndex::new(1).expect("binding index"),
             })
             .unwrap();
             assert_eq!(
@@ -157,7 +159,7 @@ mod tests {
                 input: "(let* ((a 1) (b 2)) b)",
                 dialect: Dialect::CommonLisp,
                 path: "0".parse().unwrap(),
-                binding_index: 0
+                binding_index: BindingIndex::new(2).expect("binding index")
             })
             .is_err()
         );
@@ -166,7 +168,7 @@ mod tests {
                 input: "(let* ((a 1) (b 2)) (declare (special a)) b)",
                 dialect: Dialect::CommonLisp,
                 path: "0".parse().unwrap(),
-                binding_index: 1
+                binding_index: BindingIndex::new(1).expect("binding index")
             })
             .is_err()
         );

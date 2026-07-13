@@ -7,7 +7,7 @@ use std::thread;
 use crate::domain::form_similarity::{
     TreeSimilarityWorkspace, similarity_upper_bound, tree_similarity_with_workspace,
 };
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 use super::types::{
     SimilarityCandidate, SimilarityComparisonScope, SimilarityFormReport, SimilarityOverlapPolicy,
@@ -108,9 +108,9 @@ pub fn build_similarity_pairs_with_omissions(
         .unwrap_or(1)
         .max(1);
     let work_items = build_work_items(&groups, options.comparison_scope(), worker_count);
-    let worker_items = partition_items_for_workers(work_items, worker_count);
+    let worker_items = partition_items_for_workers(work_items, worker_count)?;
 
-    thread::scope(|scope| {
+    thread::scope(|scope| -> Result<()> {
         let mut handles = Vec::new();
         for chunk in worker_items {
             handles.push(scope.spawn(move || {
@@ -121,12 +121,13 @@ pub fn build_similarity_pairs_with_omissions(
         for handle in handles {
             let output = handle
                 .join()
-                .expect("similarity comparison worker thread panicked");
+                .map_err(|_| anyhow!("similarity comparison worker thread panicked"))?;
             evaluated_pairs += output.evaluated_pairs;
             pruned_by_size += output.pruned_by_size;
             pairs.extend(output.pairs);
         }
-    });
+        Ok(())
+    })?;
 
     Ok(finalize_similarity_pairs(
         pairs,
@@ -422,9 +423,9 @@ fn triangle_range_cost(len: usize, left_range: &Range<usize>) -> usize {
 fn partition_items_for_workers(
     items: Vec<(WorkItem<'_>, usize)>,
     worker_count: usize,
-) -> Vec<Vec<WorkItem<'_>>> {
+) -> Result<Vec<Vec<WorkItem<'_>>>> {
     if worker_count <= 1 || items.len() <= 1 {
-        return vec![items.into_iter().map(|(item, _)| item).collect()];
+        return Ok(vec![items.into_iter().map(|(item, _)| item).collect()]);
     }
 
     let mut weighted_items = items;
@@ -438,15 +439,15 @@ fn partition_items_for_workers(
             .enumerate()
             .min_by_key(|(_, (load, _))| *load)
             .map(|(index, _)| index)
-            .unwrap();
+            .ok_or_else(|| anyhow!("similarity worker assignment has no available worker"))?;
         assignments[target_index].0 += weight;
         assignments[target_index].1.push(item);
     }
 
-    assignments
+    Ok(assignments
         .into_iter()
         .filter_map(|(_, items)| (!items.is_empty()).then_some(items))
-        .collect()
+        .collect())
 }
 
 fn estimated_group_cost(group: &[SimilarityCandidate], scope: SimilarityComparisonScope) -> usize {

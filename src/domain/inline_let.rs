@@ -177,7 +177,7 @@ fn parts(dialect: Dialect, input: &str, target: &ExpressionView) -> Result<Parts
     let last_body = target
         .children
         .last()
-        .expect("body exists after validation");
+        .context("inline-let body disappeared after validation")?;
     Ok(Parts {
         let_span: target.span,
         binding_name,

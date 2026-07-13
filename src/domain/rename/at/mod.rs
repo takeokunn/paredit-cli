@@ -55,7 +55,9 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
 
     let candidate = match candidates.len() {
         0 => return Err(RenameAtError::Unresolved.into()),
-        1 => candidates.pop().expect("one candidate"),
+        1 => candidates
+            .pop()
+            .ok_or_else(|| anyhow::anyhow!("one candidate"))?,
         _ => return Err(RenameAtError::Ambiguous.into()),
     };
     SyntaxTree::parse(&candidate.rewritten)

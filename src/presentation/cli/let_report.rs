@@ -3,6 +3,7 @@ use crate::application::usecase::let_report::{
     LetFormReport, LetReportPolicy, LetReportPolicyOptions, build_let_report,
     evaluate_let_report_policy,
 };
+use anyhow::anyhow;
 
 #[derive(Debug, Args)]
 pub(super) struct LetReportArgs {
@@ -40,7 +41,7 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
             .clamp(1, args.files.len());
         let mut ordered: Vec<Option<Result<FileLetReport>>> =
             (0..args.files.len()).map(|_| None).collect();
-        std::thread::scope(|scope| {
+        std::thread::scope(|scope| -> Result<()> {
             let files = &args.files;
             let explicit = args.dialect;
             let handles: Vec<_> = (0..worker_count)
@@ -68,11 +69,15 @@ pub(super) fn let_report(args: LetReportArgs) -> Result<()> {
                 })
                 .collect();
             for handle in handles {
-                for (index, report) in handle.join().expect("let-report worker thread panicked") {
+                for (index, report) in handle
+                    .join()
+                    .map_err(|_| anyhow!("let-report worker thread panicked"))?
+                {
                     ordered[index] = Some(report);
                 }
             }
-        });
+            Ok(())
+        })?;
         let mut per_file = Vec::with_capacity(args.files.len());
         let mut all_reports = Vec::new();
         for entry in ordered.into_iter().flatten() {

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::definition_reference::{
@@ -58,7 +58,7 @@ pub(super) fn collect_unused_definition_candidates(
         .clamp(1, files.len().max(1));
     let mut ordered: Vec<Option<Result<UnusedDefinitionFile>>> =
         (0..files.len()).map(|_| None).collect();
-    std::thread::scope(|scope| {
+    std::thread::scope(|scope| -> Result<()> {
         let parsed_files = &parsed_files;
         let package_form_spans = &package_form_spans;
         let atom_needles = &atom_needles;
@@ -90,12 +90,13 @@ pub(super) fn collect_unused_definition_candidates(
         for handle in handles {
             for (file_index, report) in handle
                 .join()
-                .expect("unused-definition candidate worker thread panicked")
+                .map_err(|_| anyhow!("unused-definition candidate worker thread panicked"))?
             {
                 ordered[file_index] = Some(report);
             }
         }
-    });
+        Ok(())
+    })?;
     ordered.into_iter().flatten().collect()
 }
 

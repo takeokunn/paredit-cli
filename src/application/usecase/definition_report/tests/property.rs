@@ -37,7 +37,8 @@ proptest! {
         )
         .expect("build generated parsed file");
 
-        let reports = collect_unused_definition_candidates(&[parsed]);
+        let reports = collect_unused_definition_candidates(&[parsed])
+            .expect("collect unused definition candidates");
         let generated = reports[0]
             .definitions
             .iter()

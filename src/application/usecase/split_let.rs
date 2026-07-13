@@ -1,6 +1,7 @@
 //! Application facade for safely splitting a parallel `let`.
 
 use crate::application::usecase::mutation_safety::reject_common_lisp_reader_conditionals;
+use crate::domain::binding_index::BindingIndex;
 use crate::domain::dialect::Dialect;
 use crate::domain::let_composition::{self, SplitLetRequest as DomainRequest};
 use crate::domain::sexpr::{ByteSpan, Path, SyntaxTree};
@@ -28,19 +29,18 @@ pub struct SplitLetPlan {
 pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
     let tree = SyntaxTree::parse(request.input)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
+    let binding_index = BindingIndex::new(request.binding_index)?;
     let plan = let_composition::plan_split_let(DomainRequest {
         input: request.input,
         dialect: request.dialect,
         path: request.path.clone(),
-        binding_index: request.binding_index,
+        binding_index,
     })?;
     Ok(SplitLetPlan {
         dialect: plan.dialect,
         path: plan.path,
         form_span: plan.form_span,
-        binding_index: plan
-            .binding_index
-            .expect("split-let domain plan has a boundary"),
+        binding_index: plan.binding_index.get(),
         outer_binding_count: plan.outer_binding_count,
         inner_binding_count: plan.inner_binding_count,
         rewritten: plan.rewritten,

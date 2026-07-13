@@ -51,7 +51,9 @@ pub(crate) fn insert_top_level_form(
                     (anchor_span.start().get(), format!("{}\n\n", form.trim()))
                 }
                 TopLevelInsert::After => (anchor_span.end().get(), format!("\n\n{}", form.trim())),
-                TopLevelInsert::Append => unreachable!(),
+                TopLevelInsert::Append => {
+                    anyhow::bail!("append insertion does not use an anchor")
+                }
             };
             let mut output = String::with_capacity(input.len() + inserted.len());
             output.push_str(&input[..offset]);

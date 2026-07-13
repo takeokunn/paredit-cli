@@ -1,6 +1,7 @@
 //! Core Lisp parsing, dialect, and semantic refactoring rules that stay
 //! independent from CLI delivery and filesystem adapters.
 
+pub(crate) mod binding_index;
 pub mod call_graph_report;
 pub mod call_report;
 pub(crate) mod callable_scope;
