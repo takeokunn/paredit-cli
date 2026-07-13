@@ -332,6 +332,58 @@ fn cli_plans_top_level_form_move_without_writing() {
 }
 
 #[test]
+fn cli_inserts_one_top_level_form_before_an_anchor() {
+    let dir = fresh_temp_dir("insert-top-level-before");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun existing () :existing)\n").unwrap();
+
+    paredit()
+        .args([
+            "refactor",
+            "insert-top-level",
+            "--file",
+            file.to_str().unwrap(),
+            "--with",
+            "(defmacro generated (name) `(list ,name))",
+            "--insert",
+            "before",
+            "--anchor-path",
+            "0",
+            "--write",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"written\":true"));
+
+    assert_eq!(
+        fs::read_to_string(&file).unwrap(),
+        "(defmacro generated (name) `(list ,name))\n\n(defun existing () :existing)\n"
+    );
+}
+
+#[test]
+fn cli_rejects_multiple_top_level_forms_for_insertion() {
+    let dir = fresh_temp_dir("insert-top-level-multiple");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun existing () :existing)\n").unwrap();
+
+    paredit()
+        .args([
+            "refactor",
+            "insert-top-level",
+            "--file",
+            file.to_str().unwrap(),
+            "--with",
+            "(defun one () 1) (defun two () 2)",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "exactly one top-level S-expression",
+        ));
+}
+
+#[test]
 fn cli_writes_top_level_form_move_before_anchor() {
     let dir = fresh_temp_dir("move-form-write");
     let from_file = dir.join("core.lisp");

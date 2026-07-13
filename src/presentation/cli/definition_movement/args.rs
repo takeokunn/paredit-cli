@@ -119,6 +119,31 @@ pub(in crate::presentation::cli) struct MoveFormArgs {
     pub(super) output: OutputFormat,
 }
 
+#[derive(Debug, Args)]
+pub(in crate::presentation::cli) struct InsertTopLevelArgs {
+    /// Source file receiving the top-level form.
+    #[arg(short, long)]
+    pub(super) file: PathBuf,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
+    /// Exactly one complete top-level S-expression to insert.
+    #[arg(long)]
+    pub(super) with: String,
+    /// Insertion strategy.
+    #[arg(long, value_enum, default_value_t = MoveInsert::Append)]
+    pub(super) insert: MoveInsert,
+    /// Destination top-level anchor path. Required for --insert before/after.
+    #[arg(long)]
+    pub(super) anchor_path: Option<Path>,
+    /// Rewrite the file. Without this flag, only prints a plan.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Output format for agent consumption.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub(super) output: OutputFormat,
+}
+
 fn parse_split_file_kind(value: &str) -> std::result::Result<DefinitionCategory, String> {
     DefinitionCategory::from_label(value).ok_or_else(|| {
         format!(

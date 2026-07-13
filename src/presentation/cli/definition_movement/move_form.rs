@@ -53,6 +53,7 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
         &form_text,
         args.insert,
         args.anchor_path.as_ref(),
+        "move-form",
     )?;
 
     SyntaxTree::parse(&from_rewritten).with_context(|| {

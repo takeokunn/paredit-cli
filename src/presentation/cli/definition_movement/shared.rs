@@ -37,13 +37,15 @@ pub(super) fn insert_top_level_form(
     form: &str,
     insert: MoveInsert,
     anchor_path: Option<&Path>,
+    command: &str,
 ) -> Result<(String, Option<ByteSpan>)> {
     match insert {
         MoveInsert::Append => Ok((append_top_level_form(input, form), None)),
         MoveInsert::Before | MoveInsert::After => {
             let anchor_path = anchor_path
                 .ok_or_else(|| anyhow::anyhow!("--insert before/after requires --anchor-path"))?;
-            let anchor_index = top_level_path_index(anchor_path, "move-form --anchor-path")?;
+            let anchor_flag = format!("{command} --anchor-path");
+            let anchor_index = top_level_path_index(anchor_path, &anchor_flag)?;
             if anchor_index >= tree.root_children().len() {
                 anyhow::bail!("anchor top-level path {anchor_path} is out of range");
             }
@@ -77,6 +79,7 @@ mod tests {
             "(defparameter *feature* t)",
             MoveInsert::Before,
             None,
+            "move-form",
         )
         .expect_err("missing anchor path should be rejected");
 

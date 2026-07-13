@@ -120,6 +120,7 @@ plan/preview/verify/apply lifecycle.
 | `split-file` | Plan or split multiple top-level definitions into another file. |
 | `sort-definitions` | Plan or sort contiguous top-level definition blocks in one file. |
 | `move-form` | Plan or move any top-level form between files. |
+| `insert-top-level` | Insert exactly one top-level S-expression before, after, or at the end of a file. |
 | `replacement-plan` | Convert duplicate groups into reviewed replace-forms batches. |
 | `replace-forms` | Plan or replace multiple reviewed forms in one file. |
 

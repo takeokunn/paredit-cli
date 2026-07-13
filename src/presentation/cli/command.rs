@@ -138,6 +138,8 @@ pub(super) enum RefactorCommand {
     SortDefinitions(definition_movement::args::SortDefinitionsArgs),
     /// Plan or move any top-level form between files.
     MoveForm(definition_movement::args::MoveFormArgs),
+    /// Insert one complete top-level S-expression into a Lisp source file.
+    InsertTopLevel(definition_movement::args::InsertTopLevelArgs),
     /// Convert duplicate groups into reviewed replace-forms batches.
     ReplacementPlan(duplicate_report::args::ReplacementPlanArgs),
     /// Plan or replace multiple reviewed forms in one file.
