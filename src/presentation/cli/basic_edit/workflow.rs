@@ -24,6 +24,7 @@ pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
     SyntaxTree::parse(&args.with).context("replacement is not a valid S-expression document")?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
     let rewritten = Edit::replace(&input.text, selection, &args.with);
+    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten)?;
     emit_document(&input, args.write, args.diff, rewritten)
 }
 

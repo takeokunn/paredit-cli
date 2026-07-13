@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result, bail};
 
+use crate::domain::binding_index::BindingIndex;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
@@ -27,7 +28,7 @@ pub(crate) struct SplitLetRequest<'a> {
     pub input: &'a str,
     pub dialect: Dialect,
     pub path: Path,
-    pub binding_index: usize,
+    pub binding_index: BindingIndex,
 }
 
 #[derive(Debug, Clone)]
@@ -37,7 +38,18 @@ pub(crate) struct LetCompositionPlan {
     pub form_span: ByteSpan,
     pub outer_binding_count: usize,
     pub inner_binding_count: usize,
-    pub binding_index: Option<usize>,
+    pub rewritten: String,
+    pub changed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct SplitLetPlan {
+    pub dialect: Dialect,
+    pub path: Path,
+    pub form_span: ByteSpan,
+    pub outer_binding_count: usize,
+    pub inner_binding_count: usize,
+    pub binding_index: BindingIndex,
     pub rewritten: String,
     pub changed: bool,
 }
@@ -106,7 +118,6 @@ pub(crate) fn plan_merge_nested_let(
         outer.span,
         outer_bindings.children.len(),
         inner_bindings.children.len(),
-        None,
         replacement,
         "merge-nested-let",
     )
@@ -152,13 +163,12 @@ pub(crate) fn plan_merge_nested_let_star(
         outer.span,
         outer_bindings.children.len(),
         inner_bindings.children.len(),
-        None,
         replacement,
         "merge-nested-let-star",
     )
 }
 
-pub(crate) fn plan_split_let(request: SplitLetRequest<'_>) -> Result<LetCompositionPlan> {
+pub(crate) fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
     let (tree, form) = select(request.input, request.dialect, &request.path, "split-let")?;
     require_form(request.dialect, &form, "let", "split-let selected form")?;
     reject_unsafe(&tree, request.dialect, &form, "split-let")?;
@@ -166,18 +176,19 @@ pub(crate) fn plan_split_let(request: SplitLetRequest<'_>) -> Result<LetComposit
         bail!("split-let requires a body");
     }
     let bindings = binding_list(&form.children[1], "split-let")?;
-    if request.binding_index == 0 || request.binding_index >= bindings.children.len() {
+    let binding_index = request.binding_index.get();
+    if binding_index >= bindings.children.len() {
         bail!(
             "split-let --binding-index must be between 1 and {}",
             bindings.children.len().saturating_sub(1)
         );
     }
     let parsed = parse_bindings(bindings, "split-let")?;
-    let outer_names: Vec<_> = parsed[..request.binding_index]
+    let outer_names: Vec<_> = parsed[..binding_index]
         .iter()
         .map(|(name, _)| name)
         .collect();
-    for (name, initializer) in &parsed[request.binding_index..] {
+    for (name, initializer) in &parsed[binding_index..] {
         if let Some(initializer) = initializer {
             for outer_name in &outer_names {
                 let mut refs = Vec::new();
@@ -197,26 +208,26 @@ pub(crate) fn plan_split_let(request: SplitLetRequest<'_>) -> Result<LetComposit
         }
     }
     let head = form.children[0].span.slice(request.input);
-    let outer = bindings.children[..request.binding_index]
+    let outer = bindings.children[..binding_index]
         .iter()
         .map(|v| v.span.slice(request.input))
         .collect::<Vec<_>>()
         .join(" ");
-    let inner = bindings.children[request.binding_index..]
+    let inner = bindings.children[binding_index..]
         .iter()
         .map(|v| v.span.slice(request.input))
         .collect::<Vec<_>>()
         .join(" ");
     let body = &request.input[bindings.span.end().get()..form.span.end().get() - 1];
     let replacement = format!("({head} ({outer}) ({head} ({inner}){body}))");
-    finish(
+    finish_split(
         request.input,
         request.dialect,
         request.path,
         form.span,
+        request.binding_index.get(),
+        bindings.children.len() - binding_index,
         request.binding_index,
-        bindings.children.len() - request.binding_index,
-        Some(request.binding_index),
         replacement,
         "split-let",
     )
@@ -366,7 +377,6 @@ fn finish(
     span: ByteSpan,
     outer_count: usize,
     inner_count: usize,
-    binding_index: Option<usize>,
     replacement: String,
     operation: &str,
 ) -> Result<LetCompositionPlan> {
@@ -378,9 +388,42 @@ fn finish(
         form_span: span,
         outer_binding_count: outer_count,
         inner_binding_count: inner_count,
-        binding_index,
         changed: rewritten != input,
         rewritten,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_split(
+    input: &str,
+    dialect: Dialect,
+    path: Path,
+    span: ByteSpan,
+    outer_count: usize,
+    inner_count: usize,
+    binding_index: BindingIndex,
+    replacement: String,
+    operation: &str,
+) -> Result<SplitLetPlan> {
+    let plan = finish(
+        input,
+        dialect,
+        path,
+        span,
+        outer_count,
+        inner_count,
+        replacement,
+        operation,
+    )?;
+    Ok(SplitLetPlan {
+        dialect: plan.dialect,
+        path: plan.path,
+        form_span: plan.form_span,
+        outer_binding_count: plan.outer_binding_count,
+        inner_binding_count: plan.inner_binding_count,
+        binding_index,
+        rewritten: plan.rewritten,
+        changed: plan.changed,
     })
 }
 fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
@@ -413,9 +456,12 @@ mod tests {
                 input: "(let ((x 1) (y 2)) (+ x y))",
                 dialect,
                 path: path(),
-                binding_index: 1,
+                binding_index: BindingIndex::new(1).expect("binding index"),
             })
             .expect("split");
+            assert_eq!(split.binding_index.get(), 1);
+            assert_eq!(split.outer_binding_count, 1);
+            assert_eq!(split.inner_binding_count, 1);
             SyntaxTree::parse(&split.rewritten).expect("split output");
         }
     }
@@ -427,7 +473,7 @@ mod tests {
                 input: "(let ((x 1) (y (+ x 1))) y)",
                 dialect: Dialect::CommonLisp,
                 path: path(),
-                binding_index: 1
+                binding_index: BindingIndex::new(1).expect("binding index")
             })
             .is_err()
         );
@@ -436,16 +482,7 @@ mod tests {
                 input: "(let ((x 1) (y 2)) y)",
                 dialect: Dialect::CommonLisp,
                 path: path(),
-                binding_index: 0
-            })
-            .is_err()
-        );
-        assert!(
-            plan_split_let(SplitLetRequest {
-                input: "(let ((x 1) (y 2)) y)",
-                dialect: Dialect::CommonLisp,
-                path: path(),
-                binding_index: 2
+                binding_index: BindingIndex::new(2).expect("binding index")
             })
             .is_err()
         );

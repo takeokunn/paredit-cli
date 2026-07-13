@@ -27,7 +27,8 @@ pub struct ConvertFletToLabelsPlan {
 pub fn plan_convert_flet_to_labels(
     request: ConvertFletToLabelsRequest<'_>,
 ) -> Result<ConvertFletToLabelsPlan> {
-    let (form, names) = analyze_bindings(&request, "flet", "convert-flet-to-labels")?;
+    let BindingAnalysis { form, head, names } =
+        analyze_bindings(&request, "flet", "convert-flet-to-labels")?;
     for definition in form.children[1].children.iter() {
         for body in definition.children.iter().skip(2) {
             if contains_local_function_reference(body, &names) {
@@ -37,8 +38,7 @@ pub fn plan_convert_flet_to_labels(
             }
         }
     }
-    let head = plain_atom(&form.children[0]).expect("analyzed plain head");
-    let rewritten = replace_head(request.input, &form, replace_flet_name(head));
+    let rewritten = replace_head(request.input, &form, replace_flet_name(&head));
     parse_output(&rewritten, "convert-flet-to-labels")?;
     Ok(ConvertFletToLabelsPlan {
         dialect: request.dialect,
@@ -70,7 +70,8 @@ pub struct ConvertLabelsToFletPlan {
 pub fn plan_convert_labels_to_flet(
     request: ConvertLabelsToFletRequest<'_>,
 ) -> Result<ConvertLabelsToFletPlan> {
-    let (form, names) = analyze_bindings(&request, "labels", "convert-labels-to-flet")?;
+    let BindingAnalysis { form, head, names } =
+        analyze_bindings(&request, "labels", "convert-labels-to-flet")?;
     for definition in form.children[1].children.iter() {
         for body in definition.children.iter().skip(2) {
             if contains_local_function_reference(body, &names) {
@@ -80,8 +81,7 @@ pub fn plan_convert_labels_to_flet(
             }
         }
     }
-    let head = plain_atom(&form.children[0]).expect("analyzed plain head");
-    let rewritten = replace_head(request.input, &form, replace_labels_name(head));
+    let rewritten = replace_head(request.input, &form, replace_labels_name(&head));
     parse_output(&rewritten, "convert-labels-to-flet")?;
     Ok(ConvertLabelsToFletPlan {
         dialect: request.dialect,
@@ -93,11 +93,17 @@ pub fn plan_convert_labels_to_flet(
     })
 }
 
+struct BindingAnalysis {
+    form: ExpressionView,
+    head: String,
+    names: Vec<String>,
+}
+
 fn analyze_bindings<'a, R>(
     request: &'a R,
     expected_head: &str,
     operation: &str,
-) -> Result<(ExpressionView, Vec<String>)>
+) -> Result<BindingAnalysis>
 where
     R: BindingRequest<'a> + ?Sized,
 {
@@ -117,8 +123,9 @@ where
         bail!("{operation} selected form must be a {expected_head} form");
     }
     let head = plain_atom(&form.children[0])
-        .with_context(|| format!("{operation} selected form must have a plain head"))?;
-    if !common_lisp_symbol_reference_eq(head, expected_head) {
+        .with_context(|| format!("{operation} selected form must have a plain head"))?
+        .to_owned();
+    if !common_lisp_symbol_reference_eq(&head, expected_head) {
         bail!("{operation} selected form must be a {expected_head} form");
     }
     let bindings = &form.children[1];
@@ -143,7 +150,7 @@ where
         }
         names.push(name.to_owned());
     }
-    Ok((form, names))
+    Ok(BindingAnalysis { form, head, names })
 }
 
 trait BindingRequest<'a> {

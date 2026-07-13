@@ -37,6 +37,24 @@ fn edit_replace_write_updates_file_in_place() {
 }
 
 #[test]
+fn edit_replace_trims_trailing_whitespace_only_from_the_changed_line() {
+    let dir = fresh_temp_dir("edit-replace-local-trailing-whitespace");
+    let file = dir.join("source.lisp");
+    fs::write(&file, "(defun foo (x) (+ x 1)) \n(keep) \n").expect("write source fixture");
+
+    paredit()
+        .args([
+            "edit", "replace", "--path", "0.3", "--with", "(- x 1)", "--write", "--file",
+        ])
+        .arg(&file)
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(&file).expect("read rewritten source");
+    assert_eq!(rewritten, "(defun foo (x) (- x 1))\n(keep) \n");
+}
+
+#[test]
 fn edit_format_write_updates_file_in_place() {
     let dir = fresh_temp_dir("edit-format-write");
     let file = dir.join("source.lisp");

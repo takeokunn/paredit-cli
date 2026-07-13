@@ -39,7 +39,7 @@ pub(in crate::presentation::cli) fn unused_definition_report(
         )?);
     }
 
-    let reports = collect_unused_definition_candidates(&parsed);
+    let reports = collect_unused_definition_candidates(&parsed)?;
     let policy = evaluate_unused_definition_policy(
         UnusedDefinitionPolicyOptions::new(args.fail_on_unused, args.require_unused_definitions)
             .map_err(crate::presentation::cli::gate::gate_failure)?,

@@ -176,12 +176,16 @@ fn collect_tagbody(
     let tags = direct_tags(form);
     let matches: Vec<_> = tags
         .iter()
-        .filter(|tag| eq(plain_atom(tag).unwrap(), from))
+        .filter(|tag| plain_atom(tag).is_some_and(|name| eq(name, from)))
         .collect();
     if matches.len() != 1 {
         bail!("rename-tag requires exactly one matching tag definition");
     }
-    if !eq(from, to) && tags.iter().any(|tag| eq(plain_atom(tag).unwrap(), to)) {
+    if !eq(from, to)
+        && tags
+            .iter()
+            .any(|tag| plain_atom(tag).is_some_and(|name| eq(name, to)))
+    {
         bail!("rename-tag target duplicates an existing tag");
     }
     edits.push(matches[0].span);
@@ -206,10 +210,16 @@ fn walk_tag(
     if view.kind == ExpressionKind::List {
         if head_is(view, "tagbody") {
             let tags = direct_tags(view);
-            if !eq(from, to) && tags.iter().any(|tag| eq(plain_atom(tag).unwrap(), to)) {
+            if !eq(from, to)
+                && tags
+                    .iter()
+                    .any(|tag| plain_atom(tag).is_some_and(|name| eq(name, to)))
+            {
                 bail!("rename-tag target collides with a nested tagbody");
             }
-            let shadows = tags.iter().any(|tag| eq(plain_atom(tag).unwrap(), from));
+            let shadows = tags
+                .iter()
+                .any(|tag| plain_atom(tag).is_some_and(|name| eq(name, from)));
             for child in view
                 .children
                 .iter()

@@ -69,7 +69,7 @@ pub fn plan_remove_unused_tag(
     let tags = direct_tags(&form);
     let matches = tags
         .iter()
-        .filter(|tag| tag_eq(plain_atom(tag).expect("plain tag"), &request.name))
+        .filter(|tag| plain_atom(tag).is_some_and(|name| tag_eq(name, &request.name)))
         .collect::<Vec<_>>();
     if matches.len() != 1 {
         bail!("remove-unused-tag requires exactly one matching tag definition");
@@ -164,7 +164,7 @@ fn count_tag_references(
         if head_is(view, "tagbody") {
             let shadows = direct_tags(view)
                 .iter()
-                .any(|tag| tag_eq(plain_atom(tag).expect("plain tag"), target));
+                .any(|tag| plain_atom(tag).is_some_and(|name| tag_eq(name, target)));
             for child in view
                 .children
                 .iter()
@@ -205,7 +205,9 @@ fn require_known_expression_context(tree: &SyntaxTree, path: &Path) -> Result<()
             bail!("remove-unused-block refuses reader-prefixed contexts");
         }
     }
-    let index = *indexes.last().expect("non-empty path");
+    let index = *indexes
+        .last()
+        .context("remove-unused-block requires a non-empty path")?;
     let parent = tree
         .select_path(&Path::from_indexes(indexes[..indexes.len() - 1].to_vec()))?
         .view();

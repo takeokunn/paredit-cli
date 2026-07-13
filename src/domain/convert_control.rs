@@ -1,6 +1,6 @@
 //! Dialect-aware conversion between `if` and `cond` forms.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
@@ -107,7 +107,7 @@ pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<Co
             None => format!("(if {test} {consequent})"),
         });
     }
-    let replacement = replacement.expect("non-empty clauses checked above");
+    let replacement = replacement.ok_or_else(|| anyhow!("convert-cond-to-if has no clauses"))?;
     let rewritten = replace_span(request.input, form.span, &replacement);
     parse_output(&rewritten, "convert-cond-to-if")?;
 

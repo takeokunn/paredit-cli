@@ -5,9 +5,7 @@ use anyhow::Result;
 use crate::application::usecase::extract_shared::TopLevelInsert;
 use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
-    ByteSpan, ExpressionKind, ExpressionView, Path, Selection, SymbolName, SyntaxTree,
-};
+use crate::domain::sexpr::{ByteSpan, Path, Selection, SymbolName, SyntaxTree};
 
 pub type ExtractConstantInsert = TopLevelInsert;
 
@@ -40,10 +38,7 @@ pub struct ExtractConstantPlan {
 }
 
 pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
-    let target = selection.span();
-    find_path(&tree.root_view(), target, &mut Vec::new())
-        .map(Path::from_indexes)
-        .ok_or_else(|| anyhow::anyhow!("selected expression path could not be resolved"))
+    crate::domain::extract_constant::path_for_selection(tree, selection)
 }
 
 pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<ExtractConstantPlan> {
@@ -78,20 +73,6 @@ pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<Extr
         changed: plan.changed,
         rewritten: plan.rewritten,
     })
-}
-
-fn find_path(view: &ExpressionView, target: ByteSpan, path: &mut Vec<usize>) -> Option<Vec<usize>> {
-    if view.kind != ExpressionKind::Root && view.span == target {
-        return Some(path.clone());
-    }
-    for (index, child) in view.children.iter().enumerate() {
-        path.push(index);
-        if let Some(found) = find_path(child, target, path) {
-            return Some(found);
-        }
-        path.pop();
-    }
-    None
 }
 
 #[cfg(test)]
@@ -145,5 +126,25 @@ mod tests {
                 .to_string()
                 .contains("definition head")
         );
+    }
+
+    #[test]
+    fn resolves_selection_path_in_domain() {
+        let tree = SyntaxTree::parse("(defun f () (+ 40 2))").unwrap();
+        let selection = tree.select_path(&Path::from_str("0.3").unwrap()).unwrap();
+
+        assert_eq!(
+            path_for_selection(&tree, selection).unwrap().to_string(),
+            "0.3"
+        );
+    }
+
+    #[test]
+    fn resolves_top_level_selection_path() {
+        let tree = SyntaxTree::parse("(defun f () (+ 40 2))").unwrap();
+        let selection = tree.select_at(0).unwrap();
+        let path = path_for_selection(&tree, selection).unwrap();
+
+        assert_eq!(path.to_string(), "0");
     }
 }

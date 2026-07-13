@@ -7,6 +7,53 @@ use super::types::{ByteOffset, ByteSpan, NodeId};
 pub struct Edit;
 
 impl Edit {
+    pub fn normalize_changed_line_trivia(input: &str, rewritten: String) -> Result<String> {
+        if input == rewritten {
+            return Ok(rewritten);
+        }
+
+        let tree = SyntaxTree::parse(&rewritten)?;
+        let prefix = common_prefix_len(input, &rewritten);
+        let suffix = common_suffix_len(input, &rewritten, prefix);
+        let changed_end = rewritten.len().saturating_sub(suffix);
+        let line_start = rewritten[..prefix]
+            .rfind('\n')
+            .map_or(0, |newline| newline + 1);
+        let line_end = rewritten[changed_end..]
+            .find('\n')
+            .map_or(rewritten.len(), |newline| changed_end + newline + 1);
+
+        let mut removals = Vec::new();
+        let mut cursor = line_start;
+        while cursor < line_end {
+            let newline = rewritten[cursor..line_end]
+                .find('\n')
+                .map_or(line_end, |offset| cursor + offset);
+            let content_end = if newline > cursor && rewritten.as_bytes()[newline - 1] == b'\r' {
+                newline - 1
+            } else {
+                newline
+            };
+            let trailing_start = rewritten.as_bytes()[cursor..content_end]
+                .iter()
+                .rposition(|byte| !matches!(byte, b' ' | b'\t'))
+                .map_or(cursor, |offset| cursor + offset + 1);
+
+            if trailing_start < content_end
+                && !trailing_trivia_is_opaque(&tree, trailing_start, content_end)
+            {
+                removals.push(trailing_start..content_end);
+            }
+            cursor = newline.saturating_add(1);
+        }
+
+        let mut normalized = rewritten;
+        for removal in removals.into_iter().rev() {
+            normalized.replace_range(removal, "");
+        }
+        Ok(normalized)
+    }
+
     pub fn replace(input: &str, selection: Selection<'_>, replacement: &str) -> String {
         replace_span(input, selection.span(), replacement)
     }
@@ -162,6 +209,47 @@ impl Edit {
         let removal = expand_removal(input, tree, child_span);
         Ok(remove_then_insert(input, removal, open, &insertion))
     }
+}
+
+fn common_prefix_len(left: &str, right: &str) -> usize {
+    let mut length = left
+        .as_bytes()
+        .iter()
+        .zip(right.as_bytes())
+        .take_while(|(left, right)| left == right)
+        .count();
+    while !left.is_char_boundary(length) || !right.is_char_boundary(length) {
+        length -= 1;
+    }
+    length
+}
+
+fn common_suffix_len(left: &str, right: &str, prefix: usize) -> usize {
+    let max = left.len().min(right.len()).saturating_sub(prefix);
+    let mut length = left.as_bytes()[left.len() - max..]
+        .iter()
+        .rev()
+        .zip(right.as_bytes()[right.len() - max..].iter().rev())
+        .take_while(|(left, right)| left == right)
+        .count();
+    while !left.is_char_boundary(left.len() - length)
+        || !right.is_char_boundary(right.len() - length)
+    {
+        length -= 1;
+    }
+    length
+}
+
+fn trailing_trivia_is_opaque(tree: &SyntaxTree, start: usize, end: usize) -> bool {
+    tree.nodes.iter().any(|node| {
+        node.kind == NodeKind::Atom
+            && node.span.start().get() < end
+            && start < node.span.end().get()
+    }) || tree.comments.iter().any(|comment| {
+        !comment.text.starts_with(';')
+            && comment.span.start().get() < end
+            && start < comment.span.end().get()
+    })
 }
 
 fn ensure_list(node: &Node) -> Result<()> {

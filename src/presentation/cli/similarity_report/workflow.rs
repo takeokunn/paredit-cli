@@ -41,7 +41,7 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         args.dialect,
         &options,
         args.error_policy,
-    );
+    )?;
 
     if args.error_policy == ErrorPolicy::Fail
         && let Some(error) = output.errors.first()
@@ -118,9 +118,9 @@ fn process_workspace_files(
     dialect: Option<super::super::DialectArg>,
     options: &SimilarityReportOptions,
     error_policy: ErrorPolicy,
-) -> WorkspaceProcessingOutput {
+) -> Result<WorkspaceProcessingOutput> {
     if files.is_empty() {
-        return WorkspaceProcessingOutput::default();
+        return Ok(WorkspaceProcessingOutput::default());
     }
 
     let worker_count = thread::available_parallelism()
@@ -140,16 +140,17 @@ fn process_workspace_files(
 
     let mut merged = WorkspaceProcessingOutput::default();
     for handle in handles {
-        if let Ok(output) = handle.join() {
-            merged.candidates.extend(output.candidates);
-            merged.errors.extend(output.errors);
-            merged.omitted_candidates = merged
-                .omitted_candidates
-                .saturating_add(output.omitted_candidates);
-        }
+        let output = handle
+            .join()
+            .map_err(|_| anyhow::anyhow!("similarity-report worker thread panicked"))?;
+        merged.candidates.extend(output.candidates);
+        merged.errors.extend(output.errors);
+        merged.omitted_candidates = merged
+            .omitted_candidates
+            .saturating_add(output.omitted_candidates);
     }
 
-    merged
+    Ok(merged)
 }
 
 fn process_file_chunk(
@@ -215,4 +216,35 @@ fn process_file(
         candidates,
         omitted_candidates,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::application::usecase::similarity_report::{
+        SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
+    };
+
+    #[test]
+    fn empty_workspace_returns_empty_processing_output() {
+        let options = SimilarityReportOptions::new(
+            0.87,
+            4,
+            1,
+            SimilarityComparisonScope::All,
+            SimilarityFormScope::All,
+            SimilarityOverlapPolicy::Maximal,
+            None,
+            None,
+            None,
+        )
+        .expect("test options are valid");
+
+        let output = process_workspace_files(Vec::new(), None, &options, ErrorPolicy::Fail)
+            .expect("empty workspace should not fail");
+
+        assert!(output.candidates.is_empty());
+        assert!(output.errors.is_empty());
+        assert_eq!(output.omitted_candidates, 0);
+    }
 }
