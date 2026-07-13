@@ -1,17 +1,34 @@
-//! Signature inventory and arity compatibility analysis.
+//! Compatibility facade for the signature report domain service.
 
-mod calls;
-mod collect;
-mod policy;
-mod syntax;
 #[cfg(test)]
 mod tests;
-mod types;
 
-pub use calls::classify_signature_call;
-pub use collect::build_signature_reports;
-pub use policy::evaluate_signature_report_policy;
-pub use types::{
+pub use crate::domain::signature_report::{
     SignatureCallItem, SignatureCallStatus, SignatureDefinitionItem, SignatureReportFile,
-    SignatureReportPolicy, SignatureReportSource,
+    SignatureReportPolicy, SignatureReportSource, build_signature_reports, classify_signature_call,
 };
+
+pub fn evaluate_signature_report_policy(
+    reports: &[SignatureReportFile],
+    fail_on_mismatch: bool,
+    require_definitions: Option<usize>,
+    require_calls: Option<usize>,
+) -> SignatureReportPolicy {
+    let definition_count = reports
+        .iter()
+        .map(|report| report.definitions.len())
+        .sum::<usize>();
+    let statuses = reports
+        .iter()
+        .flat_map(|report| &report.calls)
+        .map(|item| item.status)
+        .collect::<Vec<SignatureCallStatus>>();
+
+    crate::domain::signature_report::evaluate_signature_report_policy(
+        definition_count,
+        &statuses,
+        fail_on_mismatch,
+        require_definitions,
+        require_calls,
+    )
+}

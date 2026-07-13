@@ -29,14 +29,8 @@ fn policy_reports_every_failed_preview_gate() {
         ..summary()
     };
     let policy = evaluate_refactor_preview_policy(
-        RefactorPreviewPolicyOptions {
-            fail_on_no_change: true,
-            fail_on_parse_error: true,
-            fail_on_target_conflict: true,
-            require_changed_files: Some(2),
-            require_definitions: Some(2),
-            require_edits: Some(4),
-        },
+        RefactorPreviewPolicyOptions::new(true, true, true, Some(2), Some(2), Some(4))
+            .expect("valid policy options"),
         &summary,
     );
 
@@ -67,14 +61,8 @@ fn policy_reports_every_failed_preview_gate() {
 #[test]
 fn policy_summary_marks_passing_policy_as_not_blocked() {
     let policy = evaluate_refactor_preview_policy(
-        RefactorPreviewPolicyOptions {
-            fail_on_no_change: true,
-            fail_on_parse_error: true,
-            fail_on_target_conflict: true,
-            require_changed_files: Some(1),
-            require_definitions: Some(1),
-            require_edits: Some(3),
-        },
+        RefactorPreviewPolicyOptions::new(true, true, true, Some(1), Some(1), Some(3))
+            .expect("valid policy options"),
         &summary(),
     );
 
@@ -118,14 +106,17 @@ proptest! {
             parse_error_count: parse_errors,
             all_outputs_parse,
         };
-        let options = RefactorPreviewPolicyOptions {
+        let options = RefactorPreviewPolicyOptions::new(
             fail_on_no_change,
             fail_on_parse_error,
             fail_on_target_conflict,
-            require_changed_files: require_changed,
+            require_changed,
             require_definitions,
             require_edits,
-        };
+        );
+
+        prop_assume!(options.is_ok());
+        let options = options.expect("zero thresholds were discarded");
 
         let policy = evaluate_refactor_preview_policy(options, &summary);
         let expected_passed = !(fail_on_no_change && changed == 0

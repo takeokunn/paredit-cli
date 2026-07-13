@@ -1,16 +1,6 @@
-//! Duplicate form analysis for replacement planning.
+//! Backwards-compatible application facade for duplicate-form domain analysis.
 
-mod batches;
-mod collect;
-mod reports;
-mod syntax;
-#[cfg(test)]
-mod tests;
-mod types;
-
-pub use batches::collect_replacement_plan_batches;
-pub use collect::collect_duplicate_candidates;
-pub use reports::build_duplicate_shape_reports;
-pub use types::{
+pub use crate::domain::duplicate_report::{
     DuplicateCandidateGroups, DuplicateFormReport, DuplicateShapeReport, ReplacementPlanBatch,
+    build_duplicate_shape_reports, collect_duplicate_candidates, collect_replacement_plan_batches,
 };

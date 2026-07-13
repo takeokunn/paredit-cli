@@ -57,6 +57,7 @@ pub struct DefinitionNameTarget<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DefinitionBodyRange {
     start_child_index: usize,
+    end_child_index: Option<usize>,
 }
 
 impl DefinitionShape {
@@ -109,6 +110,15 @@ impl DefinitionShape {
     pub fn body_range(self) -> DefinitionBodyRange {
         DefinitionBodyRange {
             start_child_index: self.body_start_child_index,
+            end_child_index: None,
+        }
+    }
+
+    /// Returns a body range bounded by the children present in `view`.
+    pub fn body_range_in(self, view: &ExpressionView) -> DefinitionBodyRange {
+        DefinitionBodyRange {
+            start_child_index: self.body_start_child_index,
+            end_child_index: Some(view.children.len()),
         }
     }
 }
@@ -116,6 +126,7 @@ impl DefinitionShape {
 impl DefinitionBodyRange {
     pub fn contains_child(self, child_index: usize) -> bool {
         child_index >= self.start_child_index
+            && self.end_child_index.is_none_or(|end| child_index < end)
     }
 
     pub fn child_path(self, parent_path: &Path, child_index: usize) -> Option<Path> {
@@ -541,6 +552,16 @@ mod tests {
         assert_eq!(
             body.child_path(&parent_path, 4),
             Some(Path::from_indexes(vec![0, 4]))
+        );
+
+        let bounded_body = shape.body_range_in(&view);
+        assert!(bounded_body.contains_child(3));
+        assert!(bounded_body.contains_child(4));
+        assert!(!bounded_body.contains_child(5));
+        assert_eq!(
+            bounded_body.child_path(&parent_path, 5),
+            None,
+            "indexes beyond the view must not be considered body forms"
         );
     }
 }

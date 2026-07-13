@@ -30,14 +30,15 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         mode: args.mode,
         max_preview_bytes: args.max_preview_bytes,
         write: args.write,
-        policy_options: RefactorPreviewPolicyOptions {
-            fail_on_no_change: args.fail_on_no_change,
-            fail_on_parse_error: args.fail_on_parse_error,
-            fail_on_target_conflict: args.fail_on_target_conflict,
-            require_changed_files: args.require_changed_files,
-            require_definitions: args.require_definitions,
-            require_edits: args.require_edits,
-        },
+        policy_options: DomainRefactorPreviewPolicyOptions::new(
+            args.fail_on_no_change,
+            args.fail_on_parse_error,
+            args.fail_on_target_conflict,
+            args.require_changed_files,
+            args.require_definitions,
+            args.require_edits,
+        )
+        .map_err(anyhow::Error::msg)?,
         workspace: Some(workspace.workspace),
     })?;
 

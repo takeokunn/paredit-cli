@@ -27,7 +27,7 @@ pub fn value_capture(
     binding_name: &SymbolName,
     value_view: &ExpressionView,
     reference_spans: &[ByteSpan],
-) -> Vec<String> {
+) -> Vec<SymbolName> {
     if reference_spans.is_empty() {
         return Vec::new();
     }
@@ -69,7 +69,7 @@ pub fn value_capture(
         let probed = splice_all(base, &sites, symbol.as_str());
         let Ok(tree) = SyntaxTree::parse(&probed) else {
             // A value that cannot be safely re-inserted is treated as unsafe.
-            captured.push(symbol.as_str().to_owned());
+            captured.push(symbol.clone());
             continue;
         };
         let root = tree.root_view();
@@ -80,7 +80,7 @@ pub fn value_capture(
         // Each site whose spliced value stays free adds exactly one reference;
         // a shorter total means a site landed inside a shadowing binding.
         if probed_free < original_free + sites.len() {
-            captured.push(symbol.as_str().to_owned());
+            captured.push(symbol.clone());
         }
     }
     captured

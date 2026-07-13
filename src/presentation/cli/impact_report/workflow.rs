@@ -22,12 +22,13 @@ pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Res
         .max()
         .unwrap_or(ApplicationImpactRiskLevel::Info);
     let policy = evaluate_impact_report_policy(
-        ImpactReportPolicyOptions {
-            fail_on_risk_level: args.fail_on_risk_level.map(Into::into),
-            require_definitions: args.require_definitions,
-            require_references: args.require_references,
-            require_calls: args.require_calls,
-        },
+        ImpactReportPolicyOptions::new(
+            args.fail_on_risk_level.map(Into::into),
+            args.require_definitions,
+            args.require_references,
+            args.require_calls,
+        )
+        .map_err(anyhow::Error::msg)?,
         &summary,
         risk_level,
     );

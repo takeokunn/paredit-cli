@@ -84,11 +84,12 @@ fn emit_refactor_plan(request: RefactorPlanEmission<'_>) -> Result<()> {
         files: paths,
         target_kind,
         summary,
-        policy: RefactorPlanPolicyRequest {
-            fail_on_blocking_gate: policy_options.fail_on_blocking_gate,
-            require_definitions: policy_options.require_definitions,
-            require_references: policy_options.require_references,
-        },
+        policy: DomainRefactorPlanPolicyOptions::new(
+            policy_options.fail_on_blocking_gate,
+            policy_options.require_definitions,
+            policy_options.require_references,
+        )
+        .map_err(anyhow::Error::msg)?,
         risks: raw_refactor_risks(&summary),
     });
     let policy = decision.policy;

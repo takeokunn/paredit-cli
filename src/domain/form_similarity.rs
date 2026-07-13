@@ -30,7 +30,7 @@ enum NodeLabel {
 const EDIT_COST_SCALE: usize = 10;
 const ATOM_RENAME_COST: usize = 3;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct TreeSimilarityWorkspace {
     tree_distances: Vec<usize>,
     forest_distances: Vec<usize>,

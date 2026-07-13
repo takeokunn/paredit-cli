@@ -1,6 +1,7 @@
 use proptest::prelude::*;
 
 use super::*;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
 
 fn reports_for(input: &str, dialect: Dialect) -> Vec<LetFormReport> {
@@ -262,6 +263,15 @@ fn reports_unused_binding_for_a_non_earmuffed_zero_reference_name() {
 
     assert_eq!(reports.len(), 1);
     assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
+}
+
+#[test]
+fn validates_policy_threshold() {
+    assert!(LetReportPolicyOptions::new(true, true, Some(1)).is_ok());
+    assert_eq!(
+        LetReportPolicyOptions::new(false, false, Some(0)).unwrap_err(),
+        "require-inlineable-bindings must be greater than zero"
+    );
 }
 
 proptest! {

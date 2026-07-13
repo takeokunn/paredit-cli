@@ -1,10 +1,10 @@
-use anyhow::{Context, Result};
+//! Application facade for the unwrap-call domain plan.
+
+use anyhow::Result;
 
 use crate::application::usecase::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
-};
+use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 #[derive(Debug, Clone)]
 pub struct UnwrapCallRequest<'a> {
@@ -31,72 +31,32 @@ pub struct UnwrapCallPlan {
 }
 
 pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan> {
-    let tree = SyntaxTree::parse(request.input).context("unwrap-call input does not parse")?;
+    let tree = SyntaxTree::parse(request.input)?;
     reject_overlapping_common_lisp_reader_time_forms(
         &tree,
         request.dialect,
         [request.target.span],
     )?;
-
-    if request.target.kind != ExpressionKind::List
-        || request.target.delimiter != Some(Delimiter::Paren)
-    {
-        anyhow::bail!("unwrap-call target must be a parenthesized call");
-    }
-
-    let head = request
-        .target
-        .children
-        .first()
-        .and_then(|child| child.text.as_deref())
-        .context("unwrap-call target must have an atom function head")?;
-    let function = SymbolName::new(head)?;
-
-    if let Some(expected) = &request.expected_function {
-        if expected.as_str() != function.as_str() {
-            anyhow::bail!(
-                "unwrap-call expected function {}, found {}",
-                expected.as_str(),
-                function.as_str()
-            );
-        }
-    }
-
-    let child_index = request
-        .argument_index
-        .checked_add(1)
-        .context("--argument-index is too large to address any call argument")?;
-    let argument = request.target.children.get(child_index).with_context(|| {
-        format!(
-            "argument index {} is out of range for {} argument(s)",
-            request.argument_index,
-            request.target.children.len().saturating_sub(1)
-        )
-    })?;
-    let replacement = argument.span.slice(request.input).to_owned();
-    SyntaxTree::parse(&replacement).context("unwrap-call replacement is not parseable")?;
-
-    let rewritten = replace_span(request.input, request.target.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("unwrap-call rewritten output is not parseable")?;
-
-    Ok(UnwrapCallPlan {
+    let plan = crate::domain::unwrap_call::plan(crate::domain::unwrap_call::Request {
+        input: request.input,
         dialect: request.dialect,
         path: request.path,
-        function,
-        span: request.target.span,
+        target: request.target,
+        expected_function: request.expected_function,
         argument_index: request.argument_index,
-        argument_span: argument.span,
-        call_argument_count: request.target.children.len().saturating_sub(1),
-        changed: request.target.span.slice(request.input) != replacement,
-        replacement,
-        rewritten,
+    })?;
+    Ok(UnwrapCallPlan {
+        dialect: plan.dialect,
+        path: plan.path,
+        function: plan.function,
+        span: plan.span,
+        argument_index: plan.argument_index,
+        argument_span: plan.argument_span,
+        call_argument_count: plan.call_argument_count,
+        replacement: plan.replacement,
+        rewritten: plan.rewritten,
+        changed: plan.changed,
     })
-}
-
-fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
-    let mut output = input.to_owned();
-    output.replace_range(span.as_range(), replacement);
-    output
 }
 
 #[cfg(test)]

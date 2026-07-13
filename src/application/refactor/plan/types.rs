@@ -1,165 +1,10 @@
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefactorOperation {
-    Rename,
-    Remove,
-    Move,
-    Signature,
-}
-
-impl RefactorOperation {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Rename => "rename",
-            Self::Remove => "remove",
-            Self::Move => "move",
-            Self::Signature => "signature",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefactorPlanTargetKind {
-    Callable,
-    Macro,
-    CompilerMacro,
-    SetfExpander,
-    SymbolMacro,
-    Unknown,
-}
-
-impl RefactorPlanTargetKind {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Callable => "callable",
-            Self::Macro => "macro",
-            Self::CompilerMacro => "compiler_macro",
-            Self::SetfExpander => "setf_expander",
-            Self::SymbolMacro => "symbol_macro",
-            Self::Unknown => "unknown",
-        }
-    }
-
-    pub fn is_macro_like(self) -> bool {
-        matches!(
-            self,
-            Self::Macro | Self::CompilerMacro | Self::SetfExpander | Self::SymbolMacro
-        )
-    }
-
-    pub fn skips_signature_compatibility(self) -> bool {
-        self.is_macro_like()
-    }
-
-    pub fn requires_call_coverage(self, operation: RefactorOperation) -> bool {
-        match operation {
-            RefactorOperation::Rename | RefactorOperation::Move => {
-                !matches!(self, Self::SymbolMacro)
-            }
-            RefactorOperation::Signature => !self.skips_signature_compatibility(),
-            RefactorOperation::Remove => true,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VerificationPhase {
-    Pre,
-    Post,
-}
-
-impl VerificationPhase {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Pre => "pre",
-            Self::Post => "post",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum RefactorRiskLevel {
-    Info,
-    Warning,
-    Error,
-}
-
-impl RefactorRiskLevel {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Info => "info",
-            Self::Warning => "warning",
-            Self::Error => "error",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RefactorPlanSummary {
-    pub file_count: usize,
-    pub definition_count: usize,
-    pub reference_count: usize,
-    pub call_count: usize,
-    pub inbound_edge_count: usize,
-    pub outbound_edge_count: usize,
-    pub non_call_reference_count: usize,
-    pub signature_mismatch_count: usize,
-    pub safe_to_automate: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct RefactorPlanGate {
-    pub level: RefactorRiskLevel,
-    pub code: &'static str,
-    pub message: String,
-    pub count: usize,
-    pub blocks_automation: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RefactorPlanRiskSummary {
-    pub highest_level: Option<RefactorRiskLevel>,
-    pub info_count: usize,
-    pub warning_count: usize,
-    pub error_count: usize,
-    pub blocking_count: usize,
-    pub advisory_count: usize,
-}
-
-impl RefactorPlanRiskSummary {
-    pub fn from_gates(gates: &[RefactorPlanGate]) -> Self {
-        let mut summary = Self {
-            highest_level: None,
-            info_count: 0,
-            warning_count: 0,
-            error_count: 0,
-            blocking_count: 0,
-            advisory_count: 0,
-        };
-
-        for gate in gates {
-            summary.highest_level = Some(match summary.highest_level {
-                Some(level) => level.max(gate.level),
-                None => gate.level,
-            });
-
-            match gate.level {
-                RefactorRiskLevel::Info => summary.info_count += gate.count,
-                RefactorRiskLevel::Warning => summary.warning_count += gate.count,
-                RefactorRiskLevel::Error => summary.error_count += gate.count,
-            }
-
-            if gate.blocks_automation {
-                summary.blocking_count += gate.count;
-            } else {
-                summary.advisory_count += gate.count;
-            }
-        }
-
-        summary
-    }
-}
+use crate::domain::refactor_plan::{
+    RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
+    RefactorPlanPolicyOptions, RefactorPlanRiskSummary, RefactorPlanSummary,
+    RefactorPlanTargetKind,
+};
 
 #[derive(Debug, Clone)]
 pub struct RefactorPlanStep {
@@ -259,60 +104,13 @@ impl RefactorPlanAutomationDecision {
 }
 
 #[derive(Debug, Clone)]
-pub struct RefactorPlanPolicy {
-    pub fail_on_blocking_gate: bool,
-    pub require_definitions: Option<usize>,
-    pub require_references: Option<usize>,
-    pub blocking_gate_count: usize,
-    pub definition_count: usize,
-    pub reference_count: usize,
-    pub passed: bool,
-    pub violations: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct RefactorPlanPolicyRequest {
-    pub fail_on_blocking_gate: bool,
-    pub require_definitions: Option<usize>,
-    pub require_references: Option<usize>,
-}
-
-#[derive(Debug, Clone)]
-pub struct RefactorVerificationCheck {
-    pub code: &'static str,
-    pub level: RefactorRiskLevel,
-    pub passed: bool,
-    pub message: String,
-    pub count: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct RefactorVerificationRequest<'a> {
-    pub operation: RefactorOperation,
-    pub phase: VerificationPhase,
-    pub symbol: &'a str,
-    pub new_symbol: Option<&'a str>,
-    pub target_kind: RefactorPlanTargetKind,
-    pub before: RefactorPlanSummary,
-    pub after: Option<RefactorPlanSummary>,
-}
-
-#[derive(Debug, Clone)]
-pub struct RawRefactorRisk {
-    pub level: RefactorRiskLevel,
-    pub code: &'static str,
-    pub message: String,
-    pub count: usize,
-}
-
-#[derive(Debug, Clone)]
 pub struct RefactorPlanRequest<'a> {
     pub operation: RefactorOperation,
     pub symbol: &'a str,
     pub files: &'a [PathBuf],
     pub target_kind: RefactorPlanTargetKind,
     pub summary: RefactorPlanSummary,
-    pub policy: RefactorPlanPolicyRequest,
+    pub policy: RefactorPlanPolicyOptions,
     pub risks: Vec<RawRefactorRisk>,
 }
 

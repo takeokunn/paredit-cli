@@ -70,15 +70,16 @@ use crate::application::refactor::execute::{
 };
 use crate::application::refactor::plan::{
     RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
-    RefactorPlanPolicyRequest, RefactorPlanRequest, RefactorPlanStep, RefactorPlanSummary,
-    RefactorVerificationCheck, RefactorVerificationRequest,
+    RefactorPlanPolicyOptions as DomainRefactorPlanPolicyOptions, RefactorPlanRequest,
+    RefactorPlanStep, RefactorPlanSummary, RefactorVerificationCheck, RefactorVerificationRequest,
     VerificationPhase as ApplicationVerificationPhase, build_refactor_plan_decision,
     refactor_plan_gates as application_refactor_plan_gates,
     refactor_verification_checks as application_refactor_verification_checks,
 };
 use crate::application::refactor::preview::{
-    RefactorPreviewEdit, RefactorPreviewPolicy, RefactorPreviewPolicyOptions,
-    RefactorPreviewSummary, evaluate_refactor_preview_policy, refactor_preview_edits,
+    RefactorPreviewEdit, RefactorPreviewPolicy,
+    RefactorPreviewPolicyOptions as DomainRefactorPreviewPolicyOptions, RefactorPreviewSummary,
+    evaluate_refactor_preview_policy, refactor_preview_edits,
 };
 use crate::application::usecase::impact_report::{
     ImpactReportFile, ImpactRiskLevel as ApplicationImpactRiskLevel, raw_refactor_risks,

@@ -1,11 +1,3 @@
-//! Common Lisp package declaration analysis.
+//! Application facade for package declaration analysis.
 
-mod analyze;
-mod collect;
-mod syntax;
-#[cfg(test)]
-mod tests;
-mod types;
-
-pub use collect::build_package_report;
-pub use types::{InPackageReport, PackageDefinitionReport, PackageImportReport, PackageReport};
+pub use crate::domain::package_report::*;

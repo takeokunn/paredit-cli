@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use super::types::{RefactorOperation, RefactorPlanGate, RefactorPlanStep, RefactorPlanTargetKind};
+use super::types::RefactorPlanStep;
+use crate::domain::refactor_plan::{RefactorOperation, RefactorPlanGate, RefactorPlanTargetKind};
 
 pub fn refactor_plan_steps(
     operation: RefactorOperation,

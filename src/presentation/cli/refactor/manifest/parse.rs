@@ -86,10 +86,12 @@ fn parse_refactor_apply_manifest_edit(
         &format!("files[{file_index}].edits[{edit_index}].replacement"),
     )?;
 
-    Ok(RefactorApplyManifestEdit {
-        span: ByteSpan::new(ByteOffset::new(start), ByteOffset::new(end)),
-        replacement,
-    })
+    let span =
+        ByteSpan::try_new(ByteOffset::new(start), ByteOffset::new(end)).with_context(|| {
+            format!("files[{file_index}].edits[{edit_index}] start must not exceed end")
+        })?;
+
+    Ok(RefactorApplyManifestEdit { span, replacement })
 }
 
 fn required_object<'a>(

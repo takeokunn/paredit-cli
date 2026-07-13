@@ -24,6 +24,10 @@ pub(crate) fn apply_byte_span_edits(
     input: &str,
     mut edits: Vec<(ByteSpan, String)>,
 ) -> Result<String> {
+    for (span, _) in &edits {
+        span.validate_against(input)
+            .context("rewrite span is outside input or not UTF-8 aligned")?;
+    }
     edits.sort_by_key(|(span, _)| span.start());
     ensure_non_overlapping_spans(edits.iter().map(|(span, _)| *span))?;
 

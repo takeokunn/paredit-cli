@@ -1,23 +1,20 @@
-mod gates;
-mod policy;
 mod steps;
 #[cfg(test)]
 mod tests;
 mod types;
-mod verification;
 
-pub use gates::refactor_plan_gates;
-pub use policy::evaluate_refactor_plan_policy;
+pub use crate::domain::refactor_plan::{
+    RawRefactorRisk, RefactorOperation, RefactorPlanGate, RefactorPlanPolicy,
+    RefactorPlanPolicyOptions, RefactorPlanRiskSummary, RefactorPlanSummary,
+    RefactorPlanTargetKind, RefactorRiskLevel, RefactorVerificationCheck,
+    RefactorVerificationRequest, VerificationPhase, evaluate_refactor_plan_policy,
+    refactor_plan_gates, refactor_verification_checks,
+};
 pub use steps::refactor_plan_steps;
 pub use types::{
-    RawRefactorRisk, RefactorOperation, RefactorPlanAutomationDecision,
-    RefactorPlanAutomationStatus, RefactorPlanAutomationStep, RefactorPlanAutomationStepStatus,
-    RefactorPlanDecision, RefactorPlanGate, RefactorPlanPolicy, RefactorPlanPolicyRequest,
-    RefactorPlanRequest, RefactorPlanRiskSummary, RefactorPlanStep, RefactorPlanSummary,
-    RefactorPlanTargetKind, RefactorRiskLevel, RefactorVerificationCheck,
-    RefactorVerificationRequest, VerificationPhase,
+    RefactorPlanAutomationDecision, RefactorPlanAutomationStatus, RefactorPlanAutomationStep,
+    RefactorPlanAutomationStepStatus, RefactorPlanDecision, RefactorPlanRequest, RefactorPlanStep,
 };
-pub use verification::refactor_verification_checks;
 
 pub fn build_refactor_plan_decision(request: RefactorPlanRequest<'_>) -> RefactorPlanDecision {
     let gates = refactor_plan_gates(

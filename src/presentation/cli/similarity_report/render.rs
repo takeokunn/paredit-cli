@@ -174,7 +174,7 @@ fn form_json(form: &SimilarityFormReport) -> serde_json::Value {
     json!({
         "path": form.path.display().to_string(),
         "dialect": form.dialect.label(),
-        "form_path": form.form_path,
+        "form_path": form.form_path.to_string(),
         "span": { "start": form.span.start().get(), "end": form.span.end().get() },
         "node_count": form.node_count,
         "head": form.head.as_deref(),

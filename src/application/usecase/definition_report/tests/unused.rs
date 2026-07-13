@@ -106,10 +106,7 @@ fn policy_reports_fail_on_unused_and_required_minimum() {
     let reports = collect_unused_definition_candidates(&[parsed]);
 
     let policy = evaluate_unused_definition_policy(
-        UnusedDefinitionPolicyOptions {
-            fail_on_unused: true,
-            require_unused_definitions: Some(2),
-        },
+        UnusedDefinitionPolicyOptions::new(true, Some(2)).unwrap(),
         &reports,
     );
 
@@ -142,10 +139,7 @@ fn policy_ignores_protected_category_candidates_for_fail_on_unused() {
     assert_eq!(unused_definition_actionable_candidate_count(&reports), 1);
 
     let policy = evaluate_unused_definition_policy(
-        UnusedDefinitionPolicyOptions {
-            fail_on_unused: true,
-            require_unused_definitions: None,
-        },
+        UnusedDefinitionPolicyOptions::new(true, None).unwrap(),
         &reports,
     );
 
@@ -173,10 +167,7 @@ fn policy_passes_fail_on_unused_when_only_protected_category_is_unreferenced() {
     assert_eq!(unused_definition_actionable_candidate_count(&reports), 0);
 
     let policy = evaluate_unused_definition_policy(
-        UnusedDefinitionPolicyOptions {
-            fail_on_unused: true,
-            require_unused_definitions: None,
-        },
+        UnusedDefinitionPolicyOptions::new(true, None).unwrap(),
         &reports,
     );
 
