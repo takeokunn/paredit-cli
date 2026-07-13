@@ -174,6 +174,12 @@ pub struct Selection<'a> {
 }
 
 impl SyntaxTree {
+    /// Append only the closing delimiters needed to balance unclosed lists.
+    /// Refuses every other parser error so callers never guess at malformed input.
+    pub fn repair_unclosed_lists(input: &str) -> Result<String, ParseError> {
+        Parser::new(input).repair_unclosed_lists()
+    }
+
     /// Parses source text into a syntax tree that preserves byte spans.
     pub fn parse(input: &str) -> std::result::Result<Self, ParseError> {
         let mut parser = Parser::new(input);

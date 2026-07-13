@@ -40,6 +40,19 @@ pub(super) struct FormatArgs {
 }
 
 #[derive(Debug, Args)]
+pub(super) struct RepairArgs {
+    /// Input file. Reads stdin when omitted.
+    #[arg(short, long)]
+    pub(super) file: Option<PathBuf>,
+    /// Write the repaired document back to --file instead of stdout.
+    #[arg(long)]
+    pub(super) write: bool,
+    /// Print a unified diff against the input instead of the repaired document.
+    #[arg(long)]
+    pub(super) diff: bool,
+}
+
+#[derive(Debug, Args)]
 pub(crate) struct TargetArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]

@@ -94,6 +94,25 @@ impl<'a> Parser<'a> {
         })
     }
 
+    pub(in crate::domain::sexpr) fn repair_unclosed_lists(
+        &mut self,
+    ) -> std::result::Result<String, ParseError> {
+        match self.parse() {
+            Ok(_) => Ok(self.input.to_owned()),
+            Err(ParseError::UnclosedList(_)) => {
+                let mut repaired = self.input.to_owned();
+                for node_id in self.stack.iter().skip(1).rev() {
+                    let delimiter = self.nodes[node_id.get()]
+                        .delimiter
+                        .expect("parser stack contains only lists after the root");
+                    repaired.push(delimiter.close());
+                }
+                Ok(repaired)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn skip_trivia(&mut self) -> std::result::Result<(), ParseError> {
         loop {
             while self.pos.get() < self.bytes.len() && self.current_byte().is_ascii_whitespace() {

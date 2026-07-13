@@ -68,6 +68,7 @@ Mutating commands also accept:
 | Command | Purpose |
 | --- | --- |
 | `format` | Print a canonical, indentation-based rendering. |
+| `repair-unclosed-lists` | Append matching delimiters for parser-detected unclosed lists; refuse all other parse errors. |
 | `select` | Print the S-expression selected by `--path` or `--at`. |
 | `replace` | Replace the selected S-expression with replacement text. |
 | `kill` | Remove the selected S-expression. |
