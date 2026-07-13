@@ -6,7 +6,7 @@ mod symbols;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::common_lisp::is_common_lisp_declaration_form;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
+use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::syntax::{atom_text, list_head};
 use forms::collect_inferred_extract_function_special_form;
@@ -45,6 +45,10 @@ fn collect_inferred_extract_function_params(
     params: &mut Vec<String>,
 ) {
     if let Some(text) = atom_text(view) {
+        if view.reader_prefixes.contains(&ReaderPrefix::Function) {
+            return;
+        }
+
         if !is_call_head
             && is_extract_function_param_candidate(text)
             && !explicit_params

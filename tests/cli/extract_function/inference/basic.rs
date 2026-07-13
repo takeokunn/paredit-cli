@@ -41,6 +41,26 @@ fn cli_infers_extract_function_params_without_call_heads_or_literals() {
 }
 
 #[test]
+fn cli_does_not_infer_common_lisp_function_literals() {
+    assert_extract_function_inference(
+        &[
+            "--path",
+            "0.3",
+            "--name",
+            "deduplicate",
+            "--infer-params",
+            "--output",
+            "json",
+        ],
+        "(defun render (values) (remove-duplicates values :test #'eq))",
+        &["values"],
+        &["values"],
+        "(deduplicate values)",
+        Some("(defun deduplicate (values) (remove-duplicates values :test #'eq))"),
+    );
+}
+
+#[test]
 fn cli_infers_extract_function_params_without_local_let_bindings() {
     assert_extract_function_inference(
         &[
