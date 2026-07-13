@@ -5,7 +5,7 @@ use super::{DialectArg, EditTargetArgs, SourceInput};
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
-    AtomOccurrence, ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, Selection,
+    AtomOccurrence, ByteSpan, Delimiter, Edit, ExpressionKind, ExpressionView, Path, Selection,
     SymbolName, SyntaxTree,
 };
 
@@ -134,6 +134,7 @@ pub(crate) fn edit_target(
     let tree = parse_document(&input)?;
     let selection = resolve_target(&tree, target.path.as_ref(), target.at)?;
     let rewritten = f(&input.text, &tree, selection)?;
+    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten)?;
     emit_document(&input, args.write, args.diff, rewritten)
 }
 
