@@ -221,6 +221,12 @@ impl SimilarityReportOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
+
+    use crate::domain::dialect::Dialect;
+    use crate::domain::sexpr::SyntaxTree;
+
+    use super::super::{collect_similarity_candidates, SimilarityCandidateCollectionError};
 
     #[test]
     fn default_options_validate() {
@@ -269,5 +275,33 @@ mod tests {
             options.validate(),
             Err(SimilarityReportOptionsError::MaxResultsTooSmall)
         );
+    }
+
+    #[test]
+    fn candidate_collection_preserves_invalid_options_error_variant() {
+        let options = SimilarityReportOptions {
+            threshold: 1.1,
+            ..SimilarityReportOptions::default()
+        };
+        let input = "(list value)";
+        let tree = SyntaxTree::parse(input).expect("test input parses");
+        let mut candidates = Vec::new();
+
+        let error = collect_similarity_candidates(
+            &tree,
+            input,
+            Path::new("input.lisp"),
+            Dialect::CommonLisp,
+            &options,
+            &mut candidates,
+        )
+        .expect_err("invalid options must prevent collection");
+
+        assert!(matches!(
+            error,
+            SimilarityCandidateCollectionError::InvalidOptions(
+                SimilarityReportOptionsError::ThresholdOutOfRange
+            )
+        ));
     }
 }

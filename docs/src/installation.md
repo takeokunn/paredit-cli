@@ -60,6 +60,25 @@ cargo install --git https://github.com/takeokunn/paredit-cli --locked
 
 The minimum supported Rust version is `1.85` (edition 2024).
 
+## Pin automation
+
+The examples above follow the latest default branch. For CI, production
+automation, or a reproducible developer environment, pin an immutable commit
+instead. Replace `<commit>` with a full commit SHA that you have reviewed:
+
+```sh
+nix run github:takeokunn/paredit-cli/<commit> -- --help
+nix profile install github:takeokunn/paredit-cli/<commit>
+cargo install --git https://github.com/takeokunn/paredit-cli --rev <commit> --locked
+```
+
+When upgrading a pin, inspect the release notes and compare the machine-readable
+command catalog before accepting the new revision:
+
+```sh
+paredit inspect capabilities --output json
+```
+
 ## Verify
 
 ```sh

@@ -9,4 +9,5 @@
 - [Agent interface](agents.md)
 - [Integrations](integrations.md)
 - [Development](development.md)
+- [Releases and compatibility](releases.md)
 - [Repository documentation](repository.md)

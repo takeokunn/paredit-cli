@@ -209,7 +209,7 @@ fn process_file(
             .map_err(|source| ProcessingError {
                 path: file.to_path_buf(),
                 stage: "collect",
-                source,
+                source: source.into(),
             })?;
 
     Ok(FileProcessingOutput {

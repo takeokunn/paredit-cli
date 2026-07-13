@@ -75,6 +75,7 @@ cargo +1.85 test --locked
 
 ## Releases
 
-`paredit-cli` does not provide backward compatibility for command paths,
-flags, text output, or JSON schemas between releases. Automation must use the
-command reference in the current documentation release.
+The [release and compatibility guide](releases.md) defines the machine-output
+contract and upgrade expectations. Maintainers should use the root
+[release checklist](https://github.com/takeokunn/paredit-cli/blob/main/RELEASING.md)
+before publishing.

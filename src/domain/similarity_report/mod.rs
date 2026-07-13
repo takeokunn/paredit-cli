@@ -3,7 +3,7 @@ mod options;
 mod reports;
 mod types;
 
-pub use collect::collect_similarity_candidates;
+pub use collect::{collect_similarity_candidates, SimilarityCandidateCollectionError};
 pub use options::{
     SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
     SimilarityReportOptions, SimilarityReportOptionsError,

@@ -54,7 +54,7 @@ nix develop -c cargo install --path . --locked   # from a local checkout
 Prebuilt binaries are served from the public `takeokunn-paredit-cli` Cachix
 cache. The current minimum supported Rust version is `1.85`. See the
 [installation guide](docs/src/installation.md) for the flake overlay and
-flake-input usage.
+flake-input usage, including commit pinning for automation.
 
 ## Development
 
@@ -73,5 +73,14 @@ cargo +1.85 test --locked
 
 Pull requests run `nix flake check`.
 
-A typed Rust library API behind the CLI is available on
-[docs.rs](https://docs.rs/paredit-cli).
+A typed Rust library API behind the CLI is available in the
+[`paredit_cli` documentation](https://docs.rs/paredit-cli) and its
+[source](https://github.com/takeokunn/paredit-cli/blob/main/src/lib.rs).
+
+## Community and security
+
+- [Contributing](CONTRIBUTING.md): local setup, verification, and pull request expectations.
+- [Code of Conduct](CODE_OF_CONDUCT.md): standards for project spaces.
+- [Support](SUPPORT.md): where to ask usage questions or report defects.
+- [Security](SECURITY.md): private vulnerability reporting instructions.
+- [Releasing](RELEASING.md): maintainer release verification and publication steps.

@@ -1,6 +1,7 @@
 use std::path::Path as FsPath;
 
-use anyhow::Result;
+use anyhow::Error as AnyhowError;
+use thiserror::Error;
 
 use crate::domain::common_lisp::normalize_common_lisp_operator_head;
 use crate::domain::dialect::Dialect;
@@ -11,6 +12,15 @@ use super::types::{
     ComparisonHead, FormHead, SimilarityCandidate, SimilarityFormReport, SimilarityFormScope,
     SimilarityReportOptions,
 };
+use super::SimilarityReportOptionsError;
+
+#[derive(Debug, Error)]
+pub enum SimilarityCandidateCollectionError {
+    #[error(transparent)]
+    InvalidOptions(#[from] SimilarityReportOptionsError),
+    #[error("failed to select an expression while collecting similarity candidates: {0}")]
+    Selection(#[from] AnyhowError),
+}
 
 pub fn collect_similarity_candidates(
     tree: &SyntaxTree,
@@ -19,7 +29,7 @@ pub fn collect_similarity_candidates(
     dialect: Dialect,
     options: &SimilarityReportOptions,
     candidates: &mut Vec<SimilarityCandidate>,
-) -> Result<usize> {
+) -> std::result::Result<usize, SimilarityCandidateCollectionError> {
     options.validate()?;
     let line_index = (options.min_line_span() > 1).then_some(LineIndex::new(input));
     let mut collection = CandidateCollection {
