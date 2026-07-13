@@ -179,3 +179,25 @@ fn barfs_forward_without_swallowing_preceding_comment_newline() {
     assert_eq!(result, "(list a\n  ;; last item\n) b");
     SyntaxTree::parse(&result).expect("result stays balanced");
 }
+
+#[test]
+fn normalizes_trailing_trivia_only_on_changed_lines() {
+    let input = "(alpha beta) \n(unchanged) \n";
+    let rewritten = "(alpha gamma) \n(unchanged) \n".to_owned();
+
+    assert_eq!(
+        Edit::normalize_changed_line_trivia(input, rewritten).unwrap(),
+        "(alpha gamma)\n(unchanged) \n"
+    );
+}
+
+#[test]
+fn preserves_trailing_spaces_inside_multiline_atoms_and_block_comments() {
+    let input = "(print \"old  \nvalue\")\n#| old  \ncomment |#\n";
+    let rewritten = "(print \"new  \nvalue\")\n#| new  \ncomment |#\n".to_owned();
+
+    assert_eq!(
+        Edit::normalize_changed_line_trivia(input, rewritten.clone()).unwrap(),
+        rewritten
+    );
+}
