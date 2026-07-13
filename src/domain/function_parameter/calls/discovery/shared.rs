@@ -1,5 +1,5 @@
-use crate::domain::function_parameter::list_edit::list_head;
 use crate::domain::common_lisp::{common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq};
+use crate::domain::function_parameter::list_edit::list_head;
 use crate::domain::sexpr::ExpressionView;
 use crate::domain::sexpr::SymbolName;
 

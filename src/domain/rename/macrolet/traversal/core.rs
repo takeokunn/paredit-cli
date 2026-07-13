@@ -77,9 +77,7 @@ pub(in crate::domain::rename::macrolet) trait RenameTraversalMode {
     clippy::too_many_arguments,
     reason = "recursive traversal threads scope, quasiquote state, and accumulator"
 )]
-pub(in crate::domain::rename::macrolet) fn collect_renames_from_view<
-    M: RenameTraversalMode,
->(
+pub(in crate::domain::rename::macrolet) fn collect_renames_from_view<M: RenameTraversalMode>(
     view: &ExpressionView,
     path: Path,
     dialect: Dialect,

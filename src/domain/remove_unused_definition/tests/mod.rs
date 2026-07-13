@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 
 use super::*;
-use crate::domain::package_report::PackageDefinitionReport;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::dialect::Dialect;
+use crate::domain::package_report::PackageDefinitionReport;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, SyntaxTree};
 
 mod basic;

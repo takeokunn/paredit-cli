@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-use crate::domain::function_parameter::list_edit::atom_text;
 use crate::domain::common_lisp::{common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq};
+use crate::domain::function_parameter::list_edit::atom_text;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, SymbolName};
 
 pub(in crate::domain::function_parameter) fn matches_function_call_view(

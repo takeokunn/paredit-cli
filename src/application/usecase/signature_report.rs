@@ -4,8 +4,8 @@
 mod tests;
 
 pub use crate::domain::signature_report::{
-    build_signature_reports, classify_signature_call, SignatureCallItem, SignatureCallStatus,
-    SignatureDefinitionItem, SignatureReportFile, SignatureReportPolicy, SignatureReportSource,
+    SignatureCallItem, SignatureCallStatus, SignatureDefinitionItem, SignatureReportFile,
+    SignatureReportPolicy, SignatureReportSource, build_signature_reports, classify_signature_call,
 };
 
 pub fn evaluate_signature_report_policy(

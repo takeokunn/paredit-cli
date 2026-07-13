@@ -2,10 +2,10 @@ use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName}
 
 use super::super::super::selection::atom_text;
 use super::collect_symbol_atom_spans_unshadowed_in_context;
+use crate::domain::common_lisp::common_lisp_operator_head_eq;
 pub(super) use crate::domain::rename::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
-use crate::domain::common_lisp::common_lisp_operator_head_eq;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn collect_explicit_reader_form(

@@ -1,7 +1,7 @@
-use crate::domain::rename::selection::list_head;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::selection::list_head;
 use crate::domain::sexpr::{ExpressionView, SymbolName};
 
 use super::UnwrapFunctionCallSite;

@@ -214,9 +214,9 @@ pub fn collect_unused_definition_candidates(
                                 file_index,
                                 file_unused_definition_report(
                                     files,
-                                    &views,
-                                    &package_form_spans,
-                                    &atom_needles,
+                                    views,
+                                    package_form_spans,
+                                    atom_needles,
                                     file_index,
                                     file,
                                 ),

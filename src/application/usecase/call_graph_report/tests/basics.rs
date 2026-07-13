@@ -17,9 +17,11 @@ fn builds_internal_edges_across_definitions() {
     assert_eq!(report.files[0].edges[0].caller.as_deref(), Some("main"));
     assert_eq!(report.files[0].edges[0].callee, "helper");
     assert!(report.files[0].edges[0].internal);
-    assert!(report.files[0].edges[0]
-        .callee_categories
-        .contains(&DefinitionCategory::Function));
+    assert!(
+        report.files[0].edges[0]
+            .callee_categories
+            .contains(&DefinitionCategory::Function)
+    );
 }
 
 #[test]
@@ -57,9 +59,11 @@ fn resolves_unqualified_call_edge_to_package_qualified_common_lisp_definition() 
     assert_eq!(report.files[0].edges[0].caller.as_deref(), Some("caller"));
     assert_eq!(report.files[0].edges[0].callee, "target");
     assert!(report.files[0].edges[0].internal);
-    assert!(report.files[0].edges[0]
-        .callee_categories
-        .contains(&DefinitionCategory::Function));
+    assert!(
+        report.files[0].edges[0]
+            .callee_categories
+            .contains(&DefinitionCategory::Function)
+    );
 }
 
 #[test]

@@ -1,8 +1,8 @@
+use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::rename::reader::{
     bare_lambda_body_children, explicit_reader_form_kind,
     explicit_reader_function_lambda_body_children,
 };
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 
 use super::super::RenameFunctionOccurrence;

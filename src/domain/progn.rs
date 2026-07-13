@@ -103,7 +103,7 @@ pub fn plan_eliminate_empty_binding_form(
         .context("eliminate-empty-binding-form input is not valid")?;
     let form = tree.select_path(&request.path)?.view();
     if form.kind != ExpressionKind::List
-        || form.reader_prefixes.len() > 0
+        || !form.reader_prefixes.is_empty()
         || form.children.len() < 2
     {
         bail!("eliminate-empty-binding-form requires a plain let or let* form");

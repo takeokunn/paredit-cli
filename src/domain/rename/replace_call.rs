@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
-pub use crate::domain::rename::ReplaceFunctionCallsScope;
 use crate::domain::dialect::Dialect;
+pub use crate::domain::rename::ReplaceFunctionCallsScope;
 use crate::domain::sexpr::{ByteSpan, SymbolName, SyntaxTree};
 
 mod call_site;

@@ -222,8 +222,8 @@ pub(crate) fn plan_split_let(request: SplitLetRequest<'_>) -> Result<LetComposit
     )
 }
 
-fn select<'a>(
-    input: &'a str,
+fn select(
+    input: &str,
     dialect: Dialect,
     path: &Path,
     operation: &str,
@@ -358,6 +358,7 @@ fn merge_replacement(
     let body = &input[inner_bindings.span.end().get()..inner.span.end().get() - 1];
     format!("({head} ({left}{separator}{right}){body})")
 }
+#[allow(clippy::too_many_arguments)]
 fn finish(
     input: &str,
     dialect: Dialect,

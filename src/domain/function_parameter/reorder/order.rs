@@ -74,8 +74,6 @@ pub(in crate::domain::function_parameter) fn build_new_relative_order(
     Ok(relative_order)
 }
 
-pub(in crate::domain::function_parameter) fn is_identity_order(
-    order: &[usize],
-) -> bool {
+pub(in crate::domain::function_parameter) fn is_identity_order(order: &[usize]) -> bool {
     order.iter().copied().eq(0..order.len())
 }

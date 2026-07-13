@@ -3,14 +3,14 @@ use anyhow::Result;
 use super::super::RenameAtNamespace;
 use super::super::safety::ensure_function_occurrences_are_unqualified;
 use super::{Candidate, SpecializedCandidateContext, push_candidate};
+use crate::domain::common_lisp::CommonLispOperator;
+use crate::domain::definition::definition_shape;
+use crate::domain::dialect::Dialect;
 use crate::domain::rename::reader::executable_reader_context_at_path;
 use crate::domain::rename::selection::{apply_byte_span_edits, list_head};
 use crate::domain::rename::{
     RenameFunctionOccurrence, RenameFunctionRequest, plan_rename_function,
 };
-use crate::domain::common_lisp::CommonLispOperator;
-use crate::domain::definition::definition_shape;
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::Path;
 
 pub(super) fn add(

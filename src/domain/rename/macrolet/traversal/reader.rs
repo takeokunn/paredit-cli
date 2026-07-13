@@ -74,9 +74,7 @@ pub(in crate::domain::rename::macrolet) fn collect_explicit_reader_form_renames<
 
 /// Handles a bare `(lambda ...)` form directly, not just the `#'(lambda ...)`
 /// spelling handled by the "function" arm above; see `bare_lambda_body_children`.
-pub(in crate::domain::rename::macrolet) fn collect_reader_lambda_renames<
-    M: RenameTraversalMode,
->(
+pub(in crate::domain::rename::macrolet) fn collect_reader_lambda_renames<M: RenameTraversalMode>(
     view: &ExpressionView,
     path: &Path,
     context: TraversalContext<'_>,

@@ -25,8 +25,7 @@ use selection::{apply_byte_span_edits, collect_symbol_atom_spans, select_rename_
 pub type RenameReaderSafetyError = ReaderConditionalSafetyError;
 
 pub use crate::domain::rename_types::{
-    FunctionCallScope, ReplaceFunctionCallsScope, UnwrapFunctionCallsScope,
-    WrapFunctionCallsScope,
+    FunctionCallScope, ReplaceFunctionCallsScope, UnwrapFunctionCallsScope, WrapFunctionCallsScope,
 };
 
 pub use at::{RenameAtError, RenameAtNamespace, RenameAtPlan, RenameAtRequest, plan_rename_at};

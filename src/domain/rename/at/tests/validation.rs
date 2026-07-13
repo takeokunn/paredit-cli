@@ -1,5 +1,5 @@
-use crate::domain::rename::RenameReaderSafetyError;
 use crate::domain::common_lisp::CommonLispReaderConditionalKind;
+use crate::domain::rename::RenameReaderSafetyError;
 
 #[test]
 fn rejects_common_lisp_reader_conditionals_without_changing_input() {

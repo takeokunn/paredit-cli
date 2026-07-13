@@ -98,10 +98,12 @@ fn counts_common_lisp_setf_place_calls_and_edges() {
     assert_eq!(summary.inbound_edge_count, 2);
     assert_eq!(summary.non_call_reference_count, 1);
     assert_eq!(reports[0].calls.len(), 2);
-    assert!(reports[0]
-        .calls
-        .iter()
-        .all(|call| call.status == SignatureCallStatus::Exact));
+    assert!(
+        reports[0]
+            .calls
+            .iter()
+            .all(|call| call.status == SignatureCallStatus::Exact)
+    );
 }
 
 #[test]

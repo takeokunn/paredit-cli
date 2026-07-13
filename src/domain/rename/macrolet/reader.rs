@@ -1,14 +1,12 @@
-use crate::domain::rename::function::target::{
-    CallableNameTarget, callable_name_target,
-};
+use crate::domain::rename::function::target::{CallableNameTarget, callable_name_target};
 use crate::domain::sexpr::ExpressionView;
 
 use super::RenameFunctionOccurrence;
 use super::scope::{
     LocalCallableRenameKind, MacroletRenameScope, allows_function_reference_rename,
 };
-pub(super) use crate::domain::rename::reader::{atom_symbol_span, atom_symbol_text};
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+pub(super) use crate::domain::rename::reader::{atom_symbol_span, atom_symbol_text};
 use crate::domain::sexpr::{Path, ReaderPrefix, SymbolName};
 
 #[expect(

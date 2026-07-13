@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 
 use super::reader::executable_reader_context_at_path;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::dialect::Dialect;
+use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{SymbolName, SyntaxTree};
 
 mod candidate;

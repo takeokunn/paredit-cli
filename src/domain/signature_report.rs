@@ -308,7 +308,7 @@ fn collect_signature_definitions(
 }
 
 fn list_head(view: &ExpressionView) -> Option<&str> {
-    view.children.get(0).and_then(atom_text)
+    view.children.first().and_then(atom_text)
 }
 
 fn atom_text(view: &ExpressionView) -> Option<&str> {

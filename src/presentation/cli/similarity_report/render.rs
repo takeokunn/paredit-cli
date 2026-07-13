@@ -162,7 +162,7 @@ fn print_text_form(side: &str, form: &SimilarityFormReport) {
         "\t{side}\t{}\t{}\t{}\t{}..{}\tnodes={}\thead={}",
         form.path.display(),
         form.dialect.label(),
-        form.form_path.to_string(),
+        form.form_path,
         form.span.start().get(),
         form.span.end().get(),
         form.node_count,

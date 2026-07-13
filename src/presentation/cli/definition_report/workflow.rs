@@ -6,10 +6,10 @@ use super::super::*;
 use super::args::{DefinitionReportArgs, UnusedDefinitionReportArgs};
 use super::render::{print_definition_report, print_unused_definition_report};
 use crate::application::usecase::definition_report::{
-    build_definition_report, build_parsed_definition_file, collect_unused_definition_candidates,
-    evaluate_unused_definition_policy, UnusedDefinitionPolicyOptions,
+    UnusedDefinitionPolicyOptions, build_definition_report, build_parsed_definition_file,
+    collect_unused_definition_candidates, evaluate_unused_definition_policy,
 };
-use crate::infrastructure::workspace::{discover_workspace_files, WorkspaceDiscoveryOptions};
+use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
 
 pub(in crate::presentation::cli) fn definition_report(args: DefinitionReportArgs) -> Result<()> {
     let files = expand_definition_report_inputs(&args.files, args.dialect)?;

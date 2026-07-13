@@ -4,13 +4,13 @@ use crate::domain::callable_scope::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope, local_callable_scope_at_path,
 };
+use crate::domain::common_lisp::CommonLispLocalCallableForm;
+use crate::domain::definition::macro_expander_body_range;
+use crate::domain::dialect::Dialect;
 use crate::domain::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,
 };
 use crate::domain::rename::selection::list_head;
-use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::definition::macro_expander_body_range;
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ExpressionView, Path, SymbolName, SyntaxTree};
 
 use super::ReplaceFunctionCallSite;

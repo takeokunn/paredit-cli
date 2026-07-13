@@ -12,12 +12,16 @@ fn skips_common_lisp_local_callable_edges_to_shadowed_global_definitions() {
     .unwrap();
     let edges = &report.files[0].edges;
 
-    assert!(!edges
-        .iter()
-        .any(|edge| edge.caller.as_deref() == Some("main") && edge.callee == "helper"));
-    assert!(edges
-        .iter()
-        .any(|edge| edge.caller.as_deref() == Some("main") && edge.callee == "target"));
+    assert!(
+        !edges
+            .iter()
+            .any(|edge| edge.caller.as_deref() == Some("main") && edge.callee == "helper")
+    );
+    assert!(
+        edges
+            .iter()
+            .any(|edge| edge.caller.as_deref() == Some("main") && edge.callee == "target")
+    );
 }
 
 #[test]
@@ -170,26 +174,32 @@ fn skips_common_lisp_cl_user_compiler_macrolet_shadowed_global_definition_edges(
 }
 
 fn assert_no_shadowed_helper_edge(report: &CallGraphReport, caller: &str) {
-    assert!(!report.files[0]
-        .edges
-        .iter()
-        .any(|edge| { edge.caller.as_deref() == Some(caller) && edge.callee == "helper" }));
+    assert!(
+        !report.files[0]
+            .edges
+            .iter()
+            .any(|edge| { edge.caller.as_deref() == Some(caller) && edge.callee == "helper" })
+    );
 }
 
 fn assert_has_target_edge(report: &CallGraphReport, caller: &str) {
-    assert!(report.files[0]
-        .edges
-        .iter()
-        .any(|edge| { edge.caller.as_deref() == Some(caller) && edge.callee == "target" }));
+    assert!(
+        report.files[0]
+            .edges
+            .iter()
+            .any(|edge| { edge.caller.as_deref() == Some(caller) && edge.callee == "target" })
+    );
 }
 
 fn assert_shadowed_macrolet_edges(report: &CallGraphReport) {
     let edges = &report.files[0].edges;
 
     assert_eq!(edges.len(), 2);
-    assert!(edges
-        .iter()
-        .all(|edge| edge.caller.as_deref() == Some("render")));
+    assert!(
+        edges
+            .iter()
+            .all(|edge| edge.caller.as_deref() == Some("render"))
+    );
     assert!(edges.iter().all(|edge| edge.callee == "helper"));
     assert!(edges.iter().any(|edge| edge.path == "1.3.1.0.2"));
     assert!(edges.iter().any(|edge| edge.path == "1.4"));

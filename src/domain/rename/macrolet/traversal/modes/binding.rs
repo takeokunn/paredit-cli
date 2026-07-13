@@ -1,5 +1,5 @@
-use crate::domain::rename::macrolet::RenameFunctionOccurrence;
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::rename::macrolet::RenameFunctionOccurrence;
 use crate::domain::sexpr::{ExpressionView, Path};
 
 use super::super::core::RenameTraversalMode;

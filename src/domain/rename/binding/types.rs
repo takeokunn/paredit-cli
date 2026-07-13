@@ -72,11 +72,7 @@ impl BindingEdit {
         }
     }
 
-    pub(in crate::domain::rename) fn replacement(
-        &self,
-        input: &str,
-        to: &SymbolName,
-    ) -> String {
+    pub(in crate::domain::rename) fn replacement(&self, input: &str, to: &SymbolName) -> String {
         match &self.kind {
             BindingEditKind::RenameAtom => to.as_str().to_owned(),
             BindingEditKind::RewriteBareSlotSpec { slot_name } => {

@@ -1,6 +1,4 @@
-use crate::domain::rename::function::target::{
-    CallableNameTarget, callable_name_target,
-};
+use crate::domain::rename::function::target::{CallableNameTarget, callable_name_target};
 use crate::domain::rename::macrolet::RenameFunctionOccurrence;
 use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path};
 
@@ -45,9 +43,7 @@ pub(super) fn callable_list_head_target<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::rename::macrolet::scope::{
-        LocalCallableRenameKind, MacroletRenameScope,
-    };
+    use crate::domain::rename::macrolet::scope::{LocalCallableRenameKind, MacroletRenameScope};
     use crate::domain::rename::macrolet::traversal::BindingTraversal;
     use crate::domain::rename::macrolet::traversal::core::RenameTraversalMode;
     use crate::domain::rename::macrolet::traversal::state::TraversalState;

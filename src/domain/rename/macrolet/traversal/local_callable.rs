@@ -1,6 +1,4 @@
-use crate::domain::callable_scope::{
-    common_lisp_local_callable_form, local_callable_names,
-};
+use crate::domain::callable_scope::{common_lisp_local_callable_form, local_callable_names};
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::definition::{DefinitionBodyRange, definition_shape};
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView, Path};

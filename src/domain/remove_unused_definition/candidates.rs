@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 
-use crate::domain::remove_unused_definition::types::{
-    RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
-};
 use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::definition_reference::{
     collect_package_form_spans, collect_reference_needles, collect_symbol_references,
+};
+use crate::domain::remove_unused_definition::types::{
+    RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName, SyntaxTree};
 

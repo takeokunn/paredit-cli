@@ -4,8 +4,8 @@ use super::super::RenameAtNamespace;
 use super::super::safety::ensure_binding_target_is_available;
 use super::super::selection::is_common_lisp_value_position;
 use super::Candidate;
-use crate::domain::rename::{binding_rename_parts, selection::apply_byte_span_edits};
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::{binding_rename_parts, selection::apply_byte_span_edits};
 use crate::domain::sexpr::{Path, SymbolName, SyntaxTree};
 
 pub(in crate::domain::rename::at) fn binding_candidates(

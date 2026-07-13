@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::domain::definition::DefinitionCategory;
 use crate::domain::package_report::PackageDefinitionReport;
 use crate::domain::remove_unused_definition::types::UnusedDefinitionDefinition;
-use crate::domain::definition::DefinitionCategory;
 
 /// Bulk removal requires the explicit `--include-protected` opt-in for any
 /// category `DefinitionCategory::is_bulk_removable` excludes; see that

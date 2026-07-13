@@ -4,10 +4,10 @@ use crate::domain::callable_scope::{
     common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
     local_callable_body_scope, local_callable_names,
 };
-use crate::domain::function_parameter::calls::matches_function_call_view;
-use crate::domain::function_parameter::list_edit::{list_head, spans_overlap};
 use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
 use crate::domain::dialect::Dialect;
+use crate::domain::function_parameter::calls::matches_function_call_view;
+use crate::domain::function_parameter::list_edit::{list_head, spans_overlap};
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };

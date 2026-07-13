@@ -2,9 +2,9 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::dialect::Dialect;
 use crate::domain::lexical_scope::collect_unshadowed_symbol_references;
+use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };

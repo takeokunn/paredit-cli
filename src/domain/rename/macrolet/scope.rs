@@ -1,8 +1,8 @@
 use crate::domain::callable_scope::is_macro_callable_form;
-use crate::domain::rename::reader::atom_symbol_text;
-use crate::domain::rename::selection::list_head;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
+use crate::domain::rename::reader::atom_symbol_text;
+use crate::domain::rename::selection::list_head;
 use crate::domain::sexpr::{ExpressionView, SymbolName};
 
 #[derive(Debug, Clone, Copy, Default)]

@@ -1,6 +1,6 @@
 use super::{RenameAtError, plan_rename_at};
-use crate::domain::rename::{RenameAtNamespace, RenameAtRequest};
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::{RenameAtNamespace, RenameAtRequest};
 use crate::domain::sexpr::{ByteOffset, SymbolName};
 
 mod global;

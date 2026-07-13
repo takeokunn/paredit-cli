@@ -2,8 +2,8 @@ use super::super::*;
 use super::args::ImpactReportArgs;
 use super::render::print_impact_report;
 use crate::application::usecase::impact_report::{
-    build_impact_reports, evaluate_impact_report_policy, impact_risks, impact_status_counts,
-    summarize_impact_reports, ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource,
+    ImpactReportFile, ImpactReportPolicyOptions, ImpactReportSource, build_impact_reports,
+    evaluate_impact_report_policy, impact_risks, impact_status_counts, summarize_impact_reports,
 };
 
 pub(in crate::presentation::cli) fn impact_report(args: ImpactReportArgs) -> Result<()> {

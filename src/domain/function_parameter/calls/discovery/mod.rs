@@ -4,9 +4,9 @@ mod top_level;
 
 use anyhow::Result;
 
-use crate::domain::function_parameter::definition::FunctionParameterDefinitionScope;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::dialect::Dialect;
+use crate::domain::function_parameter::definition::FunctionParameterDefinitionScope;
 use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
 
 use local_callable::discover_local_callable_binding_call_paths;
@@ -18,8 +18,7 @@ pub(in crate::domain::function_parameter) struct FunctionCallPathRequest<'a> {
     pub(in crate::domain::function_parameter) explicit_call_paths: Vec<Path>,
     pub(in crate::domain::function_parameter) all_calls: bool,
     pub(in crate::domain::function_parameter) definition_span: ByteSpan,
-    pub(in crate::domain::function_parameter) definition_scope:
-        FunctionParameterDefinitionScope,
+    pub(in crate::domain::function_parameter) definition_scope: FunctionParameterDefinitionScope,
     pub(in crate::domain::function_parameter) function_name: &'a SymbolName,
     pub(in crate::domain::function_parameter) command: &'a str,
 }
@@ -106,9 +105,7 @@ fn validate_explicit_function_call_paths(
         }
 
         if !super::matches_function_call_view(&view, function_name) {
-            let Some(head) =
-                crate::domain::function_parameter::list_edit::list_head(&view)
-            else {
+            let Some(head) = crate::domain::function_parameter::list_edit::list_head(&view) else {
                 anyhow::bail!("{command} --call-path {call_path} must select a function call list");
             };
             anyhow::bail!(

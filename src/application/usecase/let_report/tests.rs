@@ -120,14 +120,18 @@ fn reports_symbol_macrolet_without_counting_expansion_reference() {
     assert_eq!(reports[0].bindings[0].name, "value");
     assert_eq!(reports[0].bindings[0].reference_count, 0);
     assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
-    assert!(reports[0].bindings[0]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert_eq!(reports[0].bindings[1].name, "used");
     assert_eq!(reports[0].bindings[1].reference_count, 1);
-    assert!(reports[0].bindings[1]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        reports[0].bindings[1]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert!(!reports[0].bindings[1].can_inline_without_duplication);
 }
 
@@ -145,14 +149,18 @@ fn reports_emacs_lisp_cl_symbol_macrolet_without_counting_expansion_reference() 
     assert_eq!(reports[0].bindings[0].name, "value");
     assert_eq!(reports[0].bindings[0].reference_count, 0);
     assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
-    assert!(reports[0].bindings[0]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert_eq!(reports[0].bindings[1].name, "used");
     assert_eq!(reports[0].bindings[1].reference_count, 1);
-    assert!(reports[0].bindings[1]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        reports[0].bindings[1]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert!(!reports[0].bindings[1].can_inline_without_duplication);
 }
 
@@ -167,9 +175,11 @@ fn reports_single_symbol_macrolet_as_supported_by_inline_let() {
     assert_eq!(reports[0].form, "symbol-macrolet");
     assert!(reports[0].inline_supported_by_inline_let);
     assert_eq!(reports[0].bindings[0].reference_count, 1);
-    assert!(!reports[0].bindings[0]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        !reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert!(reports[0].bindings[0].can_inline_without_duplication);
 }
 
@@ -184,9 +194,11 @@ fn reports_single_common_lisp_cl_user_symbol_macrolet_as_supported_by_inline_let
     assert_eq!(reports[0].form, "cl-user:symbol-macrolet");
     assert!(reports[0].inline_supported_by_inline_let);
     assert_eq!(reports[0].bindings[0].reference_count, 1);
-    assert!(!reports[0].bindings[0]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        !reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert!(reports[0].bindings[0].can_inline_without_duplication);
 }
 
@@ -204,14 +216,18 @@ fn reports_common_lisp_cl_user_symbol_macrolet_without_counting_expansion_refere
     assert_eq!(reports[0].bindings[0].name, "value");
     assert_eq!(reports[0].bindings[0].reference_count, 0);
     assert!(reports[0].bindings[0].risks.contains(&"unused-binding"));
-    assert!(reports[0].bindings[0]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        reports[0].bindings[0]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert_eq!(reports[0].bindings[1].name, "used");
     assert_eq!(reports[0].bindings[1].reference_count, 1);
-    assert!(reports[0].bindings[1]
-        .risks
-        .contains(&"unsupported-by-inline-let"));
+    assert!(
+        reports[0].bindings[1]
+            .risks
+            .contains(&"unsupported-by-inline-let")
+    );
     assert!(!reports[0].bindings[1].can_inline_without_duplication);
 }
 
@@ -230,9 +246,11 @@ fn reports_earmuffed_special_variable_rebind_distinctly_instead_of_unused_bindin
 
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].bindings[0].reference_count, 0);
-    assert!(reports[0].bindings[0]
-        .risks
-        .contains(&"possible-dynamic-variable-rebind"));
+    assert!(
+        reports[0].bindings[0]
+            .risks
+            .contains(&"possible-dynamic-variable-rebind")
+    );
     assert!(!reports[0].bindings[0].risks.contains(&"unused-binding"));
     assert!(!reports[0].bindings[0].can_inline_without_duplication);
 }

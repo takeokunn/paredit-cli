@@ -1,8 +1,8 @@
 use anyhow::{Context, Result, ensure};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
-pub use crate::domain::rename::WrapFunctionCallsScope;
 use crate::domain::dialect::Dialect;
+pub use crate::domain::rename::WrapFunctionCallsScope;
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };

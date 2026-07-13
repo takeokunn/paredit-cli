@@ -1,9 +1,7 @@
 use anyhow::Result;
 
 use crate::domain::function_parameter::FunctionParameterInsert;
-use crate::domain::function_parameter::list_edit::{
-    atom_text, insertion_edit_for_list_item,
-};
+use crate::domain::function_parameter::list_edit::{atom_text, insertion_edit_for_list_item};
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use super::validation::resolve_function_call_view;

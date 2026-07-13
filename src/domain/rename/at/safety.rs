@@ -1,8 +1,8 @@
 use anyhow::Result;
 
 use super::RenameAtError;
-use crate::domain::rename::{RenameFunctionOccurrence, binding_rename_parts};
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::{RenameFunctionOccurrence, binding_rename_parts};
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 pub(super) fn ensure_binding_target_is_available(
