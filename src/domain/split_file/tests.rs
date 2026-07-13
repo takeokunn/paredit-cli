@@ -266,3 +266,19 @@ fn plan_split_file_does_not_glue_remaining_definitions_when_removing_a_middle_it
     );
     assert!(SyntaxTree::parse(&plan.from_rewritten).is_ok());
 }
+
+#[test]
+fn plan_split_file_preserves_unselected_common_lisp_vector_literals() {
+    let mut request = split_request(
+        "(defun moved () :moved)\n\n(defun keep () #(one two))\n",
+        "",
+    );
+    request.paths = vec![Path::from_indexes(vec![0])];
+
+    let plan = plan_split_file(request).expect("split-file plan should be valid");
+
+    assert!(plan.from_rewritten.contains("#(one two)"));
+    assert!(plan.to_rewritten.contains("(defun moved () :moved)"));
+    assert!(SyntaxTree::parse(&plan.from_rewritten).is_ok());
+    assert!(SyntaxTree::parse(&plan.to_rewritten).is_ok());
+}

@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 
 use crate::domain::definition::definition_shape;
-use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
+use crate::domain::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 mod item;
@@ -25,14 +25,12 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
 
     let from_tree = SyntaxTree::parse(request.from_input)
         .with_context(|| format!("failed to parse {}", request.from_file.display()))?;
-    reject_common_lisp_reader_conditionals(&from_tree, request.from_dialect)?;
     let to_tree = SyntaxTree::parse(request.to_input).with_context(|| {
         format!(
             "destination file is not a valid S-expression document: {}",
             request.to_file.display()
         )
     })?;
-    reject_common_lisp_reader_conditionals(&to_tree, request.to_dialect)?;
 
     let mut seen_paths = std::collections::BTreeSet::new();
     let mut selected_paths = std::collections::BTreeMap::new();
@@ -121,6 +119,11 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
 
     items.sort_by_key(|item| item.span.start().get());
     ensure_non_overlapping_spans(items.iter().map(|item| item.span))?;
+    reject_overlapping_common_lisp_reader_time_forms(
+        &from_tree,
+        request.from_dialect,
+        items.iter().map(|item| item.removal_span),
+    )?;
 
     let mut running_package = package_context_before_top_level(
         &to_tree,
