@@ -20,7 +20,72 @@ use super::super::reader::{
     explicit_reader_function_lambda_body_children,
 };
 use super::super::selection::atom_text;
-use super::shared::{SymbolReferenceSite, is_target_define_symbol_macro};
+use super::shared::is_target_define_symbol_macro;
+
+#[derive(Debug, Clone)]
+struct SymbolReferenceSite {
+    path: ReferencePath,
+    span: ByteSpan,
+    is_head_position: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReferencePath(usize);
+
+struct ReferencePathNode {
+    parent: Option<usize>,
+    index: usize,
+}
+
+struct ReferencePathArena {
+    nodes: Vec<ReferencePathNode>,
+    edge_count: usize,
+    materialized_index_count: usize,
+}
+
+impl ReferencePathArena {
+    fn from_path(path: &Path) -> (Self, ReferencePath) {
+        let indexes = path.to_raw_indexes();
+        let mut nodes = Vec::with_capacity(indexes.len());
+        let mut parent = None;
+        for index in indexes {
+            let node = nodes.len();
+            nodes.push(ReferencePathNode { parent, index });
+            parent = Some(node);
+        }
+        let current = parent.expect("reference traversal starts at a root child");
+        (
+            Self {
+                nodes,
+                edge_count: 0,
+                materialized_index_count: 0,
+            },
+            ReferencePath(current),
+        )
+    }
+
+    fn child(&mut self, path: ReferencePath, index: usize) -> ReferencePath {
+        let node = self.nodes.len();
+        self.nodes.push(ReferencePathNode {
+            parent: Some(path.0),
+            index,
+        });
+        self.edge_count += 1;
+        ReferencePath(node)
+    }
+
+    fn materialize(&mut self, path: ReferencePath) -> Path {
+        let mut indexes = Vec::new();
+        let mut cursor = Some(path.0);
+        while let Some(node) = cursor {
+            indexes.push(self.nodes[node].index);
+            cursor = self.nodes[node].parent;
+        }
+        self.materialized_index_count += indexes.len();
+        indexes.reverse();
+        Path::from_indexes(indexes)
+    }
+}
 
 pub fn collect_define_symbol_macro_reference_renames(
     tree: &SyntaxTree,
@@ -70,29 +135,79 @@ fn collect_reference_renames_from_view(
         &mut shadowed_scope_count,
         "",
     );
-    reference_spans.sort_by_key(|span| span.start());
+    reference_spans.sort_by_key(|span| (span.start(), span.end()));
     reference_spans.dedup();
     if reference_spans.is_empty() {
         return;
     }
 
     let mut sites = Vec::new();
-    collect_symbol_reference_sites(view, path, false, dialect, from, &mut sites);
+    let mut paths = collect_symbol_reference_sites(view, path, false, dialect, from, &mut sites);
 
-    for span in reference_spans {
-        let Some(site) = sites
-            .iter()
-            .find(|site| site.span == span && !site.is_head_position)
-        else {
-            continue;
-        };
+    let (matching_site_indexes, _) = match_reference_spans_to_sites(&reference_spans, &mut sites);
+    for site_index in matching_site_indexes {
+        let site = &sites[site_index];
         renames.push(RenameFunctionOccurrence {
-            path: site.path.to_string(),
+            path: paths.materialize(site.path).to_string(),
             span: site.span,
             text: from.as_str().to_owned(),
             replacement: to.as_str().to_owned(),
         });
     }
+}
+
+fn match_reference_spans_to_sites(
+    reference_spans: &[ByteSpan],
+    sites: &mut [SymbolReferenceSite],
+) -> (Vec<usize>, usize) {
+    sites.sort_by_key(|site| (site.span.start(), site.span.end(), site.is_head_position));
+
+    let mut matches = Vec::with_capacity(reference_spans.len().min(sites.len()));
+    let mut reference_index = 0usize;
+    let mut site_index = 0usize;
+    let mut probes = 0usize;
+
+    while reference_index < reference_spans.len() && site_index < sites.len() {
+        let reference_key = span_key(reference_spans[reference_index]);
+        let site_key = span_key(sites[site_index].span);
+
+        match site_key.cmp(&reference_key) {
+            std::cmp::Ordering::Less => {
+                probes += 1;
+                site_index += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                probes += 1;
+                reference_index += 1;
+            }
+            std::cmp::Ordering::Equal => {
+                let mut matching_site = None;
+                while site_index < sites.len() && span_key(sites[site_index].span) == reference_key
+                {
+                    probes += 1;
+                    if matching_site.is_none() && !sites[site_index].is_head_position {
+                        matching_site = Some(site_index);
+                    }
+                    site_index += 1;
+                }
+                if let Some(matching_site) = matching_site {
+                    matches.push(matching_site);
+                }
+                reference_index += 1;
+            }
+        }
+    }
+
+    (matches, probes)
+}
+
+fn span_key(
+    span: ByteSpan,
+) -> (
+    crate::domain::sexpr::ByteOffset,
+    crate::domain::sexpr::ByteOffset,
+) {
+    (span.start(), span.end())
 }
 
 fn collect_symbol_atom_spans_unshadowed_in_reader_function_lambdas(
@@ -306,32 +421,128 @@ fn collect_symbol_reference_sites(
     dialect: Dialect,
     from: &SymbolName,
     sites: &mut Vec<SymbolReferenceSite>,
-) {
-    if is_target_define_symbol_macro(view, dialect, from) {
-        return;
+) -> ReferencePathArena {
+    struct Frame<'a> {
+        view: &'a ExpressionView,
+        path: ReferencePath,
+        is_head_position: bool,
     }
 
-    if view.kind == ExpressionKind::Atom {
-        if let Some(span) = atom_symbol_span(view) {
-            sites.push(SymbolReferenceSite {
-                span,
-                path: path.clone(),
-                is_head_position,
+    let (mut paths, root_path) = ReferencePathArena::from_path(&path);
+    let mut stack = vec![Frame {
+        view,
+        path: root_path,
+        is_head_position,
+    }];
+
+    while let Some(frame) = stack.pop() {
+        if is_target_define_symbol_macro(frame.view, dialect, from) {
+            continue;
+        }
+
+        if frame.view.kind == ExpressionKind::Atom {
+            if let Some(span) = atom_symbol_span(frame.view) {
+                sites.push(SymbolReferenceSite {
+                    span,
+                    path: frame.path,
+                    is_head_position: frame.is_head_position,
+                });
+            }
+        }
+
+        let parent_is_paren_list = frame.view.kind == ExpressionKind::List
+            && frame.view.delimiter == Some(Delimiter::Paren);
+        for (child_index, child) in frame.view.children.iter().enumerate().rev() {
+            let child_path = paths.child(frame.path, child_index);
+            stack.push(Frame {
+                view: child,
+                path: child_path,
+                is_head_position: parent_is_paren_list && child_index == 0,
             });
         }
     }
 
-    let parent_is_paren_list =
-        view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren);
+    paths
+}
 
-    for (child_index, child) in view.children.iter().enumerate() {
-        collect_symbol_reference_sites(
-            child,
-            path.child(child_index),
-            parent_is_paren_list && child_index == 0,
-            dialect,
-            from,
-            sites,
+#[cfg(test)]
+mod tests {
+    use crate::domain::dialect::Dialect;
+    use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SymbolName, SyntaxTree};
+
+    use super::{
+        ReferencePath, SymbolReferenceSite, collect_symbol_reference_sites,
+        match_reference_spans_to_sites,
+    };
+
+    fn span(index: usize) -> ByteSpan {
+        ByteSpan::new(ByteOffset::new(index * 2), ByteOffset::new(index * 2 + 1))
+    }
+
+    #[test]
+    fn matches_ten_thousand_sites_with_one_probe_per_atom() {
+        let atom_count = 10_000usize;
+        let reference_spans = (0..atom_count).map(span).collect::<Vec<_>>();
+        let mut sites = (0..atom_count)
+            .rev()
+            .map(|index| SymbolReferenceSite {
+                path: ReferencePath(index),
+                span: span(index),
+                is_head_position: false,
+            })
+            .collect::<Vec<_>>();
+
+        let (matches, probes) = match_reference_spans_to_sites(&reference_spans, &mut sites);
+
+        assert_eq!(matches.len(), atom_count);
+        assert_eq!(probes, atom_count);
+    }
+
+    #[test]
+    fn duplicate_spans_prefer_a_non_head_reference_site() {
+        let duplicate_span = span(1);
+        let reference_spans = vec![duplicate_span];
+        let mut sites = vec![
+            SymbolReferenceSite {
+                path: ReferencePath(0),
+                span: duplicate_span,
+                is_head_position: true,
+            },
+            SymbolReferenceSite {
+                path: ReferencePath(1),
+                span: duplicate_span,
+                is_head_position: false,
+            },
+        ];
+
+        let (matches, probes) = match_reference_spans_to_sites(&reference_spans, &mut sites);
+
+        assert_eq!(probes, 2);
+        assert_eq!(matches.len(), 1);
+        assert!(!sites[matches[0]].is_head_position);
+    }
+
+    #[test]
+    fn deep_reference_site_walk_allocates_one_path_node_per_edge() {
+        let depth = 6_000usize;
+        let input = format!("{}target{}", "(".repeat(depth), ")".repeat(depth));
+        let tree = SyntaxTree::parse(&input).expect("deep input should parse");
+        let root_path = Path::root_child(0);
+        let view = tree.select_path(&root_path).expect("root form").view();
+        let from = SymbolName::new("target").expect("symbol");
+        let mut sites = Vec::new();
+
+        let paths = collect_symbol_reference_sites(
+            &view,
+            root_path,
+            false,
+            Dialect::CommonLisp,
+            &from,
+            &mut sites,
         );
+
+        assert_eq!(sites.len(), 1);
+        assert_eq!(paths.edge_count, depth);
+        assert_eq!(paths.materialized_index_count, 0);
     }
 }

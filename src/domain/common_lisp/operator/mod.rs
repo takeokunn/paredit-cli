@@ -10,8 +10,9 @@ mod table;
 pub(crate) use kind::CommonLispOperator;
 
 pub(crate) use normalize::{
-    common_lisp_operator_head_eq, common_lisp_symbol_name_eq, common_lisp_symbol_reference_eq,
-    common_lisp_symbol_reference_needle, is_common_lisp_declaration_form,
+    common_lisp_operator_head_eq, common_lisp_symbol_identity_eq, common_lisp_symbol_name_eq,
+    common_lisp_symbol_reference_eq, common_lisp_symbol_reference_needle,
+    has_common_lisp_package_qualifier, is_common_lisp_declaration_form,
     is_common_lisp_earmuffed_special_variable_name, normalize_common_lisp_operator_head,
 };
 

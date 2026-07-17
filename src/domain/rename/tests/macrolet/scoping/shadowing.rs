@@ -91,6 +91,24 @@ fn skips_labels_calls_that_shadow_macrolet_binding() {
 }
 
 #[test]
+fn escaped_colon_does_not_bypass_flet_shadowing() {
+    assert_macrolet_rename! {
+        input: "(macrolet ((foo\\:bar (x) x)) (flet ((foo\\:bar (y) y)) (foo\\:bar 1)) (foo\\:bar 2))\n",
+        dialect: Dialect::CommonLisp,
+        from: "foo\\:bar",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(macrolet ((renamed (x) x))",
+            "(flet ((foo\\:bar (y) y)) (foo\\:bar 1))",
+            "(renamed 2)"
+        ]
+    };
+}
+
+#[test]
 fn plans_qualified_macrolet_rename_without_crossing_qualified_labels_shadow() {
     assert_macrolet_rename! {
         input: "(cl:macrolet ((foo (x) x)) (cl:labels ((foo (y) (foo y))) (foo 1)) (foo 2))\n",

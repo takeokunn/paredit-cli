@@ -44,7 +44,7 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
     let view = selection.view();
     let span = selection.span();
     let head = list_head(&view).map(ToOwned::to_owned);
-    let form_text = selection.text(&from_input.text).to_owned();
+    let form_text = selection.text().to_owned();
     let from_rewritten = Edit::kill(&from_input.text, &from_tree, selection)?;
 
     let (to_rewritten, anchor_span) = insert_top_level_form(

@@ -5,7 +5,7 @@ fn selects_by_path() {
     let input = "(defun add (x y) (+ x y))";
     let tree = SyntaxTree::parse(input).expect("valid");
     let selection = tree.select_path(&parse_path("0.2")).expect("selection");
-    assert_eq!(selection.text(input), "(x y)");
+    assert_eq!(selection.text(), "(x y)");
 }
 
 #[test]
@@ -13,7 +13,7 @@ fn selects_by_offset() {
     let input = "(alpha (beta gamma))";
     let tree = SyntaxTree::parse(input).expect("valid");
     let selection = tree.select_at(9).expect("selection");
-    assert_eq!(selection.text(input), "beta");
+    assert_eq!(selection.text(), "beta");
 }
 
 #[test]
@@ -45,7 +45,6 @@ fn renames_symbols_without_touching_strings_or_comments() {
     let input = "(message \"foo\") ; foo\n(foo foo)";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
-        input,
         &SymbolName::new("foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
@@ -57,7 +56,6 @@ fn renames_unqualified_occurrences_of_package_qualified_symbol() {
     let input = "(defun cl-user:foo () foo)\n(foo cl-user:foo)";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
-        input,
         &SymbolName::new("cl-user:foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
@@ -69,7 +67,7 @@ fn treats_reader_prefix_as_part_of_selection_span() {
     let input = "'(alpha beta)";
     let tree = SyntaxTree::parse(input).expect("valid");
     let selection = tree.select_at(0).expect("selection");
-    assert_eq!(selection.text(input), "'(alpha beta)");
+    assert_eq!(selection.text(), "'(alpha beta)");
 }
 
 #[test]
@@ -100,7 +98,6 @@ fn rename_symbol_renames_bare_quoted_symbol_designators() {
     let input = "'foo foo #'foo";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
-        input,
         &SymbolName::new("foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
@@ -112,9 +109,105 @@ fn does_not_rename_atoms_inside_reader_eval_forms() {
     let input = "#.(foo (bar foo)) foo";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
-        input,
         &SymbolName::new("foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
     assert_eq!(output, "#.(foo (bar foo)) bar");
+}
+
+#[test]
+fn deeply_nested_rename_occurrences_and_expression_views_do_not_overflow() {
+    const DEPTH: usize = 10_001;
+
+    let input = format!("{}target{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&input).expect("valid deeply nested input");
+    let occurrences = tree.atom_occurrences();
+
+    assert_eq!(tree.atom_occurrence_count(), 1);
+    assert_eq!(occurrences.len(), 1);
+    assert_eq!(occurrences[0].text, "target");
+    assert_eq!(occurrences[0].path.indexes().len(), DEPTH + 1);
+    drop(tree.root_view());
+
+    let quoted_input = format!("{}'target{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+    let quoted_tree = SyntaxTree::parse(&quoted_input).expect("valid deeply nested quoted input");
+    let quoted = quoted_tree.quoted_symbol_designator_occurrences();
+
+    assert_eq!(quoted.len(), 1);
+    assert_eq!(quoted[0].text, "target");
+    assert_eq!(quoted[0].path.indexes().len(), DEPTH + 1);
+    drop(quoted_tree.root_view());
+}
+
+#[test]
+fn deeply_nested_expression_view_traits_do_not_overflow() {
+    const DEPTH: usize = 30_000;
+
+    let input = format!("{}target{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&input).expect("valid deeply nested input");
+    let view = tree.root_view();
+    let cloned = view.clone();
+
+    assert!(view == cloned);
+    let debug = format!("{cloned:?}");
+    assert!(debug.contains("target"));
+}
+
+#[test]
+fn atom_occurrence_index_handles_an_atom_at_every_nested_level() {
+    const DEPTH: usize = 4_096;
+
+    let input = format!("{}leaf{}", "(target ".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&input).expect("valid deeply nested input");
+    let index = tree.atom_occurrence_index();
+
+    assert_eq!(index.occurrences().len(), DEPTH + 1);
+    assert_eq!(index.occurrences().first().unwrap().text, "target");
+    assert_eq!(index.occurrences().last().unwrap().text, "leaf");
+    let first_path = index
+        .path_for_span(index.occurrences().first().unwrap().span)
+        .unwrap();
+    let last_path = index
+        .path_for_span(index.occurrences().last().unwrap().span)
+        .unwrap();
+    assert_eq!(first_path.to_raw_indexes(), [0, 0]);
+    let last_indexes = last_path.to_raw_indexes();
+    assert_eq!(last_indexes.len(), DEPTH + 1);
+    assert_eq!(last_indexes[0], 0);
+    assert!(last_indexes[1..].iter().all(|index| *index == 1));
+}
+
+#[test]
+fn atom_occurrence_index_handles_ten_thousand_sibling_atoms() {
+    const WIDTH: usize = 10_000;
+
+    let input = format!("({})", "target ".repeat(WIDTH));
+    let tree = SyntaxTree::parse(&input).expect("valid wide input");
+    let index = tree.atom_occurrence_index();
+
+    assert_eq!(index.occurrences().len(), WIDTH);
+    let first_path = index
+        .path_for_span(index.occurrences().first().unwrap().span)
+        .unwrap();
+    let last_path = index
+        .path_for_span(index.occurrences().last().unwrap().span)
+        .unwrap();
+    assert_eq!(first_path.to_raw_indexes(), [0, 0]);
+    assert_eq!(last_path.to_raw_indexes(), [0, WIDTH - 1]);
+}
+
+#[test]
+fn rename_symbol_handles_a_deep_comb_without_materializing_paths() {
+    const DEPTH: usize = 10_000;
+
+    let input = format!("{}leaf{}", "(target ".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&input).expect("valid deeply nested input");
+    let renamed = tree.rename_symbol(
+        &SymbolName::new("target").unwrap(),
+        &SymbolName::new("renamed").unwrap(),
+    );
+
+    assert_eq!(renamed.matches("renamed").count(), DEPTH);
+    assert!(!renamed.contains("target"));
+    SyntaxTree::parse(&renamed).expect("renamed deep tree parses again");
 }

@@ -7,7 +7,6 @@ use crate::domain::form_shape::{FormShape, duplicate_shape};
 use crate::domain::sexpr::{Path, SyntaxTree};
 
 pub(super) fn collect_replace_targets(
-    input: &str,
     tree: &SyntaxTree,
     paths: &[Path],
 ) -> Result<Vec<ReplaceFormsTarget>> {
@@ -27,7 +26,7 @@ pub(super) fn collect_replace_targets(
             form_path: path.clone(),
             span: selection.span(),
             shape: duplicate_shape(&view, true),
-            text: selection.text(input).to_owned(),
+            text: selection.text().to_owned(),
         });
     }
 

@@ -27,6 +27,21 @@ pub(crate) fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> St
     output
 }
 
+pub(crate) fn replace_span_checked(
+    input: &str,
+    span: ByteSpan,
+    replacement: &str,
+) -> Result<String> {
+    span.validate_against(input)
+        .map_err(|error| anyhow::anyhow!("replacement span is invalid: {error}"))?;
+    input
+        .len()
+        .checked_sub(span.len())
+        .and_then(|retained| retained.checked_add(replacement.len()))
+        .ok_or_else(|| anyhow::anyhow!("replacement output size overflow"))?;
+    Ok(replace_span(input, span, replacement))
+}
+
 pub(crate) fn insert_top_level_form(
     input: &str,
     tree: &SyntaxTree,

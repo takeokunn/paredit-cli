@@ -1,43 +1,43 @@
-use crate::domain::rename::function::target::{CallableNameTarget, callable_name_target};
 use crate::domain::rename::macrolet::RenameFunctionOccurrence;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path};
+use crate::domain::sexpr::{ExpressionKind, ExpressionView};
 
-use super::super::super::reader::push_atom_rename_if_match;
+use super::super::super::reader::{CallableTarget, callable_target, push_atom_rename_if_match};
 use super::super::super::scope::MacroletRenameScope;
+use super::super::core::{TraversalPath, TraversalPathArena};
 use super::super::state::{TraversalContext, TraversalState};
 
 pub(super) fn collect_active_atom_rename(
     child: &ExpressionView,
-    child_path: &Path,
+    child_path: TraversalPath,
+    paths: &mut TraversalPathArena,
     context: TraversalContext<'_>,
     state: TraversalState,
     scope: MacroletRenameScope,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
     if child.kind == ExpressionKind::Atom && state.allows_active_rename(scope) {
-        return push_atom_rename_if_match(child, child_path, context.from, context.to, renames);
+        return push_atom_rename_if_match(
+            child,
+            child_path,
+            paths,
+            context.from,
+            context.to,
+            renames,
+        );
     }
     false
 }
 
-pub(super) fn callable_binding_name_target<'a>(
-    binding: &'a ExpressionView,
-    path: &Path,
-    binding_index: usize,
-) -> Option<CallableNameTarget<'a>> {
-    let name_view = binding.children.first()?;
-    callable_name_target(name_view, &path.descendant([1, binding_index, 0]))
+pub(super) fn callable_binding_name_target(binding: &ExpressionView) -> Option<CallableTarget<'_>> {
+    callable_target(binding.children.first()?)
 }
 
-pub(super) fn callable_list_head_target<'a>(
-    view: &'a ExpressionView,
-    path: &Path,
-) -> Option<CallableNameTarget<'a>> {
+pub(super) fn callable_list_head_target(view: &ExpressionView) -> Option<CallableTarget<'_>> {
     let head = view.children.first()?;
     if head.kind != ExpressionKind::List {
         return None;
     }
-    callable_name_target(head, &path.child(0))
+    callable_target(head)
 }
 
 #[cfg(test)]
@@ -45,7 +45,9 @@ mod tests {
     use super::*;
     use crate::domain::rename::macrolet::scope::{LocalCallableRenameKind, MacroletRenameScope};
     use crate::domain::rename::macrolet::traversal::BindingTraversal;
-    use crate::domain::rename::macrolet::traversal::core::RenameTraversalMode;
+    use crate::domain::rename::macrolet::traversal::core::{
+        RenameTraversalMode, TraversalPathArena,
+    };
     use crate::domain::rename::macrolet::traversal::state::TraversalState;
     use crate::domain::sexpr::{Path, SyntaxTree};
 
@@ -60,13 +62,9 @@ mod tests {
         let bindings = view.children.get(1).expect("bindings list");
         let binding = bindings.children.first().expect("binding");
 
-        let Some(target) = callable_binding_name_target(binding, &Path::from_indexes(vec![]), 0)
-        else {
-            panic!("expected setf binding target");
-        };
+        let target = callable_binding_name_target(binding).expect("setf binding target");
 
         assert_eq!(target.text, "foo");
-        assert_eq!(target.path.to_string(), "1.0.0.1");
     }
 
     #[test]
@@ -92,12 +90,14 @@ mod tests {
             reader_lambda_body_scope: MacroletRenameScope::default(),
             quasiquote_depth: 0,
         };
+        let (mut paths, path) = TraversalPathArena::from_path(&Path::from_indexes(vec![]));
         let mut renames = Vec::new();
 
         BindingTraversal::collect_binding_name_renames(
             binding,
             0,
-            &Path::from_indexes(vec![]),
+            path,
+            &mut paths,
             crate::domain::common_lisp::CommonLispLocalCallableForm::Flet,
             context,
             state,
@@ -119,10 +119,8 @@ mod tests {
             .view();
         let body = view.children.get(2).expect("body form");
 
-        let target = callable_list_head_target(body, &Path::from_indexes(vec![0, 2]))
-            .expect("setf callable head");
+        let target = callable_list_head_target(body).expect("setf callable head");
 
         assert_eq!(target.text, "foo");
-        assert_eq!(target.path.to_string(), "0.2.0.1");
     }
 }

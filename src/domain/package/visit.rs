@@ -53,11 +53,13 @@ fn visit_form(
         && atom_text(&view.children[0]).is_some_and(|head| {
             is_package_head(dialect, head, CommonLispPackageDeclarationForm::Defpackage)
         })
-        && let Some(package_name) = atom_text(&view.children[1])
-        && package.is_none_or(|target| package_atoms_match(package_name, target.as_str()))
     {
-        *matched_defpackages += 1;
-        visitor(view, path, package_name)?;
+        if let Some(package_name) = atom_text(&view.children[1]) {
+            if package.is_none_or(|target| package_atoms_match(package_name, target.as_str())) {
+                *matched_defpackages += 1;
+                visitor(view, path, package_name)?;
+            }
+        }
     }
 
     for (index, child) in view.children.iter().enumerate() {

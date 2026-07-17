@@ -101,3 +101,21 @@ fn renames_package_qualified_function_references_inside_compiler_macrolet_body_a
         ]
     };
 }
+
+#[test]
+fn escaped_colon_does_not_bypass_macrolet_shadowing() {
+    assert_function_rename! {
+        input: "(defun foo\\:bar (x) x)\n(defun caller () (macrolet ((foo\\:bar () nil)) (foo\\:bar)) (foo\\:bar 1))",
+        dialect: Dialect::CommonLisp,
+        from: "foo\\:bar",
+        to: "renamed",
+        definitions: 1,
+        calls: 1,
+        changed: true,
+        rewritten_contains: [
+            "(defun renamed (x) x)",
+            "(macrolet ((foo\\:bar () nil)) (foo\\:bar))",
+            "(renamed 1)"
+        ]
+    };
+}

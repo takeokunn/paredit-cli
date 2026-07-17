@@ -54,11 +54,19 @@ fn add_scoped(
     definitions: &[RenameFunctionOccurrence],
     calls: &[RenameFunctionOccurrence],
 ) -> Result<()> {
-    let scope = enclosing_specialized_scope(context.tree, context.path, namespace)?;
+    let scope = enclosing_specialized_scope(context.root_view, context.path, namespace)?;
     let occurrences: Vec<_> = definitions
         .iter()
         .chain(calls)
-        .filter(|item| occurrence_has_scope(context.tree, item.span, namespace, scope))
+        .filter(|item| {
+            occurrence_has_scope(
+                context.root_view,
+                context.atom_paths,
+                item.span,
+                namespace,
+                scope,
+            )
+        })
         .collect();
     let spans: Vec<ByteSpan> = occurrences.iter().map(|item| item.span).collect();
     let rewritten = apply_byte_span_edits(

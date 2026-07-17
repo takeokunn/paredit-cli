@@ -14,6 +14,7 @@ mod types;
 pub use edit::Edit;
 pub use formatter::Formatter;
 pub use parser::ParseError;
+pub(in crate::domain) use tree::AtomOccurrenceIndex;
 pub use tree::{
     AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, ReaderPrefix, Selection,
     SyntaxTree,

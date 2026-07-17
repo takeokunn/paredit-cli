@@ -125,3 +125,32 @@ fn rejects_relative_extract_function_insertion_without_anchor_path() {
         "--insert before/after requires --anchor-path"
     );
 }
+
+#[test]
+fn rejects_selection_source_mismatches_without_panicking() {
+    let source = "(defun f () α)";
+    let tree = SyntaxTree::parse(source).expect("parse selection fixture");
+    let path = Path::from_indexes(vec![0, 3]);
+    let selection = tree.select_path(&path).expect("select fixture");
+
+    for input in ["(defun g () β)", "(x)", "(defun f () aé)"] {
+        let error = plan_extract_function(ExtractFunctionRequest {
+            input,
+            selection,
+            path: Some(path.clone()),
+            dialect: Dialect::CommonLisp,
+            name: SymbolName::new("extracted").expect("symbol fixture"),
+            explicit_params: Vec::new(),
+            infer_params: false,
+            insert: ExtractFunctionInsert::Append,
+            anchor_path: None,
+        })
+        .expect_err("mismatched selection source must be rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("source used to build the selection")
+        );
+    }
+}

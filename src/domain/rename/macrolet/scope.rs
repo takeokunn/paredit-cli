@@ -1,6 +1,9 @@
 use crate::domain::callable_scope::is_macro_callable_form;
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
-use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::{
+    common_lisp_operator_head_eq, common_lisp_symbol_reference_eq,
+    has_common_lisp_package_qualifier,
+};
 use crate::domain::rename::reader::atom_symbol_text;
 use crate::domain::rename::selection::list_head;
 use crate::domain::sexpr::{ExpressionView, SymbolName};
@@ -65,15 +68,7 @@ pub(super) fn allows_function_reference_rename(
     scope: MacroletRenameScope,
     target_text: &str,
 ) -> bool {
-    !scope.is_shadowed() || is_package_qualified_callable(target_text)
-}
-
-fn is_package_qualified_callable(target_text: &str) -> bool {
-    let Some((package_name, symbol_name)) = target_text.split_once(':') else {
-        return false;
-    };
-
-    !target_text.starts_with(':') && !package_name.is_empty() && !symbol_name.is_empty()
+    !scope.is_shadowed() || has_common_lisp_package_qualifier(target_text)
 }
 
 pub(super) fn reader_lambda_body_scope(scope: MacroletRenameScope) -> MacroletRenameScope {

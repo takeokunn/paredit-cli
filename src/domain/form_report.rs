@@ -68,7 +68,7 @@ struct FormStats {
 impl FormStats {
     fn collect(view: &ExpressionView) -> Self {
         let mut stats = Self::default();
-        collect_stats(view, 0, &mut stats);
+        collect_stats(view, &mut stats);
         stats
     }
 
@@ -111,31 +111,33 @@ pub fn build_form_report(request: FormReportRequest<'_>) -> FormReport {
     }
 }
 
-fn collect_stats(view: &ExpressionView, depth: usize, stats: &mut FormStats) {
-    stats.max_depth = stats.max_depth.max(depth);
+fn collect_stats(view: &ExpressionView, stats: &mut FormStats) {
+    let mut pending = vec![(view, 0_usize)];
 
-    match view.kind {
-        ExpressionKind::Root | ExpressionKind::List => {
-            stats.list_count += 1;
-            for child in &view.children {
-                collect_stats(child, depth + 1, stats);
+    while let Some((view, depth)) = pending.pop() {
+        stats.max_depth = stats.max_depth.max(depth);
+
+        match view.kind {
+            ExpressionKind::Root | ExpressionKind::List => {
+                stats.list_count += 1;
+                pending.extend(view.children.iter().rev().map(|child| (child, depth + 1)));
             }
-        }
-        ExpressionKind::Atom => {
-            stats.atom_count += 1;
-            if let Some(text) = view
-                .text
-                .as_deref()
-                .filter(|text| !text.is_empty() && !text.starts_with('"'))
-            {
-                let entry = stats
-                    .symbols
-                    .entry(text.to_owned())
-                    .or_insert(SymbolAccumulator {
-                        count: 0,
-                        first_span: view.span,
-                    });
-                entry.count += 1;
+            ExpressionKind::Atom => {
+                stats.atom_count += 1;
+                if let Some(text) = view
+                    .text
+                    .as_deref()
+                    .filter(|text| !text.is_empty() && !text.starts_with('"'))
+                {
+                    let entry = stats
+                        .symbols
+                        .entry(text.to_owned())
+                        .or_insert(SymbolAccumulator {
+                            count: 0,
+                            first_span: view.span,
+                        });
+                    entry.count += 1;
+                }
             }
         }
     }
@@ -241,5 +243,21 @@ mod tests {
         );
         assert_eq!(result.symbols[0].count, 1);
         assert_eq!(result.symbols[1].count, 1);
+    }
+
+    #[test]
+    fn reports_statistics_for_deeply_nested_forms_without_recursion() {
+        const DEPTH: usize = 30_000;
+        let mut input = "(".repeat(DEPTH);
+        input.push('x');
+        input.push_str(&")".repeat(DEPTH));
+
+        let result = report(&input, Path::root_child(0), false);
+
+        assert_eq!(result.atom_count, 1);
+        assert_eq!(result.list_count, DEPTH);
+        assert_eq!(result.max_depth, DEPTH);
+        assert_eq!(result.symbols.len(), 1);
+        assert_eq!(result.symbols[0].symbol, "x");
     }
 }

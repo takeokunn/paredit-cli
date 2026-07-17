@@ -4,6 +4,8 @@ use crate::domain::sexpr::tree::{Node, NodeKind, ReaderPrefix, SyntaxTree};
 use crate::domain::sexpr::types::Delimiter;
 use crate::domain::sexpr::types::NodeId;
 
+const MAX_RECURSIVE_FORMAT_DEPTH: usize = 256;
+
 /// One planned unit of top-level output: either a form (with the comments that
 /// attach to it) or a run of standalone comments with no following form.
 enum TopLevelItem {
@@ -22,7 +24,9 @@ enum TopLevelItem {
 
 impl Formatter {
     pub fn new(indent: usize) -> Self {
-        Self { indent }
+        Self {
+            indent: indent.min(MAX_INLINE_WIDTH),
+        }
     }
 
     pub fn format(&self, tree: &SyntaxTree) -> String {
@@ -145,6 +149,10 @@ impl Formatter {
         output: &mut String,
     ) {
         let node = tree.node(node_id);
+        if depth >= MAX_RECURSIVE_FORMAT_DEPTH {
+            output.push_str(node.span.slice(&tree.source));
+            return;
+        }
         match node.kind {
             NodeKind::Root => (),
             NodeKind::Atom => {
@@ -252,34 +260,74 @@ impl Formatter {
     }
 
     pub(super) fn compact_node(&self, tree: &SyntaxTree, node_id: NodeId) -> Option<String> {
-        let node = tree.node(node_id);
-        match node.kind {
-            NodeKind::Root => None,
-            NodeKind::Atom => Some(node.span.slice(&tree.source).to_owned()),
-            NodeKind::List => {
-                if self.is_opaque_reader_form(node) {
-                    return Some(node.span.slice(&tree.source).to_owned());
-                }
-                if let Some(head) = self.head_text(tree, node_id) {
-                    if self.style_for_head(head) != ListStyle::General {
-                        return None;
-                    }
-                }
+        fn push_bounded(output: &mut String, value: &str) -> Option<()> {
+            let new_len = output.len().checked_add(value.len())?;
+            if new_len > MAX_INLINE_WIDTH {
+                return None;
+            }
+            output.push_str(value);
+            Some(())
+        }
 
-                let delimiter = self.list_delimiter(node);
-                let mut output = String::new();
-                self.write_reader_prefixes(node, &mut output);
-                output.push(delimiter.open());
-                for (position, child) in node.children.iter().enumerate() {
-                    if position > 0 {
-                        output.push(' ');
+        fn push_char_bounded(output: &mut String, value: char) -> Option<()> {
+            let new_len = output.len().checked_add(value.len_utf8())?;
+            if new_len > MAX_INLINE_WIDTH {
+                return None;
+            }
+            output.push(value);
+            Some(())
+        }
+
+        enum Action {
+            Node(NodeId),
+            Separator,
+            Close(char),
+        }
+
+        let mut output = String::new();
+        let mut actions = vec![Action::Node(node_id)];
+
+        while let Some(action) = actions.pop() {
+            match action {
+                Action::Separator => push_char_bounded(&mut output, ' ')?,
+                Action::Close(delimiter) => push_char_bounded(&mut output, delimiter)?,
+                Action::Node(current_id) => {
+                    let node = tree.node(current_id);
+                    match node.kind {
+                        NodeKind::Root => return None,
+                        NodeKind::Atom => {
+                            push_bounded(&mut output, node.span.slice(&tree.source))?;
+                        }
+                        NodeKind::List if self.is_opaque_reader_form(node) => {
+                            push_bounded(&mut output, node.span.slice(&tree.source))?;
+                        }
+                        NodeKind::List => {
+                            if self
+                                .head_text(tree, current_id)
+                                .is_some_and(|head| self.style_for_head(head) != ListStyle::General)
+                            {
+                                return None;
+                            }
+
+                            for prefix in &node.reader_prefixes {
+                                push_bounded(&mut output, prefix.as_source())?;
+                            }
+                            let delimiter = self.list_delimiter(node);
+                            push_char_bounded(&mut output, delimiter.open())?;
+                            actions.push(Action::Close(delimiter.close()));
+                            for (position, child) in node.children.iter().enumerate().rev() {
+                                actions.push(Action::Node(*child));
+                                if position > 0 {
+                                    actions.push(Action::Separator);
+                                }
+                            }
+                        }
                     }
-                    output.push_str(&self.compact_node(tree, *child)?);
                 }
-                output.push(delimiter.close());
-                (output.len() <= MAX_INLINE_WIDTH).then_some(output)
             }
         }
+
+        Some(output)
     }
 
     pub(super) fn format_inline_or_node(
@@ -324,6 +372,18 @@ impl Formatter {
     }
 
     pub(super) fn indent(&self, depth: usize) -> String {
-        " ".repeat(depth * self.indent)
+        " ".repeat(self.indentation_width(depth))
+    }
+
+    pub(super) fn continuation_column(&self, depth: usize, offset: usize) -> usize {
+        self.indentation_width(depth).saturating_add(offset)
+    }
+
+    pub(super) fn add_indent(&self, column: usize) -> usize {
+        column.saturating_add(self.indent)
+    }
+
+    fn indentation_width(&self, depth: usize) -> usize {
+        depth.saturating_mul(self.indent)
     }
 }

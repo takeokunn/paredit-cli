@@ -14,17 +14,22 @@ pub fn common_lisp_reader_literals(tree: &SyntaxTree) -> Vec<CommonLispReaderLit
 }
 
 fn collect_reader_literals(view: &ExpressionView, literals: &mut Vec<CommonLispReaderLiteral>) {
-    if view.kind == ExpressionKind::List
-        && view.delimiter == Some(Delimiter::Paren)
-        && view.reader_prefixes.contains(&ReaderPrefix::HashLiteral)
-    {
-        literals.push(CommonLispReaderLiteral {
-            kind: CommonLispReaderLiteralKind::Vector,
-            span: view.span,
-        });
-    }
+    let mut stack = vec![view];
+    while let Some(view) = stack.pop() {
+        if let Some(kind) = reader_literal_kind(view) {
+            literals.push(CommonLispReaderLiteral {
+                kind,
+                span: view.span,
+            });
+        }
 
-    for child in &view.children {
-        collect_reader_literals(child, literals);
+        stack.extend(view.children.iter().rev());
     }
+}
+
+pub(crate) fn reader_literal_kind(view: &ExpressionView) -> Option<CommonLispReaderLiteralKind> {
+    (view.kind == ExpressionKind::List
+        && view.delimiter == Some(Delimiter::Paren)
+        && view.reader_prefixes.contains(&ReaderPrefix::HashLiteral))
+    .then_some(CommonLispReaderLiteralKind::Vector)
 }

@@ -21,7 +21,17 @@ pub enum ParseError {
     UnterminatedBlockComment(usize),
     #[error("unterminated multiple-escape symbol starting at byte {0}")]
     UnterminatedSymbol(usize),
+    #[error("single escape at byte {0} is missing an escaped character")]
+    DanglingSingleEscape(usize),
+    #[error("reader prefix or discard at byte {0} is missing a form")]
+    MissingReaderForm(usize),
+    #[error(
+        "discarded reader form complexity limit exceeded at byte {position}: maximum is {limit} parser frames"
+    )]
+    ResourceLimitExceeded { position: usize, limit: usize },
 }
+
+pub(super) const MAX_DISCARDED_FORM_STACK_FRAMES: usize = 65_536;
 
 pub(in crate::domain::sexpr) struct Parser<'a> {
     input: &'a str,
@@ -40,6 +50,17 @@ pub(in crate::domain::sexpr) struct Parser<'a> {
 struct PrefixToken {
     kind: ReaderPrefix,
     start: ByteOffset,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SkipFrame {
+    Form {
+        missing_at: usize,
+    },
+    List {
+        open_pos: ByteOffset,
+        expected_close: u8,
+    },
 }
 
 impl<'a> Parser<'a> {
@@ -282,7 +303,7 @@ impl<'a> Parser<'a> {
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
             if byte == b'\\' {
-                self.consume_single_escape();
+                self.consume_single_escape()?;
                 continue;
             }
             if byte == b'|' {
@@ -303,11 +324,14 @@ impl<'a> Parser<'a> {
     /// This keeps character literals such as `#\[`, `#\)`, and `#\Space`, as well
     /// as escaped symbol constituents like `\(`, from being split at what would
     /// otherwise be a delimiter or whitespace boundary.
-    fn consume_single_escape(&mut self) {
+    fn consume_single_escape(&mut self) -> std::result::Result<(), ParseError> {
+        let start = self.pos.get();
         self.advance();
-        if self.pos.get() < self.bytes.len() {
-            self.advance();
+        if self.pos.get() >= self.bytes.len() {
+            return Err(ParseError::DanglingSingleEscape(start));
         }
+        self.advance();
+        Ok(())
     }
 
     /// Consumes a Lisp multiple-escape (`|...|`) region and the following
@@ -323,7 +347,7 @@ impl<'a> Parser<'a> {
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
             if byte == b'\\' {
-                self.consume_single_escape();
+                self.consume_single_escape()?;
                 continue;
             }
             if byte == b'|' {
@@ -367,10 +391,24 @@ impl<'a> Parser<'a> {
             self.skip_reader_comment()?;
             return Ok(());
         }
-        let prefixes = self.consume_reader_prefixes()?;
+        let mut prefixes = Vec::new();
+        loop {
+            prefixes.extend(self.consume_reader_prefixes()?);
+            if self.pos.get() >= self.bytes.len() {
+                break;
+            }
+            if !self.current_byte_is_reader_comment() {
+                break;
+            }
+            self.skip_reader_comment()?;
+            self.skip_trivia()?;
+        }
         if self.pos.get() >= self.bytes.len() {
-            self.push_atom(prefixes, self.pos, self.pos);
-            return Ok(());
+            let missing_at = prefixes
+                .first()
+                .map(|prefix| prefix.start.get())
+                .unwrap_or(self.pos.get());
+            return Err(ParseError::MissingReaderForm(missing_at));
         }
         match self.current_byte() {
             byte if Delimiter::from_open(byte).is_some() => self.open_list_with_prefixes(prefixes),
@@ -400,7 +438,7 @@ impl<'a> Parser<'a> {
         self.advance();
         self.advance();
         self.suppress_depth += 1;
-        let result = self.skip_trivia().and_then(|()| self.skip_form());
+        let result = self.skip_form(start.get());
         self.suppress_depth -= 1;
         result?;
         // Only the outermost datum comment records; nested `#;`/`#_` are folded in.
@@ -408,69 +446,158 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn skip_form(&mut self) -> std::result::Result<(), ParseError> {
-        if self.pos.get() >= self.bytes.len() {
-            return Ok(());
-        }
-        if self.current_byte_is_reader_comment() {
-            return self.skip_reader_comment();
-        }
+    fn skip_form(&mut self, missing_at: usize) -> std::result::Result<(), ParseError> {
+        let mut frames = Vec::new();
+        Self::push_skip_frame(&mut frames, SkipFrame::Form { missing_at }, self.pos.get())?;
+        while let Some(frame) = frames.pop() {
+            match frame {
+                SkipFrame::Form { missing_at } => {
+                    self.skip_trivia()?;
+                    if self.pos.get() >= self.bytes.len() {
+                        return Err(ParseError::MissingReaderForm(missing_at));
+                    }
 
-        while let Some(prefix) = self.current_reader_prefix() {
-            self.advance_reader_prefix(prefix);
-            self.skip_trivia()?;
-            if self.pos.get() >= self.bytes.len() {
-                return Ok(());
-            }
-            if self.current_byte_is_reader_comment() {
-                return self.skip_reader_comment();
-            }
-        }
+                    let mut prefix_start = None;
+                    while let Some(prefix) = self.current_reader_prefix() {
+                        prefix_start.get_or_insert(self.pos.get());
+                        self.advance_reader_prefix(prefix);
+                        self.skip_trivia()?;
+                        if self.pos.get() >= self.bytes.len() {
+                            return Err(ParseError::MissingReaderForm(
+                                prefix_start.unwrap_or(missing_at),
+                            ));
+                        }
+                    }
 
-        if self.pos.get() >= self.bytes.len() {
-            return Ok(());
-        }
+                    if self.current_byte_is_reader_comment() {
+                        let comment_start = self.pos.get();
+                        self.advance();
+                        self.advance();
+                        Self::push_skip_frame(
+                            &mut frames,
+                            SkipFrame::Form {
+                                missing_at: prefix_start.unwrap_or(missing_at),
+                            },
+                            comment_start,
+                        )?;
+                        Self::push_skip_frame(
+                            &mut frames,
+                            SkipFrame::Form {
+                                missing_at: comment_start,
+                            },
+                            comment_start,
+                        )?;
+                        continue;
+                    }
 
-        match self.current_byte() {
-            byte if Delimiter::from_open(byte).is_some() => self.skip_list()?,
-            byte if Delimiter::from_close(byte).is_some() => {
-                let Some(delimiter) = Delimiter::from_close(byte) else {
-                    debug_assert!(false, "closing delimiter branch without delimiter");
-                    return Ok(());
-                };
-                return Err(ParseError::UnexpectedClose {
-                    delimiter: delimiter.close(),
-                    position: self.pos.get(),
-                });
+                    if self.current_byte_is_feature_dispatch() {
+                        let dispatch_start = self.pos.get();
+                        self.advance();
+                        self.advance();
+                        // A feature conditional is one reader form even though the
+                        // normal syntax tree exposes its three parts as siblings.
+                        // The guarded datum is pushed first because frames are LIFO.
+                        Self::push_skip_frame(
+                            &mut frames,
+                            SkipFrame::Form {
+                                missing_at: dispatch_start,
+                            },
+                            dispatch_start,
+                        )?;
+                        Self::push_skip_frame(
+                            &mut frames,
+                            SkipFrame::Form {
+                                missing_at: dispatch_start,
+                            },
+                            dispatch_start,
+                        )?;
+                        continue;
+                    }
+
+                    match self.current_byte() {
+                        byte if Delimiter::from_open(byte).is_some() => {
+                            let open_pos = self.pos;
+                            let expected_close = Delimiter::from_open(byte)
+                                .expect("opening delimiter checked above")
+                                .close() as u8;
+                            self.advance();
+                            Self::push_skip_frame(
+                                &mut frames,
+                                SkipFrame::List {
+                                    open_pos,
+                                    expected_close,
+                                },
+                                open_pos.get(),
+                            )?;
+                        }
+                        byte if Delimiter::from_close(byte).is_some() => {
+                            let delimiter = Delimiter::from_close(byte)
+                                .expect("closing delimiter checked above");
+                            return Err(ParseError::UnexpectedClose {
+                                delimiter: delimiter.close(),
+                                position: self.pos.get(),
+                            });
+                        }
+                        b'"' => self.skip_string()?,
+                        _ => self.skip_atom()?,
+                    }
+                }
+                SkipFrame::List {
+                    open_pos,
+                    expected_close,
+                } => {
+                    self.skip_trivia()?;
+                    if self.pos.get() >= self.bytes.len() {
+                        return Err(ParseError::UnclosedList(open_pos.get()));
+                    }
+                    if self.current_byte() == expected_close {
+                        self.advance();
+                        continue;
+                    }
+                    Self::push_skip_frame(
+                        &mut frames,
+                        SkipFrame::List {
+                            open_pos,
+                            expected_close,
+                        },
+                        self.pos.get(),
+                    )?;
+                    Self::push_skip_frame(
+                        &mut frames,
+                        SkipFrame::Form {
+                            missing_at: self.pos.get(),
+                        },
+                        self.pos.get(),
+                    )?;
+                }
             }
-            b'"' => self.skip_string(),
-            _ => self.skip_atom()?,
         }
         Ok(())
     }
 
-    fn skip_list(&mut self) -> std::result::Result<(), ParseError> {
-        let open_pos = self.pos;
-        let open = self.current_byte();
-        let Some(expected_close) = Delimiter::from_open(open).map(Delimiter::close) else {
-            debug_assert!(false, "skip_list called on non-opening delimiter");
-            return Ok(());
-        };
-        self.advance();
-        loop {
-            self.skip_trivia()?;
-            if self.pos.get() >= self.bytes.len() {
-                return Err(ParseError::UnclosedList(open_pos.get()));
-            }
-            if self.current_byte() == expected_close as u8 {
-                self.advance();
-                return Ok(());
-            }
-            self.skip_form()?;
+    fn push_skip_frame(
+        frames: &mut Vec<SkipFrame>,
+        frame: SkipFrame,
+        position: usize,
+    ) -> std::result::Result<(), ParseError> {
+        if frames.len() >= MAX_DISCARDED_FORM_STACK_FRAMES {
+            return Err(ParseError::ResourceLimitExceeded {
+                position,
+                limit: MAX_DISCARDED_FORM_STACK_FRAMES,
+            });
         }
+        frames
+            .try_reserve(1)
+            .map_err(|_| ParseError::ResourceLimitExceeded {
+                position,
+                limit: MAX_DISCARDED_FORM_STACK_FRAMES,
+            })?;
+        frames.push(frame);
+        Ok(())
     }
 
-    fn skip_string(&mut self) {
+    fn skip_string(&mut self) -> std::result::Result<(), ParseError> {
+        let start = self.pos;
         self.advance();
         let mut escaped = false;
         while self.pos.get() < self.bytes.len() {
@@ -481,9 +608,10 @@ impl<'a> Parser<'a> {
             } else if byte == b'\\' {
                 escaped = true;
             } else if byte == b'"' {
-                return;
+                return Ok(());
             }
         }
+        Err(ParseError::UnterminatedString(start.get()))
     }
 
     fn skip_block_comment(&mut self) -> std::result::Result<(), ParseError> {
@@ -513,15 +641,10 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_atom(&mut self) -> std::result::Result<(), ParseError> {
-        if self.current_byte_is_feature_dispatch() {
-            self.advance();
-            self.advance();
-            return Ok(());
-        }
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
             if byte == b'\\' {
-                self.consume_single_escape();
+                self.consume_single_escape()?;
                 continue;
             }
             if byte == b'|' {

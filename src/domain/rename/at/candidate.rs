@@ -1,8 +1,9 @@
 use anyhow::Result;
 
 use super::RenameAtNamespace;
+use super::selection::AtomPathIndex;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ByteSpan, Path, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, ExpressionView, Path, SymbolName, SyntaxTree};
 
 mod global_callable;
 mod lexical_value;
@@ -20,6 +21,8 @@ pub(super) struct SpecializedCandidateContext<'a> {
     pub(super) input: &'a str,
     pub(super) dialect: Dialect,
     pub(super) tree: &'a SyntaxTree,
+    pub(super) root_view: &'a ExpressionView,
+    pub(super) atom_paths: AtomPathIndex<'a>,
     pub(super) path: &'a Path,
     pub(super) selected_span: ByteSpan,
     pub(super) from: &'a SymbolName,

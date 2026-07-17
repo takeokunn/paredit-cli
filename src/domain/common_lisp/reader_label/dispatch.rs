@@ -1,4 +1,6 @@
-use crate::domain::sexpr::{ByteSpan, ExpressionPath};
+use crate::domain::sexpr::ByteSpan;
+#[cfg(test)]
+use crate::domain::sexpr::ExpressionPath;
 
 /// The kind of a Common Lisp reader-label dispatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,6 +10,7 @@ pub enum CommonLispReaderLabelKind {
 }
 
 /// One `#n=` or `#n#` dispatch atom found in a parsed document.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommonLispReaderLabelDispatch {
     pub kind: CommonLispReaderLabelKind,

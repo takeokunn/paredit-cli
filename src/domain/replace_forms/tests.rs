@@ -69,6 +69,23 @@ fn rejects_shape_mismatch_when_required() {
     );
 }
 
+#[test]
+fn rejects_input_that_does_not_match_tree_source() {
+    let tree = SyntaxTree::parse("(a x)").unwrap();
+
+    let error = plan_replace_forms(ReplaceFormsRequest {
+        input: "(é x)",
+        tree: &tree,
+        dialect: Dialect::CommonLisp,
+        paths: vec![Path::from_indexes(vec![0, 1])],
+        replacement: "y",
+        require_same_shape: false,
+    })
+    .unwrap_err();
+
+    assert!(error.to_string().contains("does not match"));
+}
+
 fn lisp_symbol_strategy() -> impl Strategy<Value = String> {
     "[a-z][a-z0-9-]{0,8}".prop_map(|name| name)
 }

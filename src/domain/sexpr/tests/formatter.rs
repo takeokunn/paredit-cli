@@ -518,3 +518,25 @@ fn formatting_never_drops_comments_and_is_idempotent() {
         "comment-preserving format must be idempotent"
     );
 }
+
+#[test]
+fn formats_thirty_thousand_nested_lists_without_overflow() {
+    const DEPTH: usize = 30_000;
+
+    let input = format!("{}value{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&input).expect("valid deeply nested input");
+    let formatted = Formatter::new(2).format(&tree);
+
+    SyntaxTree::parse(&formatted).expect("deeply formatted output parses again");
+    assert!(formatted.contains("value"));
+}
+
+#[test]
+fn clamps_extreme_indent_without_overflow_or_unbounded_padding() {
+    let input = "(defun render (value) (prepare value) (emit value))";
+    let tree = SyntaxTree::parse(input).expect("valid");
+    let formatted = Formatter::new(usize::MAX).format(&tree);
+
+    assert!(formatted.len() < 1_024);
+    SyntaxTree::parse(&formatted).expect("formatted output parses again");
+}

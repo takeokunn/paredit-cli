@@ -8,17 +8,19 @@ use crate::domain::sexpr::{ExpressionKind, ExpressionView, ReaderPrefix};
 use super::super::RenameFunctionOccurrence;
 use super::super::target::callable_name_target;
 use super::core::{
-    TraversalContext, TraversalState, allows_function_reference_rename,
-    collect_function_call_head_renames_from_view,
+    TraversalContext, TraversalFrame, TraversalPath, TraversalPathArena, TraversalState,
+    allows_function_reference_rename,
 };
 
 fn collect_callable_target_rename(
     target_view: &ExpressionView,
-    target_path: crate::domain::sexpr::Path,
-    state: &TraversalState<'_>,
+    target_path: TraversalPath,
+    state: &TraversalState,
+    paths: &TraversalPathArena,
     context: &TraversalContext<'_>,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
+    let target_path = paths.materialize(target_path);
     let Some(target) = callable_name_target(target_view, &target_path) else {
         return false;
     };
@@ -40,69 +42,49 @@ fn collect_callable_target_rename(
 
 pub(in crate::domain::rename::function) fn collect_function_designator_renames(
     view: &ExpressionView,
-    state: &TraversalState<'_>,
+    state: &TraversalState,
+    paths: &TraversalPathArena,
     context: &TraversalContext<'_>,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) -> bool {
     if state.quasiquote_depth == 0 && view.reader_prefixes.contains(&ReaderPrefix::Function) {
-        return collect_callable_target_rename(view, state.path.clone(), state, context, renames);
+        return collect_callable_target_rename(view, state.path, state, paths, context, renames);
     }
 
     false
 }
 
-/// Handles a bare quoted-symbol designator (`'foo`, i.e. an atom carrying its
-/// own `ReaderPrefix::Quote`) reached via `apply_reader_prefix_context`
-/// bailing out of the traversal at top-level quote depth. `'foo` is the
-/// standard idiom for referencing a symbol as data -- e.g. `(error 'foo
-/// ...)`, `(typep x 'foo)`, `(make-instance 'foo)` -- so a function rename
-/// treats it the same as `#'foo` above: a live reference in the same
-/// namespace as the definition, subject to the same local-callable shadowing
-/// rules. A quoted *list* such as `'(foo 1)` keeps its reader prefix on the
-/// list node rather than on `foo` itself, so this never fires for genuine
-/// quoted data literals.
-pub(in crate::domain::rename::function) fn collect_quoted_symbol_designator_rename(
-    view: &ExpressionView,
-    state: &TraversalState<'_>,
-    context: &TraversalContext<'_>,
-    renames: &mut Vec<RenameFunctionOccurrence>,
-) -> bool {
-    if view.kind != ExpressionKind::Atom || !view.reader_prefixes.contains(&ReaderPrefix::Quote) {
-        return false;
-    }
-
-    collect_callable_target_rename(view, state.path.clone(), state, context, renames)
-}
-
 /// Handles a bare `(lambda ...)` form directly, skipping its parameter list
 /// the same way the `#'(lambda ...)` case below skips it via
 /// `explicit_reader_function_lambda_body_children`; see `bare_lambda_body_children`.
-pub(in crate::domain::rename::function) fn collect_bare_lambda_call_renames(
-    view: &ExpressionView,
-    context: &TraversalContext<'_>,
-    state: &TraversalState<'_>,
-    renames: &mut Vec<RenameFunctionOccurrence>,
+pub(in crate::domain::rename::function) fn collect_bare_lambda_call_renames<'a>(
+    view: &'a ExpressionView,
+    state: &TraversalState,
+    paths: &mut TraversalPathArena,
+    stack: &mut Vec<TraversalFrame<'a>>,
 ) -> bool {
     let Some(children) = bare_lambda_body_children(view) else {
         return false;
     };
 
-    for (child_index, child) in children {
-        collect_function_call_head_renames_from_view(
-            child,
-            context,
-            state.with_path(state.path.child(child_index)),
-            renames,
-        );
+    let children: Vec<_> = children.collect();
+    for (child_index, child) in children.into_iter().rev() {
+        let path = paths.child(state.path, child_index);
+        stack.push(TraversalFrame {
+            view: child,
+            state: state.with_path(path),
+        });
     }
     true
 }
 
-pub(in crate::domain::rename::function) fn collect_explicit_reader_form_call_renames(
-    view: &ExpressionView,
+pub(in crate::domain::rename::function) fn collect_explicit_reader_form_call_renames<'a>(
+    view: &'a ExpressionView,
     context: &TraversalContext<'_>,
-    state: TraversalState<'_>,
+    state: TraversalState,
+    paths: &mut TraversalPathArena,
     renames: &mut Vec<RenameFunctionOccurrence>,
+    stack: &mut Vec<TraversalFrame<'a>>,
 ) -> bool {
     if view.kind != ExpressionKind::List || view.children.len() < 2 {
         return false;
@@ -114,21 +96,8 @@ pub(in crate::domain::rename::function) fn collect_explicit_reader_form_call_ren
 
     match head.as_str() {
         "quote" if state.quasiquote_depth == 0 => {
-            // `(quote foo)` is the unabbreviated spelling of `'foo`; treat a
-            // bare symbol argument the same way `collect_quoted_symbol_designator_rename`
-            // treats `'foo` above. `(quote (foo 1))` -- a quoted *list* -- is
-            // left untouched: `view.children.get(1)` is a list there, and
-            // `collect_callable_target_rename` only matches atoms (or a
-            // `(setf foo)` spec), so it is a no-op for genuine quoted data.
-            if let Some(target) = view.children.get(1) {
-                collect_callable_target_rename(
-                    target,
-                    state.path.child(1),
-                    &state,
-                    context,
-                    renames,
-                );
-            }
+            // Quoted symbols are data, not function designators. Explicit
+            // function-valued forms are handled by the branches below.
             true
         }
         "quote" => true,
@@ -136,62 +105,51 @@ pub(in crate::domain::rename::function) fn collect_explicit_reader_form_call_ren
             if state.quasiquote_depth == 0 =>
         {
             if let Some(target) = view.children.get(1) {
-                collect_callable_target_rename(
-                    target,
-                    state.path.child(1),
-                    &state,
-                    context,
-                    renames,
-                );
+                let path = paths.child(state.path, 1);
+                collect_callable_target_rename(target, path, &state, paths, context, renames);
             }
             true
         }
         "function" if state.quasiquote_depth == 0 => {
             if let Some(target) = view.children.get(1) {
-                collect_callable_target_rename(
-                    target,
-                    state.path.child(1),
-                    &state,
-                    context,
-                    renames,
-                );
+                let path = paths.child(state.path, 1);
+                collect_callable_target_rename(target, path, &state, paths, context, renames);
             }
             if let Some(children) = explicit_reader_function_lambda_body_children(view) {
-                for (child_index, child) in children {
-                    collect_function_call_head_renames_from_view(
-                        child,
-                        context,
-                        state.with_path(state.path.child(1).child(child_index)),
-                        renames,
-                    );
+                let children: Vec<_> = children.collect();
+                for (child_index, child) in children.into_iter().rev() {
+                    let target = paths.child(state.path, 1);
+                    let path = paths.child(target, child_index);
+                    stack.push(TraversalFrame {
+                        view: child,
+                        state: state.with_path(path),
+                    });
                 }
             }
             true
         }
         "function" => true,
         "quasiquote" => {
-            for (index, child) in view.children.iter().enumerate().skip(1) {
-                collect_function_call_head_renames_from_view(
-                    child,
-                    context,
-                    state
-                        .with_quasiquote_depth(state.quasiquote_depth + 1)
-                        .with_path(state.path.child(index)),
-                    renames,
-                );
+            for (index, child) in view.children.iter().enumerate().skip(1).rev() {
+                let path = paths.child(state.path, index);
+                stack.push(TraversalFrame {
+                    view: child,
+                    state: state
+                        .with_quasiquote_depth(state.quasiquote_depth.saturating_add(1))
+                        .with_path(path),
+                });
             }
             true
         }
         "unquote" | "unquote-splicing" if state.quasiquote_depth > 0 => {
-            for (index, child) in view.children.iter().enumerate().skip(1) {
-                collect_function_call_head_renames_from_view(
-                    child,
-                    context,
-                    state
-                        .with_quasiquote_depth(state.quasiquote_depth - 1)
-                        .with_path(state.path.child(index)),
-                    renames,
-                );
+            for (index, child) in view.children.iter().enumerate().skip(1).rev() {
+                let path = paths.child(state.path, index);
+                stack.push(TraversalFrame {
+                    view: child,
+                    state: state
+                        .with_quasiquote_depth(state.quasiquote_depth.saturating_sub(1))
+                        .with_path(path),
+                });
             }
             true
         }

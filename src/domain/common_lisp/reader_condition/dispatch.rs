@@ -1,4 +1,6 @@
-use crate::domain::sexpr::{ByteSpan, ExpressionPath};
+use crate::domain::sexpr::ByteSpan;
+#[cfg(test)]
+use crate::domain::sexpr::ExpressionPath;
 
 /// The polarity of a Common Lisp reader-conditional dispatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,6 +10,7 @@ pub enum CommonLispReaderConditionalKind {
 }
 
 /// One `#+` or `#-` dispatch atom found in a parsed document.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommonLispReaderConditionalDispatch {
     pub kind: CommonLispReaderConditionalKind,

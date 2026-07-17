@@ -90,6 +90,25 @@ fn remove_unused_binding_error_for(
     .to_string()
 }
 
+#[test]
+fn rejects_target_that_does_not_match_input() {
+    let source = "(let ((x 1)) x)";
+    let symbol = symbol("x");
+
+    let error = plan_remove_unused_binding(RemoveUnusedBindingRequest {
+        input: "(é ((x 1)) x)",
+        dialect: Dialect::CommonLisp,
+        path: None,
+        target: target(source),
+        name: Some(&symbol),
+        all_bindings: false,
+        allow_drop_value: true,
+    })
+    .unwrap_err();
+
+    assert!(error.to_string().contains("does not match the input"));
+}
+
 fn common_lisp_plan(
     input: &str,
     name: Option<&str>,

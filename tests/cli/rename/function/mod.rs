@@ -231,6 +231,15 @@ fn assert_rollback_on_write_failure() {
         fs::read_to_string(&caller_file).expect("read caller after rollback"),
         "(defun caller () (old-name 2))\n"
     );
+    let staging_files = fs::read_dir(&dir)
+        .expect("list fixture directory")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().contains(".paredit-"))
+        .collect::<Vec<_>>();
+    assert!(
+        staging_files.is_empty(),
+        "staging files remained after failure: {staging_files:?}"
+    );
 }
 
 mod failure;

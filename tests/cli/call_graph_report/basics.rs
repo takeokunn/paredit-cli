@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn cli_handles_deeply_nested_call_graph_input() {
+    const DEPTH: usize = 12_000;
+    let mut source = String::with_capacity(DEPTH * 2 + 2);
+    for _ in 0..DEPTH {
+        source.push('(');
+    }
+    source.push('x');
+    for _ in 0..DEPTH {
+        source.push(')');
+    }
+    source.push('\n');
+    let lisp_file =
+        write_call_graph_fixture("call-graph-deeply-nested", "deeply-nested.lisp", &source);
+
+    let mut cmd = paredit();
+    cmd.arg("inspect")
+        .arg("call-graph")
+        .arg("--output")
+        .arg("json")
+        .arg(&lisp_file)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"edge_count\": 0"));
+}
+
+#[test]
 fn cli_reports_call_graph_across_dialects() {
     let dir = fresh_temp_dir("call-graph");
     let lisp_file = dir.join("core.lisp");
