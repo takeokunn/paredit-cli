@@ -14,7 +14,7 @@ pub(super) fn discover_duplicate_report_files(
         exclude: Vec::new(),
     })?;
 
-    Ok(discovery.files)
+    Ok(discovery.into_files())
 }
 
 #[cfg(test)]

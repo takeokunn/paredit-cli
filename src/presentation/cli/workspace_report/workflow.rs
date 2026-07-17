@@ -1,5 +1,3 @@
-use std::fs;
-
 use anyhow::{Context, Result};
 
 use crate::application::usecase::call_report::build_call_report;
@@ -41,11 +39,11 @@ pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) 
         max_depth: args.max_depth,
         exclude: Vec::new(),
     })?;
-    let mut reports = Vec::with_capacity(discovery.files.len());
+    let mut reports = Vec::with_capacity(discovery.files().len());
 
-    for file in &discovery.files {
+    for file in discovery.files() {
         let dialect = Dialect::detect(Some(file.as_path()), None);
-        let bytes = match fs::read(file) {
+        let bytes = match discovery.read_file(file) {
             Ok(bytes) => bytes,
             Err(error) => {
                 reports.push(parse_error_report(file.clone(), dialect, 0, error));
