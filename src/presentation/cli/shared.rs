@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::fmt::{self, Display, Write};
 use std::path::PathBuf;
 
 use super::{DialectArg, EditTargetArgs, SourceInput};
@@ -13,12 +14,70 @@ use crate::domain::sexpr::{
 mod diff;
 #[path = "io.rs"]
 mod io;
+#[cfg(target_os = "macos")]
+#[path = "macos_acl.rs"]
+mod macos_acl;
 
 pub(crate) use diff::unified_diff;
+pub(crate) use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
 pub(crate) use io::{
-    parse_document, read_file_or_empty, read_input, read_input_and_dialect,
-    read_input_dialect_and_tree, write_file_with_rollback, write_files_with_rollback,
+    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty, read_input,
+    read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_expected_target,
+    read_text_file_with_limit, read_text_with_limit, write_artifact_with_rollback,
+    write_file_with_rollback, write_files_with_rollback, write_files_with_rollback_expected,
 };
+
+pub(crate) fn terminal_safe<T: Display>(value: T) -> TerminalSafe<T> {
+    TerminalSafe(value)
+}
+
+pub(crate) struct TerminalSafe<T>(T);
+
+impl<T: Display> Display for TerminalSafe<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(TerminalEscapeWriter(formatter), "{}", self.0)
+    }
+}
+
+pub(crate) fn terminal_safe_error_chain(error: &anyhow::Error) -> TerminalSafeErrorChain<'_> {
+    TerminalSafeErrorChain(error)
+}
+
+pub(crate) struct TerminalSafeErrorChain<'a>(&'a anyhow::Error);
+
+impl Display for TerminalSafeErrorChain<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(TerminalEscapeWriter(formatter), "{:#}", self.0)
+    }
+}
+
+struct TerminalEscapeWriter<'a, 'b>(&'a mut fmt::Formatter<'b>);
+
+impl Write for TerminalEscapeWriter<'_, '_> {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        for character in value.chars() {
+            if is_terminal_control(character) {
+                write!(self.0, "\\u{{{:x}}}", u32::from(character))?;
+            } else {
+                self.0.write_char(character)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn is_terminal_control(character: char) -> bool {
+    matches!(
+        character,
+        '\u{0}'..='\u{1f}'
+            | '\u{7f}'..='\u{9f}'
+            | '\u{61c}'
+            | '\u{200e}'
+            | '\u{200f}'
+            | '\u{2028}'..='\u{202e}'
+            | '\u{2066}'..='\u{2069}'
+    )
+}
 
 pub(crate) fn apply_byte_span_edits(
     input: &str,
@@ -191,11 +250,31 @@ pub(crate) fn require_output_file(file: Option<&PathBuf>) -> Result<&PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::require_output_file;
+    use super::{require_output_file, terminal_safe, terminal_safe_error_chain};
 
     #[test]
     fn require_output_file_rejects_missing_file() {
         let error = require_output_file(None).unwrap_err();
         assert_eq!(error.to_string(), "--write requires --file");
+    }
+
+    #[test]
+    fn terminal_safe_escapes_record_and_display_controls() {
+        let value = "safe\0\n\r\t\u{1b}\u{7f}\u{85}\u{61c}\u{200e}\u{200f}\u{2028}\u{202e}\u{2066}\u{2069}終";
+
+        assert_eq!(
+            terminal_safe(value).to_string(),
+            "safe\\u{0}\\u{a}\\u{d}\\u{9}\\u{1b}\\u{7f}\\u{85}\\u{61c}\\u{200e}\\u{200f}\\u{2028}\\u{202e}\\u{2066}\\u{2069}終"
+        );
+    }
+
+    #[test]
+    fn terminal_safe_error_chain_escapes_each_context_as_one_value() {
+        let error = anyhow::anyhow!("leaf\n\u{202e}").context("context\t\u{1b}");
+
+        assert_eq!(
+            terminal_safe_error_chain(&error).to_string(),
+            "context\\u{9}\\u{1b}: leaf\\u{a}\\u{202e}"
+        );
     }
 }

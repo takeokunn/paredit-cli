@@ -19,14 +19,17 @@ pub(super) fn print_call_report(
 
     match output {
         OutputFormat::Text => {
-            println!("symbol\t{}", symbol.map_or("<all>", SymbolName::as_str));
+            println!(
+                "symbol\t{}",
+                safe_text!(symbol.map_or("<all>", SymbolName::as_str))
+            );
             println!("include_definitions\t{include_definitions}");
             println!("files\t{}", reports.len());
             println!("total_count\t{total_count}");
             for report in reports {
                 println!(
                     "{}\t{}\tcount={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.calls.len()
                 );
@@ -38,13 +41,13 @@ pub(super) fn print_call_report(
                     let enclosing = call.enclosing_definition.as_deref().unwrap_or("<none>");
                     println!(
                         "\t{}\t{}\t{}..{}\targs={}\tcategory={}\tenclosing={}",
-                        call.path,
-                        call.head,
+                        safe_text!(call.path),
+                        safe_text!(call.head),
                         call.span.start().get(),
                         call.span.end().get(),
                         call.argument_count,
                         category,
-                        enclosing
+                        safe_text!(enclosing)
                     );
                 }
             }

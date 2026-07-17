@@ -82,9 +82,9 @@ fn print_extract_local_function_plan(
     match output {
         OutputFormat::Text => {
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
-            println!("enclosing_path\t{}", plan.enclosing_path);
+            println!("enclosing_path\t{}", safe_text!(plan.enclosing_path));
             println!(
                 "span\t{}..{}",
                 plan.selected_span.start().get(),
@@ -95,12 +95,15 @@ fn print_extract_local_function_plan(
                 plan.enclosing_span.start().get(),
                 plan.enclosing_span.end().get()
             );
-            println!("name\t{}", plan.name);
-            println!("params\t{}", plan.params.join(","));
-            println!("inferred_params\t{}", plan.inferred_params.join(","));
-            println!("binding\t{binding}");
-            println!("call\t{}", plan.call);
-            println!("replacement\t{}", plan.replacement);
+            println!("name\t{}", safe_text!(plan.name));
+            println!("params\t{}", safe_text!(plan.params.join(",")));
+            println!(
+                "inferred_params\t{}",
+                safe_text!(plan.inferred_params.join(","))
+            );
+            println!("binding\t{}", safe_text!(binding));
+            println!("call\t{}", safe_text!(plan.call));
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

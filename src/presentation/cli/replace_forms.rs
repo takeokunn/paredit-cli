@@ -76,8 +76,10 @@ fn print_replace_forms_plan(
         OutputFormat::Text => {
             println!(
                 "file\t{}",
-                path.map(|path| path.display().to_string())
-                    .unwrap_or_else(|| "<stdin>".to_owned())
+                safe_text!(
+                    path.map(|path| path.display().to_string())
+                        .unwrap_or_else(|| "<stdin>".to_owned())
+                )
             );
             println!("dialect\t{}", dialect.label());
             println!("path_count\t{}", plan.targets.len());
@@ -95,13 +97,13 @@ fn print_replace_forms_plan(
             for target in &plan.targets {
                 println!(
                     "target\t{}\t{}..{}\t{}",
-                    target.form_path,
+                    safe_text!(target.form_path),
                     target.span.start().get(),
                     target.span.end().get(),
                     target.shape
                 );
             }
-            println!("rewritten\n{}", plan.rewritten);
+            println!("rewritten\n{}", safe_text!(plan.rewritten));
         }
         OutputFormat::Json => println!(
             "{}",

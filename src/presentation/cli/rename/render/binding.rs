@@ -13,9 +13,9 @@ pub(in crate::presentation::cli::rename) fn print_rename_binding_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
-            println!("form\t{}", plan.form);
+            println!("form\t{}", safe_text!(plan.form));
             println!(
                 "form_span\t{}..{}",
                 plan.form_span.start().get(),
@@ -26,8 +26,8 @@ pub(in crate::presentation::cli::rename) fn print_rename_binding_plan(
                 plan.binding_span.start().get(),
                 plan.binding_span.end().get()
             );
-            println!("from\t{}", plan.from);
-            println!("to\t{}", plan.to);
+            println!("from\t{}", safe_text!(plan.from));
+            println!("to\t{}", safe_text!(plan.to));
             println!("reference_count\t{}", plan.references.len());
             println!("shadowed_scope_count\t{}", plan.shadowed_scope_count);
             for span in &plan.references {

@@ -45,7 +45,7 @@ fn print_plan(
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("body_form_count\t{}", plan.body_form_count);
             println!("introduced_progn\t{}", plan.introduced_progn);
             println!("changed\t{}", plan.changed);

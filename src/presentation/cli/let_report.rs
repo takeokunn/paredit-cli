@@ -150,7 +150,7 @@ fn print_multi_file_let_report(
             for (file, dialect, reports) in per_file {
                 println!(
                     "file\t{}\tdialect={}\tlet_forms={}",
-                    file.display(),
+                    safe_text!(file.display()),
                     dialect.label(),
                     reports.len()
                 );
@@ -192,7 +192,7 @@ fn print_policy_summary_text(policy: &LetReportPolicy) {
     );
     println!("policy_passed\t{}", policy.passed);
     for violation in &policy.violations {
-        println!("policy_violation\t{violation}");
+        println!("policy_violation\t{}", safe_text!(violation));
     }
 }
 
@@ -200,8 +200,8 @@ fn print_let_forms_text(reports: &[LetFormReport]) {
     for report in reports {
         println!(
             "{}\t{}\t{}..{}\tbindings={}\tbody_count={}\tinline_supported={}",
-            report.path,
-            report.form,
+            safe_text!(report.path),
+            safe_text!(report.form),
             report.span.start().get(),
             report.span.end().get(),
             report.bindings.len(),
@@ -211,12 +211,12 @@ fn print_let_forms_text(reports: &[LetFormReport]) {
         for binding in &report.bindings {
             println!(
                 "\t{}\tvalue_span={}..{}\treferences={}\tcan_inline={}\trisks={}",
-                binding.name,
+                safe_text!(binding.name),
                 binding.value_span.start().get(),
                 binding.value_span.end().get(),
                 binding.reference_count,
                 binding.can_inline_without_duplication,
-                binding.risks.join(",")
+                safe_text!(binding.risks.join(","))
             );
         }
     }

@@ -83,28 +83,28 @@ fn print_thread_expression_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
             println!("style\t{}", plan.style.label());
-            println!("operator\t{}", plan.operator);
+            println!("operator\t{}", safe_text!(plan.operator));
             println!(
                 "span\t{}..{}",
                 plan.span.start().get(),
                 plan.span.end().get()
             );
-            println!("base\t{}", plan.base);
+            println!("base\t{}", safe_text!(plan.base));
             for step in &plan.steps {
                 println!(
                     "step\t{}\targs={}\tthreaded_arg={}\tspan={}..{}\t{}",
-                    step.head,
+                    safe_text!(step.head),
                     step.argument_count,
                     step.threaded_argument_index,
                     step.span.start().get(),
                     step.span.end().get(),
-                    step.step
+                    safe_text!(step.step)
                 );
             }
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

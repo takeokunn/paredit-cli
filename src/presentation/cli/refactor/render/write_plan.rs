@@ -14,17 +14,23 @@ pub(super) fn print_refactor_write_plan(
         write_plan.writable_indexes.len()
     );
     for path in writable_files {
-        println!("write_plan_writable_file\t{path}");
+        println!("write_plan_writable_file\t{}", safe_text!(path));
     }
     println!("write_plan_refused_file_count\t{}", refused_files.len());
     for path in refused_files {
-        println!("write_plan_refused_file\t{path}");
+        println!("write_plan_refused_file\t{}", safe_text!(path));
     }
     match &write_plan.refusal {
         Some(refusal) => {
             println!("write_plan_refusal\t{}", refusal.label());
-            println!("write_plan_refusal_reason\t{}", refusal.reason());
-            println!("write_plan_refusal_next_action\t{}", refusal.next_action());
+            println!(
+                "write_plan_refusal_reason\t{}",
+                safe_text!(refusal.reason())
+            );
+            println!(
+                "write_plan_refusal_next_action\t{}",
+                safe_text!(refusal.next_action())
+            );
             match refusal {
                 RefactorWriteRefusal::UnparsableOutputs { count } => {
                     println!("write_plan_unparsable_output_count\t{count}");

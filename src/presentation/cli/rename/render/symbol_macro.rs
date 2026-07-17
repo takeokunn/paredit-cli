@@ -23,15 +23,15 @@ pub(in crate::presentation::cli::rename) fn print_rename_symbol_macro_report(
         .sum::<usize>();
     match output {
         OutputFormat::Text => {
-            println!("from\t{from}");
-            println!("to\t{to}");
+            println!("from\t{}", safe_text!(from));
+            println!("to\t{}", safe_text!(to));
             println!("write\t{write}");
             println!("definitionCount\t{definition_count}");
             println!("referenceCount\t{reference_count}");
             for report in reports {
                 println!(
                     "{}\t{}\tdefinitions={}\treferences={}\tchanged={}\twritten={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.definitions.len(),
                     report.references.len(),

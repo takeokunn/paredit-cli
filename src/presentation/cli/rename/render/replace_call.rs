@@ -18,14 +18,14 @@ pub(in crate::presentation::cli::rename) fn print_replace_function_calls_report(
         .sum::<usize>();
     match output {
         OutputFormat::Text => {
-            println!("from\t{}", args.from);
-            println!("to\t{}", args.to);
+            println!("from\t{}", safe_text!(args.from));
+            println!("to\t{}", safe_text!(args.to));
             println!("callCount\t{call_count}");
             println!("passed\t{}", policy.passed);
             for report in reports {
                 println!(
                     "{}\t{}\tcalls={}\tchanged={}\twritten={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.calls.len(),
                     report.changed,

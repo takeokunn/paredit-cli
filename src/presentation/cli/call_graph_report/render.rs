@@ -25,7 +25,10 @@ pub(super) fn print_call_graph_report(
 
     match output {
         OutputFormat::Text => {
-            println!("symbol\t{}", symbol.map_or("<all>", SymbolName::as_str));
+            println!(
+                "symbol\t{}",
+                safe_text!(symbol.map_or("<all>", SymbolName::as_str))
+            );
             println!("include_external\t{include_external}");
             println!("files\t{}", reports.len());
             println!("definition_count\t{definition_count}");
@@ -35,7 +38,7 @@ pub(super) fn print_call_graph_report(
             println!("inbound_edge_count\t{}", policy.inbound_edge_count);
             println!("policy_passed\t{}", policy.passed);
             for violation in &policy.violations {
-                println!("policy_violation\t{violation}");
+                println!("policy_violation\t{}", safe_text!(violation));
             }
             for node in nodes_by_name.values() {
                 let categories = node
@@ -46,13 +49,15 @@ pub(super) fn print_call_graph_report(
                     .join(",");
                 println!(
                     "node\t{}\tdefinitions={}\tcategories={}",
-                    node.name, node.definition_count, categories
+                    safe_text!(node.name),
+                    node.definition_count,
+                    categories
                 );
             }
             for report in reports {
                 println!(
                     "{}\t{}\tdefinitions={}\tedges={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.definitions.len(),
                     report.edges.len()
@@ -67,11 +72,11 @@ pub(super) fn print_call_graph_report(
                         .join(",");
                     println!(
                         "\tedge\t{}\t{}\t{}..{}\tcallee={}\targs={}\tinternal={}\tcategories={}",
-                        caller,
-                        edge.path,
+                        safe_text!(caller),
+                        safe_text!(edge.path),
                         edge.span.start().get(),
                         edge.span.end().get(),
-                        edge.callee,
+                        safe_text!(edge.callee),
                         edge.argument_count,
                         edge.internal,
                         categories,

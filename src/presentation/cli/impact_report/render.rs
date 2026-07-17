@@ -20,7 +20,7 @@ pub(in crate::presentation::cli) fn print_impact_report(
 
     match output {
         OutputFormat::Text => {
-            println!("symbol\t{}", symbol.as_str());
+            println!("symbol\t{}", safe_text!(symbol.as_str()));
             println!("risk_level\t{}", policy.risk_level.label());
             println!("files\t{}", reports.len());
             println!("definition_count\t{}", policy.definition_count);
@@ -42,7 +42,7 @@ pub(in crate::presentation::cli) fn print_impact_report(
             );
             println!("policy_passed\t{}", policy.passed);
             for violation in &policy.violations {
-                println!("policy_violation\t{violation}");
+                println!("policy_violation\t{}", safe_text!(violation));
             }
             for (status, count) in &by_status {
                 println!("status\t{}\t{count}", status.label());
@@ -51,15 +51,15 @@ pub(in crate::presentation::cli) fn print_impact_report(
                 println!(
                     "risk\t{}\t{}\tcount={}\t{}",
                     risk.level.label(),
-                    risk.code,
+                    safe_text!(risk.code),
                     risk.count,
-                    risk.message
+                    safe_text!(risk.message)
                 );
             }
             for report in reports {
                 println!(
                     "{}\t{}\tdefinitions={}\treferences={}\tcalls={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.definitions.len(),
                     report.references.len(),

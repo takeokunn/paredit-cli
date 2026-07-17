@@ -10,19 +10,19 @@ pub(in crate::presentation::cli::definition_movement) fn print_move_definition_p
 ) -> Result<()> {
     match output {
         OutputFormat::Text => {
-            println!("from_file\t{}", plan.from_file.display());
-            println!("to_file\t{}", plan.to_file.display());
+            println!("from_file\t{}", safe_text!(plan.from_file.display()));
+            println!("to_file\t{}", safe_text!(plan.to_file.display()));
             println!("from_dialect\t{}", plan.from_dialect.label());
             println!("to_dialect\t{}", plan.to_dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!(
                 "span\t{}..{}",
                 plan.span.start().get(),
                 plan.span.end().get()
             );
-            println!("head\t{}", plan.definition.head);
+            println!("head\t{}", safe_text!(plan.definition.head));
             if let Some(name) = &plan.definition.name {
-                println!("name\t{name}");
+                println!("name\t{}", safe_text!(name));
             }
             println!("category\t{}", plan.definition.category.label());
             println!("to_file_existed\t{}", plan.to_file_existed);

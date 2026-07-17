@@ -39,11 +39,11 @@ fn print_plan(plan: &InlineSymbolMacroPlan, written: bool, output: OutputFormat)
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
-            println!("binding_name\t{}", plan.binding_name);
-            println!("binding_value\t{}", plan.binding_value);
+            println!("path\t{}", safe_text!(plan.path));
+            println!("binding_name\t{}", safe_text!(plan.binding_name));
+            println!("binding_value\t{}", safe_text!(plan.binding_value));
             println!("reference_count\t{}", plan.reference_count);
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

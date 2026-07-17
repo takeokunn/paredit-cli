@@ -13,20 +13,22 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
             let refused_files = preview.refused_paths_for_write_plan(&write_plan);
             let decision = preview.decision_for_write_plan(&write_plan);
             println!("mode\t{}", preview.mode.label());
-            println!("from\t{}", preview.from);
-            println!("to\t{}", preview.to);
+            println!("from\t{}", safe_text!(preview.from));
+            println!("to\t{}", safe_text!(preview.to));
             println!("write_requested\t{}", preview.write_requested);
             print_refactor_write_plan(&write_plan, &writable_files, &refused_files);
             print_refactor_preview_decision(&decision);
             if let Some(workspace) = &preview.workspace {
                 println!(
                     "workspace_roots\t{}",
-                    workspace
-                        .roots
-                        .iter()
-                        .map(|root| root.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(",")
+                    safe_text!(
+                        workspace
+                            .roots
+                            .iter()
+                            .map(|root| root.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
                 );
                 println!(
                     "workspace_discovered_file_count\t{}",
@@ -52,7 +54,7 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
             println!("files\t{}", preview.summary.file_count);
             println!("changed_file_count\t{}", preview.summary.changed_file_count);
             for changed_file in &preview.summary.changed_files {
-                println!("changed_file\t{changed_file}");
+                println!("changed_file\t{}", safe_text!(changed_file));
             }
             println!(
                 "unchanged_file_count\t{}",
@@ -71,14 +73,17 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
             let policy_summary = preview.policy.summary();
             println!("policy_violation_count\t{}", policy_summary.violation_count);
             println!("policy_write_blocked\t{}", policy_summary.write_blocked);
-            println!("policy_next_action\t{}", policy_summary.next_action);
+            println!(
+                "policy_next_action\t{}",
+                safe_text!(policy_summary.next_action)
+            );
             for violation in &preview.policy.violations {
-                println!("policy_violation\t{violation}");
+                println!("policy_violation\t{}", safe_text!(violation));
             }
             for file in &preview.files {
                 println!(
                     "file\t{}\t{}\tchanged={}\twritten={}\tedits={}\tparse={}\tinput_hash={}\toutput_hash={}",
-                    file.path.display(),
+                    safe_text!(file.path.display()),
                     file.dialect.label(),
                     file.changed,
                     file.written,
@@ -90,10 +95,10 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
                 for edit in &file.edits {
                     println!(
                         "edit\t{}\tstart={}\tend={}\treplacement={}",
-                        file.path.display(),
+                        safe_text!(file.path.display()),
                         edit.start,
                         edit.end,
-                        edit.replacement
+                        safe_text!(edit.replacement)
                     );
                 }
             }
@@ -209,8 +214,11 @@ fn refactor_preview_policy_summary_json(preview: &RefactorPreview) -> Value {
 
 fn print_refactor_preview_decision(decision: &RefactorPreviewDecision) {
     println!("decision_status\t{}", decision.status.label());
-    println!("decision_reason\t{}", decision.status.reason());
-    println!("decision_next_action\t{}", decision.status.next_action());
+    println!("decision_reason\t{}", safe_text!(decision.status.reason()));
+    println!(
+        "decision_next_action\t{}",
+        safe_text!(decision.status.next_action())
+    );
     println!(
         "decision_write_parse_refused\t{}",
         decision.write_parse_refused
@@ -219,7 +227,7 @@ fn print_refactor_preview_decision(decision: &RefactorPreviewDecision) {
     for step in decision.steps() {
         println!(
             "decision_step\t{}\tstatus={}",
-            step.name,
+            safe_text!(step.name),
             step.status.label()
         );
     }

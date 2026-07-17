@@ -12,17 +12,17 @@ pub(super) fn print_definition_report(
     for report in reports {
         println!(
             "{}\t{}\tdefinitions={}\tpackage={}",
-            report.path.display(),
+            safe_text!(report.path.display()),
             report.dialect.label(),
             report.definitions.len(),
-            report.package.as_deref().unwrap_or("")
+            safe_text!(report.package.as_deref().unwrap_or(""))
         );
         for definition in &report.definitions {
             println!(
                 "\t{}\t{}\t{}\t{}..{}\tparams={}\tbody={}\tpackage={}",
                 definition.category.label(),
-                definition.head,
-                definition.name.as_deref().unwrap_or(""),
+                safe_text!(definition.head),
+                safe_text!(definition.name.as_deref().unwrap_or("")),
                 definition.span.start().get(),
                 definition.span.end().get(),
                 definition
@@ -33,7 +33,7 @@ pub(super) fn print_definition_report(
                     .body_form_count
                     .map(|count| count.to_string())
                     .unwrap_or_default(),
-                definition.package.as_deref().unwrap_or("")
+                safe_text!(definition.package.as_deref().unwrap_or(""))
             );
         }
     }
@@ -52,24 +52,24 @@ pub(super) fn print_unused_definition_report(
     );
     println!("policy_passed\t{}", policy.passed);
     for violation in &policy.violations {
-        println!("policy_violation\t{violation}");
+        println!("policy_violation\t{}", safe_text!(violation));
     }
     for report in reports {
         println!(
             "{}\t{}\tdefinitions={}\tcandidates={}\tpackage={}",
-            report.path.display(),
+            safe_text!(report.path.display()),
             report.dialect.label(),
             report.definitions.len(),
             unused_candidate_count(report),
-            report.package.as_deref().unwrap_or("")
+            safe_text!(report.package.as_deref().unwrap_or(""))
         );
         for item in &report.definitions {
             let definition = &item.definition;
             println!(
                 "\t{}\t{}\t{}\t{}..{}\treferences={}\tunused={}\tbulk_removable={}",
                 definition.category.label(),
-                definition.head,
-                definition.name.as_deref().unwrap_or(""),
+                safe_text!(definition.head),
+                safe_text!(definition.name.as_deref().unwrap_or("")),
                 definition.span.start().get(),
                 definition.span.end().get(),
                 item.references.len(),

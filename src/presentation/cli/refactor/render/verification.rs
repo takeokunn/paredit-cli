@@ -9,10 +9,10 @@ pub(in crate::presentation::cli) fn print_refactor_verification(
         OutputFormat::Text => {
             println!("operation\t{}", verification.operation.label());
             println!("phase\t{}", verification.phase.label());
-            println!("symbol\t{}", verification.symbol);
+            println!("symbol\t{}", safe_text!(verification.symbol));
             println!(
                 "new_symbol\t{}",
-                verification.new_symbol.as_deref().unwrap_or("<none>")
+                safe_text!(verification.new_symbol.as_deref().unwrap_or("<none>"))
             );
             println!("passed\t{}", verification.passed);
             println!("target_kind\t{}", verification.target_kind.label());
@@ -51,10 +51,10 @@ pub(in crate::presentation::cli) fn print_refactor_verification(
                 println!(
                     "check\t{}\t{}\tpassed={}\tcount={}\t{}",
                     check.level.label(),
-                    check.code,
+                    safe_text!(check.code),
                     check.passed,
                     check.count,
-                    check.message
+                    safe_text!(check.message)
                 );
             }
         }

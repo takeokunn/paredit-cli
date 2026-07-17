@@ -11,21 +11,21 @@ pub(in crate::presentation::cli::definition_movement) fn print_sort_definitions_
 ) -> Result<()> {
     match output {
         OutputFormat::Text => {
-            println!("file\t{}", plan.file.display());
+            println!("file\t{}", safe_text!(plan.file.display()));
             println!("dialect\t{}", plan.dialect.label());
             println!("strategy\t{}", plan.strategy.label());
             println!("definition_count\t{}", plan.items.len());
             for item in &plan.items {
-                println!("old_path\t{}", item.old_path);
-                println!("new_path\t{}", item.new_path);
+                println!("old_path\t{}", safe_text!(item.old_path));
+                println!("new_path\t{}", safe_text!(item.new_path));
                 println!(
                     "span\t{}..{}",
                     item.span.start().get(),
                     item.span.end().get()
                 );
-                println!("head\t{}", item.head);
+                println!("head\t{}", safe_text!(item.head));
                 if let Some(name) = &item.name {
-                    println!("name\t{name}");
+                    println!("name\t{}", safe_text!(name));
                 }
                 println!("category\t{}", item.category.label());
             }

@@ -14,27 +14,30 @@ pub(in crate::presentation::cli) fn print_refactor_check_result(
 
     match output {
         OutputFormat::Text => {
-            println!("manifest_path\t{}", result.manifest.path.display());
+            println!(
+                "manifest_path\t{}",
+                safe_text!(result.manifest.path.display())
+            );
             println!("manifest_hash\t{}", result.manifest.hash);
             println!("mode\t{}", result.manifest.mode);
-            println!("from\t{}", result.manifest.from);
-            println!("to\t{}", result.manifest.to);
+            println!("from\t{}", safe_text!(result.manifest.from));
+            println!("to\t{}", safe_text!(result.manifest.to));
             println!("root_enforced\t{}", result.root.enforced);
             if let Some(path) = &result.root.path {
-                println!("root\t{}", path.display());
+                println!("root\t{}", safe_text!(path.display()));
             }
             println!("manifest_policy_passed\t{}", result.manifest_policy_passed);
             println!("manifest_outputs_parse\t{}", result.manifest_outputs_parse);
             println!("status\t{}", decision.status.label());
-            println!("next_action\t{}", decision.next_action.label());
+            println!("next_action\t{}", safe_text!(decision.next_action.label()));
             println!(
                 "blocked_reasons\t{}",
-                blocked_reason_text(&decision.blocked_reasons)
+                safe_text!(blocked_reason_text(&decision.blocked_reasons))
             );
             for step in decision.steps() {
                 println!(
                     "decision_step\t{}\tstatus={}",
-                    step.name,
+                    safe_text!(step.name),
                     step.status.label()
                 );
             }
@@ -43,7 +46,7 @@ pub(in crate::presentation::cli) fn print_refactor_check_result(
             println!("files\t{}", result.summary.file_count);
             println!("changed_file_count\t{}", result.summary.changed_file_count);
             for path in &result.summary.changed_files {
-                println!("changed_file\t{path}");
+                println!("changed_file\t{}", safe_text!(path));
             }
             println!("edit_count\t{}", result.summary.edit_count);
             println!("stale_file_count\t{}", result.summary.stale_file_count);
@@ -59,7 +62,7 @@ pub(in crate::presentation::cli) fn print_refactor_check_result(
             for file in &result.files {
                 println!(
                     "file\t{}\tchanged={}\texpected_changed={}\tedits={}\tinput_hash_matches={}\toutput_hash_matches={}\tparse={}\texpected_parse={}\tmanifest_flags_match={}\tstale={}",
-                    file.path.display(),
+                    safe_text!(file.path.display()),
                     file.changed,
                     file.expected_changed,
                     file.edit_count,

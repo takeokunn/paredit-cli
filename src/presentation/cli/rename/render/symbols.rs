@@ -14,13 +14,13 @@ pub(in crate::presentation::cli::rename) fn print_rename_symbols_report(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => {
-            println!("from\t{from}");
-            println!("to\t{to}");
+            println!("from\t{}", safe_text!(from));
+            println!("to\t{}", safe_text!(to));
             println!("write\t{write}");
             for report in reports {
                 println!(
                     "{}\t{}\tcount={}\tchanged={}\twritten={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.occurrences.len(),
                     report.changed,

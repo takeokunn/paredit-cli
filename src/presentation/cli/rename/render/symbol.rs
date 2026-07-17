@@ -17,13 +17,13 @@ pub(in crate::presentation::cli::rename) fn print_rename_plan(
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", dialect.label());
-            println!("from\t{from}");
-            println!("to\t{to}");
+            println!("from\t{}", safe_text!(from));
+            println!("to\t{}", safe_text!(to));
             println!("count\t{}", occurrences.len());
             for occurrence in occurrences {
                 println!(
                     "{}\t{}..{}",
-                    occurrence.path,
+                    safe_text!(occurrence.path),
                     occurrence.span.start().get(),
                     occurrence.span.end().get()
                 );

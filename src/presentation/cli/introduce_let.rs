@@ -60,7 +60,7 @@ fn print_introduce_let_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
             println!(
                 "selected_span\t{}..{}",
@@ -72,8 +72,8 @@ fn print_introduce_let_plan(
                 plan.enclosing_span.start().get(),
                 plan.enclosing_span.end().get()
             );
-            println!("name\t{}", plan.name);
-            println!("binding_value\t{}", plan.binding_value);
+            println!("name\t{}", safe_text!(plan.name));
+            println!("binding_value\t{}", safe_text!(plan.binding_value));
             println!("occurrence_count\t{}", plan.occurrence_spans.len());
             for span in &plan.occurrence_spans {
                 println!(
@@ -93,7 +93,7 @@ fn print_introduce_let_plan(
                     span.end().get()
                 );
             }
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

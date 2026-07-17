@@ -43,7 +43,7 @@ fn print_plan(plan: &SplitLetPlan, written: bool, output: OutputFormat) -> Resul
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("binding_index\t{}", plan.binding_index);
             println!("outer_binding_count\t{}", plan.outer_binding_count);
             println!("inner_binding_count\t{}", plan.inner_binding_count);

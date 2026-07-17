@@ -149,6 +149,8 @@ mod split_file;
 mod split_let_star;
 #[path = "cli/symbol_report.rs"]
 mod symbol_report;
+#[path = "cli/terminal_output_safety.rs"]
+mod terminal_output_safety;
 #[path = "cli/thread_expression/mod.rs"]
 mod thread_expression;
 #[path = "cli/unwrap_call.rs"]

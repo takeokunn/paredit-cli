@@ -44,7 +44,7 @@ pub(in crate::presentation::cli) fn insert_top_level(args: InsertTopLevelArgs) -
     match args.output {
         OutputFormat::Text => println!(
             "file={} dialect={} insert={:?} anchor_path={:?} changed={} written={}",
-            args.file.display(),
+            safe_text!(args.file.display()),
             dialect.label(),
             args.insert,
             args.anchor_path,

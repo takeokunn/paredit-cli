@@ -21,10 +21,10 @@ pub(super) fn print_symbol_occurrences(
             for occurrence in occurrences {
                 println!(
                     "{}\t{}..{}\t{}",
-                    occurrence.path,
+                    safe_text!(occurrence.path),
                     occurrence.span.start().get(),
                     occurrence.span.end().get(),
-                    occurrence.text
+                    safe_text!(occurrence.text)
                 );
             }
         }
@@ -63,13 +63,13 @@ pub(super) fn print_symbol_report(
 
     match output {
         OutputFormat::Text => {
-            println!("symbol\t{symbol}");
+            println!("symbol\t{}", safe_text!(symbol));
             println!("files\t{}", reports.len());
             println!("total_count\t{total_count}");
             for report in reports {
                 println!(
                     "{}\t{}\tcount={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.occurrences.len()
                 );
@@ -81,10 +81,10 @@ pub(super) fn print_symbol_report(
                         .unwrap_or("<none>");
                     println!(
                         "\t{}\t{}..{}\tcontext={}",
-                        occurrence.path,
+                        safe_text!(occurrence.path),
                         occurrence.span.start().get(),
                         occurrence.span.end().get(),
-                        context
+                        safe_text!(context)
                     );
                 }
             }
