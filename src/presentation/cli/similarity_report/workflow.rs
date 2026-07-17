@@ -7,10 +7,12 @@ use crate::application::usecase::similarity_report::{
     SimilarityCandidate, SimilarityReportOptions, build_similarity_pairs_with_omissions,
     collect_similarity_candidates,
 };
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use crate::infrastructure::workspace::{
+    WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
+};
 
-use super::super::read_input_and_dialect;
 use super::args::SimilarityReportArgs;
 use super::render::print_similarity_report;
 use super::types::{ErrorPolicy, FileProcessingError};
@@ -36,22 +38,17 @@ pub fn similarity_report(args: SimilarityReportArgs) -> Result<()> {
         args.max_comparisons,
         args.max_results,
     )?;
-    let output = process_workspace_files(
-        discovery.files.clone(),
-        args.dialect,
-        &options,
-        args.error_policy,
-    )?;
+    let output = process_workspace_files(&discovery, args.dialect, &options, args.error_policy)?;
 
-    if args.error_policy == ErrorPolicy::Fail
-        && let Some(error) = output.errors.first()
-    {
-        return Err(anyhow::anyhow!(
-            "failed to {} {}: {}",
-            error.stage,
-            error.path.display(),
-            error.source
-        ));
+    if args.error_policy == ErrorPolicy::Fail {
+        if let Some(error) = output.errors.first() {
+            return Err(anyhow::anyhow!(
+                "failed to {} {}: {}",
+                error.stage,
+                error.path.display(),
+                error.source
+            ));
+        }
     }
 
     let errors: Vec<FileProcessingError> = output
@@ -114,12 +111,12 @@ struct WorkspaceProcessingOutput {
 }
 
 fn process_workspace_files(
-    files: Vec<PathBuf>,
+    discovery: &WorkspaceDiscovery,
     dialect: Option<super::super::DialectArg>,
     options: &SimilarityReportOptions,
     error_policy: ErrorPolicy,
 ) -> Result<WorkspaceProcessingOutput> {
-    if files.is_empty() {
+    if discovery.files().is_empty() {
         return Ok(WorkspaceProcessingOutput::default());
     }
 
@@ -127,14 +124,15 @@ fn process_workspace_files(
         .map(|parallelism| parallelism.get())
         .unwrap_or(1)
         .max(1);
-    let chunk_size = files.len().max(1).div_ceil(worker_count);
+    let chunk_size = discovery.files().len().max(1).div_ceil(worker_count);
     let mut handles = Vec::new();
 
-    for chunk in files.chunks(chunk_size) {
+    for chunk in discovery.files().chunks(chunk_size) {
         let files = chunk.to_owned();
         let options = options.clone();
+        let discovery = discovery.clone();
         handles.push(thread::spawn(move || {
-            process_file_chunk(files, dialect, &options, error_policy)
+            process_file_chunk(files, &discovery, dialect, &options, error_policy)
         }));
     }
 
@@ -155,13 +153,14 @@ fn process_workspace_files(
 
 fn process_file_chunk(
     files: Vec<PathBuf>,
+    discovery: &WorkspaceDiscovery,
     dialect: Option<super::super::DialectArg>,
     options: &SimilarityReportOptions,
     error_policy: ErrorPolicy,
 ) -> WorkspaceProcessingOutput {
     let mut output = WorkspaceProcessingOutput::default();
     for file in files {
-        match process_file(&file, dialect, options) {
+        match process_file(&file, discovery, dialect, options) {
             Ok(file_output) => {
                 output.candidates.extend(file_output.candidates);
                 output.omitted_candidates = output
@@ -187,25 +186,31 @@ struct FileProcessingOutput {
 
 fn process_file(
     file: &std::path::Path,
+    discovery: &WorkspaceDiscovery,
     dialect: Option<super::super::DialectArg>,
     options: &SimilarityReportOptions,
 ) -> std::result::Result<FileProcessingOutput, ProcessingError> {
-    let (input, dialect) =
-        read_input_and_dialect(Some(file.to_path_buf()), dialect).map_err(|source| {
-            ProcessingError {
-                path: file.to_path_buf(),
-                stage: "read",
-                source,
-            }
+    let bytes = discovery
+        .read_file(file)
+        .map_err(|source| ProcessingError {
+            path: file.to_path_buf(),
+            stage: "read",
+            source,
         })?;
-    let tree = SyntaxTree::parse(&input.text).map_err(|source| ProcessingError {
+    let text = String::from_utf8(bytes).map_err(|source| ProcessingError {
+        path: file.to_path_buf(),
+        stage: "read",
+        source: source.into(),
+    })?;
+    let dialect = Dialect::detect(Some(file), dialect.map(Into::into));
+    let tree = SyntaxTree::parse(&text).map_err(|source| ProcessingError {
         path: file.to_path_buf(),
         stage: "parse",
         source: source.into(),
     })?;
     let mut candidates = Vec::new();
     let omitted_candidates =
-        collect_similarity_candidates(&tree, &input.text, file, dialect, options, &mut candidates)
+        collect_similarity_candidates(&tree, &text, file, dialect, options, &mut candidates)
             .map_err(|source| ProcessingError {
                 path: file.to_path_buf(),
                 stage: "collect",
@@ -240,8 +245,13 @@ mod tests {
         )
         .expect("test options are valid");
 
-        let output = process_workspace_files(Vec::new(), None, &options, ErrorPolicy::Fail)
-            .expect("empty workspace should not fail");
+        let output = process_workspace_files(
+            &WorkspaceDiscovery::default(),
+            None,
+            &options,
+            ErrorPolicy::Fail,
+        )
+        .expect("empty workspace should not fail");
 
         assert!(output.candidates.is_empty());
         assert!(output.errors.is_empty());

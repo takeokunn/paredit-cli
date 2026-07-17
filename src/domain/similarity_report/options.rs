@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
+pub(crate) const MAX_STORED_RESULTS: usize = 1_000_000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimilarityOverlapPolicy {
     Maximal,
@@ -129,6 +131,8 @@ pub enum SimilarityReportOptionsError {
     MaxComparisonsTooSmall,
     #[error("--max-results must be at least 1")]
     MaxResultsTooSmall,
+    #[error("--max-results must not exceed 1000000")]
+    MaxResultsTooLarge,
 }
 
 impl SimilarityReportOptions {
@@ -214,6 +218,12 @@ impl SimilarityReportOptions {
         if self.max_results == Some(0) {
             return Err(SimilarityReportOptionsError::MaxResultsTooSmall);
         }
+        if self
+            .max_results
+            .is_some_and(|limit| limit > MAX_STORED_RESULTS)
+        {
+            return Err(SimilarityReportOptionsError::MaxResultsTooLarge);
+        }
         Ok(())
     }
 }
@@ -226,7 +236,7 @@ mod tests {
     use crate::domain::dialect::Dialect;
     use crate::domain::sexpr::SyntaxTree;
 
-    use super::super::{collect_similarity_candidates, SimilarityCandidateCollectionError};
+    use super::super::{SimilarityCandidateCollectionError, collect_similarity_candidates};
 
     #[test]
     fn default_options_validate() {
@@ -274,6 +284,19 @@ mod tests {
         assert_eq!(
             options.validate(),
             Err(SimilarityReportOptionsError::MaxResultsTooSmall)
+        );
+    }
+
+    #[test]
+    fn reject_result_limit_above_retained_result_budget() {
+        let options = SimilarityReportOptions {
+            max_results: Some(MAX_STORED_RESULTS + 1),
+            ..SimilarityReportOptions::default()
+        };
+
+        assert_eq!(
+            options.validate(),
+            Err(SimilarityReportOptionsError::MaxResultsTooLarge)
         );
     }
 

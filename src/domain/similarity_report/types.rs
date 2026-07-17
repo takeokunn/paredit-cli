@@ -2,16 +2,76 @@ use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::domain::dialect::Dialect;
 use crate::domain::form_similarity::StructuralTree;
-use crate::domain::sexpr::{ByteSpan, Path};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, Path};
 
 #[allow(unused_imports)]
 pub use crate::domain::similarity_report::{
     SimilarityComparisonScope, SimilarityFormScope, SimilarityOverlapPolicy,
     SimilarityReportOptions, SimilarityReportOptionsError,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedFormText {
+    source: Arc<str>,
+    span: ByteSpan,
+}
+
+impl SharedFormText {
+    fn owned(text: String) -> Self {
+        let len = text.len();
+        Self {
+            source: Arc::from(text),
+            span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(len)),
+        }
+    }
+
+    pub(crate) fn from_source(source: Arc<str>, span: ByteSpan) -> Self {
+        Self { source, span }
+    }
+
+    pub(crate) fn source_identity(&self) -> *const str {
+        Arc::as_ptr(&self.source)
+    }
+
+    pub(crate) fn source_len(&self) -> usize {
+        self.source.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shares_source(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.source, &other.source)
+    }
+}
+
+impl Deref for SharedFormText {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.span.slice(&self.source)
+    }
+}
+
+impl AsRef<str> for SharedFormText {
+    fn as_ref(&self) -> &str {
+        self
+    }
+}
+
+impl PartialEq<str> for SharedFormText {
+    fn eq(&self, other: &str) -> bool {
+        self.as_ref() == other
+    }
+}
+
+impl PartialEq<&str> for SharedFormText {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_ref() == *other
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityFormReport {
@@ -21,7 +81,7 @@ pub struct SimilarityFormReport {
     pub span: ByteSpan,
     pub node_count: usize,
     pub head: Option<FormHead>,
-    pub text: String,
+    pub text: SharedFormText,
 }
 
 impl SimilarityFormReport {
@@ -41,7 +101,27 @@ impl SimilarityFormReport {
             span,
             node_count,
             head,
-            text: text.into(),
+            text: SharedFormText::owned(text.into()),
+        }
+    }
+
+    pub(crate) fn new_shared(
+        path: PathBuf,
+        dialect: Dialect,
+        form_path: Path,
+        span: ByteSpan,
+        node_count: usize,
+        head: Option<FormHead>,
+        source: Arc<str>,
+    ) -> Self {
+        Self {
+            path,
+            dialect,
+            form_path,
+            span,
+            node_count,
+            head,
+            text: SharedFormText::from_source(source, span),
         }
     }
 
@@ -56,19 +136,19 @@ impl SimilarityFormReport {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityCandidate {
-    pub form: SimilarityFormReport,
+    pub form: Arc<SimilarityFormReport>,
     pub tree: StructuralTree,
     pub comparison_head: Option<ComparisonHead>,
 }
 
 impl SimilarityCandidate {
     pub fn new(
-        form: SimilarityFormReport,
+        form: impl Into<Arc<SimilarityFormReport>>,
         tree: StructuralTree,
         comparison_head: Option<ComparisonHead>,
     ) -> Self {
         Self {
-            form,
+            form: form.into(),
             tree,
             comparison_head,
         }
@@ -87,8 +167,8 @@ impl SimilarityCandidate {
 pub struct SimilarityPairReport {
     pub similarity: f64,
     pub score: f64,
-    pub left: SimilarityFormReport,
-    pub right: SimilarityFormReport,
+    pub left: Arc<SimilarityFormReport>,
+    pub right: Arc<SimilarityFormReport>,
 }
 
 impl SimilarityPairReport {
@@ -97,6 +177,20 @@ impl SimilarityPairReport {
         score: f64,
         left: SimilarityFormReport,
         right: SimilarityFormReport,
+    ) -> Self {
+        Self {
+            similarity,
+            score,
+            left: Arc::new(left),
+            right: Arc::new(right),
+        }
+    }
+
+    pub(crate) fn from_shared(
+        similarity: f64,
+        score: f64,
+        left: Arc<SimilarityFormReport>,
+        right: Arc<SimilarityFormReport>,
     ) -> Self {
         Self {
             similarity,
@@ -216,6 +310,7 @@ pub struct SimilarityReportSummary {
     pub possible_pairs: usize,
     pub evaluated_pairs: usize,
     pub pruned_by_size: usize,
+    pub resource_skipped_pairs: usize,
     pub comparison_limit_reached: bool,
     pub unprocessed_pairs: usize,
     pub matched_pairs: usize,
@@ -232,6 +327,7 @@ impl SimilarityReportSummary {
         possible_pairs: usize,
         evaluated_pairs: usize,
         pruned_by_size: usize,
+        resource_skipped_pairs: usize,
         comparison_limit_reached: bool,
         unprocessed_pairs: usize,
         matched_pairs: usize,
@@ -245,6 +341,7 @@ impl SimilarityReportSummary {
             possible_pairs,
             evaluated_pairs,
             pruned_by_size,
+            resource_skipped_pairs,
             comparison_limit_reached,
             unprocessed_pairs,
             matched_pairs,
