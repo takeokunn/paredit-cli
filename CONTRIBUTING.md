@@ -23,7 +23,8 @@ nix flake check
 
 `nix flake check` is the required verification gate. It checks formatting,
 GitHub Actions syntax, Clippy, the test suite, package construction, rendered
-documentation, and the lint/format integration paths. See the full
+documentation, the exact MSRV build/test, and the lint/format integration
+paths. See the full
 [development guide](docs/src/development.md) for the local development loop
 and MSRV verification.
 
