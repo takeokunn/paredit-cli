@@ -35,7 +35,7 @@ pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs
         anyhow::bail!("selected top-level form is not recognized as a definition: {head}");
     };
 
-    let definition_text = selection.text(&input.text).to_owned();
+    let definition_text = selection.text().to_owned();
     let definition = DefinitionReportItem {
         path: args.path.to_string(),
         span,

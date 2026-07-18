@@ -77,7 +77,7 @@ fn expand_definition_report_inputs(
                 exclude: Vec::new(),
             })?;
 
-            for discovered in discovery.files {
+            for discovered in discovery.into_files() {
                 push_unique(&mut expanded, &mut seen, discovered);
             }
         } else {

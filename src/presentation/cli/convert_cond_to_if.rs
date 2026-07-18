@@ -40,7 +40,7 @@ fn print_plan(plan: &ConvertCondToIfPlan, written: bool, output: OutputFormat) -
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("clause_count\t{}", plan.clause_count);
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");

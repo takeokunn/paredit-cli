@@ -10,7 +10,7 @@ pub(super) fn print_form_report(report: &FormReport, output: OutputFormat) -> Re
         OutputFormat::Text => {
             println!("dialect\t{}", report.dialect.label());
             if let Some(path) = &report.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
             println!(
                 "span\t{}..{}",
@@ -22,7 +22,10 @@ pub(super) fn print_form_report(report: &FormReport, output: OutputFormat) -> Re
                 "delimiter\t{}",
                 report.delimiter.map(delimiter_label).unwrap_or("<none>")
             );
-            println!("head\t{}", report.head.as_deref().unwrap_or("<none>"));
+            println!(
+                "head\t{}",
+                safe_text!(report.head.as_deref().unwrap_or("<none>"))
+            );
             println!("definition_like\t{}", report.definition_like);
             println!("child_count\t{}", report.child_count);
             println!("atom_count\t{}", report.atom_count);
@@ -31,14 +34,14 @@ pub(super) fn print_form_report(report: &FormReport, output: OutputFormat) -> Re
             for symbol in &report.symbols {
                 println!(
                     "symbol\t{}\tcount={}\tfirst_span={}..{}",
-                    symbol.symbol,
+                    safe_text!(symbol.symbol),
                     symbol.count,
                     symbol.first_span.start().get(),
                     symbol.first_span.end().get()
                 );
             }
             if let Some(source) = &report.source {
-                println!("source\t{source}");
+                println!("source\t{}", safe_text!(source));
             }
         }
         OutputFormat::Json => println!(

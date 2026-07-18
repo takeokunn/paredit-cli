@@ -75,18 +75,18 @@ fn print_plan(plan: &ExtractConstantPlan, written: bool, output: OutputFormat) -
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("span\t{}..{}", plan.span_start, plan.span_end);
-            println!("name\t{}", plan.name);
+            println!("name\t{}", safe_text!(plan.name));
             println!("insert\t{}", plan.insert.label());
             if let Some(path) = &plan.anchor_path {
-                println!("anchor_path\t{path}");
+                println!("anchor_path\t{}", safe_text!(path));
             }
             if let Some(span) = plan.anchor_span {
                 println!("anchor_span\t{}..{}", span.start().get(), span.end().get());
             }
-            println!("replacement\t{}", plan.replacement);
-            println!("definition\t{}", plan.definition);
+            println!("replacement\t{}", safe_text!(plan.replacement));
+            println!("definition\t{}", safe_text!(plan.definition));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

@@ -6,9 +6,56 @@ fn replaces_expression() {
     let tree = SyntaxTree::parse(input).expect("valid");
     let selection = tree.select_path(&parse_path("0.1")).expect("selection");
     assert_eq!(
-        Edit::replace(input, selection, "delta"),
+        Edit::replace(input, selection, "delta").unwrap(),
         "(alpha delta gamma)"
     );
+}
+
+#[test]
+fn edit_rejects_input_that_does_not_match_selection_source() {
+    let source = "(alpha beta)";
+    let tree = SyntaxTree::parse(source).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+
+    assert!(Edit::replace("(alpha zeta)", selection, "delta").is_err());
+    assert!(Edit::wrap("(alpha zeta)", &tree, selection).is_err());
+}
+
+#[test]
+fn edit_rejects_input_with_incompatible_utf8_boundaries() {
+    let source = "(a x)";
+    let tree = SyntaxTree::parse(source).expect("valid");
+    let selection = tree.select_path(&parse_path("0.1")).expect("selection");
+
+    assert!(Edit::replace("(é x)", selection, "delta").is_err());
+}
+
+#[test]
+fn edit_rejects_corrupted_selection_span_without_panicking() {
+    let source = "(alpha beta)";
+    let mut tree = SyntaxTree::parse(source).expect("valid");
+    let selected_id = tree
+        .select_path(&parse_path("0.1"))
+        .expect("selection")
+        .node_id;
+    tree.nodes[selected_id.get()].span = ByteSpan::new(ByteOffset::new(9), ByteOffset::new(7));
+    let selection = Selection {
+        tree: &tree,
+        node_id: selected_id,
+    };
+
+    assert!(Edit::replace(source, selection, "delta").is_err());
+    assert!(Edit::kill(source, &tree, selection).is_err());
+}
+
+#[test]
+fn edit_rejects_selection_from_a_different_tree() {
+    let source = "(alpha beta)";
+    let first = SyntaxTree::parse(source).expect("valid");
+    let second = SyntaxTree::parse(source).expect("valid");
+    let selection = first.select_path(&parse_path("0.1")).expect("selection");
+
+    assert!(Edit::kill(source, &second, selection).is_err());
 }
 
 #[test]

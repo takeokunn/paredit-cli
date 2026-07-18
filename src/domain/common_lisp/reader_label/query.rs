@@ -1,8 +1,13 @@
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, SyntaxTree};
+#[cfg(test)]
+use crate::domain::sexpr::ExpressionPath;
+use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
 
-use super::{CommonLispReaderLabelDispatch, CommonLispReaderLabelForm, CommonLispReaderLabelKind};
+#[cfg(test)]
+use super::CommonLispReaderLabelDispatch;
+use super::{CommonLispReaderLabelForm, CommonLispReaderLabelKind};
 
 /// Returns every Common Lisp `#n=` or `#n#` dispatch atom in source order.
+#[cfg(test)]
 pub fn common_lisp_reader_label_dispatches(
     tree: &SyntaxTree,
 ) -> Vec<CommonLispReaderLabelDispatch> {
@@ -22,6 +27,7 @@ pub fn common_lisp_reader_label_forms(tree: &SyntaxTree) -> Vec<CommonLispReader
     forms
 }
 
+#[cfg(test)]
 fn collect_dispatches(
     view: &ExpressionView,
     path: &ExpressionPath,
@@ -41,16 +47,19 @@ fn collect_dispatches(
 }
 
 fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderLabelForm>) {
-    for (index, child) in view.children.iter().enumerate() {
+    let mut stack = vec![(view, 0)];
+    while let Some((view, index)) = stack.pop() {
+        let Some(child) = view.children.get(index) else {
+            continue;
+        };
         if let Some(kind) = reader_label_kind(child) {
             let span = match kind {
-                CommonLispReaderLabelKind::Definition => view
-                    .children
-                    .get(index + 1)
-                    .map_or(child.content_span, |datum| {
-                        ByteSpan::new(child.content_span.start(), datum.span.end())
-                    }),
-                CommonLispReaderLabelKind::Reference => child.content_span,
+                CommonLispReaderLabelKind::Definition => {
+                    view.children.get(index + 1).map_or(child.span, |datum| {
+                        ByteSpan::new(child.span.start(), datum.span.end())
+                    })
+                }
+                CommonLispReaderLabelKind::Reference => child.span,
             };
             forms.push(CommonLispReaderLabelForm {
                 kind,
@@ -58,11 +67,13 @@ fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderLabelFor
                 span,
             });
         }
-        collect_forms(child, forms);
+
+        stack.push((view, index + 1));
+        stack.push((child, 0));
     }
 }
 
-fn reader_label_kind(view: &ExpressionView) -> Option<CommonLispReaderLabelKind> {
+pub(crate) fn reader_label_kind(view: &ExpressionView) -> Option<CommonLispReaderLabelKind> {
     if view.kind != ExpressionKind::Atom {
         return None;
     }

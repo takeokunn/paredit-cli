@@ -11,17 +11,17 @@ pub(super) fn print_remove_definition_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => {
-            println!("file\t{}", plan.file.display());
+            println!("file\t{}", safe_text!(plan.file.display()));
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!(
                 "span\t{}..{}",
                 plan.span.start().get(),
                 plan.span.end().get()
             );
-            println!("head\t{}", plan.definition.head);
+            println!("head\t{}", safe_text!(plan.definition.head));
             if let Some(name) = &plan.definition.name {
-                println!("name\t{name}");
+                println!("name\t{}", safe_text!(name));
             }
             println!("category\t{}", plan.definition.category.label());
             println!("changed\t{}", plan.changed);
@@ -77,19 +77,19 @@ pub(super) fn print_remove_unused_definitions_plan(
             for file in &plan.files {
                 println!(
                     "{}\t{}\tremovals={}\tskipped={}\tchanged={}\tpackage={}",
-                    file.path.display(),
+                    safe_text!(file.path.display()),
                     file.dialect.label(),
                     file.removals.len(),
                     file.skipped.len(),
                     file.changed,
-                    file.package.as_deref().unwrap_or("")
+                    safe_text!(file.package.as_deref().unwrap_or(""))
                 );
                 for removal in &file.removals {
                     println!(
                         "\tremove\t{}\t{}\t{}\t{}..{}",
                         removal.definition.category.label(),
-                        removal.definition.head,
-                        removal.definition.name.as_deref().unwrap_or(""),
+                        safe_text!(removal.definition.head),
+                        safe_text!(removal.definition.name.as_deref().unwrap_or("")),
                         removal.definition.span.start().get(),
                         removal.definition.span.end().get()
                     );
@@ -98,8 +98,8 @@ pub(super) fn print_remove_unused_definitions_plan(
                     println!(
                         "\tskip\t{}\t{}\t{}\t{}",
                         skipped.definition.category.label(),
-                        skipped.definition.head,
-                        skipped.definition.name.as_deref().unwrap_or(""),
+                        safe_text!(skipped.definition.head),
+                        safe_text!(skipped.definition.name.as_deref().unwrap_or("")),
                         skipped.reason.label()
                     );
                 }

@@ -11,17 +11,19 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
     match output {
         OutputFormat::Text => {
             println!("operation\t{}", plan.operation.label());
-            println!("symbol\t{}", plan.symbol);
+            println!("symbol\t{}", safe_text!(plan.symbol));
             println!("target_kind\t{}", plan.target_kind.label());
             if let Some(workspace) = &plan.workspace {
                 println!(
                     "workspace_roots\t{}",
-                    workspace
-                        .roots
-                        .iter()
-                        .map(|root| root.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(",")
+                    safe_text!(
+                        workspace
+                            .roots
+                            .iter()
+                            .map(|root| root.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
                 );
                 println!(
                     "workspace_discovered_file_count\t{}",
@@ -46,8 +48,11 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
             }
             println!("safe_to_automate\t{}", summary.safe_to_automate);
             println!("decision_status\t{}", plan.automation.status.label());
-            println!("decision_reason\t{}", plan.automation.reason);
-            println!("decision_next_action\t{}", plan.automation.next_action);
+            println!("decision_reason\t{}", safe_text!(plan.automation.reason));
+            println!(
+                "decision_next_action\t{}",
+                safe_text!(plan.automation.next_action)
+            );
             println!(
                 "decision_safe_to_automate\t{}",
                 plan.automation.safe_to_automate
@@ -60,7 +65,7 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
             for step in plan.automation.steps() {
                 println!(
                     "decision_step\t{}\tstatus={}",
-                    step.name,
+                    safe_text!(step.name),
                     step.status.label()
                 );
             }
@@ -72,7 +77,7 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
             println!("policy_definition_count\t{}", plan.policy.definition_count);
             println!("policy_reference_count\t{}", plan.policy.reference_count);
             for violation in &plan.policy.violations {
-                println!("policy_violation\t{violation}");
+                println!("policy_violation\t{}", safe_text!(violation));
             }
             println!(
                 "risk_highest_level\t{}",
@@ -104,19 +109,19 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
                 println!(
                     "gate\t{}\t{}\tcount={}\tblocks={}\t{}",
                     gate.level.label(),
-                    gate.code,
+                    safe_text!(gate.code),
                     gate.count,
                     gate.blocks_automation,
-                    gate.message
+                    safe_text!(gate.message)
                 );
             }
             for step in &plan.steps {
                 println!(
                     "step\t{}\t{}\tcommand={}\t{}",
                     step.order,
-                    step.action,
-                    step.command.as_deref().unwrap_or("<manual-review>"),
-                    step.rationale
+                    safe_text!(step.action),
+                    safe_text!(step.command.as_deref().unwrap_or("<manual-review>")),
+                    safe_text!(step.rationale)
                 );
             }
         }

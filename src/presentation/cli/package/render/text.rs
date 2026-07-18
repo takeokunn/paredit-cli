@@ -11,7 +11,7 @@ pub(super) fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -
     let merge_count = plan.merges.len();
     let changed_merge_count = plan.merges.iter().filter(|merge| merge.changed).count();
 
-    println!("file\t{}", plan.path.display());
+    println!("file\t{}", safe_text!(plan.path.display()));
     println!("dialect\t{}", plan.dialect.label());
     println!("merge_count\t{merge_count}");
     println!("changed_merge_count\t{changed_merge_count}");
@@ -21,18 +21,21 @@ pub(super) fn print_merge_package_options_plan(plan: &MergePackageOptionsPlan) -
         let key = merge.key.as_deref().unwrap_or("-");
         println!(
             "\tmerge\t{}\t{}\tkey={}\t{}..{}\tchanged={}",
-            merge.package,
-            merge.head,
-            key,
+            safe_text!(merge.package),
+            safe_text!(merge.head),
+            safe_text!(key),
             merge.kept_span.start().get(),
             merge.kept_span.end().get(),
             merge.changed
         );
-        println!("\t\told\t{}", merge.old_atoms.join(" | "));
-        println!("\t\tnew\t{}", merge.new_atoms.join(" | "));
-        println!("\t\tremoved\t{}", merge.removed_paths.join(" | "));
+        println!("\t\told\t{}", safe_text!(merge.old_atoms.join(" | ")));
+        println!("\t\tnew\t{}", safe_text!(merge.new_atoms.join(" | ")));
+        println!(
+            "\t\tremoved\t{}",
+            safe_text!(merge.removed_paths.join(" | "))
+        );
     }
-    println!("rewritten\t{}", plan.rewritten);
+    println!("rewritten\t{}", safe_text!(plan.rewritten));
     Ok(())
 }
 
@@ -44,7 +47,7 @@ pub(super) fn print_sort_package_options_plan(plan: &SortPackageOptionsPlan) -> 
         .filter(|package| package.changed)
         .count();
 
-    println!("file\t{}", plan.path.display());
+    println!("file\t{}", safe_text!(plan.path.display()));
     println!("dialect\t{}", plan.dialect.label());
     println!("package_count\t{package_count}");
     println!("changed_package_count\t{changed_package_count}");
@@ -53,16 +56,16 @@ pub(super) fn print_sort_package_options_plan(plan: &SortPackageOptionsPlan) -> 
     for package in &plan.packages {
         println!(
             "\tpackage\t{}\t{}\t{}..{}\tchanged={}",
-            package.package,
-            package.defpackage_path,
+            safe_text!(package.package),
+            safe_text!(package.defpackage_path),
             package.defpackage_span.start().get(),
             package.defpackage_span.end().get(),
             package.changed
         );
-        println!("\t\told\t{}", package.old_options.join(" | "));
-        println!("\t\tnew\t{}", package.new_options.join(" | "));
+        println!("\t\told\t{}", safe_text!(package.old_options.join(" | ")));
+        println!("\t\tnew\t{}", safe_text!(package.new_options.join(" | ")));
     }
-    println!("rewritten\t{}", plan.rewritten);
+    println!("rewritten\t{}", safe_text!(plan.rewritten));
     Ok(())
 }
 
@@ -70,7 +73,7 @@ pub(super) fn print_sort_package_exports_plan(plan: &SortPackageExportsPlan) -> 
     let export_count = plan.exports.len();
     let changed_export_count = plan.exports.iter().filter(|export| export.changed).count();
 
-    println!("file\t{}", plan.path.display());
+    println!("file\t{}", safe_text!(plan.path.display()));
     println!("dialect\t{}", plan.dialect.label());
     println!("export_count\t{export_count}");
     println!("changed_export_count\t{changed_export_count}");
@@ -79,16 +82,16 @@ pub(super) fn print_sort_package_exports_plan(plan: &SortPackageExportsPlan) -> 
     for export in &plan.exports {
         println!(
             "\texport\t{}\t{}\t{}..{}\tchanged={}",
-            export.package,
-            export.export_path,
+            safe_text!(export.package),
+            safe_text!(export.export_path),
             export.export_span.start().get(),
             export.export_span.end().get(),
             export.changed
         );
-        println!("\t\told\t{}", export.old_symbols.join(" "));
-        println!("\t\tnew\t{}", export.new_symbols.join(" "));
+        println!("\t\told\t{}", safe_text!(export.old_symbols.join(" ")));
+        println!("\t\tnew\t{}", safe_text!(export.new_symbols.join(" ")));
     }
-    println!("rewritten\t{}", plan.rewritten);
+    println!("rewritten\t{}", safe_text!(plan.rewritten));
     Ok(())
 }
 
@@ -108,7 +111,7 @@ pub(super) fn print_package_report(reports: &[PackageReportFile]) -> Result<()> 
     for report in reports {
         println!(
             "{}\t{}\tdefpackages={}\tin_packages={}",
-            report.path.display(),
+            safe_text!(report.path.display()),
             report.dialect.label(),
             report.report.defpackages.len(),
             report.report.in_packages.len()
@@ -116,19 +119,19 @@ pub(super) fn print_package_report(reports: &[PackageReportFile]) -> Result<()> 
         for defpackage in &report.report.defpackages {
             println!(
                 "\tdefpackage\t{}\t{}..{}\t{}",
-                defpackage.path,
+                safe_text!(defpackage.path),
                 defpackage.span.start().get(),
                 defpackage.span.end().get(),
-                defpackage.name
+                safe_text!(defpackage.name)
             );
         }
         for in_package in &report.report.in_packages {
             println!(
                 "\tin-package\t{}\t{}..{}\t{}",
-                in_package.path,
+                safe_text!(in_package.path),
                 in_package.span.start().get(),
                 in_package.span.end().get(),
-                in_package.name
+                safe_text!(in_package.name)
             );
         }
     }
@@ -148,8 +151,8 @@ pub(super) fn print_rename_package_plan(
     let changed_count = plans.iter().filter(|plan| plan.changed).count();
     let written_count = plans.iter().filter(|plan| plan.written).count();
 
-    println!("from\t{from}");
-    println!("to\t{to}");
+    println!("from\t{}", safe_text!(from));
+    println!("to\t{}", safe_text!(to));
     println!("write\t{write}");
     println!("file_count\t{}", plans.len());
     println!("occurrence_count\t{occurrence_count}");
@@ -158,7 +161,7 @@ pub(super) fn print_rename_package_plan(
     for plan in plans {
         println!(
             "{}\t{}\toccurrences={}\tchanged={}\twritten={}",
-            plan.path.display(),
+            safe_text!(plan.path.display()),
             plan.dialect.label(),
             plan.occurrences.len(),
             plan.changed,
@@ -168,11 +171,11 @@ pub(super) fn print_rename_package_plan(
             println!(
                 "\t{}\t{}\t{}..{}\t{}\t=>\t{}",
                 occurrence.kind.label(),
-                occurrence.path,
+                safe_text!(occurrence.path),
                 occurrence.span.start().get(),
                 occurrence.span.end().get(),
-                occurrence.text,
-                occurrence.replacement
+                safe_text!(occurrence.text),
+                safe_text!(occurrence.replacement)
             );
         }
     }
@@ -180,11 +183,11 @@ pub(super) fn print_rename_package_plan(
 }
 
 pub(super) fn print_add_export_plan(plan: &AddExportPlan) -> Result<()> {
-    println!("file\t{}", plan.path.display());
+    println!("file\t{}", safe_text!(plan.path.display()));
     println!("dialect\t{}", plan.dialect.label());
-    println!("package\t{}", plan.package);
-    println!("symbol\t{}", plan.symbol);
-    println!("defpackage_path\t{}", plan.defpackage_path);
+    println!("package\t{}", safe_text!(plan.package));
+    println!("symbol\t{}", safe_text!(plan.symbol));
+    println!("defpackage_path\t{}", safe_text!(plan.defpackage_path));
     println!(
         "defpackage_span\t{}..{}",
         plan.defpackage_span.start().get(),
@@ -207,6 +210,6 @@ pub(super) fn print_add_export_plan(plan: &AddExportPlan) -> Result<()> {
     println!("already_exported\t{}", plan.already_exported);
     println!("changed\t{}", plan.changed);
     println!("written\t{}", plan.written);
-    println!("rewritten\t{}", plan.rewritten);
+    println!("rewritten\t{}", safe_text!(plan.rewritten));
     Ok(())
 }

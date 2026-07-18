@@ -40,7 +40,7 @@ fn print_plan(plan: &ConvertLetStarToLetPlan, written: bool, output: OutputForma
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("binding_count\t{}", plan.binding_names.len());
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");

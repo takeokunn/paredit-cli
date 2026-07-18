@@ -1,15 +1,17 @@
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionPath, ExpressionView, SyntaxTree};
+#[cfg(test)]
+use crate::domain::sexpr::ExpressionPath;
+use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
 
-use super::{
-    CommonLispReaderConditionalDispatch, CommonLispReaderConditionalForm,
-    CommonLispReaderConditionalKind,
-};
+#[cfg(test)]
+use super::CommonLispReaderConditionalDispatch;
+use super::{CommonLispReaderConditionalForm, CommonLispReaderConditionalKind};
 
 /// Returns every Common Lisp `#+` or `#-` dispatch atom in source order.
 ///
 /// The parser keeps the dispatch, feature expression, and guarded datum as
 /// sibling expressions. A bare dispatch is still reported so callers can
 /// reject incomplete input safely before attempting a structural refactor.
+#[cfg(test)]
 pub fn common_lisp_reader_conditional_dispatches(
     tree: &SyntaxTree,
 ) -> Vec<CommonLispReaderConditionalDispatch> {
@@ -35,6 +37,7 @@ pub fn common_lisp_reader_conditional_forms(
     forms
 }
 
+#[cfg(test)]
 fn collect_dispatches(
     view: &ExpressionView,
     path: &ExpressionPath,
@@ -54,25 +57,32 @@ fn collect_dispatches(
 }
 
 fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderConditionalForm>) {
-    for (index, child) in view.children.iter().enumerate() {
+    let mut stack = vec![(view, 0)];
+    while let Some((view, index)) = stack.pop() {
+        let Some(child) = view.children.get(index) else {
+            continue;
+        };
         if let Some(kind) = reader_conditional_kind(child) {
-            let span = view
+            let end = view
                 .children
                 .get(index + 2)
-                .map_or(child.content_span, |guarded| {
-                    ByteSpan::new(child.content_span.start(), guarded.span.end())
-                });
+                .or_else(|| view.children.get(index + 1))
+                .map_or(child.span.end(), |component| component.span.end());
             forms.push(CommonLispReaderConditionalForm {
                 kind,
                 dispatch_span: child.content_span,
-                span,
+                span: ByteSpan::new(child.span.start(), end),
             });
         }
-        collect_forms(child, forms);
+
+        stack.push((view, index + 1));
+        stack.push((child, 0));
     }
 }
 
-fn reader_conditional_kind(view: &ExpressionView) -> Option<CommonLispReaderConditionalKind> {
+pub(crate) fn reader_conditional_kind(
+    view: &ExpressionView,
+) -> Option<CommonLispReaderConditionalKind> {
     if view.kind != ExpressionKind::Atom {
         return None;
     }

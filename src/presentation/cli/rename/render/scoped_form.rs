@@ -13,15 +13,15 @@ pub(in crate::presentation::cli::rename) fn print_rename_in_form_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
             println!(
                 "scope_span\t{}..{}",
                 plan.scope_span.start().get(),
                 plan.scope_span.end().get()
             );
-            println!("from\t{}", plan.from);
-            println!("to\t{}", plan.to);
+            println!("from\t{}", safe_text!(plan.from));
+            println!("to\t{}", safe_text!(plan.to));
             println!("count\t{}", plan.occurrences.len());
             for span in &plan.occurrences {
                 println!("occurrence\t{}..{}", span.start().get(), span.end().get());

@@ -116,6 +116,64 @@ fn similarity_candidate(file: &str, node_count: usize) -> SimilarityCandidate {
     )
 }
 
+fn structural_similarity_candidate(file: &str, input: &str, index: usize) -> SimilarityCandidate {
+    let syntax_tree = SyntaxTree::parse(input).unwrap();
+    let structural_tree = crate::domain::form_similarity::StructuralTree::from_view(
+        &syntax_tree
+            .select_path(&crate::domain::sexpr::Path::root_child(0))
+            .unwrap()
+            .view(),
+    );
+    SimilarityCandidate::new(
+        SimilarityFormReport::new(
+            PathBuf::from(file),
+            Dialect::CommonLisp,
+            SExprPath::root_child(index),
+            ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
+            structural_tree.node_count(),
+            Some("foo".into()),
+            input,
+        ),
+        structural_tree,
+        Some("foo".into()),
+    )
+}
+
+#[test]
+fn report_tree_edit_budget_is_exact_and_shared_across_workers() {
+    let left_shape = "(foo (bar a) b)";
+    let right_shape = "(foo bar (a b))";
+    let values = (0..96)
+        .map(|index| {
+            structural_similarity_candidate(
+                "budget.lisp",
+                if index % 2 == 0 {
+                    left_shape
+                } else {
+                    right_shape
+                },
+                index,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let sequential = super::reports::tree_edit_operation_budget_execution_for_test(&values, 1, 1);
+    let parallel = super::reports::tree_edit_operation_budget_execution_for_test(&values, 1, 2);
+
+    assert_eq!(sequential.0, parallel.0);
+    assert_eq!(
+        sequential.0.as_deref(),
+        Some("tree similarity operation budget exceeded (2 operations, limit 1)")
+    );
+    assert_eq!((sequential.1, parallel.1), (1, 1));
+    assert!(sequential.2 && parallel.2);
+    assert_eq!(sequential.3, 1);
+    assert_eq!(parallel.3, 2);
+
+    let repeated = super::reports::tree_edit_operation_budget_execution_for_test(&values, 1, 2);
+    assert_eq!(repeated, parallel);
+}
+
 #[test]
 fn similarity_form_containment_is_span_based() {
     let outer = report_form("a.lisp", 0, 30);
@@ -312,10 +370,132 @@ fn comparison_scope_filters_pair_population() {
 }
 
 #[test]
+fn small_or_single_chunk_comparisons_stay_on_the_calling_thread() {
+    assert_eq!(
+        super::reports::scheduling_policy_for_test(8, 2_048, 1),
+        (1, false)
+    );
+    assert_eq!(
+        super::reports::scheduling_policy_for_test(8, 2_049, 1),
+        (4, false)
+    );
+    assert_eq!(
+        super::reports::scheduling_policy_for_test(1, 2_049, 1),
+        (1, false)
+    );
+    assert_eq!(
+        super::reports::scheduling_policy_for_test(8, 2_049, 2),
+        (4, true)
+    );
+    assert_eq!(
+        super::reports::scheduling_policy_for_test(usize::MAX, usize::MAX, usize::MAX),
+        (4, true)
+    );
+}
+
+#[test]
+fn large_result_limits_constrain_worker_local_buffers() {
+    assert_eq!(
+        super::reports::result_bounded_worker_count_for_test(4, Some(250_000)),
+        4
+    );
+    assert_eq!(
+        super::reports::result_bounded_worker_count_for_test(4, Some(250_001)),
+        1
+    );
+    assert_eq!(
+        super::reports::result_bounded_worker_count_for_test(4, Some(1_000_000)),
+        1
+    );
+}
+
+#[test]
+fn large_scoped_groups_are_split_at_file_boundaries() {
+    let mut values = Vec::new();
+    for path in ["a.lisp", "b.lisp", "c.lisp"] {
+        values.extend((0..40).map(|_| similarity_candidate(path, 3)));
+    }
+    values.sort_unstable_by(|left, right| {
+        left.form
+            .node_count
+            .cmp(&right.form.node_count)
+            .then_with(|| left.form.path.cmp(&right.form.path))
+    });
+    let groups = [values.as_slice()];
+
+    let mut same_file_costs =
+        super::reports::work_item_costs_for_test(&groups, SimilarityComparisonScope::SameFile, 4);
+    same_file_costs.sort_unstable();
+    assert_eq!(same_file_costs, vec![780, 780, 780]);
+
+    let mut cross_file_costs =
+        super::reports::work_item_costs_for_test(&groups, SimilarityComparisonScope::CrossFile, 4);
+    cross_file_costs.sort_unstable();
+    assert_eq!(cross_file_costs, vec![1_600, 3_200]);
+    assert_eq!(cross_file_costs.iter().sum::<usize>(), 4_800);
+}
+
+#[test]
+fn split_scoped_comparisons_match_the_sequential_path() {
+    let input = std::iter::repeat_n("(foo a)", 40)
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut values = Vec::new();
+    for path in ["a.lisp", "b.lisp", "c.lisp"] {
+        values.extend(candidates(path, &input, 2));
+    }
+
+    let options = |comparison_scope, max_comparisons| {
+        report_options(
+            1.0,
+            2,
+            1,
+            comparison_scope,
+            SimilarityFormScope::All,
+            SimilarityOverlapPolicy::Maximal,
+            None,
+            max_comparisons,
+            None,
+        )
+    };
+    let scheduled = super::reports::build_similarity_pairs(
+        values.clone(),
+        &options(SimilarityComparisonScope::SameFile, None),
+    )
+    .unwrap();
+    let sequential = super::reports::build_similarity_pairs(
+        values.clone(),
+        &options(SimilarityComparisonScope::SameFile, Some(usize::MAX)),
+    )
+    .unwrap();
+    assert_eq!(scheduled, sequential);
+
+    let cross_file_options = options(SimilarityComparisonScope::CrossFile, None);
+    let scheduled =
+        super::reports::build_similarity_pairs(values.clone(), &cross_file_options).unwrap();
+    let sequential = super::reports::build_similarity_pairs(
+        values.clone(),
+        &options(SimilarityComparisonScope::CrossFile, Some(usize::MAX)),
+    )
+    .unwrap();
+    assert_eq!(scheduled, sequential);
+    assert_eq!(sequential.summary.evaluated_pairs, 4_800);
+    assert_eq!(sequential.summary.unprocessed_pairs, 0);
+
+    let mut reversed = values;
+    reversed.reverse();
+    let reversed = super::reports::build_similarity_pairs(reversed, &cross_file_options).unwrap();
+    assert_eq!(scheduled, reversed);
+    assert_eq!(scheduled.summary.possible_pairs, 4_800);
+    assert_eq!(scheduled.summary.evaluated_pairs, 4_800);
+    assert_eq!(scheduled.summary.matched_pairs, 4_800);
+}
+
+#[test]
 fn threshold_is_inclusive() {
     let values = candidates("a.lisp", "(foo a b) (foo x y)", 2);
     let similarity =
-        crate::domain::form_similarity::tree_similarity(&values[0].tree, &values[1].tree);
+        crate::domain::form_similarity::tree_similarity(&values[0].tree, &values[1].tree).unwrap();
     let report = build_similarity_pairs(values, similarity, SimilarityOverlapPolicy::All, None);
     assert_eq!(report.pairs.len(), 1);
     assert_eq!(report.summary.evaluated_pairs, 1);
@@ -424,6 +604,7 @@ fn cross_file_size_pruning_keeps_later_valid_pairs() {
         &right_refs,
         0.75,
         None,
+        None,
         &mut evaluated_pairs,
         &mut workspace,
     );
@@ -453,6 +634,70 @@ fn maximal_overlap_suppresses_only_strictly_contained_pairs() {
     };
     assert!(nested_pair(&all));
     assert!(!nested_pair(&maximal));
+}
+
+#[test]
+fn maximal_overlap_normalizes_reversed_cross_file_pair_orientation() {
+    let mut values = candidates("a.lisp", "(outer (same x extra))", 2);
+    values.extend(candidates("b.lisp", "(outer padding padding (same y))", 2));
+    let node_count = |path: &str, text: &str| {
+        values
+            .iter()
+            .find(|candidate| {
+                candidate.form.path == FsPath::new(path) && candidate.form.text == text
+            })
+            .unwrap()
+            .form
+            .node_count
+    };
+
+    assert!(
+        node_count("a.lisp", "(outer (same x extra))")
+            < node_count("b.lisp", "(outer padding padding (same y))")
+    );
+    assert!(node_count("a.lisp", "(same x extra)") > node_count("b.lisp", "(same y)"));
+
+    let all = build_similarity_pairs(values.clone(), 0.0, SimilarityOverlapPolicy::All, None);
+    let maximal = build_similarity_pairs(values, 0.0, SimilarityOverlapPolicy::Maximal, None);
+    let nested_pair = |report: &SimilarityReport| {
+        report.pairs.iter().any(|pair| {
+            (pair.left.text == "(same x extra)" && pair.right.text == "(same y)")
+                || (pair.left.text == "(same y)" && pair.right.text == "(same x extra)")
+        })
+    };
+
+    assert!(nested_pair(&all));
+    assert!(!nested_pair(&maximal));
+    assert!(maximal.summary.suppressed_pairs > 0);
+}
+
+#[test]
+fn maximal_overlap_normalizes_reversed_same_file_pair_orientation() {
+    let mut pairs = vec![
+        SimilarityPairReport::new(
+            1.0,
+            2.0,
+            report_form("same.lisp", 0, 20),
+            report_form("same.lisp", 30, 60),
+        ),
+        SimilarityPairReport::new(
+            1.0,
+            1.0,
+            report_form("same.lisp", 40, 50),
+            report_form("same.lisp", 5, 10),
+        ),
+    ];
+
+    assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 1);
+    assert_eq!(pairs.len(), 1);
+    assert_eq!(
+        pairs[0].left.span,
+        ByteSpan::new(ByteOffset::new(0), ByteOffset::new(20))
+    );
+    assert_eq!(
+        pairs[0].right.span,
+        ByteSpan::new(ByteOffset::new(30), ByteOffset::new(60))
+    );
 }
 
 #[test]
@@ -521,6 +766,39 @@ fn maximal_overlap_suppression_is_independent_of_score_order() {
 }
 
 #[test]
+fn maximal_overlap_retains_duplicate_span_pairs() {
+    let pair = SimilarityPairReport::new(
+        1.0,
+        1.0,
+        report_form("a.lisp", 0, 10),
+        report_form("b.lisp", 0, 10),
+    );
+    let mut pairs = vec![pair.clone(), pair];
+
+    assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 0);
+    assert_eq!(pairs.len(), 2);
+}
+
+#[test]
+fn maximal_overlap_handles_large_non_overlapping_group() {
+    const PAIR_COUNT: usize = 10_000;
+    let mut pairs = (0..PAIR_COUNT)
+        .map(|index| {
+            let start = index * 2;
+            SimilarityPairReport::new(
+                1.0,
+                1.0,
+                report_form("a.lisp", start, start + 1),
+                report_form("b.lisp", start, start + 1),
+            )
+        })
+        .collect();
+
+    assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 0);
+    assert_eq!(pairs.len(), PAIR_COUNT);
+}
+
+#[test]
 fn max_results_truncates_only_reported_pairs() {
     let values = candidates("a.lisp", "(foo a) (foo b) (foo c)", 2);
     let report = build_similarity_pairs(values, 0.0, SimilarityOverlapPolicy::All, Some(1));
@@ -542,6 +820,128 @@ fn max_results_truncates_only_reported_pairs() {
     assert_eq!(unlimited.summary.reported_pairs, 3);
     assert!(!unlimited.summary.truncated);
     assert_eq!(report.pairs[0].score, unlimited.pairs[0].score);
+}
+
+#[test]
+fn bounded_results_count_matches_beyond_the_retained_capacity() {
+    let values = vec![
+        similarity_candidate("a.lisp", 3),
+        similarity_candidate("a.lisp", 3),
+    ];
+    let (matched, exceeded, cancelled, retained_scores) =
+        super::reports::bounded_result_scores_for_test(&values, &[1.0, 5.0, 2.0, 4.0, 3.0], 2);
+
+    assert_eq!(matched, 5);
+    assert!(!exceeded);
+    assert!(!cancelled);
+    assert_eq!(retained_scores, vec![5.0, 4.0]);
+}
+
+#[test]
+fn zero_result_limit_counts_matches_without_reserving_storage() {
+    let values = vec![
+        similarity_candidate("a.lisp", 3),
+        similarity_candidate("b.lisp", 3),
+    ];
+    let (matched, exceeded, cancelled, retained_scores) =
+        super::reports::bounded_result_scores_for_test(&values, &[1.0, 5.0, 2.0], 0);
+
+    assert_eq!(matched, 3);
+    assert!(!exceeded);
+    assert!(!cancelled);
+    assert!(retained_scores.is_empty());
+}
+
+#[test]
+fn cross_file_groups_keep_comparing_after_the_single_result_slot_is_full() {
+    let values = ["a.lisp", "b.lisp", "c.lisp", "d.lisp"]
+        .map(|path| similarity_candidate(path, 4))
+        .into_iter()
+        .collect();
+    let report = super::reports::build_similarity_pairs(
+        values,
+        &report_options(
+            0.0,
+            4,
+            1,
+            SimilarityComparisonScope::CrossFile,
+            SimilarityFormScope::All,
+            SimilarityOverlapPolicy::All,
+            None,
+            None,
+            Some(1),
+        ),
+    )
+    .unwrap();
+
+    assert_eq!(report.summary.matched_pairs, 6);
+    assert_eq!(report.summary.reported_pairs, 1);
+    assert!(report.summary.truncated);
+}
+
+#[test]
+fn bounded_results_never_retain_more_than_the_requested_limit() {
+    let values = vec![
+        similarity_candidate("a.lisp", 3),
+        similarity_candidate("b.lisp", 3),
+    ];
+    let scores = (0..200_000)
+        .map(|index| ((index * 7919) % 100_003) as f64)
+        .collect::<Vec<_>>();
+    let (matched, peak_retained, budget_retained, cancelled) =
+        super::reports::bounded_result_retention_for_test(&values, &scores, 127);
+
+    assert_eq!(matched, scores.len());
+    assert_eq!(peak_retained, 127);
+    assert_eq!(budget_retained, 127);
+    assert!(!cancelled);
+}
+
+#[test]
+fn bounded_result_ties_are_deterministic_across_insertion_order() {
+    let values = ["a.lisp", "b.lisp", "c.lisp", "d.lisp"].map(|path| similarity_candidate(path, 3));
+    let forward = [(2, 3), (1, 3), (0, 3), (0, 2), (0, 1)];
+    let reverse = forward.into_iter().rev().collect::<Vec<_>>();
+    let forward_paths = super::reports::bounded_result_paths_for_test(&values, &forward, 3);
+    let reverse_paths = super::reports::bounded_result_paths_for_test(&values, &reverse, 3);
+
+    assert_eq!(forward_paths, reverse_paths);
+    assert_eq!(
+        forward_paths,
+        vec![
+            ("a.lisp".into(), "b.lisp".into()),
+            ("a.lisp".into(), "c.lisp".into()),
+            ("a.lisp".into(), "d.lisp".into()),
+        ]
+    );
+}
+
+#[test]
+fn bounded_parallel_merge_is_independent_of_worker_merge_order() {
+    let values = ["a.lisp", "b.lisp", "c.lisp", "d.lisp"].map(|path| similarity_candidate(path, 3));
+    let first_worker = [(2, 3), (1, 3)];
+    let second_worker = [(0, 3), (0, 2), (0, 1)];
+    let worker_pairs = [first_worker.as_slice(), second_worker.as_slice()];
+    let (forward_cancelled, forward_heap_len, forward_budget_retained, forward_paths) =
+        super::reports::bounded_parallel_result_paths_for_test(&values, &worker_pairs, &[0, 1], 3);
+    let (reverse_cancelled, reverse_heap_len, reverse_budget_retained, reverse_paths) =
+        super::reports::bounded_parallel_result_paths_for_test(&values, &worker_pairs, &[1, 0], 3);
+
+    assert!(!forward_cancelled);
+    assert!(!reverse_cancelled);
+    assert_eq!(forward_budget_retained, forward_heap_len);
+    assert_eq!(reverse_budget_retained, reverse_heap_len);
+    assert_eq!(forward_heap_len, 3);
+    assert_eq!(reverse_heap_len, 3);
+    assert_eq!(forward_paths, reverse_paths);
+    assert_eq!(
+        forward_paths,
+        vec![
+            ("a.lisp".into(), "b.lisp".into()),
+            ("a.lisp".into(), "c.lisp".into()),
+            ("a.lisp".into(), "d.lisp".into()),
+        ]
+    );
 }
 
 #[test]
@@ -577,6 +977,34 @@ fn max_comparisons_stops_ted_evaluation_and_tracks_unprocessed_pairs() {
 }
 
 #[test]
+fn same_file_comparison_limit_uses_stable_path_order() {
+    let mut values = candidates("z.lisp", "(foo a) (foo a)", 2);
+    values.extend(candidates("a.lisp", "(foo a) (foo a)", 2));
+    let options = report_options(
+        1.0,
+        2,
+        1,
+        SimilarityComparisonScope::SameFile,
+        SimilarityFormScope::All,
+        SimilarityOverlapPolicy::All,
+        None,
+        Some(1),
+        None,
+    );
+
+    // Repeated construction catches randomized HashMap iteration deciding which
+    // file consumes the single-comparison budget.
+    for _ in 0..64 {
+        let report = super::reports::build_similarity_pairs(values.clone(), &options).unwrap();
+
+        assert_eq!(report.summary.evaluated_pairs, 1);
+        assert_eq!(report.pairs.len(), 1);
+        assert_eq!(report.pairs[0].left.path, PathBuf::from("a.lisp"));
+        assert_eq!(report.pairs[0].right.path, PathBuf::from("a.lisp"));
+    }
+}
+
+#[test]
 fn sufficient_max_comparisons_does_not_report_limit_reached() {
     let report = super::reports::build_similarity_pairs(
         candidates("a.lisp", "(foo a) (foo b) (foo c)", 2),
@@ -602,19 +1030,57 @@ fn sufficient_max_comparisons_does_not_report_limit_reached() {
 }
 
 #[test]
-fn max_comparisons_is_applied_after_size_pruning() {
-    let values = candidates(
-        "a.lisp",
-        "(foo a) (foo a b c d) (foo x y z w) (foo p q r s)",
-        2,
-    );
+fn resource_budgets_enforce_candidate_and_planned_comparison_limits() {
+    assert!(super::reports::validate_resource_budgets_for_test(100_000, 100_000_000, None).is_ok());
+    assert!(super::reports::validate_resource_budgets_for_test(100_001, 0, None).is_err());
+    assert!(super::reports::validate_resource_budgets_for_test(1, 100_000_001, None).is_err());
+    assert!(super::reports::validate_resource_budgets_for_test(1, 100_000_001, Some(10)).is_ok());
+}
+
+#[test]
+fn max_comparisons_counts_size_pruned_pairs_as_inspected() {
+    for scope in [
+        SimilarityComparisonScope::All,
+        SimilarityComparisonScope::SameFile,
+    ] {
+        let values = candidates(
+            "a.lisp",
+            "(foo a) (foo a b c d) (foo x y z w) (foo p q r s)",
+            2,
+        );
+        let report = super::reports::build_similarity_pairs(
+            values,
+            &report_options(
+                0.6,
+                4,
+                1,
+                scope,
+                SimilarityFormScope::All,
+                SimilarityOverlapPolicy::All,
+                None,
+                Some(1),
+                None,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(report.summary.possible_pairs, 6);
+        assert_eq!(report.summary.evaluated_pairs, 0);
+        assert_eq!(report.summary.pruned_by_size, 1);
+        assert_eq!(report.summary.unprocessed_pairs, 5);
+        assert!(report.summary.comparison_limit_reached);
+    }
+
+    let mut cross_file_values = candidates("a.lisp", "(foo a)", 2);
+    cross_file_values.extend(candidates("b.lisp", "(foo a b c d)", 2));
+    cross_file_values.extend(candidates("c.lisp", "(foo x y z w)", 2));
     let report = super::reports::build_similarity_pairs(
-        values,
+        cross_file_values,
         &report_options(
             0.6,
             4,
             1,
-            SimilarityComparisonScope::All,
+            SimilarityComparisonScope::CrossFile,
             SimilarityFormScope::All,
             SimilarityOverlapPolicy::All,
             None,
@@ -624,9 +1090,9 @@ fn max_comparisons_is_applied_after_size_pruning() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.possible_pairs, 6);
-    assert_eq!(report.summary.evaluated_pairs, 1);
-    assert_eq!(report.summary.pruned_by_size, 3);
+    assert_eq!(report.summary.possible_pairs, 3);
+    assert_eq!(report.summary.evaluated_pairs, 0);
+    assert_eq!(report.summary.pruned_by_size, 1);
     assert_eq!(report.summary.unprocessed_pairs, 2);
     assert!(report.summary.comparison_limit_reached);
 }
@@ -676,4 +1142,171 @@ fn different_heads_do_not_share_a_comparison_bucket() {
     assert_eq!(report.summary.possible_pairs, 0);
     assert_eq!(report.summary.evaluated_pairs, 0);
     assert!(report.pairs.is_empty());
+}
+
+#[test]
+fn deeply_nested_candidate_collection_does_not_overflow() {
+    const DEPTH: usize = 10_001;
+
+    let input = format!("{}target{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&input).expect("valid deeply nested input");
+    let options = report_options(
+        0.87,
+        2,
+        1,
+        SimilarityComparisonScope::All,
+        SimilarityFormScope::All,
+        SimilarityOverlapPolicy::Maximal,
+        Some(1),
+        None,
+        None,
+    );
+    let mut values = Vec::new();
+    let omitted = collect_similarity_candidates(
+        &tree,
+        &input,
+        FsPath::new("deep.lisp"),
+        Dialect::CommonLisp,
+        &options,
+        &mut values,
+    )
+    .expect("collect deeply nested candidates");
+
+    assert_eq!(values.len(), 1);
+    assert_eq!(omitted, DEPTH - 1);
+}
+
+#[test]
+fn candidate_collection_shares_input_and_applies_cumulative_budgets() {
+    let input = "(outer (inner value)) (other value)";
+    let tree = SyntaxTree::parse(input).unwrap();
+    let options = report_options(
+        0.87,
+        2,
+        1,
+        SimilarityComparisonScope::All,
+        SimilarityFormScope::All,
+        SimilarityOverlapPolicy::Maximal,
+        None,
+        None,
+        None,
+    );
+    let mut values = Vec::new();
+    let omitted = super::collect::collect_similarity_candidates_with_budgets_for_test(
+        &tree,
+        input,
+        FsPath::new("budget.lisp"),
+        Dialect::CommonLisp,
+        &options,
+        &mut values,
+        6,
+        input.len(),
+    )
+    .unwrap();
+
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].form.text, "(outer (inner value))");
+    assert!(omitted >= 2);
+
+    let mut all_values = Vec::new();
+    collect_similarity_candidates(
+        &tree,
+        input,
+        FsPath::new("shared.lisp"),
+        Dialect::CommonLisp,
+        &options,
+        &mut all_values,
+    )
+    .unwrap();
+    assert!(
+        all_values[0]
+            .form
+            .text
+            .shares_source(&all_values[1].form.text)
+    );
+}
+
+#[test]
+fn rejected_large_source_is_not_materialized_for_candidates() {
+    let input = format!("{}(outer (inner value))", " ".repeat(1024 * 1024));
+    let tree = SyntaxTree::parse(&input).unwrap();
+    let options = report_options(
+        0.87,
+        2,
+        1,
+        SimilarityComparisonScope::All,
+        SimilarityFormScope::All,
+        SimilarityOverlapPolicy::Maximal,
+        None,
+        None,
+        None,
+    );
+    let mut values = Vec::new();
+    let (omitted, source_materialized) =
+        super::collect::collect_similarity_candidates_materialization_for_test(
+            &tree,
+            &input,
+            FsPath::new("large.lisp"),
+            Dialect::CommonLisp,
+            &options,
+            &mut values,
+            usize::MAX,
+            input.len() - 1,
+        )
+        .unwrap();
+
+    assert_eq!(values.len(), 0);
+    assert_eq!(omitted, 2);
+    assert!(!source_materialized);
+}
+
+#[test]
+fn candidate_text_budget_counts_each_retained_source_once() {
+    let first_input = format!("{}(outer (inner value))", " ".repeat(128));
+    let second_input = format!("{}(other (nested value))", " ".repeat(128));
+    let first_tree = SyntaxTree::parse(&first_input).unwrap();
+    let second_tree = SyntaxTree::parse(&second_input).unwrap();
+    let options = report_options(
+        0.87,
+        2,
+        1,
+        SimilarityComparisonScope::All,
+        SimilarityFormScope::All,
+        SimilarityOverlapPolicy::Maximal,
+        None,
+        None,
+        None,
+    );
+    let mut values = Vec::new();
+    let text_budget = first_input.len() + second_input.len() - 1;
+
+    let first_omitted = super::collect::collect_similarity_candidates_with_budgets_for_test(
+        &first_tree,
+        &first_input,
+        FsPath::new("first.lisp"),
+        Dialect::CommonLisp,
+        &options,
+        &mut values,
+        usize::MAX,
+        text_budget,
+    )
+    .unwrap();
+    let retained_after_first = values.len();
+    let second_omitted = super::collect::collect_similarity_candidates_with_budgets_for_test(
+        &second_tree,
+        &second_input,
+        FsPath::new("second.lisp"),
+        Dialect::CommonLisp,
+        &options,
+        &mut values,
+        usize::MAX,
+        text_budget,
+    )
+    .unwrap();
+
+    assert_eq!(first_omitted, 0);
+    assert_eq!(retained_after_first, 2);
+    assert_eq!(values.len(), retained_after_first);
+    assert_eq!(second_omitted, 2);
+    assert!(values[0].form.text.shares_source(&values[1].form.text));
 }

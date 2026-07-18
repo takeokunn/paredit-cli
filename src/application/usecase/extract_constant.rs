@@ -42,6 +42,9 @@ pub fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result
 }
 
 pub fn plan_extract_constant(request: ExtractConstantRequest<'_>) -> Result<ExtractConstantPlan> {
+    request
+        .selection
+        .validate_context(request.input, request.tree)?;
     if request.dialect == Dialect::CommonLisp {
         reject_overlapping_common_lisp_reader_time_forms(
             request.tree,
@@ -146,5 +149,56 @@ mod tests {
         let path = path_for_selection(&tree, selection).unwrap();
 
         assert_eq!(path.to_string(), "0");
+    }
+
+    #[test]
+    fn rejects_selection_source_mismatches_without_panicking() {
+        let source = "(defun f () α)";
+        let tree = SyntaxTree::parse(source).unwrap();
+        let path = Path::from_str("0.3").unwrap();
+        let selection = tree.select_path(&path).unwrap();
+
+        for input in ["(defun g () β)", "(x)", "(defun f () aé)"] {
+            let error = plan_extract_constant(ExtractConstantRequest {
+                input,
+                tree: &tree,
+                selection,
+                path: path.clone(),
+                dialect: Dialect::CommonLisp,
+                name: SymbolName::new("answer").unwrap(),
+                insert: ExtractConstantInsert::Append,
+                anchor_path: None,
+            })
+            .expect_err("mismatched selection source must be rejected");
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("source used to build the selection")
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_selection_from_a_different_tree_with_the_same_source() {
+        let input = "(defun f () 42)";
+        let selection_tree = SyntaxTree::parse(input).unwrap();
+        let request_tree = SyntaxTree::parse(input).unwrap();
+        let path = Path::from_str("0.3").unwrap();
+        let selection = selection_tree.select_path(&path).unwrap();
+
+        let error = plan_extract_constant(ExtractConstantRequest {
+            input,
+            tree: &request_tree,
+            selection,
+            path,
+            dialect: Dialect::CommonLisp,
+            name: SymbolName::new("answer").unwrap(),
+            insert: ExtractConstantInsert::Append,
+            anchor_path: None,
+        })
+        .expect_err("selection from another tree must be rejected");
+
+        assert!(error.to_string().contains("different syntax tree"));
     }
 }

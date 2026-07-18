@@ -71,16 +71,16 @@ fn print_inline_function_plan(
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("definition_path\t{}", plan.definition_path);
+            println!("definition_path\t{}", safe_text!(plan.definition_path));
             println!("all_calls\t{}", plan.all_calls);
             println!(
                 "definition_span\t{}..{}",
                 plan.definition_span.start().get(),
                 plan.definition_span.end().get()
             );
-            println!("function_name\t{}", plan.function_name);
+            println!("function_name\t{}", safe_text!(plan.function_name));
             for call in &plan.calls {
-                println!("call_path\t{}", call.call_path);
+                println!("call_path\t{}", safe_text!(call.call_path));
                 println!(
                     "call_span\t{}..{}",
                     call.call_span.start().get(),
@@ -89,10 +89,12 @@ fn print_inline_function_plan(
                 for parameter in &call.parameters {
                     println!(
                         "parameter\t{}\targument={}\treferences={}",
-                        parameter.name, parameter.argument, parameter.reference_count
+                        safe_text!(parameter.name),
+                        safe_text!(parameter.argument),
+                        parameter.reference_count
                     );
                 }
-                println!("replacement\t{}", call.replacement);
+                println!("replacement\t{}", safe_text!(call.replacement));
             }
             println!("remove_definition\t{}", plan.remove_definition);
             println!("definition_removed\t{}", plan.definition_removed);

@@ -54,24 +54,28 @@ impl Edit {
         Ok(normalized)
     }
 
-    pub fn replace(input: &str, selection: Selection<'_>, replacement: &str) -> String {
-        replace_span(input, selection.span(), replacement)
+    pub fn replace(input: &str, selection: Selection<'_>, replacement: &str) -> Result<String> {
+        validate_selection_input(input, selection)?;
+        Ok(replace_span(input, selection.span(), replacement))
     }
 
     pub fn kill(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let span = expand_removal(input, tree, selection.span());
         Ok(replace_span(input, span, ""))
     }
 
-    pub fn wrap(input: &str, _tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
-        Ok(Self::replace(
+    pub fn wrap(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
+        Ok(replace_span(
             input,
-            selection,
-            &format!("({})", selection.text(input)),
+            selection.span(),
+            &format!("({})", selection.text()),
         ))
     }
 
-    pub fn splice(input: &str, _tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn splice(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let (open, close) = list_delimiter_offsets(node)?;
@@ -82,7 +86,8 @@ impl Edit {
         Ok(output)
     }
 
-    pub fn raise(input: &str, _tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+    pub fn raise(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         let parent_id = node
             .parent
@@ -91,7 +96,7 @@ impl Edit {
         if parent.kind == NodeKind::Root {
             anyhow::bail!("cannot raise a top-level expression");
         }
-        Ok(replace_span(input, parent.span, selection.text(input)))
+        Ok(replace_span(input, parent.span, selection.text()))
     }
 
     pub fn transpose_forward(
@@ -99,6 +104,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
     ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let sibling = next_sibling(tree, selection.node_id)
             .ok_or_else(|| anyhow!("selected expression has no next sibling to transpose"))?;
         Ok(swap_node_text(
@@ -113,6 +119,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
     ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let sibling = previous_sibling(tree, selection.node_id)
             .ok_or_else(|| anyhow!("selected expression has no previous sibling to transpose"))?;
         Ok(swap_node_text(
@@ -127,6 +134,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
     ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let sibling = next_sibling(tree, selection.node_id)
@@ -151,6 +159,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
     ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let sibling = previous_sibling(tree, selection.node_id)
@@ -172,6 +181,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
     ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let child = *node
@@ -195,6 +205,7 @@ impl Edit {
         tree: &SyntaxTree,
         selection: Selection<'_>,
     ) -> Result<String> {
+        validate_edit_context(input, tree, selection)?;
         let node = selection.node();
         ensure_list(node)?;
         let child = *node
@@ -209,6 +220,22 @@ impl Edit {
         let removal = expand_removal(input, tree, child_span);
         Ok(remove_then_insert(input, removal, open, &insertion))
     }
+}
+
+fn validate_selection_input(input: &str, selection: Selection<'_>) -> Result<()> {
+    selection
+        .validate_source(input)
+        .map_err(|error| anyhow!("edit {error}"))
+}
+
+fn validate_edit_context(input: &str, tree: &SyntaxTree, selection: Selection<'_>) -> Result<()> {
+    selection.validate_context(input, tree).map_err(|error| {
+        if error.to_string().starts_with("input ") {
+            anyhow!("edit {error}")
+        } else {
+            error
+        }
+    })
 }
 
 fn common_prefix_len(left: &str, right: &str) -> usize {

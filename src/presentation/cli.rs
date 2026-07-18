@@ -1,3 +1,9 @@
+macro_rules! safe_text {
+    ($value:expr) => {
+        crate::presentation::cli::terminal_safe(&$value)
+    };
+}
+
 mod analysis_report;
 mod args;
 mod basic_edit;
@@ -64,6 +70,7 @@ mod workspace_report;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path as FsPath, PathBuf};
+use std::process::ExitCode;
 
 use crate::application::refactor::execute::{
     RefactorExecuteGateInputs, RefactorWriteRefusal, build_refactor_execute_decision,
@@ -96,9 +103,11 @@ use serde_json::{Value, json};
 use args::*;
 use command::Command;
 pub(crate) use shared::{
-    apply_byte_span_edits, bounded_preview, matching_symbol_occurrences, read_input_and_dialect,
-    read_input_dialect_and_tree, require_output_file, resolve_target, stable_text_hash,
-    unified_diff, write_file_with_rollback, write_files_with_rollback,
+    MAX_SOURCE_INPUT_BYTES, apply_byte_span_edits, bounded_preview, matching_symbol_occurrences,
+    read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_limit,
+    read_text_with_limit, require_output_file, resolve_target, stable_text_hash, terminal_safe,
+    terminal_safe_error_chain, unified_diff, write_artifact_with_rollback,
+    write_file_with_rollback, write_files_with_rollback,
 };
 
 #[derive(Debug, Parser)]
@@ -114,13 +123,32 @@ struct Cli {
     command: Command,
 }
 
-pub fn run() -> Result<()> {
+pub fn run() -> ExitCode {
     let cli = Cli::parse();
     match dispatch::dispatch(cli.command) {
-        Err(error) if error.downcast_ref::<gate::GateFailure>().is_some() => {
-            eprintln!("Error: {error:#}");
-            std::process::exit(gate::GATE_FAILURE_EXIT_CODE);
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("Error: {}", terminal_safe_error_chain(&error));
+            if error.downcast_ref::<gate::GateFailure>().is_some() {
+                ExitCode::from(gate::GATE_FAILURE_EXIT_CODE as u8)
+            } else {
+                ExitCode::FAILURE
+            }
         }
-        result => result,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::terminal_safe_error_chain;
+
+    #[test]
+    fn cli_error_diagnostic_escapes_untrusted_controls() {
+        let error = anyhow::anyhow!("bad\npath\t\u{1b}[31m\u{202e}").context("open failed");
+
+        assert_eq!(
+            format!("Error: {}", terminal_safe_error_chain(&error)),
+            "Error: open failed: bad\\u{a}path\\u{9}\\u{1b}[31m\\u{202e}"
+        );
     }
 }

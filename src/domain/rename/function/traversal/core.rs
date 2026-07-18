@@ -1,13 +1,14 @@
 use anyhow::Result;
 
-use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::common_lisp::{
+    common_lisp_symbol_reference_eq, has_common_lisp_package_qualifier,
+};
 use crate::domain::definition::{definition_shape, is_macro_expander_definition};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
-use crate::domain::callable_scope::is_local_callable_bound;
 use crate::domain::rename::reader::{
     apply_reader_prefix_context, atom_symbol_span, atom_symbol_text,
 };
@@ -19,7 +20,7 @@ use super::modes::{
 };
 use super::reader::{
     collect_bare_lambda_call_renames, collect_explicit_reader_form_call_renames,
-    collect_function_designator_renames, collect_quoted_symbol_designator_rename,
+    collect_function_designator_renames,
 };
 
 pub(in crate::domain::rename::function) struct TraversalContext<'a> {
@@ -28,70 +29,121 @@ pub(in crate::domain::rename::function) struct TraversalContext<'a> {
     pub(super) to: &'a SymbolName,
 }
 
-pub(in crate::domain::rename::function) struct TraversalState<'a> {
-    pub(super) path: Path,
-    pub(super) local_callables: &'a [String],
+#[derive(Clone, Copy)]
+pub(in crate::domain::rename::function) struct TraversalState {
+    pub(super) path: TraversalPath,
+    pub(super) local_callable_shadowed: bool,
+    pub(super) local_function_shadowed: bool,
     pub(super) quasiquote_depth: usize,
     pub(super) in_macro_expander: bool,
     pub(super) shadowed_depth: usize,
 }
 
-impl<'a> TraversalState<'a> {
-    pub(super) fn with_path(&self, path: Path) -> Self {
-        Self {
-            path,
-            local_callables: self.local_callables,
-            quasiquote_depth: self.quasiquote_depth,
-            in_macro_expander: self.in_macro_expander,
-            shadowed_depth: self.shadowed_depth,
+#[derive(Clone, Copy)]
+pub(super) struct TraversalPath(usize);
+
+struct TraversalPathNode {
+    parent: Option<usize>,
+    index: usize,
+}
+
+pub(super) struct TraversalPathArena {
+    nodes: Vec<TraversalPathNode>,
+}
+
+impl TraversalPathArena {
+    fn root_child(index: usize) -> (Self, TraversalPath) {
+        (
+            Self {
+                nodes: vec![TraversalPathNode {
+                    parent: None,
+                    index,
+                }],
+            },
+            TraversalPath(0),
+        )
+    }
+
+    pub(super) fn child(&mut self, path: TraversalPath, index: usize) -> TraversalPath {
+        let next = self.nodes.len();
+        self.nodes.push(TraversalPathNode {
+            parent: Some(path.0),
+            index,
+        });
+        TraversalPath(next)
+    }
+
+    pub(super) fn descendant(
+        &mut self,
+        mut path: TraversalPath,
+        indexes: impl IntoIterator<Item = usize>,
+    ) -> TraversalPath {
+        for index in indexes {
+            path = self.child(path, index);
         }
+        path
+    }
+
+    pub(super) fn materialize(&self, path: TraversalPath) -> Path {
+        let mut indexes = Vec::new();
+        let mut cursor = Some(path.0);
+        while let Some(node_index) = cursor {
+            let node = &self.nodes[node_index];
+            indexes.push(node.index);
+            cursor = node.parent;
+        }
+        indexes.reverse();
+        Path::from_indexes(indexes)
+    }
+}
+
+impl TraversalState {
+    pub(super) fn with_path(&self, path: TraversalPath) -> Self {
+        Self { path, ..*self }
     }
 
     pub(super) fn with_quasiquote_depth(&self, quasiquote_depth: usize) -> Self {
         Self {
-            path: self.path.clone(),
-            local_callables: self.local_callables,
             quasiquote_depth,
-            in_macro_expander: self.in_macro_expander,
-            shadowed_depth: self.shadowed_depth,
+            ..*self
         }
     }
 
-    pub(super) fn with_local_callables(&self, local_callables: &'a [String]) -> Self {
+    pub(super) fn with_local_shadowing(
+        &self,
+        local_callable_shadowed: bool,
+        local_function_shadowed: bool,
+    ) -> Self {
         Self {
-            path: self.path.clone(),
-            local_callables,
-            quasiquote_depth: self.quasiquote_depth,
-            in_macro_expander: self.in_macro_expander,
-            shadowed_depth: self.shadowed_depth,
+            local_callable_shadowed,
+            local_function_shadowed,
+            ..*self
         }
     }
 
     pub(super) fn in_macro_expander(&self) -> Self {
         Self {
-            path: self.path.clone(),
-            local_callables: self.local_callables,
-            quasiquote_depth: self.quasiquote_depth,
             in_macro_expander: true,
-            shadowed_depth: self.shadowed_depth,
+            ..*self
         }
     }
 }
 
-pub(in crate::domain::rename::function) fn allows_function_reference_rename(
-    state: &TraversalState<'_>,
-    target_text: &str,
-) -> bool {
-    (!is_local_callable_bound(state.local_callables, target_text) && state.shadowed_depth == 0)
-        || is_package_qualified_callable(target_text)
+pub(super) struct TraversalFrame<'a> {
+    pub(super) view: &'a ExpressionView,
+    pub(super) state: TraversalState,
 }
 
-fn is_package_qualified_callable(target_text: &str) -> bool {
-    let Some((package_name, symbol_name)) = target_text.split_once(':') else {
+pub(in crate::domain::rename::function) fn allows_function_reference_rename(
+    state: &TraversalState,
+    target_text: &str,
+) -> bool {
+    if state.local_function_shadowed {
         return false;
-    };
+    }
 
-    !target_text.starts_with(':') && !package_name.is_empty() && !symbol_name.is_empty()
+    (!state.local_callable_shadowed && state.shadowed_depth == 0)
+        || has_common_lisp_package_qualifier(target_text)
 }
 
 pub fn collect_function_call_head_renames(
@@ -106,16 +158,19 @@ pub fn collect_function_call_head_renames(
     for (index, _) in tree.root_children().iter().enumerate() {
         let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
+        let (mut paths, traversal_path) = TraversalPathArena::root_child(index);
         collect_function_call_head_renames_from_view(
             &view,
             &context,
             TraversalState {
-                path,
-                local_callables: &[],
+                path: traversal_path,
+                local_callable_shadowed: false,
+                local_function_shadowed: false,
                 quasiquote_depth: 0,
                 in_macro_expander: false,
                 shadowed_depth: 0,
             },
+            &mut paths,
             &mut renames,
         );
     }
@@ -126,33 +181,48 @@ pub fn collect_function_call_head_renames(
 pub(in crate::domain::rename::function) fn collect_function_call_head_renames_from_view(
     view: &ExpressionView,
     context: &TraversalContext<'_>,
-    state: TraversalState<'_>,
+    state: TraversalState,
+    paths: &mut TraversalPathArena,
     renames: &mut Vec<RenameFunctionOccurrence>,
 ) {
+    let mut stack = vec![TraversalFrame { view, state }];
+    while let Some(frame) = stack.pop() {
+        collect_function_call_head_renames_from_frame(frame, context, paths, renames, &mut stack);
+    }
+}
+
+fn collect_function_call_head_renames_from_frame<'a>(
+    frame: TraversalFrame<'a>,
+    context: &TraversalContext<'_>,
+    paths: &mut TraversalPathArena,
+    renames: &mut Vec<RenameFunctionOccurrence>,
+    stack: &mut Vec<TraversalFrame<'a>>,
+) {
+    let TraversalFrame { view, state } = frame;
     let Some(quasiquote_depth) = apply_reader_prefix_context(view, state.quasiquote_depth) else {
-        collect_quoted_symbol_designator_rename(view, &state, context, renames);
         return;
     };
 
     let reader_state = state.with_quasiquote_depth(quasiquote_depth);
-    if collect_function_designator_renames(view, &reader_state, context, renames) {
+    if collect_function_designator_renames(view, &reader_state, paths, context, renames) {
         return;
     }
 
-    if collect_bare_lambda_call_renames(view, context, &reader_state, renames) {
+    if collect_bare_lambda_call_renames(view, &reader_state, paths, stack) {
         return;
     }
 
-    if collect_explicit_reader_form_call_renames(view, context, reader_state, renames) {
+    if collect_explicit_reader_form_call_renames(view, context, reader_state, paths, renames, stack)
+    {
         return;
     }
 
     if quasiquote_depth > 0 && !state.in_macro_expander {
-        collect_children(
+        push_children(
             view,
-            context,
             state.with_quasiquote_depth(quasiquote_depth),
-            renames,
+            paths,
+            stack,
         );
         return;
     }
@@ -167,7 +237,9 @@ pub(in crate::domain::rename::function) fn collect_function_call_head_renames_fr
                 head,
                 context,
                 state.with_quasiquote_depth(0),
+                paths,
                 renames,
+                stack,
             ) {
                 return;
             }
@@ -177,7 +249,9 @@ pub(in crate::domain::rename::function) fn collect_function_call_head_renames_fr
                 head,
                 context,
                 state.with_quasiquote_depth(0),
+                paths,
                 renames,
+                stack,
             ) {
                 return;
             }
@@ -189,7 +263,7 @@ pub(in crate::domain::rename::function) fn collect_function_call_head_renames_fr
             {
                 if let Some(head_view) = view.children.first() {
                     renames.push(RenameFunctionOccurrence {
-                        path: state.path.child(0).to_string(),
+                        path: paths.child(state.path, 0).to_string(paths),
                         span: atom_symbol_span(head_view).unwrap_or(head_view.span),
                         text: atom_symbol_text(head_view).unwrap_or(head).to_owned(),
                         replacement: context.to.as_str().to_owned(),
@@ -205,37 +279,44 @@ pub(in crate::domain::rename::function) fn collect_function_call_head_renames_fr
         }
     }
 
-    for (index, child) in view.children.iter().enumerate() {
+    for (index, child) in view.children.iter().enumerate().rev() {
         if let Some(range) = definition_body_range {
             if !range.contains_child(index) {
                 continue;
             }
         }
-        let child_state = state
-            .with_quasiquote_depth(0)
-            .with_path(state.path.child(index));
+        let child_path = paths.child(state.path, index);
+        let child_state = state.with_quasiquote_depth(0).with_path(child_path);
         let child_state =
             if macro_expander_body_range.is_some_and(|range| range.contains_child(index)) {
                 child_state.in_macro_expander()
             } else {
                 child_state
             };
-        collect_function_call_head_renames_from_view(child, context, child_state, renames);
+        stack.push(TraversalFrame {
+            view: child,
+            state: child_state,
+        });
     }
 }
 
-pub(in crate::domain::rename::function) fn collect_children(
-    view: &ExpressionView,
-    context: &TraversalContext<'_>,
-    state: TraversalState<'_>,
-    renames: &mut Vec<RenameFunctionOccurrence>,
+fn push_children<'a>(
+    view: &'a ExpressionView,
+    state: TraversalState,
+    paths: &mut TraversalPathArena,
+    stack: &mut Vec<TraversalFrame<'a>>,
 ) {
-    for (index, child) in view.children.iter().enumerate() {
-        collect_function_call_head_renames_from_view(
-            child,
-            context,
-            state.with_path(state.path.child(index)),
-            renames,
-        );
+    for (index, child) in view.children.iter().enumerate().rev() {
+        let child_path = paths.child(state.path, index);
+        stack.push(TraversalFrame {
+            view: child,
+            state: state.with_path(child_path),
+        });
+    }
+}
+
+impl TraversalPath {
+    fn to_string(self, paths: &TraversalPathArena) -> String {
+        paths.materialize(self).to_string()
     }
 }

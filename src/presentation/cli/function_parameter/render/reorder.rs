@@ -13,7 +13,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_reorder_function_p
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("definition_path\t{}", plan.definition_path);
+            println!("definition_path\t{}", safe_text!(plan.definition_path));
             println!("all_calls\t{}", plan.all_calls);
             println!(
                 "definition_span\t{}..{}",
@@ -25,14 +25,14 @@ pub(in crate::presentation::cli::function_parameter) fn print_reorder_function_p
                 plan.parameter_list_span.start().get(),
                 plan.parameter_list_span.end().get()
             );
-            println!("function_name\t{}", plan.function_name);
+            println!("function_name\t{}", safe_text!(plan.function_name));
             println!(
                 "old_parameter_order\t{}",
-                symbol_names(&plan.old_parameter_order).join(",")
+                safe_text!(symbol_names(&plan.old_parameter_order).join(","))
             );
             println!(
                 "new_parameter_order\t{}",
-                symbol_names(&plan.new_parameter_order).join(",")
+                safe_text!(symbol_names(&plan.new_parameter_order).join(","))
             );
             for ((path, span), arguments) in plan
                 .call_paths
@@ -42,10 +42,10 @@ pub(in crate::presentation::cli::function_parameter) fn print_reorder_function_p
             {
                 println!(
                     "call\t{}\t{}..{}\treordered_arguments={}",
-                    path,
+                    safe_text!(path),
                     span.start().get(),
                     span.end().get(),
-                    arguments.join(",")
+                    safe_text!(arguments.join(","))
                 );
             }
             println!("changed\t{}", plan.changed);

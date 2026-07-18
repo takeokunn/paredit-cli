@@ -60,7 +60,7 @@ fn property_generated_rename_preserves_parse_and_atom_spans() {
             );
         }
 
-        let output = tree.rename_symbol(&input, &from, &to);
+        let output = tree.rename_symbol(&from, &to);
         let output_tree = SyntaxTree::parse(&output).expect("renamed output parses");
         let output_atoms = output_tree
             .atom_occurrences()

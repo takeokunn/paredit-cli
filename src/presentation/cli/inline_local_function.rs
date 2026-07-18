@@ -44,15 +44,17 @@ fn print_plan(plan: &InlineLocalFunctionPlan, written: bool, output: OutputForma
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
-            println!("function_name\t{}", plan.function_name);
+            println!("path\t{}", safe_text!(plan.path));
+            println!("function_name\t{}", safe_text!(plan.function_name));
             for parameter in &plan.parameters {
                 println!(
                     "parameter\t{}\targument={}\treferences={}",
-                    parameter.name, parameter.argument, parameter.reference_count
+                    safe_text!(parameter.name),
+                    safe_text!(parameter.argument),
+                    parameter.reference_count
                 );
             }
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

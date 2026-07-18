@@ -11,21 +11,21 @@ pub(in crate::presentation::cli::definition_movement) fn print_split_file_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => {
-            println!("from_file\t{}", plan.from_file.display());
-            println!("to_file\t{}", plan.to_file.display());
+            println!("from_file\t{}", safe_text!(plan.from_file.display()));
+            println!("to_file\t{}", safe_text!(plan.to_file.display()));
             println!("from_dialect\t{}", plan.from_dialect.label());
             println!("to_dialect\t{}", plan.to_dialect.label());
             println!("definition_count\t{}", plan.items.len());
             for item in &plan.items {
-                println!("path\t{}", item.path);
+                println!("path\t{}", safe_text!(item.path));
                 println!(
                     "span\t{}..{}",
                     item.span.start().get(),
                     item.span.end().get()
                 );
-                println!("head\t{}", item.definition.head);
+                println!("head\t{}", safe_text!(item.definition.head));
                 if let Some(name) = &item.definition.name {
-                    println!("name\t{name}");
+                    println!("name\t{}", safe_text!(name));
                 }
                 println!("category\t{}", item.definition.category.label());
             }

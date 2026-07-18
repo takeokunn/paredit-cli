@@ -38,6 +38,13 @@ pub fn plan_remove_unused_binding(
     let input_tree = SyntaxTree::parse(request.input)
         .context("remove-unused-binding input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
+    let parsed_target = input_tree
+        .select_at(request.target.span.start().get())
+        .context("remove-unused-binding target span is not present in the input")?;
+    anyhow::ensure!(
+        parsed_target.view() == request.target,
+        "remove-unused-binding target does not match the input"
+    );
 
     let parts = remove_unused_binding_parts(
         request.dialect,

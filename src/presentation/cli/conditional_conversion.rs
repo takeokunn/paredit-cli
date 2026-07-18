@@ -41,7 +41,7 @@ pub(super) fn run(
     match args.output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("body_count\t{}", plan.body_count);
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");

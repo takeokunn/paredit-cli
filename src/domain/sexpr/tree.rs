@@ -1,3 +1,5 @@
+use std::fmt;
+
 use anyhow::{Result, anyhow};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
@@ -18,7 +20,7 @@ use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, Symb
 ///     .select_path(&ExpressionPath::from_indexes(vec![0, 2, 1]))
 ///     .unwrap();
 ///
-/// assert_eq!(selection.text(input), "value");
+/// assert_eq!(selection.text(), "value");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntaxTree {
@@ -137,6 +139,63 @@ pub struct AtomOccurrence {
     pub text: String,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(in crate::domain) struct BorrowedAtomOccurrence<'a> {
+    node_id: NodeId,
+    pub(in crate::domain) span: ByteSpan,
+    pub(in crate::domain) text: &'a str,
+}
+
+pub(in crate::domain) struct AtomOccurrenceIndex<'a> {
+    parent_steps: Vec<Option<(NodeId, usize)>>,
+    occurrences: Vec<BorrowedAtomOccurrence<'a>>,
+    quoted_designators: Vec<BorrowedAtomOccurrence<'a>>,
+}
+
+impl AtomOccurrenceIndex<'_> {
+    pub(in crate::domain) fn occurrences(&self) -> &[BorrowedAtomOccurrence<'_>] {
+        &self.occurrences
+    }
+
+    fn rename_occurrences(&self) -> impl Iterator<Item = &BorrowedAtomOccurrence<'_>> {
+        self.occurrences.iter().chain(&self.quoted_designators)
+    }
+
+    pub(in crate::domain) fn path_for_span(&self, span: ByteSpan) -> Option<ExpressionPath> {
+        let occurrence = self.find_by_span(span)?;
+        Some(self.path_for_node(occurrence.node_id))
+    }
+
+    pub(in crate::domain) fn last_index_for_span(&self, span: ByteSpan) -> Option<usize> {
+        let occurrence = self.find_by_span(span)?;
+        self.parent_steps[occurrence.node_id.get()].map(|(_, index)| index)
+    }
+
+    fn find_by_span(&self, span: ByteSpan) -> Option<&BorrowedAtomOccurrence<'_>> {
+        let key = (span.start(), span.end());
+        self.occurrences
+            .binary_search_by_key(&key, |occurrence| {
+                (occurrence.span.start(), occurrence.span.end())
+            })
+            .ok()
+            .map(|index| &self.occurrences[index])
+    }
+
+    fn path_for_node(&self, node_id: NodeId) -> ExpressionPath {
+        let mut indexes = Vec::new();
+        let mut cursor = Some(node_id);
+        while let Some(current) = cursor {
+            let Some((parent, index)) = self.parent_steps[current.get()] else {
+                break;
+            };
+            indexes.push(index);
+            cursor = (parent != NodeId::ROOT).then_some(parent);
+        }
+        indexes.reverse();
+        ExpressionPath::from_indexes(indexes)
+    }
+}
+
 /// The high-level shape of an expression node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpressionKind {
@@ -146,7 +205,6 @@ pub enum ExpressionKind {
 }
 
 /// Immutable tree view data for one expression and its descendants.
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpressionView {
     pub kind: ExpressionKind,
     pub delimiter: Option<Delimiter>,
@@ -164,6 +222,111 @@ pub struct ExpressionView {
     /// begins, past its reader prefixes and any intervening trivia. `0` for
     /// non-atom nodes.
     pub symbol_offset: usize,
+}
+
+impl Clone for ExpressionView {
+    fn clone(&self) -> Self {
+        let mut frames = vec![(self, false)];
+        let mut clones = Vec::new();
+
+        while let Some((view, expanded)) = frames.pop() {
+            if !expanded {
+                frames.push((view, true));
+                frames.extend(view.children.iter().rev().map(|child| (child, false)));
+                continue;
+            }
+
+            let children_start = clones
+                .len()
+                .checked_sub(view.children.len())
+                .expect("expanded expression clone has all child views");
+            let children = clones.split_off(children_start);
+            clones.push(Self {
+                kind: view.kind,
+                delimiter: view.delimiter,
+                reader_prefixes: view.reader_prefixes.clone(),
+                span: view.span,
+                content_span: view.content_span,
+                text: view.text.clone(),
+                children,
+                symbol_offset: view.symbol_offset,
+            });
+        }
+
+        clones.pop().expect("expression view clone is constructed")
+    }
+}
+
+impl PartialEq for ExpressionView {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pending = vec![(self, other)];
+        while let Some((left, right)) = pending.pop() {
+            if left.kind != right.kind
+                || left.delimiter != right.delimiter
+                || left.reader_prefixes != right.reader_prefixes
+                || left.span != right.span
+                || left.content_span != right.content_span
+                || left.text != right.text
+                || left.symbol_offset != right.symbol_offset
+                || left.children.len() != right.children.len()
+            {
+                return false;
+            }
+            pending.extend(left.children.iter().zip(&right.children));
+        }
+        true
+    }
+}
+
+impl Eq for ExpressionView {}
+
+impl fmt::Debug for ExpressionView {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        enum Action<'a> {
+            View(&'a ExpressionView),
+            Separator,
+            Close(usize),
+        }
+
+        let mut actions = vec![Action::View(self)];
+        while let Some(action) = actions.pop() {
+            match action {
+                Action::Separator => formatter.write_str(", ")?,
+                Action::Close(symbol_offset) => {
+                    write!(formatter, "], symbol_offset: {symbol_offset} }}")?;
+                }
+                Action::View(view) => {
+                    write!(
+                        formatter,
+                        "ExpressionView {{ kind: {:?}, delimiter: {:?}, reader_prefixes: {:?}, span: {:?}, content_span: {:?}, text: {:?}, children: [",
+                        view.kind,
+                        view.delimiter,
+                        view.reader_prefixes,
+                        view.span,
+                        view.content_span,
+                        view.text,
+                    )?;
+                    actions.push(Action::Close(view.symbol_offset));
+                    for (position, child) in view.children.iter().enumerate().rev() {
+                        actions.push(Action::View(child));
+                        if position > 0 {
+                            actions.push(Action::Separator);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for ExpressionView {
+    fn drop(&mut self) {
+        let mut pending = std::mem::take(&mut self.children);
+        while let Some(mut view) = pending.pop() {
+            pending.append(&mut view.children);
+        }
+    }
 }
 
 /// A validated selection of one non-root expression inside a syntax tree.
@@ -236,47 +399,102 @@ impl SyntaxTree {
 
     /// Collects every atom in the tree together with its path and byte span.
     pub fn atom_occurrences(&self) -> Vec<AtomOccurrence> {
-        let mut occurrences = Vec::new();
-        let mut path_stack = Vec::new();
-        for (index, child) in self.node(NodeId::ROOT).children.iter().enumerate() {
-            path_stack.push(index);
-            self.collect_atoms(*child, &mut path_stack, &mut occurrences);
-            path_stack.pop();
-        }
-        occurrences
+        self.collect_atom_occurrences(false)
     }
 
     /// Counts the atoms `atom_occurrences` would report without materializing
     /// their paths and text. Callers that only need the total (e.g. workspace
     /// inventory reports) avoid one `String` and one path `Vec` per atom.
     pub fn atom_occurrence_count(&self) -> usize {
-        fn count(tree: &SyntaxTree, node_id: NodeId) -> usize {
-            let node = tree.node(node_id);
+        let mut count: usize = 0;
+        let mut pending = self.node(NodeId::ROOT).children.clone();
+        while let Some(node_id) = pending.pop() {
+            let node = self.node(node_id);
             if node
                 .reader_prefixes
                 .iter()
                 .any(|prefix| prefix.is_opaque_reader_form())
             {
-                return 0;
+                continue;
             }
             if node.kind == NodeKind::Atom {
                 let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
-                return usize::from(
+                count = count.saturating_add(usize::from(
                     !is_quoted_literal
                         && node
                             .span
-                            .slice(&tree.source)
+                            .slice(&self.source)
                             .get(node.symbol_offset..)
                             .is_some(),
-                );
+                ));
+                continue;
             }
-            node.children.iter().map(|child| count(tree, *child)).sum()
+            pending.extend(node.children.iter().copied());
         }
-        self.node(NodeId::ROOT)
+        count
+    }
+
+    pub(in crate::domain) fn atom_occurrence_index(&self) -> AtomOccurrenceIndex<'_> {
+        let mut parent_steps = vec![None; self.nodes.len()];
+        let mut occurrences = Vec::new();
+        let mut quoted_designators = Vec::new();
+        let mut pending = self
+            .node(NodeId::ROOT)
             .children
             .iter()
-            .map(|child| count(self, *child))
-            .sum()
+            .copied()
+            .enumerate()
+            .rev()
+            .map(|(index, node_id)| (node_id, NodeId::ROOT, index))
+            .collect::<Vec<_>>();
+
+        while let Some((node_id, parent_id, index)) = pending.pop() {
+            parent_steps[node_id.get()] = Some((parent_id, index));
+            let node = self.node(node_id);
+            if node
+                .reader_prefixes
+                .iter()
+                .any(|prefix| prefix.is_opaque_reader_form())
+            {
+                continue;
+            }
+            if node.kind == NodeKind::Atom {
+                if let Some(text) = node.span.slice(&self.source).get(node.symbol_offset..) {
+                    let occurrence = BorrowedAtomOccurrence {
+                        node_id,
+                        span: ByteSpan::new(
+                            ByteOffset::new(node.span.start().get() + node.symbol_offset),
+                            node.span.end(),
+                        ),
+                        text,
+                    };
+                    if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
+                        quoted_designators.push(occurrence);
+                    } else {
+                        occurrences.push(occurrence);
+                    }
+                }
+                continue;
+            }
+            pending.extend(
+                node.children
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .rev()
+                    .map(|(index, child_id)| (child_id, node_id, index)),
+            );
+        }
+        debug_assert!(occurrences.windows(2).all(|pair| {
+            let left = (pair[0].span.start(), pair[0].span.end());
+            let right = (pair[1].span.start(), pair[1].span.end());
+            left < right
+        }));
+        AtomOccurrenceIndex {
+            parent_steps,
+            occurrences,
+            quoted_designators,
+        }
     }
 
     /// Collects bare quoted-symbol designators (`'foo`, i.e. an atom whose own
@@ -298,14 +516,7 @@ impl SyntaxTree {
     /// remain ordinary atoms already covered by `atom_occurrences` and are
     /// left untouched here.
     pub fn quoted_symbol_designator_occurrences(&self) -> Vec<AtomOccurrence> {
-        let mut occurrences = Vec::new();
-        let mut path_stack = Vec::new();
-        for (index, child) in self.node(NodeId::ROOT).children.iter().enumerate() {
-            path_stack.push(index);
-            self.collect_quoted_symbol_designators(*child, &mut path_stack, &mut occurrences);
-            path_stack.pop();
-        }
-        occurrences
+        self.collect_atom_occurrences(true)
     }
 
     /// Rewrites matching atom occurrences while preserving the rest of the source text.
@@ -318,19 +529,18 @@ impl SyntaxTree {
     /// let input = "(let ((value 1)) (+ value value))";
     /// let tree = SyntaxTree::parse(input).unwrap();
     /// let output = tree.rename_symbol(
-    ///     input,
     ///     &SymbolName::new("value").unwrap(),
     ///     &SymbolName::new("count").unwrap(),
     /// );
     ///
     /// assert_eq!(output, "(let ((count 1)) (+ count count))");
     /// ```
-    pub fn rename_symbol(&self, input: &str, from: &SymbolName, to: &SymbolName) -> String {
-        let mut occurrences = self
-            .atom_occurrences()
-            .into_iter()
-            .chain(self.quoted_symbol_designator_occurrences())
-            .filter(|occurrence| common_lisp_symbol_reference_eq(&occurrence.text, from.as_str()))
+    pub fn rename_symbol(&self, from: &SymbolName, to: &SymbolName) -> String {
+        let input = self.source.as_str();
+        let index = self.atom_occurrence_index();
+        let mut occurrences = index
+            .rename_occurrences()
+            .filter(|occurrence| common_lisp_symbol_reference_eq(occurrence.text, from.as_str()))
             .collect::<Vec<_>>();
         occurrences.sort_by_key(|occurrence| occurrence.span.start());
         let mut output = String::with_capacity(input.len());
@@ -368,7 +578,7 @@ impl SyntaxTree {
                     0 => format!("{location} has no child expressions"),
                     len => format!(
                         "{location} has {len} child expressions (valid indexes 0..={})",
-                        len - 1
+                        len.saturating_sub(1)
                     ),
                 };
                 anyhow!("path segment {} is out of range: {arity}", index.get())
@@ -407,86 +617,71 @@ impl SyntaxTree {
         .ok_or_else(|| anyhow!("no expression contains byte offset {}", offset.get()))
     }
 
-    // `path_stack` is pushed/popped in place rather than cloned at every
-    // recursion level (as `ExpressionPath::child` would do): cloning the
-    // whole path on the way down makes a deeply nested document (thousands
-    // of levels) cost O(depth^2) allocation instead of O(depth), which is
-    // slow enough to look hung. A full `ExpressionPath` is only built once
-    // an atom is actually found.
-    fn collect_atoms(
-        &self,
-        node_id: NodeId,
-        path_stack: &mut Vec<usize>,
-        output: &mut Vec<AtomOccurrence>,
-    ) {
-        let node = self.node(node_id);
-        if node
-            .reader_prefixes
-            .iter()
-            .any(|prefix| prefix.is_opaque_reader_form())
-        {
-            return;
+    // A full `ExpressionPath` is only built when an atom is found. Enter/leave
+    // frames preserve pre-order traversal without consuming the call stack.
+    fn collect_atom_occurrences(&self, quoted_designators: bool) -> Vec<AtomOccurrence> {
+        enum Frame {
+            Enter { node_id: NodeId, index: usize },
+            Leave,
         }
-        if node.kind == NodeKind::Atom {
-            let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
-            if let Some(symbol_text) = (!is_quoted_literal)
-                .then(|| node.span.slice(&self.source))
-                .and_then(|text| text.get(node.symbol_offset..))
-            {
-                let symbol_span = ByteSpan::new(
-                    ByteOffset::new(node.span.start().get() + node.symbol_offset),
-                    node.span.end(),
-                );
-                output.push(AtomOccurrence {
-                    path: ExpressionPath::from_indexes(path_stack.clone()),
-                    span: symbol_span,
-                    text: symbol_text.to_string(),
-                });
-            }
-            return;
-        }
-        for (index, child) in node.children.iter().enumerate() {
-            path_stack.push(index);
-            self.collect_atoms(*child, path_stack, output);
-            path_stack.pop();
-        }
-    }
 
-    fn collect_quoted_symbol_designators(
-        &self,
-        node_id: NodeId,
-        path_stack: &mut Vec<usize>,
-        output: &mut Vec<AtomOccurrence>,
-    ) {
-        let node = self.node(node_id);
-        if node
-            .reader_prefixes
+        let mut output = Vec::new();
+        let mut path_stack = Vec::new();
+        let mut pending = self
+            .node(NodeId::ROOT)
+            .children
             .iter()
-            .any(|prefix| prefix.is_opaque_reader_form())
-        {
-            return;
-        }
-        if node.kind == NodeKind::Atom {
-            if node.reader_prefixes.contains(&ReaderPrefix::Quote) {
-                if let Some(symbol_text) = node.span.slice(&self.source).get(node.symbol_offset..) {
-                    let symbol_span = ByteSpan::new(
-                        ByteOffset::new(node.span.start().get() + node.symbol_offset),
-                        node.span.end(),
-                    );
-                    output.push(AtomOccurrence {
-                        path: ExpressionPath::from_indexes(path_stack.clone()),
-                        span: symbol_span,
-                        text: symbol_text.to_string(),
-                    });
-                }
-            }
-            return;
-        }
-        for (index, child) in node.children.iter().enumerate() {
+            .copied()
+            .enumerate()
+            .rev()
+            .map(|(index, node_id)| Frame::Enter { node_id, index })
+            .collect::<Vec<_>>();
+
+        while let Some(frame) = pending.pop() {
+            let Frame::Enter { node_id, index } = frame else {
+                path_stack.pop();
+                continue;
+            };
             path_stack.push(index);
-            self.collect_quoted_symbol_designators(*child, path_stack, output);
-            path_stack.pop();
+            pending.push(Frame::Leave);
+
+            let node = self.node(node_id);
+            if node
+                .reader_prefixes
+                .iter()
+                .any(|prefix| prefix.is_opaque_reader_form())
+            {
+                continue;
+            }
+            if node.kind == NodeKind::Atom {
+                let is_quoted_literal = node.reader_prefixes.contains(&ReaderPrefix::Quote);
+                if is_quoted_literal == quoted_designators {
+                    if let Some(symbol_text) =
+                        node.span.slice(&self.source).get(node.symbol_offset..)
+                    {
+                        let symbol_span = ByteSpan::new(
+                            ByteOffset::new(node.span.start().get() + node.symbol_offset),
+                            node.span.end(),
+                        );
+                        output.push(AtomOccurrence {
+                            path: ExpressionPath::from_indexes(path_stack.clone()),
+                            span: symbol_span,
+                            text: symbol_text.to_string(),
+                        });
+                    }
+                }
+                continue;
+            }
+            pending.extend(
+                node.children
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .rev()
+                    .map(|(index, node_id)| Frame::Enter { node_id, index }),
+            );
         }
+        output
     }
 
     fn atom_text(&self, node_id: NodeId) -> Option<&str> {
@@ -498,32 +693,51 @@ impl SyntaxTree {
     }
 
     pub(in crate::domain::sexpr) fn expression_view(&self, node_id: NodeId) -> ExpressionView {
-        let node = self.node(node_id);
-        ExpressionView {
-            kind: match node.kind {
-                NodeKind::Root => ExpressionKind::Root,
-                NodeKind::List => ExpressionKind::List,
-                NodeKind::Atom => ExpressionKind::Atom,
-            },
-            delimiter: node.delimiter,
-            reader_prefixes: node.reader_prefixes.clone(),
-            span: node.span,
-            content_span: ByteSpan::new(
-                match node.kind {
-                    NodeKind::List => node.open.unwrap_or(node.span.start()),
-                    NodeKind::Atom => ByteOffset::new(node.span.start().get() + node.symbol_offset),
-                    NodeKind::Root => node.span.start(),
+        let mut frames = vec![(node_id, false)];
+        let mut views = Vec::new();
+
+        while let Some((current_id, expanded)) = frames.pop() {
+            let node = self.node(current_id);
+            if !expanded {
+                frames.push((current_id, true));
+                frames.extend(node.children.iter().rev().map(|child| (*child, false)));
+                continue;
+            }
+
+            let children_start = views
+                .len()
+                .checked_sub(node.children.len())
+                .expect("expanded expression has all child views");
+            let children = views.split_off(children_start);
+            views.push(ExpressionView {
+                kind: match node.kind {
+                    NodeKind::Root => ExpressionKind::Root,
+                    NodeKind::List => ExpressionKind::List,
+                    NodeKind::Atom => ExpressionKind::Atom,
                 },
-                node.span.end(),
-            ),
-            text: (node.kind == NodeKind::Atom).then(|| node.span.slice(&self.source).to_string()),
-            symbol_offset: node.symbol_offset,
-            children: node
-                .children
-                .iter()
-                .map(|child| self.expression_view(*child))
-                .collect(),
+                delimiter: node.delimiter,
+                reader_prefixes: node.reader_prefixes.clone(),
+                span: node.span,
+                content_span: ByteSpan::new(
+                    match node.kind {
+                        NodeKind::List => node.open.unwrap_or(node.span.start()),
+                        NodeKind::Atom => {
+                            ByteOffset::new(node.span.start().get() + node.symbol_offset)
+                        }
+                        NodeKind::Root => node.span.start(),
+                    },
+                    node.span.end(),
+                ),
+                text: (node.kind == NodeKind::Atom)
+                    .then(|| node.span.slice(&self.source).to_string()),
+                symbol_offset: node.symbol_offset,
+                children,
+            });
         }
+
+        views
+            .pop()
+            .expect("expression view root is always constructed")
     }
 
     pub(in crate::domain::sexpr) fn node(&self, node_id: NodeId) -> &Node {
@@ -532,9 +746,30 @@ impl SyntaxTree {
 }
 
 impl<'a> Selection<'a> {
+    pub(crate) fn validate_source(self, input: &str) -> Result<()> {
+        if self.tree.source != input {
+            anyhow::bail!("input does not match the source used to build the selection");
+        }
+        self.span()
+            .validate_against(input)
+            .map_err(|error| anyhow!("selected span is invalid: {error}"))
+    }
+
+    pub(crate) fn validate_context(self, input: &str, tree: &SyntaxTree) -> Result<()> {
+        self.validate_tree(tree)?;
+        self.validate_source(input)
+    }
+
+    pub(crate) fn validate_tree(self, tree: &SyntaxTree) -> Result<()> {
+        if !std::ptr::eq(tree, self.tree) {
+            anyhow::bail!("selection belongs to a different syntax tree");
+        }
+        Ok(())
+    }
+
     /// Returns the original source text covered by this selection.
-    pub fn text(self, input: &str) -> &str {
-        self.span().slice(input)
+    pub fn text(self) -> &'a str {
+        self.span().slice(&self.tree.source)
     }
 
     pub(in crate::domain::sexpr) fn node(self) -> &'a Node {

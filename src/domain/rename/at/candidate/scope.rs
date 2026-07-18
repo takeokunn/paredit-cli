@@ -1,18 +1,22 @@
 use anyhow::Result;
 
 use super::super::RenameAtNamespace;
+use super::super::selection::{AtomPathIndex, ancestor_views};
 use crate::domain::common_lisp::common_lisp_operator_head_eq;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, Path, SyntaxTree};
+use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, Path};
 
 pub(super) fn enclosing_specialized_scope(
-    tree: &SyntaxTree,
+    root_view: &ExpressionView,
     path: &Path,
     namespace: RenameAtNamespace,
 ) -> Result<Option<ByteSpan>> {
     let indexes = path.to_raw_indexes();
-    for end in (1..indexes.len()).rev() {
-        let ancestor = Path::from_indexes(indexes[..end].to_vec());
-        let view = tree.select_path(&ancestor)?.view();
+    for (end, view) in ancestor_views(root_view, path)?
+        .into_iter()
+        .enumerate()
+        .rev()
+    {
+        let end = end + 1;
         if view.kind != ExpressionKind::List {
             continue;
         }
@@ -54,18 +58,14 @@ pub(super) fn enclosing_specialized_scope(
 }
 
 pub(super) fn occurrence_has_scope(
-    tree: &SyntaxTree,
+    root_view: &ExpressionView,
+    atom_paths: AtomPathIndex<'_>,
     span: ByteSpan,
     namespace: RenameAtNamespace,
     expected: Option<ByteSpan>,
 ) -> bool {
-    let Some(path) = tree
-        .atom_occurrences()
-        .into_iter()
-        .find(|occurrence| occurrence.span == span)
-        .map(|occurrence| occurrence.path)
-    else {
+    let Some(path) = atom_paths.path_for_span(span) else {
         return false;
     };
-    enclosing_specialized_scope(tree, &path, namespace).ok() == Some(expected)
+    enclosing_specialized_scope(root_view, &path, namespace).ok() == Some(expected)
 }

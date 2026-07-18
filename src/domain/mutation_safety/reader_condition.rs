@@ -3,8 +3,8 @@ use std::fmt;
 
 use crate::domain::common_lisp::{
     CommonLispReaderConditionalKind, CommonLispReaderLabelKind, CommonLispReaderLiteralKind,
-    common_lisp_reader_conditional_dispatches, common_lisp_reader_conditional_forms,
-    common_lisp_reader_label_dispatches, common_lisp_reader_label_forms,
+    common_lisp_reader_conditional_forms, common_lisp_reader_conditional_kind,
+    common_lisp_reader_label_forms, common_lisp_reader_label_kind, common_lisp_reader_literal_kind,
     common_lisp_reader_literals,
 };
 use crate::domain::dialect::Dialect;
@@ -24,32 +24,46 @@ pub(crate) fn reject_common_lisp_reader_conditionals(
         return Ok(());
     }
 
-    let Some(dispatch) = common_lisp_reader_conditional_dispatches(tree)
-        .into_iter()
-        .next()
-    else {
-        if let Some(dispatch) = common_lisp_reader_label_dispatches(tree).into_iter().next() {
-            return Err(ReaderConditionalSafetyError::CommonLispReaderLabel {
-                kind: dispatch.kind,
-                span: dispatch.span,
-            });
-        }
-        if let Some(literal) = common_lisp_reader_literals(tree).into_iter().next() {
-            return Err(ReaderConditionalSafetyError::CommonLispReaderLiteral {
-                kind: literal.kind,
-                span: literal.span,
-            });
-        }
-        if let Some(span) = first_read_time_evaluation(&tree.root_view()) {
-            return Err(ReaderConditionalSafetyError::CommonLispReadTimeEvaluation { span });
-        }
-        return Ok(());
-    };
+    let root = tree.root_view();
+    let mut stack = vec![&root];
+    let mut conditional = None;
+    let mut label = None;
+    let mut literal = None;
+    let mut read_time_evaluation = None;
 
-    Err(ReaderConditionalSafetyError::CommonLispReaderConditional {
-        kind: dispatch.kind,
-        span: dispatch.span,
-    })
+    while let Some(view) = stack.pop() {
+        if conditional.is_none() {
+            conditional =
+                common_lisp_reader_conditional_kind(view).map(|kind| (kind, view.content_span));
+        }
+        if label.is_none() {
+            label = common_lisp_reader_label_kind(view).map(|kind| (kind, view.content_span));
+        }
+        if literal.is_none() {
+            literal = common_lisp_reader_literal_kind(view).map(|kind| (kind, view.span));
+        }
+        if read_time_evaluation.is_none() && view.reader_prefixes.contains(&ReaderPrefix::ReadEval)
+        {
+            read_time_evaluation = Some(view.span);
+        }
+
+        stack.extend(view.children.iter().rev());
+    }
+
+    if let Some((kind, span)) = conditional {
+        return Err(ReaderConditionalSafetyError::CommonLispReaderConditional { kind, span });
+    }
+    if let Some((kind, span)) = label {
+        return Err(ReaderConditionalSafetyError::CommonLispReaderLabel { kind, span });
+    }
+    if let Some((kind, span)) = literal {
+        return Err(ReaderConditionalSafetyError::CommonLispReaderLiteral { kind, span });
+    }
+    if let Some(span) = read_time_evaluation {
+        return Err(ReaderConditionalSafetyError::CommonLispReadTimeEvaluation { span });
+    }
+
+    Ok(())
 }
 
 /// Rejects only edits that partially overlap a Common Lisp reader-time form.
@@ -178,30 +192,25 @@ impl fmt::Display for ReaderConditionalSafetyError {
 
 impl Error for ReaderConditionalSafetyError {}
 
-fn first_read_time_evaluation(view: &ExpressionView) -> Option<ByteSpan> {
-    if view.reader_prefixes.contains(&ReaderPrefix::ReadEval) {
-        return Some(view.span);
-    }
-
-    view.children.iter().find_map(first_read_time_evaluation)
-}
-
 fn first_partially_overlapping_read_time_evaluation(
     view: &ExpressionView,
     mutation_spans: &[ByteSpan],
 ) -> Option<ByteSpan> {
-    if view.reader_prefixes.contains(&ReaderPrefix::ReadEval)
-        && mutation_spans
-            .iter()
-            .copied()
-            .any(|span| overlaps_partially(span, view.span))
-    {
-        return Some(view.span);
+    let mut stack = vec![view];
+    while let Some(view) = stack.pop() {
+        if view.reader_prefixes.contains(&ReaderPrefix::ReadEval)
+            && mutation_spans
+                .iter()
+                .copied()
+                .any(|span| overlaps_partially(span, view.span))
+        {
+            return Some(view.span);
+        }
+
+        stack.extend(view.children.iter().rev());
     }
 
-    view.children
-        .iter()
-        .find_map(|child| first_partially_overlapping_read_time_evaluation(child, mutation_spans))
+    None
 }
 
 fn overlaps_partially(left: ByteSpan, right: ByteSpan) -> bool {
@@ -269,5 +278,83 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn rejects_reader_prefix_only_edits_of_conditionals() {
+        for (input, prefix_len) in [
+            ("'#+sbcl selected", 1),
+            ("`#+sbcl selected", 1),
+            ("#'#+sbcl selected", 2),
+        ] {
+            let tree = SyntaxTree::parse(input).expect("parse succeeds");
+            let prefix = ByteSpan::new(ByteOffset::new(0), ByteOffset::new(prefix_len));
+
+            let error = reject_overlapping_common_lisp_reader_time_forms(
+                &tree,
+                Dialect::CommonLisp,
+                [prefix],
+            )
+            .expect_err("reader prefix edit must reject");
+
+            assert!(matches!(
+                error,
+                ReaderConditionalSafetyError::CommonLispReaderConditional { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn rejects_reader_prefix_only_edits_of_labels() {
+        for input in ["'#1=(item)", "`#1=(item)"] {
+            let tree = SyntaxTree::parse(input).expect("parse succeeds");
+            let prefix = ByteSpan::new(ByteOffset::new(0), ByteOffset::new(1));
+
+            let error = reject_overlapping_common_lisp_reader_time_forms(
+                &tree,
+                Dialect::CommonLisp,
+                [prefix],
+            )
+            .expect_err("reader prefix edit must reject");
+
+            assert!(matches!(
+                error,
+                ReaderConditionalSafetyError::CommonLispReaderLabel { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn rejects_feature_edit_in_incomplete_reader_conditional() {
+        let input = "#+sbcl";
+        let tree = SyntaxTree::parse(input).expect("parse succeeds");
+        let feature_start = input.find("sbcl").expect("feature exists");
+        let feature = ByteSpan::new(
+            ByteOffset::new(feature_start),
+            ByteOffset::new(feature_start + "sbcl".len()),
+        );
+
+        let error =
+            reject_overlapping_common_lisp_reader_time_forms(&tree, Dialect::CommonLisp, [feature])
+                .expect_err("incomplete conditional feature edit must reject");
+
+        assert!(matches!(
+            error,
+            ReaderConditionalSafetyError::CommonLispReaderConditional { .. }
+        ));
+    }
+
+    #[test]
+    fn overlap_checks_support_deep_common_lisp_input() {
+        const DEPTH: usize = 30_000;
+        let input = format!("{}value{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+        let tree = SyntaxTree::parse(&input).expect("deep input parses");
+
+        reject_overlapping_common_lisp_reader_time_forms(
+            &tree,
+            Dialect::CommonLisp,
+            std::iter::empty(),
+        )
+        .expect("deep input must not overflow the stack");
     }
 }

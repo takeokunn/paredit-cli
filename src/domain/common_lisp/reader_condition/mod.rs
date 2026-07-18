@@ -8,8 +8,10 @@
 mod dispatch;
 mod query;
 
-pub use dispatch::{
-    CommonLispReaderConditionalDispatch, CommonLispReaderConditionalForm,
-    CommonLispReaderConditionalKind,
-};
-pub use query::{common_lisp_reader_conditional_dispatches, common_lisp_reader_conditional_forms};
+#[cfg(test)]
+pub use dispatch::CommonLispReaderConditionalDispatch;
+pub use dispatch::{CommonLispReaderConditionalForm, CommonLispReaderConditionalKind};
+#[cfg(test)]
+pub use query::common_lisp_reader_conditional_dispatches;
+pub use query::common_lisp_reader_conditional_forms;
+pub(crate) use query::reader_conditional_kind;

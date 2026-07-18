@@ -2,7 +2,9 @@ use super::super::super::super::*;
 use super::super::super::args::RefactorDiffArgs;
 use super::super::super::manifest::io::read_refactor_manifest_file;
 use super::super::super::manifest::parse::parse_refactor_apply_manifest;
-use super::super::super::manifest::root::resolve_refactor_manifest_path;
+use super::super::super::manifest::root::{
+    MAX_MANIFEST_SOURCE_TOTAL_BYTES, read_refactor_manifest_source,
+};
 use super::super::super::manifest::validation::validate_manifest_edits;
 use super::super::super::render::print_refactor_diff_result;
 use super::super::super::types::diff::{
@@ -22,11 +24,18 @@ pub(in crate::presentation::cli) fn refactor_diff(args: RefactorDiffArgs) -> Res
         .transpose()?;
 
     let mut files = Vec::with_capacity(manifest.files.len());
+    let mut source_bytes = 0_u64;
 
     for file in &manifest.files {
-        let resolved_path = resolve_refactor_manifest_path(&file.path, root_guard.as_ref())?;
-        let input = fs::read_to_string(&resolved_path)
-            .with_context(|| format!("failed to read {}", resolved_path.display()))?;
+        let (_resolved_path, input, _expected_original) =
+            read_refactor_manifest_source(&file.path, root_guard.as_ref())?;
+        source_bytes = source_bytes.saturating_add(input.len() as u64);
+        if source_bytes > MAX_MANIFEST_SOURCE_TOTAL_BYTES {
+            anyhow::bail!(
+                "refusing manifest sources: cumulative input exceeds {} bytes",
+                MAX_MANIFEST_SOURCE_TOTAL_BYTES
+            );
+        }
         let input_hash = stable_text_hash(&input);
         let input_hash_matches = input_hash == file.input_hash;
         let edits = file

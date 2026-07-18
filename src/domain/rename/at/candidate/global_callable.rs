@@ -57,17 +57,12 @@ fn executable_occurrences<'a>(
     definitions: &'a [RenameFunctionOccurrence],
     calls: &'a [RenameFunctionOccurrence],
 ) -> Result<Vec<&'a RenameFunctionOccurrence>> {
-    let atom_paths = context.tree.atom_occurrences();
     let mut executable = Vec::new();
     for occurrence in definitions.iter().chain(calls) {
-        let Some(path) = atom_paths
-            .iter()
-            .find(|atom| atom.span == occurrence.span)
-            .map(|atom| &atom.path)
-        else {
+        let Some(path) = context.atom_paths.path_for_span(occurrence.span) else {
             continue;
         };
-        if executable_reader_context_at_path(context.tree, context.dialect, path)? {
+        if executable_reader_context_at_path(context.tree, context.dialect, &path)? {
             executable.push(occurrence);
         }
     }

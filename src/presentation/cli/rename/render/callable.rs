@@ -26,15 +26,15 @@ pub(in crate::presentation::cli::rename) fn print_callable_rename_report(
         .sum::<usize>();
     match output {
         OutputFormat::Text => {
-            println!("from\t{from}");
-            println!("to\t{to}");
+            println!("from\t{}", safe_text!(from));
+            println!("to\t{}", safe_text!(to));
             println!("write\t{write}");
             println!("definitionCount\t{definition_count}");
             println!("callCount\t{call_count}");
             for report in reports {
                 println!(
                     "{}\t{}\tdefinitions={}\tcalls={}\tchanged={}\twritten={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.definitions.len(),
                     report.calls.len(),

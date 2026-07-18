@@ -40,7 +40,7 @@ fn print_plan(plan: &MergeNestedFletPlan, written: bool, output: OutputFormat) -
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!("outer_binding_count\t{}", plan.outer_binding_count);
             println!("inner_binding_count\t{}", plan.inner_binding_count);
             println!("changed\t{}", plan.changed);

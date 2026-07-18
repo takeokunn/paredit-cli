@@ -39,9 +39,9 @@ fn print_plan(plan: &InlineLiteralConstantPlan, written: bool, output: OutputFor
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
-            println!("constant_name\t{}", plan.constant_name);
-            println!("literal\t{}", plan.literal);
+            println!("path\t{}", safe_text!(plan.path));
+            println!("constant_name\t{}", safe_text!(plan.constant_name));
+            println!("literal\t{}", safe_text!(plan.literal));
             println!("reference_count\t{}", plan.reference_count);
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");

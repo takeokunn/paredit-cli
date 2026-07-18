@@ -19,6 +19,13 @@ use validation::{
 };
 
 pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFormsPlan> {
+    let input_tree = SyntaxTree::parse(request.input)
+        .context("replace-forms input is not a valid S-expression document")?;
+    anyhow::ensure!(
+        &input_tree == request.tree,
+        "replace-forms input does not match the source used to build the syntax tree"
+    );
+
     let replacement_tree = SyntaxTree::parse(request.replacement)
         .context("--with must be a valid S-expression document")?;
     // The replacement becomes source code in the rewritten document, so it
@@ -31,7 +38,7 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
     let replacement_view = replacement_tree.select_path(&Path::root_child(0))?.view();
     let replacement_shape = duplicate_shape(&replacement_view, true);
 
-    let targets = collect_replace_targets(request.input, request.tree, &request.paths)?;
+    let targets = collect_replace_targets(request.tree, &request.paths)?;
     reject_overlapping_common_lisp_reader_time_forms(
         request.tree,
         request.dialect,

@@ -12,7 +12,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_move_function_para
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("definition_path\t{}", plan.definition_path);
+            println!("definition_path\t{}", safe_text!(plan.definition_path));
             println!("all_calls\t{}", plan.all_calls);
             println!(
                 "definition_span\t{}..{}",
@@ -24,8 +24,8 @@ pub(in crate::presentation::cli::function_parameter) fn print_move_function_para
                 plan.parameter_list_span.start().get(),
                 plan.parameter_list_span.end().get()
             );
-            println!("function_name\t{}", plan.function_name);
-            println!("parameter_name\t{}", plan.parameter_name);
+            println!("function_name\t{}", safe_text!(plan.function_name));
+            println!("parameter_name\t{}", safe_text!(plan.parameter_name));
             println!("from_index\t{}", plan.from_index);
             println!("to_index\t{}", plan.to_index);
             for ((path, span), moved_argument) in plan
@@ -36,10 +36,10 @@ pub(in crate::presentation::cli::function_parameter) fn print_move_function_para
             {
                 println!(
                     "call\t{}\t{}..{}\tmoved_argument={}",
-                    path,
+                    safe_text!(path),
                     span.start().get(),
                     span.end().get(),
-                    moved_argument
+                    safe_text!(moved_argument)
                 );
             }
             println!("changed\t{}", plan.changed);

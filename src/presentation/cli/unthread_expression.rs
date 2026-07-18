@@ -79,28 +79,28 @@ fn print_unthread_expression_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
             println!("style\t{}", plan.style.label());
-            println!("operator\t{}", plan.operator);
+            println!("operator\t{}", safe_text!(plan.operator));
             println!(
                 "span\t{}..{}",
                 plan.span.start().get(),
                 plan.span.end().get()
             );
-            println!("base\t{}", plan.base);
+            println!("base\t{}", safe_text!(plan.base));
             for step in &plan.steps {
                 println!(
                     "step\t{}\targs={}\tinsertion_index={}\tspan={}..{}\t{}",
-                    step.head,
+                    safe_text!(step.head),
                     step.argument_count,
                     step.insertion_index,
                     step.span.start().get(),
                     step.span.end().get(),
-                    step.form
+                    safe_text!(step.form)
                 );
             }
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

@@ -7,7 +7,10 @@
 mod dispatch;
 mod query;
 
-pub use dispatch::{
-    CommonLispReaderLabelDispatch, CommonLispReaderLabelForm, CommonLispReaderLabelKind,
-};
-pub use query::{common_lisp_reader_label_dispatches, common_lisp_reader_label_forms};
+#[cfg(test)]
+pub use dispatch::CommonLispReaderLabelDispatch;
+pub use dispatch::{CommonLispReaderLabelForm, CommonLispReaderLabelKind};
+#[cfg(test)]
+pub use query::common_lisp_reader_label_dispatches;
+pub use query::common_lisp_reader_label_forms;
+pub(crate) use query::reader_label_kind;

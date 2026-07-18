@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 use crate::domain::dialect::Dialect;
-use crate::domain::extract_shared::{TopLevelInsert, insert_top_level_form, replace_span};
+use crate::domain::extract_shared::{TopLevelInsert, insert_top_level_form, replace_span_checked};
 use crate::domain::sexpr::{
     ByteSpan, ExpressionKind, ExpressionView, Path, ReaderPrefix, Selection, SymbolName, SyntaxTree,
 };
@@ -34,6 +34,7 @@ pub(crate) struct Plan {
 }
 
 pub(crate) fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) -> Result<Path> {
+    selection.validate_tree(tree)?;
     let target = selection.span();
     find_path(&tree.root_view(), target, &mut Vec::new())
         .map(Path::from_indexes)
@@ -41,14 +42,17 @@ pub(crate) fn path_for_selection(tree: &SyntaxTree, selection: Selection<'_>) ->
 }
 
 pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
+    request
+        .selection
+        .validate_context(request.input, request.tree)?;
     let head = dialect_head(request.dialect)?;
     validate_target(request.tree, &request.path, request.dialect)?;
 
     let span = request.selection.span();
-    let selected = request.selection.text(request.input).to_owned();
+    let selected = request.selection.text().to_owned();
     let replacement = request.name.as_str().to_owned();
     let definition = format!("({head} {} {selected})", request.name);
-    let replaced = replace_span(request.input, span, &replacement);
+    let replaced = replace_span_checked(request.input, span, &replacement)?;
     let replaced_tree = SyntaxTree::parse(&replaced)
         .context("replacement output is not a valid S-expression document")?;
     let (rewritten, anchor_span) = insert_top_level_form(

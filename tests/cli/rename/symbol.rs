@@ -102,52 +102,55 @@ fn cli_renames_bare_quoted_symbol_designator_references() {
 }
 
 #[test]
-fn cli_refactor_preview_renames_bare_quoted_symbol_designator_in_symbol_and_function_mode() {
-    for mode in ["symbol", "function"] {
-        let dir = fresh_temp_dir(&format!("quoted-designator-{mode}"));
-        let lisp_file = dir.join("core.lisp");
-        fs::write(
-            &lisp_file,
-            "(define-condition foo (error) ())\n(defun signal-foo () (error 'foo))",
-        )
-        .expect("write lisp fixture");
+fn cli_refactor_preview_symbol_mode_renames_bare_quoted_data() {
+    let dir = fresh_temp_dir("quoted-data-symbol-mode");
+    let lisp_file = dir.join("core.lisp");
+    fs::write(
+        &lisp_file,
+        "(define-condition foo (error) ())\n(defun signal-foo () (error 'foo))",
+    )
+    .expect("write lisp fixture");
 
-        let mut cmd = paredit();
-        cmd.arg("refactor")
-            .arg("preview")
-            .arg("--from")
-            .arg("foo")
-            .arg("--to")
-            .arg("bar")
-            .arg("--mode")
-            .arg(mode)
-            .arg("--write")
-            .arg("--output")
-            .arg("json")
-            .arg(&lisp_file)
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("\"written\": true"));
+    let mut cmd = paredit();
+    cmd.args([
+        "refactor", "preview", "--from", "foo", "--to", "bar", "--mode", "symbol", "--write",
+        "--output", "json",
+    ])
+    .arg(&lisp_file)
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"written\": true"));
 
-        let rewritten = fs::read_to_string(&lisp_file).expect("read rewritten lisp");
-        assert!(
-            rewritten.contains("(error 'bar)"),
-            "mode {mode}: quoted designator was not renamed: {rewritten}"
-        );
-        assert!(
-            !rewritten.contains("'foo"),
-            "mode {mode}: stale quoted reference left behind: {rewritten}"
-        );
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read rewritten lisp"),
+        "(define-condition bar (error) ())\n(defun signal-foo () (error 'bar))"
+    );
+}
 
-        // The rewritten file must still parse; `find-symbol` is a cheap way
-        // to force the CLI to reparse it end-to-end.
-        let mut find_cmd = paredit();
-        find_cmd
-            .args(["inspect", "find-symbol", "--symbol", "bar", "--file"])
-            .arg(&lisp_file)
-            .assert()
-            .success();
-    }
+#[test]
+fn cli_refactor_preview_function_mode_preserves_bare_quote_and_renames_explicit_designators() {
+    let dir = fresh_temp_dir("quoted-data-function-mode");
+    let lisp_file = dir.join("core.lisp");
+    fs::write(
+        &lisp_file,
+        "(defun foo () nil)\n(defun caller () (list 'foo #'foo (function foo)))",
+    )
+    .expect("write lisp fixture");
+
+    let mut cmd = paredit();
+    cmd.args([
+        "refactor", "preview", "--from", "foo", "--to", "bar", "--mode", "function", "--write",
+        "--output", "json",
+    ])
+    .arg(&lisp_file)
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"written\": true"));
+
+    assert_eq!(
+        fs::read_to_string(&lisp_file).expect("read rewritten lisp"),
+        "(defun bar () nil)\n(defun caller () (list 'foo #'bar (function bar)))"
+    );
 }
 
 #[test]

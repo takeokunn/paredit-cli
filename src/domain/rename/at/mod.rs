@@ -13,6 +13,7 @@ mod types;
 
 use candidate::{SpecializedCandidateContext, add_specialized_candidates, binding_candidates};
 pub use error::RenameAtError;
+use selection::AtomPathIndex;
 pub use types::{RenameAtNamespace, RenameAtPlan, RenameAtRequest};
 
 pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
@@ -26,26 +27,42 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
 
     let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect).map_err(RenameAtError::from)?;
-    let selected = tree
-        .atom_occurrences()
-        .into_iter()
+    let atom_occurrences = tree.atom_occurrence_index();
+    let atom_paths = AtomPathIndex::new(&atom_occurrences);
+    let selected = atom_occurrences
+        .occurrences()
+        .iter()
         .find(|occurrence| occurrence.span.contains(request.at))
         .ok_or(RenameAtError::InvalidSelection)?;
-    let path = selected.path.clone();
+    let path = atom_paths
+        .path_for_span(selected.span)
+        .ok_or(RenameAtError::InvalidSelection)?;
     if !executable_reader_context_at_path(&tree, request.dialect, &path)? {
         return Err(RenameAtError::InertReaderContext.into());
     }
     if selected.text.contains(':') || request.to.as_str().contains(':') {
         return Err(RenameAtError::UnsupportedPackageSyntax.into());
     }
-    let from = SymbolName::new(selected.text.clone()).context("selected atom is not a symbol")?;
-    let mut candidates = binding_candidates(&tree, request.input, &path, &from, &request.to)?;
+    let from =
+        SymbolName::new(selected.text.to_owned()).context("selected atom is not a symbol")?;
+    let root_view = tree.root_view();
+    let mut candidates = binding_candidates(
+        &tree,
+        &root_view,
+        atom_paths,
+        request.input,
+        &path,
+        &from,
+        &request.to,
+    )?;
     add_specialized_candidates(
         &mut candidates,
         SpecializedCandidateContext {
             input: request.input,
             dialect: request.dialect,
             tree: &tree,
+            root_view: &root_view,
+            atom_paths,
             path: &path,
             selected_span: selected.span,
             from: &from,

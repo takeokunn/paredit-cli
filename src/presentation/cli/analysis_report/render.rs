@@ -113,7 +113,7 @@ pub(super) fn print_outline(
             for entry in entries {
                 println!(
                     "{}\t{}..{}\t{}\t{}",
-                    entry.path,
+                    safe_text!(entry.path),
                     entry.span.start().get(),
                     entry.span.end().get(),
                     entry.head.as_deref().unwrap_or("<unknown>"),

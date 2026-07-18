@@ -43,14 +43,17 @@ fn print_text(
     println!("max_candidates\t{}", optional_usize(args.max_candidates));
     println!("max_results\t{}", optional_usize(args.max_results));
     println!("error_policy\t{}", args.error_policy.label());
-    println!("scanned_files\t{}", discovery.files.len());
-    println!("processed_files\t{}", discovery.files.len() - errors.len());
+    println!("scanned_files\t{}", discovery.files().len());
+    println!(
+        "processed_files\t{}",
+        discovery.files().len() - errors.len()
+    );
     println!("skipped_error_files\t{}", errors.len());
-    println!("skipped_unknown\t{}", discovery.skipped_unknown_count);
-    println!("skipped_hidden\t{}", discovery.skipped_hidden_count);
-    println!("skipped_generated\t{}", discovery.skipped_generated_count);
-    println!("skipped_symlink\t{}", discovery.skipped_symlink_count);
-    println!("skipped_excluded\t{}", discovery.skipped_excluded_count);
+    println!("skipped_unknown\t{}", discovery.skipped_unknown_count());
+    println!("skipped_hidden\t{}", discovery.skipped_hidden_count());
+    println!("skipped_generated\t{}", discovery.skipped_generated_count());
+    println!("skipped_symlink\t{}", discovery.skipped_symlink_count());
+    println!("skipped_excluded\t{}", discovery.skipped_excluded_count());
     println!("possible_pairs\t{}", summary.possible_pairs);
     println!(
         "candidate_limit_reached\t{}",
@@ -59,6 +62,7 @@ fn print_text(
     println!("omitted_candidates\t{}", summary.omitted_candidates);
     println!("evaluated_pairs\t{}", summary.evaluated_pairs);
     println!("pruned_by_size\t{}", summary.pruned_by_size);
+    println!("resource_skipped_pairs\t{}", summary.resource_skipped_pairs);
     println!(
         "comparison_limit_reached\t{}",
         summary.comparison_limit_reached
@@ -73,9 +77,9 @@ fn print_text(
     for error in errors {
         println!(
             "error\t{}\t{}\t{}",
-            error.path.display(),
-            error.stage,
-            error.message
+            safe_text!(error.path.display()),
+            safe_text!(error.stage),
+            safe_text!(error.message)
         );
     }
 
@@ -119,19 +123,20 @@ fn json_report(
             "fail_on_duplicates": args.fail_on_duplicates,
         },
         "summary": {
-            "scanned_files": discovery.files.len(),
-            "processed_files": discovery.files.len() - errors.len(),
+            "scanned_files": discovery.files().len(),
+            "processed_files": discovery.files().len() - errors.len(),
             "skipped_error_files": errors.len(),
-            "skipped_unknown": discovery.skipped_unknown_count,
-            "skipped_hidden": discovery.skipped_hidden_count,
-            "skipped_generated": discovery.skipped_generated_count,
-            "skipped_symlink": discovery.skipped_symlink_count,
-            "skipped_excluded": discovery.skipped_excluded_count,
+            "skipped_unknown": discovery.skipped_unknown_count(),
+            "skipped_hidden": discovery.skipped_hidden_count(),
+            "skipped_generated": discovery.skipped_generated_count(),
+            "skipped_symlink": discovery.skipped_symlink_count(),
+            "skipped_excluded": discovery.skipped_excluded_count(),
             "possible_pairs": report.summary.possible_pairs,
             "candidate_limit_reached": report.summary.candidate_limit_reached,
             "omitted_candidates": report.summary.omitted_candidates,
             "evaluated_pairs": report.summary.evaluated_pairs,
             "pruned_by_size": report.summary.pruned_by_size,
+            "resource_skipped_pairs": report.summary.resource_skipped_pairs,
             "comparison_limit_reached": report.summary.comparison_limit_reached,
             "unprocessed_pairs": report.summary.unprocessed_pairs,
             "matched_pairs": report.summary.matched_pairs,
@@ -160,13 +165,13 @@ fn optional_usize(value: Option<usize>) -> String {
 fn print_text_form(side: &str, form: &SimilarityFormReport) {
     println!(
         "\t{side}\t{}\t{}\t{}\t{}..{}\tnodes={}\thead={}",
-        form.path.display(),
+        safe_text!(form.path.display()),
         form.dialect.label(),
-        form.form_path,
+        safe_text!(form.form_path),
         form.span.start().get(),
         form.span.end().get(),
         form.node_count,
-        form.head.as_deref().unwrap_or("")
+        safe_text!(form.head.as_deref().unwrap_or(""))
     );
 }
 
@@ -178,6 +183,6 @@ fn form_json(form: &SimilarityFormReport) -> serde_json::Value {
         "span": { "start": form.span.start().get(), "end": form.span.end().get() },
         "node_count": form.node_count,
         "head": form.head.as_deref(),
-        "text": form.text,
+        "text": form.text.as_ref(),
     })
 }

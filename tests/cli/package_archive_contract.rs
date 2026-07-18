@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::process::Command as ProcessCommand;
 
 #[test]
-fn cargo_package_includes_public_oss_docs() {
+fn cargo_package_includes_required_contract_assets() {
     let cargo = std::env::var("CARGO").expect("CARGO env var");
     let output = ProcessCommand::new(cargo)
         .args(["package", "--allow-dirty", "--list"])
@@ -22,10 +22,21 @@ fn cargo_package_includes_public_oss_docs() {
         .filter(|line| !line.is_empty())
         .collect();
 
-    for required in ["LICENSE", "README.md"] {
+    for required in [
+        ".github/workflows/ci.yml",
+        "Cargo.lock",
+        "Cargo.toml",
+        "LICENSE",
+        "README.md",
+        "action.yml",
+        "docs/src/commands.md",
+        "docs/src/integrations.md",
+        "flake.nix",
+        "skills/paredit-cli/SKILL.md",
+    ] {
         assert!(
             packaged_files.contains(required),
-            "cargo package archive is missing required public document: {required}"
+            "cargo package archive is missing required contract asset: {required}"
         );
     }
 }

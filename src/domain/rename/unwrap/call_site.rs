@@ -16,7 +16,7 @@ pub(super) fn unwrap_call_site_from_view(
     view: &ExpressionView,
     dialect: Dialect,
     input: &str,
-    path: String,
+    path: impl FnOnce() -> String,
     function: &SymbolName,
     wrapper: &SymbolName,
 ) -> UnwrapCandidate {
@@ -38,7 +38,7 @@ pub(super) fn unwrap_call_site_from_view(
     };
 
     let site = UnwrapFunctionCallSite {
-        path,
+        path: path(),
         span: view.content_span,
         replacement: inner_call.content_span.slice(input).to_owned(),
         text: view.span.slice(input).to_owned(),

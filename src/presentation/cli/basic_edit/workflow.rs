@@ -25,9 +25,9 @@ pub(in crate::presentation::cli) fn repair_unclosed_lists(args: RepairArgs) -> R
 }
 
 pub(in crate::presentation::cli) fn select(args: TargetArgs) -> Result<()> {
-    let (input, _, tree) = read_input_dialect_and_tree(args.file, None)?;
+    let (_, _, tree) = read_input_dialect_and_tree(args.file, None)?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-    print!("{}", selection.text(&input.text));
+    print!("{}", selection.text());
     Ok(())
 }
 
@@ -35,7 +35,7 @@ pub(in crate::presentation::cli) fn replace(args: ReplaceArgs) -> Result<()> {
     let (input, _, tree) = read_input_dialect_and_tree(args.file, None)?;
     SyntaxTree::parse(&args.with).context("replacement is not a valid S-expression document")?;
     let selection = resolve_target(&tree, args.path.as_ref(), args.at)?;
-    let rewritten = Edit::replace(&input.text, selection, &args.with);
+    let rewritten = Edit::replace(&input.text, selection, &args.with)?;
     let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten)?;
     emit_document(&input, args.write, args.diff, rewritten)
 }

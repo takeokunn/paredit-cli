@@ -10,22 +10,22 @@ pub(in crate::presentation::cli::definition_movement) fn print_move_form_plan(
 ) -> Result<()> {
     match output {
         OutputFormat::Text => {
-            println!("from_file\t{}", plan.from_file.display());
-            println!("to_file\t{}", plan.to_file.display());
+            println!("from_file\t{}", safe_text!(plan.from_file.display()));
+            println!("to_file\t{}", safe_text!(plan.to_file.display()));
             println!("from_dialect\t{}", plan.from_dialect.label());
             println!("to_dialect\t{}", plan.to_dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             println!(
                 "span\t{}..{}",
                 plan.span.start().get(),
                 plan.span.end().get()
             );
             if let Some(head) = &plan.head {
-                println!("head\t{head}");
+                println!("head\t{}", safe_text!(head));
             }
             println!("insert\t{}", plan.insert.label());
             if let Some(anchor_path) = &plan.anchor_path {
-                println!("anchor_path\t{anchor_path}");
+                println!("anchor_path\t{}", safe_text!(anchor_path));
             }
             if let Some(anchor_span) = plan.anchor_span {
                 println!(

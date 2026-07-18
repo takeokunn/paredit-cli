@@ -89,21 +89,24 @@ fn print_extract_function_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
             println!("span\t{}..{}", plan.span_start, plan.span_end);
-            println!("name\t{}", plan.name);
-            println!("params\t{}", plan.params.join(","));
-            println!("inferred_params\t{}", plan.inferred_params.join(","));
+            println!("name\t{}", safe_text!(plan.name));
+            println!("params\t{}", safe_text!(plan.params.join(",")));
+            println!(
+                "inferred_params\t{}",
+                safe_text!(plan.inferred_params.join(","))
+            );
             println!("insert\t{}", plan.insert.label());
             if let Some(path) = &plan.anchor_path {
-                println!("anchor_path\t{path}");
+                println!("anchor_path\t{}", safe_text!(path));
             }
             if let Some(span) = plan.anchor_span {
                 println!("anchor_span\t{}..{}", span.start().get(), span.end().get());
             }
-            println!("call\t{}", plan.call);
-            println!("definition\t{}", plan.definition);
+            println!("call\t{}", safe_text!(plan.call));
+            println!("definition\t{}", safe_text!(plan.definition));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

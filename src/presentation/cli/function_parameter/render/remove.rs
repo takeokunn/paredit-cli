@@ -12,7 +12,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_remove_function_pa
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("definition_path\t{}", plan.definition_path);
+            println!("definition_path\t{}", safe_text!(plan.definition_path));
             println!("all_calls\t{}", plan.all_calls);
             println!(
                 "definition_span\t{}..{}",
@@ -24,11 +24,11 @@ pub(in crate::presentation::cli::function_parameter) fn print_remove_function_pa
                 plan.parameter_list_span.start().get(),
                 plan.parameter_list_span.end().get()
             );
-            println!("function_name\t{}", plan.function_name);
-            println!("parameter_name\t{}", plan.parameter_name);
+            println!("function_name\t{}", safe_text!(plan.function_name));
+            println!("parameter_name\t{}", safe_text!(plan.parameter_name));
             println!("parameter_index\t{}", plan.parameter_index);
             if let Some(keyword) = plan.parameter_keyword.as_deref() {
-                println!("parameter_keyword\t{keyword}");
+                println!("parameter_keyword\t{}", safe_text!(keyword));
             }
             for ((path, span), removed_argument) in plan
                 .call_paths
@@ -38,10 +38,10 @@ pub(in crate::presentation::cli::function_parameter) fn print_remove_function_pa
             {
                 println!(
                     "call\t{}\t{}..{}\tremoved_argument={}",
-                    path,
+                    safe_text!(path),
                     span.start().get(),
                     span.end().get(),
-                    removed_argument.as_deref().unwrap_or("<missing>")
+                    safe_text!(removed_argument.as_deref().unwrap_or("<missing>"))
                 );
             }
             println!("changed\t{}", plan.changed);

@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 
-use crate::domain::extract_shared::{insert_top_level_form, replace_span};
+use crate::domain::extract_shared::{insert_top_level_form, replace_span_checked};
 use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{ExpressionView, SyntaxTree};
 
@@ -18,12 +18,13 @@ use rewrite::{extracted_call, extracted_definition};
 pub use types::{ExtractFunctionInsert, ExtractFunctionPlan, ExtractFunctionRequest};
 
 pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<ExtractFunctionPlan> {
+    request.selection.validate_source(request.input)?;
     let input_tree = SyntaxTree::parse(request.input)
         .context("extract-function input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
 
     let span = request.selection.span();
-    let selected = request.selection.text(request.input).to_owned();
+    let selected = request.selection.text().to_owned();
     let mut params = request.explicit_params;
     let inferred_params = if request.infer_params {
         infer_extract_function_params(request.dialect, &request.selection.view(), &params)
@@ -40,7 +41,7 @@ pub fn plan_extract_function(request: ExtractFunctionRequest<'_>) -> Result<Extr
 
     let call = extracted_call(&request.name, &params);
     let definition = extracted_definition(request.dialect, &request.name, &params, &selected);
-    let replaced = replace_span(request.input, span, &call);
+    let replaced = replace_span_checked(request.input, span, &call)?;
     let replaced_tree = SyntaxTree::parse(&replaced)
         .context("replacement output is not a valid S-expression document")?;
     let (rewritten, anchor_span) = insert_top_level_form(

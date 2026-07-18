@@ -13,7 +13,7 @@ impl Formatter {
     ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let continuation_column = depth * self.indent + head.len() + 2;
+        let continuation_column = self.continuation_column(depth, head.len().saturating_add(2));
         output.push(delimiter.open());
         self.format_node(tree, node.children[0], depth + 1, output);
 

@@ -1,6 +1,7 @@
 mod query;
 
 pub use query::common_lisp_reader_literals;
+pub(crate) use query::reader_literal_kind;
 
 use crate::domain::sexpr::ByteSpan;
 

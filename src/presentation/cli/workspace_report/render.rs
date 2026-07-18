@@ -44,11 +44,13 @@ fn print_text_workspace_report(
 ) {
     println!(
         "roots\t{}",
-        roots
-            .iter()
-            .map(|root| root.display().to_string())
-            .collect::<Vec<_>>()
-            .join(",")
+        safe_text!(
+            roots
+                .iter()
+                .map(|root| root.display().to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
     );
     println!("files\t{}", summary.file_count);
     println!("parsed\t{}", summary.parsed_count);
@@ -58,10 +60,10 @@ fn print_text_workspace_report(
     println!("atoms\t{}", summary.atom_count);
     println!("definitions\t{}", summary.definition_count);
     println!("calls\t{}", summary.call_count);
-    println!("skipped_unknown\t{}", discovery.skipped_unknown_count);
-    println!("skipped_hidden\t{}", discovery.skipped_hidden_count);
-    println!("skipped_generated\t{}", discovery.skipped_generated_count);
-    println!("skipped_symlink\t{}", discovery.skipped_symlink_count);
+    println!("skipped_unknown\t{}", discovery.skipped_unknown_count());
+    println!("skipped_hidden\t{}", discovery.skipped_hidden_count());
+    println!("skipped_generated\t{}", discovery.skipped_generated_count());
+    println!("skipped_symlink\t{}", discovery.skipped_symlink_count());
     for (dialect, count) in &summary.dialect_counts {
         println!("dialect\t{dialect}\t{count}");
     }
@@ -71,7 +73,7 @@ fn print_text_workspace_report(
     for report in reports {
         println!(
             "{}\t{}\t{}\tdefinitions={}\tcalls={}",
-            report.path.display(),
+            safe_text!(report.path.display()),
             report.dialect.label(),
             report.status.label(),
             report.definition_count,
@@ -117,10 +119,10 @@ fn print_json_workspace_report(
                 }))
                 .collect::<Vec<_>>(),
             "skipped": {
-                "unknown": discovery.skipped_unknown_count,
-                "hidden": discovery.skipped_hidden_count,
-                "generated": discovery.skipped_generated_count,
-                "symlink": discovery.skipped_symlink_count,
+                "unknown": discovery.skipped_unknown_count(),
+                "hidden": discovery.skipped_hidden_count(),
+                "generated": discovery.skipped_generated_count(),
+                "symlink": discovery.skipped_symlink_count(),
             },
             "files": reports
                 .iter()

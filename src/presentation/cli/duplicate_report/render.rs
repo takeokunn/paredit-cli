@@ -17,17 +17,21 @@ pub(in crate::presentation::cli) fn print_duplicate_report(
             println!("group_count\t{}", reports.len());
             println!("form_count\t{form_count}");
             for report in reports {
-                println!("shape\t{}\tcount={}", report.shape, report.count);
+                println!(
+                    "shape\t{}\tcount={}",
+                    safe_text!(report.shape),
+                    report.count
+                );
                 for form in &report.forms {
                     println!(
                         "\t{}\t{}\t{}\t{}..{}\tnodes={}\thead={}",
-                        form.path.display(),
+                        safe_text!(form.path.display()),
                         form.dialect.label(),
-                        form.form_path,
+                        safe_text!(form.form_path),
                         form.span.start().get(),
                         form.span.end().get(),
                         form.node_count,
-                        form.head.as_deref().unwrap_or("")
+                        safe_text!(form.head.as_deref().unwrap_or(""))
                     );
                 }
             }
@@ -88,31 +92,31 @@ pub(in crate::presentation::cli) fn print_replacement_plan(
                 let targets = replacement_forms(batch);
                 println!(
                     "batch\t{}\t{}\tcount={}\tcandidate_count={}\tshape={}",
-                    batch.file.display(),
+                    safe_text!(batch.file.display()),
                     batch.dialect.label(),
                     targets.len(),
                     batch.forms.len(),
-                    batch.shape
+                    safe_text!(batch.shape)
                 );
                 if let Some(form) = kept_form(batch) {
                     println!(
                         "kept\t{}\t{}..{}\tnodes={}\thead={}",
-                        form.form_path,
+                        safe_text!(form.form_path),
                         form.span.start().get(),
                         form.span.end().get(),
                         form.node_count,
-                        form.head.as_deref().unwrap_or("")
+                        safe_text!(form.head.as_deref().unwrap_or(""))
                     );
                 }
-                println!("command\t{}", format_command(&command_args));
+                println!("command\t{}", safe_text!(format_command(&command_args)));
                 for form in targets {
                     println!(
                         "\t{}\t{}..{}\tnodes={}\thead={}",
-                        form.form_path,
+                        safe_text!(form.form_path),
                         form.span.start().get(),
                         form.span.end().get(),
                         form.node_count,
-                        form.head.as_deref().unwrap_or("")
+                        safe_text!(form.head.as_deref().unwrap_or(""))
                     );
                 }
             }

@@ -166,7 +166,7 @@ impl Formatter {
                         tree,
                         *child,
                         depth + 1,
-                        depth * self.indent + head.len() + 3,
+                        self.continuation_column(depth, head.len().saturating_add(3)),
                         output,
                     );
                 }
@@ -207,7 +207,7 @@ impl Formatter {
                         tree,
                         *child,
                         depth + 1,
-                        depth * self.indent + head.len() + 3,
+                        self.continuation_column(depth, head.len().saturating_add(3)),
                         output,
                     );
                 }

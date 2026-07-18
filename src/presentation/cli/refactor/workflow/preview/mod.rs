@@ -153,9 +153,6 @@ fn emit_refactor_preview(request: RefactorPreviewEmission<'_>) -> Result<()> {
     )
 }
 
-/// Persists the manifest exactly as `--output json` would print it, then
-/// reports the manifest path and hash so `apply --expect-manifest-hash` can
-/// run without a `status` round-trip.
 fn write_manifest_and_print_summary(
     preview: &crate::presentation::cli::refactor::types::preview::RefactorPreview,
     manifest_path: &FsPath,
@@ -165,13 +162,13 @@ fn write_manifest_and_print_summary(
         "{}\n",
         serde_json::to_string_pretty(&refactor_preview_manifest_json(preview))?
     );
-    fs::write(manifest_path, &manifest_text)
-        .with_context(|| format!("failed to write manifest {}", manifest_path.display()))?;
     let manifest_hash = stable_text_hash(&manifest_text);
+    write_artifact_with_rollback(manifest_path.to_path_buf(), manifest_text)
+        .with_context(|| format!("failed to write manifest {}", manifest_path.display()))?;
 
     match output {
         OutputFormat::Text => {
-            println!("manifest_path\t{}", manifest_path.display());
+            println!("manifest_path\t{}", safe_text!(manifest_path.display()));
             println!("manifest_hash\t{manifest_hash}");
             println!("changed_file_count\t{}", preview.summary.changed_file_count);
             println!("edit_count\t{}", preview.summary.edit_count);

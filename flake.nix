@@ -24,6 +24,7 @@
       inherit (nixpkgs) lib;
 
       cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+      msrvToolchainVersion = "${cargoToml.package.rust-version}.0";
 
       systems = [
         "x86_64-linux"
@@ -42,9 +43,9 @@
 
       forAllSystems = f: lib.genAttrs systems (system: f pkgsFor.${system});
 
-      mkParedit =
-        pkgs:
-        pkgs.rustPlatform.buildRustPackage {
+      mkPareditWithPlatform =
+        pkgs: rustPlatform:
+        rustPlatform.buildRustPackage {
           pname = "paredit-cli";
           version = cargoToml.package.version;
           # The whole tracked tree is the build input on purpose: the crate's
@@ -59,6 +60,8 @@
             mainProgram = "paredit";
           };
         };
+
+      mkParedit = pkgs: mkPareditWithPlatform pkgs pkgs.rustPlatform;
 
       mkDocs =
         pkgs:
@@ -274,6 +277,7 @@
             pkgs.rust-bin.stable.latest.default
             pkgs.rust-analyzer
             pkgs.cargo-nextest
+            pkgs.cargo-audit
             pkgs.rustfmt
             pkgs.clippy
             pkgs.mdbook
@@ -291,7 +295,7 @@
               cargo publish --dry-run --allow-dirty --locked
 
             Quick verification:
-              nix flake check  # treefmt + actionlint + clippy + nextest + package build/tests + lint/format integration
+              nix flake check  # treefmt + actionlint + clippy + nextest + package/MSRV build/tests + lint/format integration
 
             Build and run:
               nix build .#              # result/bin/paredit
@@ -314,6 +318,11 @@
         system:
         let
           pkgs = pkgsFor.${system};
+          msrvToolchain = pkgs.rust-bin.stable.${msrvToolchainVersion}.default;
+          msrvRustPlatform = pkgs.makeRustPlatform {
+            cargo = msrvToolchain;
+            rustc = msrvToolchain;
+          };
         in
         {
           treefmt = treefmtFor.${system}.config.build.check self;
@@ -388,6 +397,7 @@
               touch $out
             '';
           });
+          msrv = mkPareditWithPlatform pkgs msrvRustPlatform;
           package = self.packages.${system}.default;
           # NOTE: `cargo publish --dry-run` is intentionally NOT a flake check.
           # It resolves the crates-io registry index over the network, which

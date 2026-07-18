@@ -26,8 +26,8 @@ pub(in crate::presentation::cli::rename) fn print_unwrap_function_calls_report(
         .sum::<usize>();
     match output {
         OutputFormat::Text => {
-            println!("function\t{}", args.function);
-            println!("wrapper\t{}", args.wrapper);
+            println!("function\t{}", safe_text!(args.function));
+            println!("wrapper\t{}", safe_text!(args.wrapper));
             println!("callCount\t{call_count}");
             println!("skippedNonUnaryWrapperCount\t{skipped_non_unary_wrapper_count}");
             println!("skippedNestedCount\t{skipped_nested_count}");
@@ -35,7 +35,7 @@ pub(in crate::presentation::cli::rename) fn print_unwrap_function_calls_report(
             for report in reports {
                 println!(
                     "{}\t{}\tcalls={}\tchanged={}\twritten={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.calls.len(),
                     report.changed,

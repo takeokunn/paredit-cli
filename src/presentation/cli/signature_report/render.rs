@@ -42,14 +42,17 @@ fn print_text_report(
     policy: &SignatureReportPolicy,
     by_status: &BTreeMap<SignatureCallStatus, usize>,
 ) {
-    println!("symbol\t{}", symbol.map_or("<all>", SymbolName::as_str));
+    println!(
+        "symbol\t{}",
+        safe_text!(symbol.map_or("<all>", SymbolName::as_str))
+    );
     println!("files\t{}", reports.len());
     println!("definition_count\t{}", policy.definition_count);
     println!("call_count\t{}", policy.call_count);
     println!("mismatch_count\t{}", policy.mismatch_count);
     println!("policy_passed\t{}", policy.passed);
     for violation in &policy.violations {
-        println!("policy_violation\t{violation}");
+        println!("policy_violation\t{}", safe_text!(violation));
     }
     for (status, count) in by_status {
         println!("status\t{}\t{count}", status.label());
@@ -57,7 +60,7 @@ fn print_text_report(
     for report in reports {
         println!(
             "{}\t{}\tdefinitions={}\tcalls={}",
-            report.path.display(),
+            safe_text!(report.path.display()),
             report.dialect.label(),
             report.definitions.len(),
             report.calls.len()
@@ -65,8 +68,8 @@ fn print_text_report(
         for definition in &report.definitions {
             println!(
                 "\tdefinition\t{}\t{}\t{}..{}\tparams={}",
-                definition.path,
-                definition.name.as_deref().unwrap_or(""),
+                safe_text!(definition.path),
+                safe_text!(definition.name.as_deref().unwrap_or("")),
                 definition.span.start().get(),
                 definition.span.end().get(),
                 definition
@@ -87,14 +90,14 @@ fn print_text_report(
                 .unwrap_or("<none>");
             println!(
                 "\tcall\t{}\t{}\t{}..{}\targs={}\texpected={}\tstatus={}\tenclosing={}",
-                item.call.path,
-                item.call.head,
+                safe_text!(item.call.path),
+                safe_text!(item.call.head),
                 item.call.span.start().get(),
                 item.call.span.end().get(),
                 item.call.argument_count,
                 expected,
                 item.status.label(),
-                enclosing,
+                safe_text!(enclosing),
             );
         }
     }

@@ -1,3 +1,3 @@
-fn main() -> anyhow::Result<()> {
+fn main() -> std::process::ExitCode {
     paredit_cli::presentation::cli::run()
 }

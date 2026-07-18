@@ -12,7 +12,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_swap_function_para
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("definition_path\t{}", plan.definition_path);
+            println!("definition_path\t{}", safe_text!(plan.definition_path));
             println!("all_calls\t{}", plan.all_calls);
             println!(
                 "definition_span\t{}..{}",
@@ -24,9 +24,9 @@ pub(in crate::presentation::cli::function_parameter) fn print_swap_function_para
                 plan.parameter_list_span.start().get(),
                 plan.parameter_list_span.end().get()
             );
-            println!("function_name\t{}", plan.function_name);
-            println!("left_name\t{}", plan.left_name);
-            println!("right_name\t{}", plan.right_name);
+            println!("function_name\t{}", safe_text!(plan.function_name));
+            println!("left_name\t{}", safe_text!(plan.left_name));
+            println!("right_name\t{}", safe_text!(plan.right_name));
             println!("left_index\t{}", plan.left_index);
             println!("right_index\t{}", plan.right_index);
             for ((path, span), (left_argument, right_argument)) in plan
@@ -37,11 +37,11 @@ pub(in crate::presentation::cli::function_parameter) fn print_swap_function_para
             {
                 println!(
                     "call\t{}\t{}..{}\tleft_argument={}\tright_argument={}",
-                    path,
+                    safe_text!(path),
                     span.start().get(),
                     span.end().get(),
-                    left_argument,
-                    right_argument
+                    safe_text!(left_argument),
+                    safe_text!(right_argument)
                 );
             }
             println!("changed\t{}", plan.changed);

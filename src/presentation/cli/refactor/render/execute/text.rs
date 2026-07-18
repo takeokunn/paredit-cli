@@ -14,8 +14,8 @@ pub(super) fn print_workspace_refactor_execute_text(
     let refused_files = preview.refused_paths_for_write_plan(&write_plan);
     println!("command\trefactor workspace-execute");
     println!("mode\t{}", preview.mode.label());
-    println!("from\t{}", preview.from);
-    println!("to\t{}", preview.to);
+    println!("from\t{}", safe_text!(preview.from));
+    println!("to\t{}", safe_text!(preview.to));
     println!("write_requested\t{}", preview.write_requested);
     print_refactor_write_plan(&write_plan, &writable_files, &refused_files);
     print_decision("preflight_decision", &execution.preflight_decision);
@@ -23,7 +23,7 @@ pub(super) fn print_workspace_refactor_execute_text(
     print_outcome("outcome", &execution.outcome);
     println!("changed_file_count\t{}", preview.summary.changed_file_count);
     for changed_file in &preview.summary.changed_files {
-        println!("changed_file\t{changed_file}");
+        println!("changed_file\t{}", safe_text!(changed_file));
     }
     println!(
         "unchanged_file_count\t{}",
@@ -36,17 +36,20 @@ pub(super) fn print_workspace_refactor_execute_text(
     let policy_summary = preview.policy.summary();
     println!("policy_violation_count\t{}", policy_summary.violation_count);
     println!("policy_write_blocked\t{}", policy_summary.write_blocked);
-    println!("policy_next_action\t{}", policy_summary.next_action);
+    println!(
+        "policy_next_action\t{}",
+        safe_text!(policy_summary.next_action)
+    );
     if let Some(verification) = &execution.pre_verification {
         println!("pre_verification_passed\t{}", verification.passed);
         for check in &verification.checks {
             println!(
                 "pre_check\t{}\t{}\tpassed={}\tcount={}\t{}",
                 check.level.label(),
-                check.code,
+                safe_text!(check.code),
                 check.passed,
                 check.count,
-                check.message
+                safe_text!(check.message)
             );
         }
     }
@@ -56,10 +59,10 @@ pub(super) fn print_workspace_refactor_execute_text(
             println!(
                 "post_check\t{}\t{}\tpassed={}\tcount={}\t{}",
                 check.level.label(),
-                check.code,
+                safe_text!(check.code),
                 check.passed,
                 check.count,
-                check.message
+                safe_text!(check.message)
             );
         }
     }
@@ -71,10 +74,23 @@ fn print_decision(label: &str, decision: &RefactorExecuteDecision) {
     let summary = decision.summary();
 
     println!("{}\tstatus\t{}", label, decision.status.label());
-    println!("{}\treason\t{}", label, decision.status.reason());
-    println!("{}\tnext_action\t{}", label, decision.status.next_action());
+    println!(
+        "{}\treason\t{}",
+        label,
+        safe_text!(decision.status.reason())
+    );
+    println!(
+        "{}\tnext_action\t{}",
+        label,
+        safe_text!(decision.status.next_action())
+    );
     for step in decision.steps() {
-        println!("{}\tstep\t{}\t{}", label, step.name, step.status.label());
+        println!(
+            "{}\tstep\t{}\t{}",
+            label,
+            safe_text!(step.name),
+            step.status.label()
+        );
     }
     println!(
         "{}\tpassed_step_count\t{}",
@@ -111,10 +127,19 @@ fn print_outcome(label: &str, outcome: &WorkspaceRefactorExecuteOutcome) {
     let summary = outcome.summary();
 
     println!("{}\tstatus\t{}", label, outcome.status.label());
-    println!("{}\treason\t{}", label, outcome.status.reason());
-    println!("{}\tnext_action\t{}", label, outcome.status.next_action());
+    println!("{}\treason\t{}", label, safe_text!(outcome.status.reason()));
+    println!(
+        "{}\tnext_action\t{}",
+        label,
+        safe_text!(outcome.status.next_action())
+    );
     for step in outcome.steps() {
-        println!("{}\tstep\t{}\t{}", label, step.name, step.status.label());
+        println!(
+            "{}\tstep\t{}\t{}",
+            label,
+            safe_text!(step.name),
+            step.status.label()
+        );
     }
     println!(
         "{}\tpassed_step_count\t{}",

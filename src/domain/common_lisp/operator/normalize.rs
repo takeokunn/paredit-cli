@@ -17,8 +17,57 @@ pub(crate) fn common_lisp_operator_head_eq(head: &str, expected: &str) -> bool {
 }
 
 pub(crate) fn common_lisp_symbol_name_eq(head: &str, expected: &str) -> bool {
-    normalize_common_lisp_operator_head(head)
-        .eq_ignore_ascii_case(normalize_common_lisp_operator_head(expected))
+    canonical_common_lisp_symbol_name(normalize_common_lisp_operator_head(head))
+        == canonical_common_lisp_symbol_name(normalize_common_lisp_operator_head(expected))
+}
+
+fn last_common_lisp_package_marker(symbol: &str) -> Option<usize> {
+    let mut escaped = false;
+    let mut in_multiple_escape = false;
+    let mut marker = None;
+
+    for (index, character) in symbol.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match character {
+            '\\' => escaped = true,
+            '|' => in_multiple_escape = !in_multiple_escape,
+            ':' if !in_multiple_escape => marker = Some(index),
+            _ => {}
+        }
+    }
+
+    marker
+}
+
+fn canonical_common_lisp_symbol_name(symbol: &str) -> String {
+    let mut canonical = String::with_capacity(symbol.len());
+    let mut escaped = false;
+    let mut in_multiple_escape = false;
+
+    for character in symbol.chars() {
+        if escaped {
+            canonical.push(character);
+            escaped = false;
+            continue;
+        }
+
+        match character {
+            '\\' => escaped = true,
+            '|' => in_multiple_escape = !in_multiple_escape,
+            _ if in_multiple_escape => canonical.push(character),
+            _ => canonical.push(character.to_ascii_uppercase()),
+        }
+    }
+
+    if escaped {
+        canonical.push('\\');
+    }
+
+    canonical
 }
 
 /// Strips a Common Lisp package qualifier (`pkg:sym` or `pkg::sym`) and the
@@ -30,10 +79,16 @@ pub(crate) fn common_lisp_symbol_name_eq(head: &str, expected: &str) -> bool {
 /// reference to a same-named symbol elsewhere.
 fn strip_common_lisp_symbol_qualifiers(head: &str) -> &str {
     let head = head.strip_prefix("#:").unwrap_or(head);
-    match head.rfind(':') {
+    match last_common_lisp_package_marker(head) {
         Some(index) if index > 0 => &head[index + 1..],
         _ => head,
     }
+}
+
+pub(crate) fn has_common_lisp_package_qualifier(symbol: &str) -> bool {
+    let symbol = symbol.strip_prefix("#:").unwrap_or(symbol);
+    last_common_lisp_package_marker(symbol)
+        .is_some_and(|index| index > 0 && index + 1 < symbol.len())
 }
 
 /// General-purpose Common Lisp symbol-name equality for occurrence matching,
@@ -47,22 +102,70 @@ fn strip_common_lisp_symbol_qualifiers(head: &str) -> &str {
 /// `execute-command-line` for the purpose of asking "is this symbol
 /// referenced anywhere?" Comparison is case-insensitive per the CLHS reader.
 pub(crate) fn common_lisp_symbol_reference_eq(candidate: &str, expected: &str) -> bool {
-    strip_common_lisp_symbol_qualifiers(candidate)
-        .eq_ignore_ascii_case(strip_common_lisp_symbol_qualifiers(expected))
+    canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(candidate))
+        == canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(expected))
 }
 
-/// Lowercased unqualified name of `symbol`, for substring prefiltering.
+fn common_lisp_explicit_package_and_name(symbol: &str) -> Option<(&str, &str)> {
+    let marker = last_common_lisp_package_marker(symbol)?;
+    if marker == 0 || marker + 1 >= symbol.len() {
+        return None;
+    }
+
+    let package_end = if symbol.as_bytes().get(marker - 1) == Some(&b':') {
+        marker - 1
+    } else {
+        marker
+    };
+    (package_end > 0).then_some((&symbol[..package_end], &symbol[marker + 1..]))
+}
+
+fn canonical_common_lisp_package_identity(package: &str) -> String {
+    let canonical = canonical_common_lisp_symbol_name(package);
+    if canonical == "CL" {
+        "COMMON-LISP".to_owned()
+    } else {
+        canonical
+    }
+}
+
+/// Compares user-defined symbols without assuming package visibility.
 ///
-/// Every reference matcher built on [`common_lisp_symbol_reference_eq`] (or
-/// on exact equality for other dialects) only accepts an atom whose source
-/// text contains this needle ASCII-case-insensitively: the stripped
-/// candidate is a substring of the candidate's source text, and (case-
-/// insensitive) equality with the stripped symbol makes it an occurrence of
-/// the needle. Source text whose lowercased form lacks the needle therefore
-/// cannot contain any match, so whole-file reference scans can be skipped
-/// after one substring test.
+/// An unqualified symbol can only match another unqualified symbol. Explicitly
+/// qualified symbols must name the same package, while uninterned symbols are
+/// conservatively treated as distinct.
+pub(crate) fn common_lisp_symbol_identity_eq(candidate: &str, expected: &str) -> bool {
+    if candidate.starts_with("#:") || expected.starts_with("#:") {
+        return false;
+    }
+
+    match (
+        common_lisp_explicit_package_and_name(candidate),
+        common_lisp_explicit_package_and_name(expected),
+    ) {
+        (Some((candidate_package, candidate_name)), Some((expected_package, expected_name))) => {
+            canonical_common_lisp_package_identity(candidate_package)
+                == canonical_common_lisp_package_identity(expected_package)
+                && canonical_common_lisp_symbol_name(candidate_name)
+                    == canonical_common_lisp_symbol_name(expected_name)
+        }
+        (None, None) => {
+            canonical_common_lisp_symbol_name(candidate)
+                == canonical_common_lisp_symbol_name(expected)
+        }
+        _ => false,
+    }
+}
+
+/// Canonical unqualified name of `symbol`, for reference indexes and
+/// prefiltering parsed atoms.
+///
+/// Common Lisp escape syntax affects case: `foo` and `|FOO|` denote the same
+/// symbol, while `foo` and `|foo|` do not. Removing the reader escapes and
+/// folding only unescaped characters therefore produces a stable key without
+/// collapsing distinct escaped names.
 pub(crate) fn common_lisp_symbol_reference_needle(symbol: &str) -> String {
-    strip_common_lisp_symbol_qualifiers(symbol).to_ascii_lowercase()
+    canonical_common_lisp_symbol_name(strip_common_lisp_symbol_qualifiers(symbol))
 }
 
 pub(crate) fn is_common_lisp_declaration_form(head: &str) -> bool {

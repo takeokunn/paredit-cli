@@ -129,6 +129,8 @@ fn compares_common_lisp_heads_case_insensitively_after_prefix_normalization() {
     assert!(is_common_lisp_declaration_form("COMMON-LISP:DECLARE"));
     assert!(is_common_lisp_declaration_form("cl-user:DECLAIM"));
     assert!(is_common_lisp_declaration_form("common-lisp-user:PROCLAIM"));
+    assert!(common_lisp_operator_head_eq("|QUOTE|", "quote"));
+    assert!(!common_lisp_operator_head_eq("|quote|", "quote"));
 }
 
 #[test]
@@ -170,6 +172,22 @@ fn matches_symbol_references_across_arbitrary_package_qualifiers() {
         "nshell.application:foo",
         "bar"
     ));
+    assert!(!common_lisp_symbol_reference_eq("foo\\:bar", "bar"));
+    assert!(common_lisp_symbol_reference_eq("foo\\:bar", "|FOO:BAR|"));
+    assert!(!common_lisp_symbol_reference_eq("|foo|", "foo"));
+    assert_eq!(common_lisp_symbol_reference_needle("foo\\:bar"), "FOO:BAR");
+    assert_eq!(
+        common_lisp_symbol_reference_needle("pkg:|FOO:BAR|"),
+        "FOO:BAR"
+    );
+    assert_ne!(
+        common_lisp_symbol_reference_needle("foo"),
+        common_lisp_symbol_reference_needle("|foo|")
+    );
+    assert!(has_common_lisp_package_qualifier("pkg:foo"));
+    assert!(has_common_lisp_package_qualifier("pkg::foo"));
+    assert!(!has_common_lisp_package_qualifier("foo\\:bar"));
+    assert!(!has_common_lisp_package_qualifier("|foo:bar|"));
 }
 
 #[test]

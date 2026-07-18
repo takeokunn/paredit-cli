@@ -13,8 +13,8 @@ pub(in crate::presentation::cli::rename) fn print_rename_at_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             println!("namespace\t{}", plan.namespace.label());
-            println!("from\t{}", plan.from);
-            println!("to\t{}", plan.to);
+            println!("from\t{}", safe_text!(plan.from));
+            println!("to\t{}", safe_text!(plan.to));
             println!("occurrence_count\t{}", plan.occurrences.len());
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");

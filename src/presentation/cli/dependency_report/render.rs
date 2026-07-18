@@ -33,20 +33,20 @@ pub(super) fn print_dependency_report(
             for report in reports {
                 println!(
                     "{}\t{}\tpackage={}\tdependencies={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
-                    report.package.as_deref().unwrap_or("<none>"),
+                    safe_text!(report.package.as_deref().unwrap_or("<none>")),
                     report.dependencies.len()
                 );
                 for dependency in &report.dependencies {
                     println!(
                         "\tdependency\t{}\t{}\t{}..{}\ttarget={}\tsource={}",
                         dependency.kind.label(),
-                        dependency.path,
+                        safe_text!(dependency.path),
                         dependency.span.start().get(),
                         dependency.span.end().get(),
-                        dependency.target,
-                        dependency.source.as_deref().unwrap_or("<none>")
+                        safe_text!(dependency.target),
+                        safe_text!(dependency.source.as_deref().unwrap_or("<none>"))
                     );
                 }
             }

@@ -198,9 +198,75 @@ fn collect_call_graph_definitions(
     for index in 0..tree.root_children().len() {
         let path = Path::root_child(index);
         let view = tree.select_path(&path)?.view();
-        collect_call_graph_definitions_from_view(&view, dialect, path, &mut items);
+        let _ = collect_call_graph_definitions_from_view(&view, dialect, path, &mut items);
     }
     Ok(items)
+}
+
+#[derive(Clone, Copy)]
+struct CallGraphDefinitionPath(usize);
+
+struct CallGraphDefinitionPathNode {
+    parent: Option<usize>,
+    index: usize,
+}
+
+struct CallGraphDefinitionPathArena {
+    nodes: Vec<CallGraphDefinitionPathNode>,
+    edge_count: usize,
+    materialized_path_count: usize,
+}
+
+impl CallGraphDefinitionPathArena {
+    fn from_path(path: &Path) -> (Self, CallGraphDefinitionPath) {
+        let indexes = path.to_raw_indexes();
+        let mut nodes = Vec::with_capacity(indexes.len());
+        let mut parent = None;
+        for index in indexes {
+            let node = nodes.len();
+            nodes.push(CallGraphDefinitionPathNode { parent, index });
+            parent = Some(node);
+        }
+        let root = parent.expect("call-graph traversal starts at a root child");
+        (
+            Self {
+                nodes,
+                edge_count: 0,
+                materialized_path_count: 0,
+            },
+            CallGraphDefinitionPath(root),
+        )
+    }
+
+    fn child(&mut self, path: CallGraphDefinitionPath, index: usize) -> CallGraphDefinitionPath {
+        let node = self.nodes.len();
+        self.nodes.push(CallGraphDefinitionPathNode {
+            parent: Some(path.0),
+            index,
+        });
+        self.edge_count += 1;
+        CallGraphDefinitionPath(node)
+    }
+
+    fn materialize(&mut self, path: CallGraphDefinitionPath) -> Path {
+        let mut indexes = Vec::new();
+        let mut cursor = Some(path.0);
+        while let Some(node) = cursor {
+            indexes.push(self.nodes[node].index);
+            cursor = self.nodes[node].parent;
+        }
+        indexes.reverse();
+        self.materialized_path_count += 1;
+        Path::from_indexes(indexes)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct CallGraphDefinitionTraversalStats {
+    visited_count: usize,
+    edge_count: usize,
+    materialized_path_count: usize,
 }
 
 fn collect_call_graph_definitions_from_view(
@@ -208,26 +274,41 @@ fn collect_call_graph_definitions_from_view(
     dialect: Dialect,
     path: Path,
     items: &mut Vec<CallGraphDefinitionItem>,
-) {
-    if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
-        if let Some(head) = list_head(view) {
-            let is_in_package = dialect.common_lisp_package_declaration_form_for_head(head)
-                == Some(CommonLispPackageDeclarationForm::InPackage);
-            if !is_in_package {
-                if let Some(shape) = definition_shape(dialect, view, head) {
-                    items.push(CallGraphDefinitionItem {
-                        name: shape.name(view).map(str::to_owned),
-                        category: shape.category,
-                        path: path.clone(),
-                        span: view.span,
-                        parameter_count: shape.lambda_parameter_count(view).unwrap_or(0),
-                    });
+) -> CallGraphDefinitionTraversalStats {
+    let (mut paths, root_path) = CallGraphDefinitionPathArena::from_path(&path);
+    let mut stack = vec![(view, root_path)];
+    let mut visited_count = 0;
+
+    while let Some((view, path)) = stack.pop() {
+        visited_count += 1;
+        if view.kind == ExpressionKind::List && view.delimiter == Some(Delimiter::Paren) {
+            if let Some(head) = list_head(view) {
+                let is_in_package = dialect.common_lisp_package_declaration_form_for_head(head)
+                    == Some(CommonLispPackageDeclarationForm::InPackage);
+                if !is_in_package {
+                    if let Some(shape) = definition_shape(dialect, view, head) {
+                        items.push(CallGraphDefinitionItem {
+                            name: shape.name(view).map(str::to_owned),
+                            category: shape.category,
+                            path: paths.materialize(path),
+                            span: view.span,
+                            parameter_count: shape.lambda_parameter_count(view).unwrap_or(0),
+                        });
+                    }
                 }
             }
         }
+
+        for (index, child) in view.children.iter().enumerate().rev() {
+            let child_path = paths.child(path, index);
+            stack.push((child, child_path));
+        }
     }
-    for (index, child) in view.children.iter().enumerate() {
-        collect_call_graph_definitions_from_view(child, dialect, path.child(index), items);
+
+    CallGraphDefinitionTraversalStats {
+        visited_count,
+        edge_count: paths.edge_count,
+        materialized_path_count: paths.materialized_path_count,
     }
 }
 
@@ -361,6 +442,36 @@ pub fn evaluate_call_graph_policy(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deeply_nested_definition_scan_has_linear_path_work() {
+        const DEPTH: usize = 6_000;
+        let mut input = String::with_capacity(DEPTH * 2 + 1);
+        for _ in 0..DEPTH {
+            input.push('(');
+        }
+        input.push('x');
+        for _ in 0..DEPTH {
+            input.push(')');
+        }
+
+        let tree = SyntaxTree::parse(&input).expect("deep input parses");
+        let path = Path::root_child(0);
+        let view = tree.select_path(&path).expect("root exists").view();
+        let mut definitions = Vec::new();
+
+        let stats = collect_call_graph_definitions_from_view(
+            &view,
+            Dialect::CommonLisp,
+            path,
+            &mut definitions,
+        );
+
+        assert!(definitions.is_empty());
+        assert_eq!(stats.visited_count, DEPTH + 1);
+        assert_eq!(stats.edge_count, DEPTH);
+        assert_eq!(stats.materialized_path_count, 0);
+    }
 
     #[test]
     fn validates_thresholds() {

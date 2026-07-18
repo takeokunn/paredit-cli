@@ -72,16 +72,16 @@ fn print_remove_unused_binding_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
-            println!("form\t{}", plan.form);
+            println!("form\t{}", safe_text!(plan.form));
             println!(
                 "form_span\t{}..{}",
                 plan.form_span.start().get(),
                 plan.form_span.end().get()
             );
             if let Some(binding_name) = &plan.binding_name {
-                println!("binding_name\t{binding_name}");
+                println!("binding_name\t{}", safe_text!(binding_name));
             }
             if let Some(binding_span) = plan.binding_span {
                 println!(
@@ -91,7 +91,7 @@ fn print_remove_unused_binding_plan(
                 );
             }
             if let Some(binding_value) = &plan.binding_value {
-                println!("binding_value\t{binding_value}");
+                println!("binding_value\t{}", safe_text!(binding_value));
             }
             if let Some(reference_count) = plan.reference_count {
                 println!("reference_count\t{reference_count}");
@@ -100,7 +100,7 @@ fn print_remove_unused_binding_plan(
             for binding in &plan.bindings {
                 println!(
                     "\t{}\tbinding_span={}..{}\treferences={}",
-                    binding.binding_name,
+                    safe_text!(binding.binding_name),
                     binding.binding_span.start().get(),
                     binding.binding_span.end().get(),
                     binding.reference_count
@@ -110,7 +110,7 @@ fn print_remove_unused_binding_plan(
                 "dropped_value_requires_review\t{}",
                 plan.dropped_value_requires_review
             );
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{}", written);
         }

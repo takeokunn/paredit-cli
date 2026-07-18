@@ -26,10 +26,10 @@ pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
         .sum::<usize>();
     match output {
         OutputFormat::Text => {
-            println!("function\t{}", args.function);
-            println!("wrapper\t{}", args.wrapper);
+            println!("function\t{}", safe_text!(args.function));
+            println!("wrapper\t{}", safe_text!(args.wrapper));
             if let Some(template) = &args.wrapper_template {
-                println!("wrapperTemplate\t{template}");
+                println!("wrapperTemplate\t{}", safe_text!(template));
             }
             println!("callCount\t{call_count}");
             println!("skippedAlreadyWrappedCount\t{skipped_already_wrapped_count}");
@@ -38,7 +38,7 @@ pub(in crate::presentation::cli::rename) fn print_wrap_function_calls_report(
             for report in reports {
                 println!(
                     "{}\t{}\tcalls={}\tchanged={}\twritten={}",
-                    report.path.display(),
+                    safe_text!(report.path.display()),
                     report.dialect.label(),
                     report.calls.len(),
                     report.changed,

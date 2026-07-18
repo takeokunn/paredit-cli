@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::definition::DefinitionCategory;
 use crate::domain::package_report::PackageDefinitionReport;
 use crate::domain::remove_unused_definition::types::UnusedDefinitionDefinition;
@@ -67,14 +68,7 @@ fn package_export_keys(package: &PackageDefinitionReport) -> Vec<String> {
 }
 
 fn normalize_symbol_key(value: &str) -> String {
-    let normalized = normalize_keyword_prefix(value);
-    let symbol = normalized
-        .rsplit_once("::")
-        .map(|(_, symbol)| symbol)
-        .or_else(|| normalized.rsplit_once(':').map(|(_, symbol)| symbol))
-        .unwrap_or(normalized);
-
-    normalize_keyword_prefix(symbol).to_ascii_lowercase()
+    common_lisp_symbol_reference_needle(normalize_keyword_prefix(value))
 }
 
 fn normalize_keyword_prefix(value: &str) -> &str {
@@ -82,4 +76,23 @@ fn normalize_keyword_prefix(value: &str) -> &str {
         .strip_prefix("#:")
         .or_else(|| value.strip_prefix(':'))
         .unwrap_or(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_symbol_key;
+
+    #[test]
+    fn normalizes_only_unescaped_package_qualifiers_and_symbol_characters() {
+        assert_eq!(normalize_symbol_key("pkg:foo"), "FOO");
+        assert_eq!(normalize_symbol_key("|pkg:name|:foo"), "FOO");
+        assert_eq!(normalize_symbol_key("pkg:|foo:bar|"), "foo:bar");
+        assert_eq!(normalize_symbol_key("|foo:bar|"), "foo:bar");
+    }
+
+    #[test]
+    fn preserves_distinct_escaped_symbol_names() {
+        assert_eq!(normalize_symbol_key("foo"), normalize_symbol_key("|FOO|"));
+        assert_ne!(normalize_symbol_key("foo"), normalize_symbol_key("|foo|"));
+    }
 }

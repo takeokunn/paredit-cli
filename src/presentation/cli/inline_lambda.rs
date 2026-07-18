@@ -44,11 +44,15 @@ fn print_plan(plan: &InlineLambdaPlan, written: bool, output: OutputFormat) -> R
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("path\t{}", plan.path);
+            println!("path\t{}", safe_text!(plan.path));
             for binding in &plan.bindings {
-                println!("binding\t{}\targument={}", binding.name, binding.argument);
+                println!(
+                    "binding\t{}\targument={}",
+                    safe_text!(binding.name),
+                    safe_text!(binding.argument)
+                );
             }
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

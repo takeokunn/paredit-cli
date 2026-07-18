@@ -38,18 +38,19 @@ fn renames_function_designators_but_skips_quoted_data() {
 }
 
 #[test]
-fn renames_bare_quoted_symbol_designator_but_skips_quoted_call_shaped_data() {
+fn preserves_quoted_data_while_renaming_calls_and_explicit_function_designators() {
     assert_function_rename! {
-        input: "(defun helper (x) x)\n(list 'helper (quote helper) '(helper 1) (error 'helper))",
+        input: "(defun helper (x) x)\n(helper 1)\n(list 'helper (quote helper) (error 'helper) (typep x 'helper) (make-instance 'helper) #'helper (function helper) (symbol-function 'helper) (fdefinition 'helper))",
         dialect: Dialect::CommonLisp,
         from: "helper",
         to: "renamed",
         definitions: 1,
-        calls: 3,
+        calls: 5,
         changed: true,
         rewritten_contains: [
             "(defun renamed (x) x)",
-            "(list 'renamed (quote renamed) '(helper 1) (error 'renamed))"
+            "(renamed 1)",
+            "(list 'helper (quote helper) (error 'helper) (typep x 'helper) (make-instance 'helper) #'renamed (function renamed) (symbol-function 'renamed) (fdefinition 'renamed))"
         ]
     };
 }

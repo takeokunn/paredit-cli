@@ -12,7 +12,7 @@ pub(in crate::presentation::cli::function_parameter) fn print_add_function_param
     match output {
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
-            println!("definition_path\t{}", plan.definition_path);
+            println!("definition_path\t{}", safe_text!(plan.definition_path));
             println!("all_calls\t{}", plan.all_calls);
             println!(
                 "definition_span\t{}..{}",
@@ -24,15 +24,15 @@ pub(in crate::presentation::cli::function_parameter) fn print_add_function_param
                 plan.parameter_list_span.start().get(),
                 plan.parameter_list_span.end().get()
             );
-            println!("function_name\t{}", plan.function_name);
-            println!("parameter_name\t{}", plan.parameter_name);
-            println!("argument\t{}", plan.argument);
+            println!("function_name\t{}", safe_text!(plan.function_name));
+            println!("parameter_name\t{}", safe_text!(plan.parameter_name));
+            println!("argument\t{}", safe_text!(plan.argument));
             println!("insert\t{}", plan.insert.label());
             println!("parameter_section\t{}", plan.section.label());
             for (path, span) in plan.call_paths.iter().zip(&plan.call_spans) {
                 println!(
                     "call\t{}\t{}..{}",
-                    path,
+                    safe_text!(path),
                     span.start().get(),
                     span.end().get()
                 );

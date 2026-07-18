@@ -66,9 +66,9 @@ fn print_unwrap_call_plan(
         OutputFormat::Text => {
             println!("dialect\t{}", plan.dialect.label());
             if let Some(path) = &plan.path {
-                println!("path\t{path}");
+                println!("path\t{}", safe_text!(path));
             }
-            println!("function\t{}", plan.function);
+            println!("function\t{}", safe_text!(plan.function));
             println!(
                 "span\t{}..{}",
                 plan.span.start().get(),
@@ -81,7 +81,7 @@ fn print_unwrap_call_plan(
                 plan.argument_span.end().get()
             );
             println!("call_argument_count\t{}", plan.call_argument_count);
-            println!("replacement\t{}", plan.replacement);
+            println!("replacement\t{}", safe_text!(plan.replacement));
             println!("changed\t{}", plan.changed);
             println!("written\t{written}");
         }

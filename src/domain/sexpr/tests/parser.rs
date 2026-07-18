@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::sexpr::parser::MAX_DISCARDED_FORM_STACK_FRAMES;
 
 #[test]
 fn parses_balanced_document() {
@@ -153,7 +154,7 @@ fn skips_common_lisp_reader_comments() {
     let from = SymbolName::new("foo").expect("symbol");
     let to = SymbolName::new("bar").expect("symbol");
     assert_eq!(
-        tree.rename_symbol(input, &from, &to),
+        tree.rename_symbol(&from, &to),
         "(bar bar) #;(foo baz) (bar qux)"
     );
 }
@@ -169,9 +170,205 @@ fn skips_clojure_discard_forms() {
     let from = SymbolName::new("foo").expect("symbol");
     let to = SymbolName::new("bar").expect("symbol");
     assert_eq!(
-        tree.rename_symbol(input, &from, &to),
+        tree.rename_symbol(&from, &to),
         "(bar bar) #_(foo baz) (bar qux)"
     );
+}
+
+#[test]
+fn keeps_reader_prefix_pending_across_a_reader_comment() {
+    let input = "'#;ignored (kept)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    assert_eq!(tree.root_children().len(), 1);
+    let kept = tree.select_path(&parse_path("0")).expect("kept form");
+    assert_eq!(kept.text(), input);
+    assert_eq!(kept.view().reader_prefixes, vec![ReaderPrefix::Quote]);
+}
+
+#[test]
+fn keeps_discarded_prefix_pending_across_a_nested_reader_comment() {
+    let input = "#;'#;ignored (kept) (live)";
+    let tree = SyntaxTree::parse(input).expect("valid");
+
+    assert_eq!(tree.root_children().len(), 1);
+    assert_eq!(
+        tree.select_path(&parse_path("0"))
+            .expect("live form")
+            .text(),
+        "(live)"
+    );
+}
+
+#[test]
+fn rejects_reader_prefixes_without_a_form() {
+    for input in ["'", "`", ",", ",@", "#'", "#.", "#?", "#?@", "^"] {
+        assert_eq!(
+            SyntaxTree::parse(input).unwrap_err(),
+            ParseError::MissingReaderForm(0),
+            "input: {input}"
+        );
+    }
+}
+
+#[test]
+fn rejects_reader_comments_without_a_form() {
+    for input in ["#;", "#_"] {
+        assert_eq!(
+            SyntaxTree::parse(input).unwrap_err(),
+            ParseError::MissingReaderForm(0),
+            "input: {input}"
+        );
+    }
+}
+
+#[test]
+fn rejects_unterminated_strings_inside_reader_comments() {
+    for input in ["#;\"unterminated", "#_\"unterminated"] {
+        assert_eq!(
+            SyntaxTree::parse(input).unwrap_err(),
+            ParseError::UnterminatedString(2),
+            "input: {input}"
+        );
+    }
+}
+
+#[test]
+fn skips_deeply_nested_reader_comment_forms_without_recursion() {
+    const DEPTH: usize = 10_000;
+
+    let nested_list = format!("#;{}ignored{}", "(".repeat(DEPTH), ")".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&nested_list).expect("deep discarded list should parse");
+    assert!(tree.root_children().is_empty());
+
+    let nested_comments = format!("{}{}", "#;".repeat(DEPTH), "ignored ".repeat(DEPTH));
+    let tree = SyntaxTree::parse(&nested_comments).expect("deep nested comments should parse");
+    assert!(tree.root_children().is_empty());
+}
+
+#[test]
+fn bounds_nested_reader_comment_frames() {
+    let limit = MAX_DISCARDED_FORM_STACK_FRAMES;
+    for reader_comment in ["#;", "#_"] {
+        let below = format!(
+            "{}{}",
+            reader_comment.repeat(limit),
+            "ignored ".repeat(limit)
+        );
+        let tree = SyntaxTree::parse(&below).expect("frame count at limit should parse");
+        assert!(tree.root_children().is_empty());
+
+        let above = format!(
+            "{}{}",
+            reader_comment.repeat(limit + 1),
+            "ignored ".repeat(limit + 1)
+        );
+        assert!(matches!(
+            SyntaxTree::parse(&above),
+            Err(ParseError::ResourceLimitExceeded {
+                limit: MAX_DISCARDED_FORM_STACK_FRAMES,
+                ..
+            })
+        ));
+    }
+}
+
+#[test]
+fn bounds_discarded_list_frames() {
+    let limit = MAX_DISCARDED_FORM_STACK_FRAMES;
+    for reader_comment in ["#;", "#_"] {
+        let below = format!(
+            "{reader_comment}{}ignored{}",
+            "(".repeat(limit - 1),
+            ")".repeat(limit - 1)
+        );
+        SyntaxTree::parse(&below).expect("frame count at limit should parse");
+
+        let above = format!(
+            "{reader_comment}{}ignored{}",
+            "(".repeat(limit),
+            ")".repeat(limit)
+        );
+        assert!(matches!(
+            SyntaxTree::parse(&above),
+            Err(ParseError::ResourceLimitExceeded {
+                limit: MAX_DISCARDED_FORM_STACK_FRAMES,
+                ..
+            })
+        ));
+    }
+}
+
+#[test]
+fn bounds_discarded_feature_dispatch_frames() {
+    let limit = MAX_DISCARDED_FORM_STACK_FRAMES;
+    for reader_comment in ["#;", "#_"] {
+        for feature_dispatch in ["#+", "#-"] {
+            let below_depth = limit - 2;
+            let below = format!(
+                "{reader_comment}{}{feature_dispatch}feature guarded{}",
+                "(".repeat(below_depth),
+                ")".repeat(below_depth)
+            );
+            SyntaxTree::parse(&below).expect("frame count at limit should parse");
+
+            let above_depth = limit - 1;
+            let above = format!(
+                "{reader_comment}{}{feature_dispatch}feature guarded{}",
+                "(".repeat(above_depth),
+                ")".repeat(above_depth)
+            );
+            assert!(matches!(
+                SyntaxTree::parse(&above),
+                Err(ParseError::ResourceLimitExceeded {
+                    limit: MAX_DISCARDED_FORM_STACK_FRAMES,
+                    ..
+                })
+            ));
+        }
+    }
+}
+
+#[test]
+fn reader_comments_discard_complete_feature_conditionals() {
+    for reader_comment in ["#;", "#_"] {
+        for feature_dispatch in ["#+", "#-"] {
+            let input = format!(
+                "{reader_comment}{feature_dispatch}(and sbcl unix) (discarded foo) (live bar)"
+            );
+            let tree = SyntaxTree::parse(&input).expect("feature conditional should be discarded");
+
+            assert_eq!(tree.root_children().len(), 1, "input: {input}");
+            assert_eq!(
+                tree.select_path(&parse_path("0"))
+                    .expect("live form")
+                    .text(),
+                "(live bar)",
+                "input: {input}"
+            );
+        }
+    }
+}
+
+#[test]
+fn nested_reader_comments_discard_complete_feature_conditionals() {
+    let input = "#;#+sbcl #_#-unix (nested) (guarded) (live)";
+    let tree = SyntaxTree::parse(input).expect("nested feature conditional should be discarded");
+
+    assert_eq!(tree.root_children().len(), 1);
+    assert_eq!(
+        tree.select_path(&parse_path("0"))
+            .expect("live form")
+            .text(),
+        "(live)"
+    );
+}
+
+#[test]
+fn incomplete_discarded_feature_conditionals_return_errors() {
+    for input in ["#;#+", "#;#+sbcl", "#_#-", "#_#-(and sbcl"] {
+        assert!(SyntaxTree::parse(input).is_err(), "input: {input}");
+    }
 }
 
 #[test]
@@ -179,7 +376,6 @@ fn keeps_reader_eval_body_opaque_during_rename() {
     let input = "#.(foo foo) foo";
     let tree = SyntaxTree::parse(input).expect("valid");
     let output = tree.rename_symbol(
-        input,
         &SymbolName::new("foo").unwrap(),
         &SymbolName::new("bar").unwrap(),
     );
@@ -194,7 +390,7 @@ fn skips_nested_common_lisp_block_comments() {
     let from = SymbolName::new("foo").expect("symbol");
     let to = SymbolName::new("bar").expect("symbol");
     assert_eq!(
-        tree.rename_symbol(input, &from, &to),
+        tree.rename_symbol(&from, &to),
         "(bar #| outer foo #| nested |# still outer |# bar) (bar baz)"
     );
 }
@@ -242,7 +438,6 @@ fn character_literal_does_not_break_rename() {
     let tree = SyntaxTree::parse(input).expect("valid");
     assert_eq!(
         tree.rename_symbol(
-            input,
             &SymbolName::new("foo").unwrap(),
             &SymbolName::new("bar").unwrap(),
         ),
@@ -274,6 +469,17 @@ fn rejects_unterminated_pipe_escaped_symbol() {
         SyntaxTree::parse("(defun |Foo (x) (+ x 1))").unwrap_err(),
         ParseError::UnterminatedSymbol(7)
     );
+}
+
+#[test]
+fn rejects_dangling_single_escapes() {
+    for (input, position) in [("\\", 0), ("foo\\", 3)] {
+        assert_eq!(
+            SyntaxTree::parse(input).unwrap_err(),
+            ParseError::DanglingSingleEscape(position),
+            "input: {input}"
+        );
+    }
 }
 
 #[test]
