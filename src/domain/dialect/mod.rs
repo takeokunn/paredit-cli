@@ -3,6 +3,13 @@
 
 mod capability;
 mod parse;
+mod semantic;
+
+pub use semantic::{
+    BinderShape, BindingVisibility, BodyShape, DefinitionShape, ExtractFunctionOperation,
+    IntroduceLetOperation, ParameterShape, RelativeNodePath, RenameBindingOperation, ScopeShape,
+    SemanticOperation, UnsupportedSemanticOperation, VerifiedSemanticPolicy,
+};
 
 #[cfg(test)]
 mod tests;

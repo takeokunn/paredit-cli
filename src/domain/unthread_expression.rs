@@ -12,6 +12,7 @@ pub use types::{
     UnthreadExpressionPlan, UnthreadExpressionRequest, UnthreadExpressionStep, UnthreadStyle,
 };
 
+use crate::domain::dialect::Dialect;
 use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, SymbolName, SyntaxTree};
 use anyhow::{Context, Result};
@@ -22,6 +23,18 @@ use syntax::{atom_child, expression_source};
 pub fn plan_unthread_expression(
     request: UnthreadExpressionRequest<'_>,
 ) -> Result<UnthreadExpressionPlan> {
+    match request.dialect {
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => {}
+        Dialect::Unknown => {
+            anyhow::bail!("unthread-expression does not support dialect unknown");
+        }
+    }
+
     reject_common_lisp_reader_conditionals(request.tree, request.dialect)?;
 
     if request.target.kind != ExpressionKind::List
@@ -87,9 +100,11 @@ pub fn plan_unthread_expression(
         .map(|view| pipeline_step(request.input, view))
         .collect::<Result<Vec<_>>>()?;
     let (replacement, steps) = unthread_replacement(style, &base, pipeline_steps);
-    SyntaxTree::parse(&replacement).context("unthread-expression replacement does not parse")?;
+    SyntaxTree::parse_with_dialect(&replacement, request.dialect)
+        .context("unthread-expression replacement does not parse")?;
     let rewritten = replace_span(request.input, request.target.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("unthread-expression rewritten output does not parse")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("unthread-expression rewritten output does not parse")?;
     let changed = rewritten != request.input;
 
     Ok(UnthreadExpressionPlan {

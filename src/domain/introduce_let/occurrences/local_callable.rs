@@ -1,5 +1,5 @@
 use crate::domain::{
-    dialect::Dialect,
+    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
     sexpr::{ByteSpan, ChildIndex, ExpressionView},
 };
 
@@ -10,7 +10,7 @@ use super::{
 use crate::domain::introduce_let::syntax::local_callable_binding_child_shadowed;
 
 pub(super) fn collect_local_callable_binding_spans(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target: &ExpressionView,
     binding_name: &str,
@@ -24,7 +24,7 @@ pub(super) fn collect_local_callable_binding_spans(
 
     for binding in &binding_form.children {
         collect_local_callable_binding_spec_spans(
-            dialect,
+            semantic,
             binding,
             target,
             binding_name,
@@ -35,7 +35,7 @@ pub(super) fn collect_local_callable_binding_spans(
 }
 
 fn collect_local_callable_binding_spec_spans(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding: &ExpressionView,
     target: &ExpressionView,
     binding_name: &str,
@@ -51,7 +51,7 @@ fn collect_local_callable_binding_spec_spans(
         let child_shadowed = shadowed_by_binding
             || local_callable_binding_child_shadowed(binding, binding_name, index);
         collect_equivalent_expression_spans(
-            dialect,
+            semantic,
             child,
             target,
             binding_name,
@@ -62,7 +62,7 @@ fn collect_local_callable_binding_spec_spans(
 }
 
 pub(super) fn is_span_shadowed_by_local_callable_binding(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_span: ByteSpan,
     binding_name: &str,
@@ -74,7 +74,7 @@ pub(super) fn is_span_shadowed_by_local_callable_binding(
 
     binding_form.children.iter().any(|binding| {
         is_span_shadowed_by_local_callable_binding_spec(
-            dialect,
+            semantic,
             binding,
             target_span,
             binding_name,
@@ -84,7 +84,7 @@ pub(super) fn is_span_shadowed_by_local_callable_binding(
 }
 
 pub(super) fn is_path_shadowed_by_local_callable_binding(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_path: &[ChildIndex],
     binding_name: &str,
@@ -102,7 +102,7 @@ pub(super) fn is_path_shadowed_by_local_callable_binding(
         shadowed_by_binding
     } else {
         is_path_shadowed_by_local_callable_binding_spec(
-            dialect,
+            semantic,
             binding,
             rest,
             binding_name,
@@ -112,7 +112,7 @@ pub(super) fn is_path_shadowed_by_local_callable_binding(
 }
 
 fn is_span_shadowed_by_local_callable_binding_spec(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding: &ExpressionView,
     target_span: ByteSpan,
     binding_name: &str,
@@ -125,12 +125,12 @@ fn is_span_shadowed_by_local_callable_binding_spec(
     binding.children.iter().enumerate().any(|(index, child)| {
         let child_shadowed = shadowed_by_binding
             || local_callable_binding_child_shadowed(binding, binding_name, index);
-        is_span_shadowed_by_binding(dialect, child, target_span, binding_name, child_shadowed)
+        is_span_shadowed_by_binding(semantic, child, target_span, binding_name, child_shadowed)
     })
 }
 
 fn is_path_shadowed_by_local_callable_binding_spec(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding: &ExpressionView,
     target_path: &[ChildIndex],
     binding_name: &str,
@@ -149,6 +149,6 @@ fn is_path_shadowed_by_local_callable_binding_spec(
     if rest.is_empty() {
         child_shadowed
     } else {
-        is_path_shadowed_by_binding(dialect, child, rest, binding_name, child_shadowed)
+        is_path_shadowed_by_binding(semantic, child, rest, binding_name, child_shadowed)
     }
 }

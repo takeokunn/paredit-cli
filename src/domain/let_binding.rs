@@ -26,14 +26,26 @@ pub struct ConvertLetToLetStarPlan {
     pub changed: bool,
 }
 
+pub(crate) fn validate_convert_let_to_let_star_dialect(dialect: Dialect) -> Result<()> {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
+        bail!("convert-let-to-let-star supports only Common Lisp and Emacs Lisp");
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_convert_let_star_to_let_dialect(dialect: Dialect) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("convert-let-star-to-let currently supports only Common Lisp");
+    }
+    Ok(())
+}
+
 pub fn plan_convert_let_to_let_star(
     request: ConvertLetToLetStarRequest<'_>,
 ) -> Result<ConvertLetToLetStarPlan> {
-    if !matches!(request.dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("convert-let-to-let-star supports only Common Lisp and Emacs Lisp");
-    }
-    let tree =
-        SyntaxTree::parse(request.input).context("convert-let-to-let-star input is not valid")?;
+    validate_convert_let_to_let_star_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("convert-let-to-let-star input is not valid")?;
     let form = tree.select_path(&request.path)?.view();
     validate_form(
         &form,
@@ -46,7 +58,7 @@ pub fn plan_convert_let_to_let_star(
         analyze_bindings(&form, request.dialect, "convert-let-to-let-star")?;
     reject_dependencies(&names, &initializers, &request, "convert-let-to-let-star")?;
     let rewritten = replace_head(request.input, form.children[0].span, "let*");
-    parse_output(&rewritten, "convert-let-to-let-star")?;
+    parse_output(&rewritten, request.dialect, "convert-let-to-let-star")?;
     Ok(ConvertLetToLetStarPlan {
         dialect: request.dialect,
         path: request.path,
@@ -76,10 +88,8 @@ pub struct ConvertLetStarToLetPlan {
 pub fn plan_convert_let_star_to_let(
     request: ConvertLetStarToLetRequest<'_>,
 ) -> Result<ConvertLetStarToLetPlan> {
-    if request.dialect != Dialect::CommonLisp {
-        bail!("convert-let-star-to-let currently supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input)
+    validate_convert_let_star_to_let_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("convert-let-star-to-let input is not a valid S-expression document")?;
     let form = tree.select_path(&request.path)?.view();
     validate_form(
@@ -93,7 +103,7 @@ pub fn plan_convert_let_star_to_let(
         analyze_bindings(&form, request.dialect, "convert-let-star-to-let")?;
     reject_dependencies(&names, &initializers, &request, "convert-let-star-to-let")?;
     let rewritten = replace_head(request.input, form.children[0].span, "let");
-    parse_output(&rewritten, "convert-let-star-to-let")?;
+    parse_output(&rewritten, request.dialect, "convert-let-star-to-let")?;
     Ok(ConvertLetStarToLetPlan {
         dialect: request.dialect,
         path: request.path,
@@ -260,8 +270,9 @@ fn replace_head(input: &str, span: ByteSpan, replacement: &str) -> String {
     output.push_str(&input[span.end().get()..]);
     output
 }
-fn parse_output(output: &str, operation: &str) -> Result<()> {
-    SyntaxTree::parse(output).with_context(|| format!("{operation} output is not valid"))?;
+fn parse_output(output: &str, dialect: Dialect, operation: &str) -> Result<()> {
+    SyntaxTree::parse_with_dialect(output, dialect)
+        .with_context(|| format!("{operation} output is not valid"))?;
     Ok(())
 }
 
@@ -332,5 +343,74 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn dialect_support_matrix_is_enforced_before_parsing_and_reparses_output() {
+        for (dialect, input) in [
+            (Dialect::CommonLisp, "#\\) (let ((x 1) (y 2)) (+ x y))"),
+            (Dialect::EmacsLisp, "?\\) (let ((x 1) (y 2)) (+ x y))"),
+        ] {
+            let plan = plan_convert_let_to_let_star(ConvertLetToLetStarRequest {
+                input,
+                dialect,
+                path: "1".parse().expect("path"),
+            })
+            .expect("supported dialect");
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+                .expect("dialect-specific let output");
+        }
+
+        for dialect in [
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan_convert_let_to_let_star(ConvertLetToLetStarRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                error
+                    .to_string()
+                    .contains("supports only Common Lisp and Emacs Lisp"),
+                "{dialect:?}: {error:#}"
+            );
+        }
+
+        let plan = plan_convert_let_star_to_let(ConvertLetStarToLetRequest {
+            input: "#\\) (let* ((x 1) (y 2)) (+ x y))",
+            dialect: Dialect::CommonLisp,
+            path: "1".parse().expect("path"),
+        })
+        .expect("Common Lisp");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("Common Lisp let output");
+
+        for dialect in [
+            Dialect::EmacsLisp,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan_convert_let_star_to_let(ConvertLetStarToLetRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                error
+                    .to_string()
+                    .contains("currently supports only Common Lisp"),
+                "{dialect:?}: {error:#}"
+            );
+        }
     }
 }

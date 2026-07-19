@@ -85,6 +85,8 @@ fn cli_plans_defmacro_optional_parameter_rename_without_touching_default_form() 
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -110,6 +112,8 @@ fn cli_plans_defmacro_optional_parameter_rename_without_touching_default_form() 
 fn cli_plans_define_setf_expander_environment_parameter_rename() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -137,6 +141,8 @@ fn cli_plans_define_setf_expander_environment_parameter_rename() {
 fn cli_plans_define_compiler_macro_environment_parameter_rename() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

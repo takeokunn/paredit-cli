@@ -169,3 +169,38 @@ fn skips_exported_definition_when_file_uses_package_nickname() {
         SkippedDefinitionRemovalReason::ExportedDefinition
     );
 }
+
+#[test]
+fn common_lisp_package_exports_do_not_protect_non_common_lisp_definitions() {
+    let text = "(define public-entry (lambda () 1))\n";
+    let form = "(define public-entry (lambda () 1))";
+    let mut public_entry = definition(text, form, "public-entry", DefinitionCategory::Function);
+    public_entry.head = "define".to_owned();
+    let request = RemoveUnusedDefinitionsRequest {
+        files: vec![file_with_dialect(
+            PathBuf::from("public.scm"),
+            Dialect::Scheme,
+            Some("app"),
+            text,
+            vec![public_entry],
+        )],
+        package_definitions: vec![PackageDefinitionReport {
+            path: "0".to_owned(),
+            span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(0)),
+            name: "#:app".to_owned(),
+            nicknames: Vec::new(),
+            uses: Vec::new(),
+            exports: vec!["#:public-entry".to_owned()],
+            imports: Vec::new(),
+            option_count: 1,
+        }],
+        include_protected: false,
+        include_exported: false,
+    };
+
+    let plan = plan_remove_unused_definitions(request).expect("plan should build");
+
+    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.removal_count, 1);
+    assert_eq!(plan.skipped_count, 0);
+}

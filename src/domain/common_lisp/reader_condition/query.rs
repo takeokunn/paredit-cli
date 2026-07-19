@@ -1,6 +1,6 @@
 #[cfg(test)]
 use crate::domain::sexpr::ExpressionPath;
-use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
+use crate::domain::sexpr::{ByteOffset, ByteSpan, ExpressionKind, ExpressionView, SyntaxTree};
 
 #[cfg(test)]
 use super::CommonLispReaderConditionalDispatch;
@@ -8,8 +8,9 @@ use super::{CommonLispReaderConditionalForm, CommonLispReaderConditionalKind};
 
 /// Returns every Common Lisp `#+` or `#-` dispatch atom in source order.
 ///
-/// The parser keeps the dispatch, feature expression, and guarded datum as
-/// sibling expressions. A bare dispatch is still reported so callers can
+/// Legacy trees keep the dispatch, feature expression, and guarded datum as
+/// siblings. Dialect-aware Common Lisp trees keep the complete conditional as
+/// one opaque atom. A bare legacy dispatch is still reported so callers can
 /// reject incomplete input safely before attempting a structural refactor.
 #[cfg(test)]
 pub fn common_lisp_reader_conditional_dispatches(
@@ -26,9 +27,9 @@ pub fn common_lisp_reader_conditional_dispatches(
 
 /// Returns the complete source region consumed by every reader conditional.
 ///
-/// The parser represents a reader conditional as three sibling expressions:
-/// its dispatch atom, feature expression, and guarded datum. The returned span
-/// protects all three, rather than only the dispatch token.
+/// This supports both legacy trees, where the dispatch, feature expression,
+/// and guarded datum are siblings, and dialect-aware Common Lisp trees, where
+/// the complete conditional is one opaque atom.
 pub fn common_lisp_reader_conditional_forms(
     tree: &SyntaxTree,
 ) -> Vec<CommonLispReaderConditionalForm> {
@@ -43,11 +44,11 @@ fn collect_dispatches(
     path: &ExpressionPath,
     dispatches: &mut Vec<CommonLispReaderConditionalDispatch>,
 ) {
-    if let Some(kind) = reader_conditional_kind(view) {
+    if let Some((kind, span, _)) = reader_conditional(view) {
         dispatches.push(CommonLispReaderConditionalDispatch {
             kind,
             path: path.clone(),
-            span: view.content_span,
+            span,
         });
     }
 
@@ -62,16 +63,22 @@ fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderConditio
         let Some(child) = view.children.get(index) else {
             continue;
         };
-        if let Some(kind) = reader_conditional_kind(child) {
-            let end = view
-                .children
-                .get(index + 2)
-                .or_else(|| view.children.get(index + 1))
-                .map_or(child.span.end(), |component| component.span.end());
+        if let Some((kind, dispatch_span, shape)) = reader_conditional(child) {
+            let span = match shape {
+                ReaderConditionalShape::OpaqueForm => child.span,
+                ReaderConditionalShape::LegacyDispatch => {
+                    let end = view
+                        .children
+                        .get(index + 2)
+                        .or_else(|| view.children.get(index + 1))
+                        .map_or(child.span.end(), |component| component.span.end());
+                    ByteSpan::new(child.span.start(), end)
+                }
+            };
             forms.push(CommonLispReaderConditionalForm {
                 kind,
-                dispatch_span: child.content_span,
-                span: ByteSpan::new(child.span.start(), end),
+                dispatch_span,
+                span,
             });
         }
 
@@ -83,17 +90,48 @@ fn collect_forms(view: &ExpressionView, forms: &mut Vec<CommonLispReaderConditio
 pub(crate) fn reader_conditional_kind(
     view: &ExpressionView,
 ) -> Option<CommonLispReaderConditionalKind> {
+    reader_conditional(view).map(|(kind, _, _)| kind)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ReaderConditionalShape {
+    LegacyDispatch,
+    OpaqueForm,
+}
+
+fn reader_conditional(
+    view: &ExpressionView,
+) -> Option<(
+    CommonLispReaderConditionalKind,
+    ByteSpan,
+    ReaderConditionalShape,
+)> {
     if view.kind != ExpressionKind::Atom {
         return None;
     }
 
-    match view
-        .text
-        .as_deref()
-        .and_then(|text| text.get(view.symbol_offset..))
-    {
-        Some("#+") => Some(CommonLispReaderConditionalKind::Include),
-        Some("#-") => Some(CommonLispReaderConditionalKind::Exclude),
-        _ => None,
-    }
+    let text = view.text.as_deref()?.get(view.symbol_offset..)?;
+    let (kind, shape) = match text {
+        "#+" => (
+            CommonLispReaderConditionalKind::Include,
+            ReaderConditionalShape::LegacyDispatch,
+        ),
+        "#-" => (
+            CommonLispReaderConditionalKind::Exclude,
+            ReaderConditionalShape::LegacyDispatch,
+        ),
+        text if text.starts_with("#+") => (
+            CommonLispReaderConditionalKind::Include,
+            ReaderConditionalShape::OpaqueForm,
+        ),
+        text if text.starts_with("#-") => (
+            CommonLispReaderConditionalKind::Exclude,
+            ReaderConditionalShape::OpaqueForm,
+        ),
+        _ => return None,
+    };
+    let dispatch_start = view.content_span.start();
+    let dispatch_end = ByteOffset::new(dispatch_start.get() + 2);
+
+    Some((kind, ByteSpan::new(dispatch_start, dispatch_end), shape))
 }

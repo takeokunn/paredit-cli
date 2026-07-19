@@ -373,15 +373,15 @@ pub(crate) fn read_input_dialect_and_tree(
     explicit: Option<DialectArg>,
 ) -> Result<(SourceInput, Dialect, SyntaxTree)> {
     let (input, dialect) = read_input_and_dialect(file, explicit)?;
-    let tree = parse_document(&input)?;
+    let tree = parse_document(&input, dialect)?;
     Ok((input, dialect, tree))
 }
 
-/// Parses a source document, naming the input and the error's line/column in
-/// the context. The underlying [`ParseError`] keeps the raw byte offset,
-/// which feeds directly into `--at`.
-pub(crate) fn parse_document(input: &SourceInput) -> Result<SyntaxTree> {
-    SyntaxTree::parse(&input.text).map_err(|error| {
+/// Parses a source document with its resolved dialect, naming the input and
+/// the error's line/column in the context. The underlying [`ParseError`] keeps
+/// the raw byte offset, which feeds directly into `--at`.
+pub(crate) fn parse_document(input: &SourceInput, dialect: Dialect) -> Result<SyntaxTree> {
+    SyntaxTree::parse_with_dialect(&input.text, dialect).map_err(|error| {
         let location = parse_error_line_column(&input.text, &error);
         let source = match input.file.as_deref() {
             Some(path) => path.display().to_string(),
@@ -395,7 +395,8 @@ fn parse_error_line_column(text: &str, error: &ParseError) -> String {
     let position = match error {
         ParseError::UnexpectedClose { position, .. }
         | ParseError::MismatchedClose { position, .. }
-        | ParseError::ResourceLimitExceeded { position, .. } => *position,
+        | ParseError::ResourceLimitExceeded { position, .. }
+        | ParseError::UnsupportedReaderDispatch { position, .. } => *position,
         ParseError::UnclosedList(position)
         | ParseError::UnterminatedString(position)
         | ParseError::UnterminatedBlockComment(position)

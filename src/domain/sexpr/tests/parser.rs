@@ -1,10 +1,316 @@
 use super::*;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::parser::MAX_DISCARDED_FORM_STACK_FRAMES;
 
 #[test]
 fn parses_balanced_document() {
     let tree = SyntaxTree::parse("(defun add (x y) (+ x y))").expect("valid");
     assert_eq!(tree.root_children().len(), 1);
+}
+
+#[test]
+fn applies_dialect_reader_collisions_without_splitting_reader_forms() {
+    struct Case {
+        dialect: Dialect,
+        input: &'static str,
+        delimiter: Delimiter,
+        children: &'static [&'static str],
+    }
+
+    let cases = [
+        Case {
+            dialect: Dialect::CommonLisp,
+            input: "(#+feature guarded tail)",
+            delimiter: Delimiter::Paren,
+            children: &["#+feature guarded", "tail"],
+        },
+        Case {
+            dialect: Dialect::EmacsLisp,
+            input: "[#'f tail]",
+            delimiter: Delimiter::Bracket,
+            children: &["#'f", "tail"],
+        },
+        Case {
+            dialect: Dialect::Scheme,
+            input: "(#;discard kept)",
+            delimiter: Delimiter::Paren,
+            children: &["kept"],
+        },
+        Case {
+            dialect: Dialect::Clojure,
+            input: "{left,right}",
+            delimiter: Delimiter::Brace,
+            children: &["left", "right"],
+        },
+        Case {
+            dialect: Dialect::Janet,
+            input: "[;value # ignored\n next]",
+            delimiter: Delimiter::Bracket,
+            children: &[";value", "next"],
+        },
+        Case {
+            dialect: Dialect::Fennel,
+            input: "{#(value) tail}",
+            delimiter: Delimiter::Brace,
+            children: &["#(value)", "tail"],
+        },
+    ];
+
+    for case in cases {
+        let tree = SyntaxTree::parse_with_dialect(case.input, case.dialect)
+            .unwrap_or_else(|error| panic!("{}: {error}", case.dialect.label()));
+        let root = tree.root_view();
+        assert_eq!(root.children.len(), 1, "{}", case.dialect.label());
+        let form = &root.children[0];
+        assert_eq!(
+            form.delimiter,
+            Some(case.delimiter),
+            "{}",
+            case.dialect.label()
+        );
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(case.input))
+            .collect::<Vec<_>>();
+        assert_eq!(children, case.children, "{}", case.dialect.label());
+    }
+}
+
+#[test]
+fn multi_datum_reader_forms_are_single_siblings() {
+    let cases = [
+        (
+            Dialect::CommonLisp,
+            "(#+feature (guarded value) tail)",
+            &["#+feature (guarded value)", "tail"] as &[&str],
+        ),
+        (
+            Dialect::Clojure,
+            "(^:private target tail)",
+            &["^:private", "target", "tail"] as &[&str],
+        ),
+    ];
+
+    for (dialect, input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid reader form");
+        let form = &tree.root_view().children[0];
+        let children = form
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect::<Vec<_>>();
+        assert_eq!(children, expected, "{}", dialect.label());
+    }
+}
+
+#[test]
+fn unsupported_dispatch_fails_closed_in_live_and_discarded_forms() {
+    let cases = [
+        (Dialect::CommonLisp, "#?value"),
+        (Dialect::CommonLisp, "#12Q"),
+        (Dialect::CommonLisp, "#12Qvalue"),
+        (Dialect::EmacsLisp, "#(value)"),
+        (Dialect::Scheme, "#_value"),
+        (Dialect::Scheme, "#12Qvalue"),
+        (Dialect::Clojure, "#;value"),
+        (Dialect::Clojure, "#?value"),
+        (Dialect::Clojure, "#12Qvalue"),
+        (Dialect::CommonLisp, "#+feature #?value"),
+        (Dialect::CommonLisp, "#+feature #12Q"),
+        (Dialect::CommonLisp, "#+feature #12Qvalue"),
+        (Dialect::Scheme, "#;#?value"),
+        (Dialect::Scheme, "#;#12Qvalue"),
+        (Dialect::Clojure, "#_#;value"),
+        (Dialect::Clojure, "#_#?value"),
+        (Dialect::Clojure, "#_#12Qvalue"),
+    ];
+
+    for (dialect, input) in cases {
+        let error = SyntaxTree::parse_with_dialect(input, dialect).unwrap_err();
+        assert!(
+            matches!(error, ParseError::UnsupportedReaderDispatch { .. }),
+            "{} returned the wrong error for {input}: {error}",
+            dialect.label(),
+        );
+        assert!(error.to_string().contains("unsupported reader dispatch"));
+    }
+
+    assert_eq!(
+        SyntaxTree::parse_with_dialect("#_value", Dialect::Scheme).unwrap_err(),
+        ParseError::UnsupportedReaderDispatch {
+            dispatch: "#".to_owned(),
+            position: 0,
+        }
+    );
+}
+
+#[test]
+fn common_lisp_atom_like_dispatches_round_trip_losslessly() {
+    let cases = [
+        "#:done", "#36rz", "#36RZ", "#37r10", "#16ra.", "#b1010", "#o17", "#d10", "#xFF",
+    ];
+
+    for input in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)
+            .expect("valid atom dispatch");
+        let root = tree.root_view();
+        assert_eq!(root.children.len(), 1, "{input}");
+        assert_eq!(root.children[0].span.slice(input), input);
+        assert_eq!(root.children[0].text.as_deref(), Some(input));
+    }
+}
+
+#[test]
+fn standard_dialect_dispatch_forms_are_single_opaque_spans() {
+    let cases = [
+        (
+            Dialect::CommonLisp,
+            "#P\"/tmp/example.lisp\" tail",
+            "#P\"/tmp/example.lisp\"",
+        ),
+        (
+            Dialect::CommonLisp,
+            "#S(point :x 1 :y 2) tail",
+            "#S(point :x 1 :y 2)",
+        ),
+        (Dialect::CommonLisp, "#A(1 2) tail", "#A(1 2)"),
+        (
+            Dialect::CommonLisp,
+            "#2a((1 2) (3 4)) tail",
+            "#2a((1 2) (3 4))",
+        ),
+        (
+            Dialect::CommonLisp,
+            "#1=(node . #1#) tail",
+            "#1=(node . #1#)",
+        ),
+        (Dialect::CommonLisp, "#1# tail", "#1#"),
+        (Dialect::Scheme, "#1=(node . #1#) tail", "#1=(node . #1#)"),
+        (Dialect::Scheme, "#1# tail", "#1#"),
+        (Dialect::Scheme, "#u8(1 2 3) tail", "#u8(1 2 3)"),
+        (Dialect::Clojure, r##"#"foo.*" tail"##, r##"#"foo.*""##),
+        (
+            Dialect::Clojure,
+            r#"#:person{:first "Ada"} tail"#,
+            r#"#:person{:first "Ada"}"#,
+        ),
+        (
+            Dialect::Clojure,
+            r#"#inst "1985-04-12T23:20:50.52-00:00" tail"#,
+            r#"#inst "1985-04-12T23:20:50.52-00:00""#,
+        ),
+        (Dialect::Clojure, "#+/foo 1 tail", "#+/foo 1"),
+    ];
+
+    for (dialect, input, expected_span) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid dispatch form");
+        let root = tree.root_view();
+        assert_eq!(root.children.len(), 2, "{}", dialect.label());
+        assert_eq!(
+            root.children[0].span.slice(input),
+            expected_span,
+            "{}",
+            dialect.label()
+        );
+        assert_eq!(root.children[1].text.as_deref(), Some("tail"));
+    }
+}
+
+#[test]
+fn standard_dispatch_forms_require_their_payload_datum() {
+    let cases = [
+        (Dialect::CommonLisp, "#P"),
+        (Dialect::CommonLisp, "#S"),
+        (Dialect::CommonLisp, "#A"),
+        (Dialect::CommonLisp, "#2A"),
+        (Dialect::CommonLisp, "#1="),
+        (Dialect::Scheme, "#1="),
+    ];
+
+    for (dialect, input) in cases {
+        assert_eq!(
+            SyntaxTree::parse_with_dialect(input, dialect),
+            Err(ParseError::MissingReaderForm(0)),
+            "{}: {input}",
+            dialect.label()
+        );
+    }
+}
+
+#[test]
+fn standard_dispatch_forms_are_consumed_inside_skipped_datums() {
+    let cases = [
+        (
+            Dialect::CommonLisp,
+            "#+feature #2A((1 2) (3 4)) tail",
+            &["#+feature #2A((1 2) (3 4))", "tail"] as &[&str],
+        ),
+        (
+            Dialect::CommonLisp,
+            "#+feature #1=(node . #1#) tail",
+            &["#+feature #1=(node . #1#)", "tail"] as &[&str],
+        ),
+        (
+            Dialect::CommonLisp,
+            "#+feature #:done tail",
+            &["#+feature #:done", "tail"] as &[&str],
+        ),
+        (
+            Dialect::CommonLisp,
+            "#+feature #36rz tail",
+            &["#+feature #36rz", "tail"] as &[&str],
+        ),
+        (Dialect::Scheme, "#;#1=(node . #1#) tail", &["tail"]),
+        (Dialect::Scheme, "#;#1# tail", &["tail"]),
+        (Dialect::Clojure, "#_#+/foo 1 tail", &["tail"]),
+    ];
+
+    for (dialect, input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid skipped form");
+        let spans = tree
+            .root_view()
+            .children
+            .iter()
+            .map(|child| child.span.slice(input))
+            .collect::<Vec<_>>();
+        assert_eq!(spans, expected, "{}", dialect.label());
+    }
+}
+
+#[test]
+fn opaque_dialect_dispatch_forms_are_not_traversed_by_rename() {
+    let cases = [
+        (
+            Dialect::Clojure,
+            "#:foo{:key foo} foo",
+            "#:foo{:key foo} bar",
+        ),
+        (
+            Dialect::CommonLisp,
+            "#S(node :value foo) foo",
+            "#S(node :value foo) bar",
+        ),
+        (
+            Dialect::CommonLisp,
+            "#1=(foo . #1#) foo",
+            "#1=(foo . #1#) bar",
+        ),
+        (Dialect::Scheme, "#1=(foo . #1#) foo", "#1=(foo . #1#) bar"),
+    ];
+
+    for (dialect, input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid reader form");
+        assert_eq!(
+            tree.rename_symbol(
+                &SymbolName::new("foo").expect("source symbol"),
+                &SymbolName::new("bar").expect("target symbol"),
+            ),
+            expected,
+            "{}",
+            dialect.label()
+        );
+    }
 }
 
 #[test]
@@ -105,6 +411,47 @@ fn parses_clojure_metadata_prefix_on_map_and_atom() {
         vec![ReaderPrefix::Metadata]
     );
     assert_eq!(metadata_keyword.text.as_deref(), Some("^:private"));
+}
+
+#[test]
+fn clojure_metadata_keeps_target_live_and_discard_skips_target() {
+    let input = "^:private (defn foo [] (foo)) (foo)";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::Clojure).expect("valid metadata");
+
+    let root = tree.root_view();
+    assert_eq!(root.children.len(), 3);
+    assert_eq!(
+        root.children[0].reader_prefixes,
+        vec![ReaderPrefix::Metadata]
+    );
+    assert_eq!(root.children[0].text.as_deref(), Some("^:private"));
+    assert_eq!(root.children[1].span.slice(input), "(defn foo [] (foo))");
+    assert_eq!(root.children[2].span.slice(input), "(foo)");
+
+    let foo_paths = tree
+        .atom_occurrences()
+        .into_iter()
+        .filter(|occurrence| occurrence.text == "foo")
+        .map(|occurrence| occurrence.path.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(foo_paths, vec!["1.1", "1.3.0", "2.0"]);
+
+    let outline = tree.outline(|head| Dialect::Clojure.is_definition_head(head));
+    assert_eq!(outline.len(), 2);
+    assert_eq!(outline[0].path.to_string(), "1");
+    assert_eq!(outline[0].head.as_deref(), Some("defn"));
+    assert!(outline[0].definition_like);
+
+    let skipped_input = "#_^:private (defn foo [] (foo)) tail";
+    let skipped = SyntaxTree::parse_with_dialect(skipped_input, Dialect::Clojure)
+        .expect("valid discarded metadata");
+    let spans = skipped
+        .root_view()
+        .children
+        .iter()
+        .map(|child| child.span.slice(skipped_input))
+        .collect::<Vec<_>>();
+    assert_eq!(spans, vec!["tail"]);
 }
 
 #[test]
@@ -430,6 +777,42 @@ fn parses_named_and_whitespace_character_literals() {
     let space = SyntaxTree::parse("(x #\\ )").expect("valid");
     let form = space.select_path(&parse_path("0")).expect("form").view();
     assert_eq!(form.children[1].text.as_deref(), Some("#\\ "));
+}
+
+#[test]
+fn parses_dialect_character_literals_with_closing_delimiters() {
+    let cases = [
+        (Dialect::Scheme, "(#\\))", "#\\)"),
+        (Dialect::Clojure, "(\\))", "\\)"),
+        (Dialect::EmacsLisp, "(?\\))", "?\\)"),
+    ];
+
+    for (dialect, input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid character literal");
+        let form = &tree.root_view().children[0];
+        assert_eq!(form.children.len(), 1, "{}", dialect.label());
+        assert_eq!(
+            form.children[0].span.slice(input),
+            expected,
+            "{}",
+            dialect.label()
+        );
+    }
+}
+
+#[test]
+fn discarded_forms_use_the_same_dialect_character_literal_scanner() {
+    let cases = [
+        (Dialect::Scheme, "#;(#\\)) kept"),
+        (Dialect::Clojure, "#_(\\)) kept"),
+    ];
+
+    for (dialect, input) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid discarded form");
+        let root = tree.root_view();
+        assert_eq!(root.children.len(), 1, "{}", dialect.label());
+        assert_eq!(root.children[0].text.as_deref(), Some("kept"));
+    }
 }
 
 #[test]

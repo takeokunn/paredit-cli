@@ -36,7 +36,8 @@ pub struct InlineLocalFunctionPlan {
 pub fn plan_inline_local_function(
     request: InlineLocalFunctionRequest<'_>,
 ) -> Result<InlineLocalFunctionPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    inline_local_function::validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let plan = inline_local_function::plan(DomainRequest {
         input: request.input,
@@ -62,4 +63,34 @@ pub fn plan_inline_local_function(
         rewritten: plan.rewritten,
         changed: plan.changed,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_dialect_before_parsing_and_uses_dialect_parser() {
+        let plan = plan_inline_local_function(InlineLocalFunctionRequest {
+            input: r"#\) (flet ((identity (x) x)) (identity value))",
+            dialect: Dialect::CommonLisp,
+            path: "1".parse().expect("path"),
+        })
+        .expect("Common Lisp");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten input");
+
+        for dialect in [Dialect::EmacsLisp, Dialect::Unknown] {
+            let error = plan_inline_local_function(InlineLocalFunctionRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert_eq!(
+                error.to_string(),
+                "inline-local-function currently supports only Common Lisp"
+            );
+        }
+    }
 }

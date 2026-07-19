@@ -28,7 +28,11 @@ pub use types::{
 const DEFAULT_ENTRY_SEPARATOR: &str = "\n\n";
 
 pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<SortDefinitionsPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    if request.dialect == crate::domain::dialect::Dialect::Unknown {
+        anyhow::bail!("sort-definitions does not support the unknown dialect");
+    }
+
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let blocks = collect_sortable_blocks(request.input, &tree, request.dialect)?;
     let mut replacements = Vec::new();
@@ -76,7 +80,7 @@ pub fn plan_sort_definitions(request: SortDefinitionsRequest<'_>) -> Result<Sort
     }
 
     let rewritten = apply_replacements(request.input, &replacements);
-    SyntaxTree::parse(&rewritten)?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)?;
     let changed = rewritten != request.input;
 
     Ok(SortDefinitionsPlan {

@@ -27,10 +27,8 @@ pub(crate) struct Plan {
 }
 
 pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
-    if !matches!(request.dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("split-let-star supports only Common Lisp and Emacs Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input)
+    validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("split-let-star input is not a valid S-expression document")?;
     let form = tree.select_path(&request.path)?.view();
     require_let_star(request.dialect, &form)?;
@@ -71,7 +69,8 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
     let body = &request.input[bindings.span.end().get()..form.span.end().get() - 1];
     let replacement = format!("({head} ({outer}) ({head} ({inner}){body}))");
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("split-let-star output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("split-let-star output is not valid")?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -82,6 +81,13 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         changed: rewritten != request.input,
         rewritten,
     })
+}
+
+pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
+        bail!("split-let-star supports only Common Lisp and Emacs Lisp");
+    }
+    Ok(())
 }
 
 fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
@@ -136,22 +142,54 @@ fn contains_headed_form(dialect: Dialect, view: &ExpressionView, expected: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn splits_in_both_dialects() {
-        for dialect in [Dialect::CommonLisp, Dialect::EmacsLisp] {
-            let p = plan(Request {
-                input: "(let* ((a 1) (b (+ a 1)) (c (+ b 1))) (+ a b c))",
+    fn splits_in_both_dialects_with_reader_literals_outside_target() {
+        for (dialect, reader_literal) in
+            [(Dialect::CommonLisp, r"#\)"), (Dialect::EmacsLisp, r"?\)")]
+        {
+            let input =
+                format!("(let* ((a 1) (b (+ a 1)) (c (+ b 1))) (+ a b c)) {reader_literal}");
+            let plan = plan(Request {
+                input: &input,
                 dialect,
-                path: "0".parse().unwrap(),
+                path: "0".parse().expect("path"),
                 binding_index: BindingIndex::new(1).expect("binding index"),
             })
-            .unwrap();
+            .expect("plan");
             assert_eq!(
-                p.rewritten,
-                "(let* ((a 1)) (let* ((b (+ a 1)) (c (+ b 1))) (+ a b c)))"
+                plan.rewritten,
+                format!(
+                    "(let* ((a 1)) (let* ((b (+ a 1)) (c (+ b 1))) (+ a b c))) {reader_literal}"
+                )
+            );
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect).expect("rewritten input");
+        }
+    }
+
+    #[test]
+    fn rejects_unsupported_dialects_before_parsing() {
+        for dialect in [
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan(Request {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+                binding_index: BindingIndex::new(1).expect("binding index"),
+            })
+            .expect_err("dialect must be rejected");
+            assert_eq!(
+                error.to_string(),
+                "split-let-star supports only Common Lisp and Emacs Lisp"
             );
         }
     }
+
     #[test]
     fn rejects_invalid_boundaries_and_declarations() {
         assert!(

@@ -31,18 +31,42 @@ pub struct InlineLetPlan {
     pub changed: bool,
 }
 
+pub(crate) const fn supports_inline_let_dialect(dialect: Dialect) -> bool {
+    matches!(
+        dialect,
+        Dialect::CommonLisp
+            | Dialect::EmacsLisp
+            | Dialect::Scheme
+            | Dialect::Clojure
+            | Dialect::Janet
+            | Dialect::Fennel
+    )
+}
+
+fn require_supported_dialect(dialect: Dialect) -> Result<()> {
+    if supports_inline_let_dialect(dialect) {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "inline-let requires a known dialect because semantic safety cannot be verified for unknown input"
+    )
+}
+
 pub fn plan_inline_let(request: InlineLetRequest<'_>) -> Result<InlineLetPlan> {
-    let input_tree = SyntaxTree::parse(request.input)
+    require_supported_dialect(request.dialect)?;
+    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-let input is not a valid S-expression document")?;
     crate::domain::mutation_safety::reject_common_lisp_reader_conditionals(
         &input_tree,
         request.dialect,
     )?;
+    let target = select_target_from_tree(&input_tree, request.path.as_ref(), &request.target)?;
     let plan = plan(CoreRequest {
         input: request.input,
         dialect: request.dialect,
         path: request.path,
-        target: request.target,
+        target,
         allow_duplicate_evaluation: request.allow_duplicate_evaluation,
     })?;
     Ok(InlineLetPlan {
@@ -82,8 +106,28 @@ pub(crate) struct CorePlan {
     pub changed: bool,
 }
 
+fn select_target_from_tree(
+    tree: &SyntaxTree,
+    path: Option<&Path>,
+    requested_target: &ExpressionView,
+) -> Result<ExpressionView> {
+    let selected = match path {
+        Some(path) => tree.select_path(path)?,
+        None => tree.select_at(requested_target.span.start().get())?,
+    };
+    let target = selected.view();
+    if target.span != requested_target.span {
+        anyhow::bail!("inline-let target does not match the dialect-aware input tree");
+    }
+    Ok(target)
+}
+
 pub(crate) fn plan(request: CoreRequest<'_>) -> Result<CorePlan> {
-    let parts = parts(request.dialect, request.input, &request.target)?;
+    require_supported_dialect(request.dialect)?;
+    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("inline-let input is not a valid S-expression document")?;
+    let target = select_target_from_tree(&input_tree, request.path.as_ref(), &request.target)?;
+    let parts = parts(request.dialect, request.input, &target)?;
     let reference_count = parts.reference_spans.len();
     if reference_count == 0 {
         anyhow::bail!("inline-let would drop an unused binding value");
@@ -101,7 +145,7 @@ pub(crate) fn plan(request: CoreRequest<'_>) -> Result<CorePlan> {
         &parts.binding_value,
     );
     let rewritten = replace_span(request.input, parts.let_span, &replacement);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("inline-let output is not a valid S-expression document")?;
 
     Ok(CorePlan {
@@ -262,30 +306,214 @@ mod tests {
     use super::*;
 
     fn plan(input: &str, dialect: Dialect, allow_duplicate_evaluation: bool) -> Result<CorePlan> {
-        let tree = SyntaxTree::parse(input)?;
-        let target = tree.select_path(&Path::from_indexes(vec![0]))?.view();
+        let path = Path::from_indexes(vec![0]);
+        let tree = SyntaxTree::parse_with_dialect(input, dialect)?;
+        let target = tree.select_path(&path)?.view();
         super::plan(CoreRequest {
             input,
             dialect,
-            path: Some(Path::from_indexes(vec![0])),
+            path: Some(path),
             target,
             allow_duplicate_evaluation,
         })
     }
 
     #[test]
-    fn supports_list_and_vector_binding_dialects() {
-        let common_lisp = plan("(let ((x 1)) (+ x y))", Dialect::CommonLisp, false).unwrap();
-        assert_eq!(common_lisp.rewritten, "(+ 1 y)");
-        let clojure = plan("(let [x 1] (+ x y))", Dialect::Clojure, false).unwrap();
-        assert_eq!(clojure.rewritten, "(+ 1 y)");
+    fn all_known_dialects_rewrite_and_reparse_with_the_same_dialect() {
+        for (dialect, input, expected) in [
+            (
+                Dialect::CommonLisp,
+                "(let ((x 1)) (+ x y)) #\\)",
+                "(+ 1 y) #\\)",
+            ),
+            (
+                Dialect::EmacsLisp,
+                r"(let ((x 1)) (+ x y)) ?\)",
+                r"(+ 1 y) ?\)",
+            ),
+            (Dialect::Scheme, "(let ((x 1)) (+ x y))", "(+ 1 y)"),
+            (Dialect::Clojure, "(let [x 1] (+ x y))", "(+ 1 y)"),
+            (Dialect::Janet, "(let [x 1] (+ x y))", "(+ 1 y)"),
+            (Dialect::Fennel, "(let [x 1] (+ x y))", "(+ 1 y)"),
+        ] {
+            assert!(supports_inline_let_dialect(dialect));
+            let core = plan(input, dialect, false).unwrap();
+            assert_eq!(core.rewritten, expected);
+            SyntaxTree::parse_with_dialect(&core.rewritten, dialect).unwrap();
+
+            let path = Path::from_indexes(vec![0]);
+            let tree = SyntaxTree::parse_with_dialect(input, dialect).unwrap();
+            let target = tree.select_path(&path).unwrap().view();
+            let public = plan_inline_let(InlineLetRequest {
+                input,
+                dialect,
+                path: Some(path),
+                target,
+                allow_duplicate_evaluation: false,
+            })
+            .unwrap();
+            assert_eq!(public.rewritten, core.rewritten);
+            SyntaxTree::parse_with_dialect(&public.rewritten, dialect).unwrap();
+        }
     }
 
     #[test]
-    fn rejects_unused_duplicate_and_capture_cases() {
-        assert!(plan("(let ((x (effect))) y)", Dialect::CommonLisp, false).is_err());
-        assert!(plan("(let ((x (effect))) (+ x x))", Dialect::CommonLisp, false).is_err());
-        assert!(plan("(let ((x (effect))) (+ x x))", Dialect::CommonLisp, true).is_ok());
-        assert!(plan("(let ((x y)) (let ((y 2)) x))", Dialect::CommonLisp, false).is_err());
+    fn support_predicate_rejects_only_unknown() {
+        assert!(!supports_inline_let_dialect(Dialect::Unknown));
+    }
+
+    #[test]
+    fn unknown_fails_closed_before_parsing_or_target_traversal() {
+        let valid_input = "(let ((x 1)) x)";
+        let path = Path::from_indexes(vec![0]);
+        let tree = SyntaxTree::parse_with_dialect(valid_input, Dialect::CommonLisp).unwrap();
+        let target = tree.select_path(&path).unwrap().view();
+
+        let expected = "inline-let requires a known dialect because semantic safety cannot be verified for unknown input";
+        let core_error = super::plan(CoreRequest {
+            input: ")",
+            dialect: Dialect::Unknown,
+            path: Some(path.clone()),
+            target: target.clone(),
+            allow_duplicate_evaluation: false,
+        })
+        .unwrap_err();
+        assert_eq!(core_error.to_string(), expected);
+
+        let public_error = plan_inline_let(InlineLetRequest {
+            input: ")",
+            dialect: Dialect::Unknown,
+            path: Some(path),
+            target,
+            allow_duplicate_evaluation: false,
+        })
+        .unwrap_err();
+        assert_eq!(public_error.to_string(), expected);
+    }
+
+    #[test]
+    fn all_known_dialects_reject_unused_or_duplicated_evaluation() {
+        for (dialect, unused, duplicate) in [
+            (
+                Dialect::CommonLisp,
+                "(let ((x (effect))) y)",
+                "(let ((x (effect))) (+ x x))",
+            ),
+            (
+                Dialect::EmacsLisp,
+                "(let ((x (effect))) y)",
+                "(let ((x (effect))) (+ x x))",
+            ),
+            (
+                Dialect::Scheme,
+                "(let ((x (effect))) y)",
+                "(let ((x (effect))) (+ x x))",
+            ),
+            (
+                Dialect::Clojure,
+                "(let [x (effect)] y)",
+                "(let [x (effect)] (+ x x))",
+            ),
+            (
+                Dialect::Janet,
+                "(let [x (effect)] y)",
+                "(let [x (effect)] (+ x x))",
+            ),
+            (
+                Dialect::Fennel,
+                "(let [x (effect)] y)",
+                "(let [x (effect)] (+ x x))",
+            ),
+        ] {
+            assert!(plan(unused, dialect, false).is_err());
+            assert!(plan(duplicate, dialect, false).is_err());
+            assert!(plan(duplicate, dialect, true).is_ok());
+        }
+    }
+
+    #[test]
+    fn callable_bindings_are_not_rewritten_when_they_shadow_the_let_binding() {
+        for (dialect, input, expected) in [
+            (
+                Dialect::CommonLisp,
+                "(let ((x 1)) (list x (lambda (x) x)))",
+                "(list 1 (lambda (x) x))",
+            ),
+            (
+                Dialect::EmacsLisp,
+                "(let ((x 1)) (list x (lambda (x) x)))",
+                "(list 1 (lambda (x) x))",
+            ),
+            (
+                Dialect::Scheme,
+                "(let ((x 1)) (list x (lambda x x)))",
+                "(list 1 (lambda x x))",
+            ),
+            (
+                Dialect::Clojure,
+                "(let [x 1] (list x (fn x [value] x)))",
+                "(list 1 (fn x [value] x))",
+            ),
+            (
+                Dialect::Clojure,
+                "(let [x 1] (list x (fn ([x] x) ([x y] x))))",
+                "(list 1 (fn ([x] x) ([x y] x)))",
+            ),
+            (
+                Dialect::Janet,
+                "(let [x 1] (list x (fn [x] x)))",
+                "(list 1 (fn [x] x))",
+            ),
+            (
+                Dialect::Fennel,
+                "(let [x 1] (list x (fn [x] x)))",
+                "(list 1 (fn [x] x))",
+            ),
+        ] {
+            let shadowed = plan(input, dialect, false).unwrap();
+            assert_eq!(shadowed.reference_count, 1);
+            assert_eq!(shadowed.rewritten, expected);
+            SyntaxTree::parse_with_dialect(&shadowed.rewritten, dialect).unwrap();
+        }
+    }
+
+    #[test]
+    fn rejects_inline_let_when_callable_bindings_would_capture_the_value() {
+        for (dialect, input) in [
+            (
+                Dialect::CommonLisp,
+                "(let ((target external)) (lambda (external) target))",
+            ),
+            (
+                Dialect::EmacsLisp,
+                "(let ((target external)) (lambda (external) target))",
+            ),
+            (
+                Dialect::Scheme,
+                "(let ((target external)) (lambda external target))",
+            ),
+            (
+                Dialect::Clojure,
+                "(let [target recur-name] (fn recur-name ([value] target)))",
+            ),
+            (
+                Dialect::Clojure,
+                "(let [target external] (fn ([external] target) ([other external] target)))",
+            ),
+            (
+                Dialect::Janet,
+                "(let [target external] (fn [external] target))",
+            ),
+            (
+                Dialect::Fennel,
+                "(let [target external] (fn [external] target))",
+            ),
+        ] {
+            let error = plan(input, dialect, false).unwrap_err();
+            assert!(
+                error.to_string().contains("would capture variable"),
+                "unexpected {dialect:?} error: {error:#}"
+            );
+        }
     }
 }

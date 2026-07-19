@@ -1,6 +1,35 @@
 use super::*;
 
 #[test]
+fn rejects_unknown_dialect_before_extract_function_planning() {
+    let input = "(+ width height)";
+    let tree = SyntaxTree::parse(input).expect("parse fixture");
+    let path = Path::from_indexes(vec![0]);
+    let selection = tree.select_path(&path).expect("select fixture");
+
+    assert!(infer_extract_function_params(Dialect::Unknown, &selection.view(), &[]).is_empty());
+
+    let error = plan_extract_function(ExtractFunctionRequest {
+        input,
+        selection,
+        path: Some(path),
+        dialect: Dialect::Unknown,
+        name: SymbolName::new("area").expect("symbol fixture"),
+        explicit_params: Vec::new(),
+        infer_params: true,
+        insert: ExtractFunctionInsert::Append,
+        anchor_path: None,
+    })
+    .expect_err("unknown dialect should be rejected");
+
+    assert!(
+        error
+            .to_string()
+            .contains("extract-function is not supported for this dialect")
+    );
+}
+
+#[test]
 fn plans_extract_function_with_inferred_params() {
     let plan = plan_at(
         "(defun render () (+ width height))",
@@ -17,7 +46,28 @@ fn plans_extract_function_with_inferred_params() {
     );
     assert_eq!(plan.inferred_params, vec!["width", "height"]);
     assert!(plan.changed);
-    SyntaxTree::parse(&plan.rewritten).expect("rewritten output remains parseable");
+    SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+        .expect("rewritten output remains parseable");
+}
+
+#[test]
+fn extract_function_preserves_dialect_reader_collisions() {
+    let cases = [(
+        Dialect::Janet,
+        "(+ width height)\n# ignored ))",
+        "(area width height)",
+        "(defn area [width height] (+ width height))",
+    )];
+
+    for (dialect, input, expected_call, expected_definition) in cases {
+        let plan = plan_at_dialect(dialect, input, &[0], "area", &["width", "height"], false);
+
+        assert_eq!(plan.call, expected_call);
+        assert_eq!(plan.definition, expected_definition);
+        assert!(plan.rewritten.contains("# ignored ))"));
+        SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+            .expect("rewritten output remains parseable");
+    }
 }
 
 #[test]

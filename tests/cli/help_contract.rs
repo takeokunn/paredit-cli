@@ -77,3 +77,14 @@ fn rename_local_function_help_surfaces_flet_and_labels_boundary() {
             "preserving the difference between non-recursive flet bodies and recursive labels bodies",
         ));
 }
+
+#[test]
+fn basic_edit_help_surfaces_optional_dialect_override() {
+    for subcommand in ["repair-unclosed-lists", "select", "replace", "kill"] {
+        paredit()
+            .args(["edit", subcommand, "--help"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("--dialect <DIALECT>"));
+    }
+}

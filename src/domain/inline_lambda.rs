@@ -32,10 +32,9 @@ pub(crate) struct Plan {
 }
 
 pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
-    if request.dialect != Dialect::CommonLisp {
-        bail!("inline-lambda currently supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input).context("inline-lambda input is not valid")?;
+    validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("inline-lambda input is not valid")?;
     let call = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(call.span) {
         bail!("inline-lambda cannot replace a call containing comments");
@@ -88,7 +87,8 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         .join(" ");
     let replacement = format!("(let ({rendered}) {})", body.span.slice(request.input));
     let rewritten = replace_span(request.input, call.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("inline-lambda output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("inline-lambda output is not valid")?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -99,6 +99,13 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         changed: rewritten != request.input,
         rewritten,
     })
+}
+
+pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("inline-lambda currently supports only Common Lisp");
+    }
+    Ok(())
 }
 
 fn plain_symbol(view: &ExpressionView, role: &str) -> Result<SymbolName> {
@@ -186,5 +193,40 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn dialect_support_matrix_is_enforced_before_parsing_and_reparses_output() {
+        let result = plan(Request {
+            input: "#\\) ((lambda (x) x) 1)",
+            dialect: Dialect::CommonLisp,
+            path: "1".parse().expect("path"),
+        })
+        .expect("Common Lisp");
+        assert!(result.rewritten.starts_with("#\\)"));
+        SyntaxTree::parse_with_dialect(&result.rewritten, Dialect::CommonLisp)
+            .expect("Common Lisp output");
+
+        for dialect in [
+            Dialect::EmacsLisp,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan(Request {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                error
+                    .to_string()
+                    .contains("currently supports only Common Lisp"),
+                "{dialect:?}: {error:#}"
+            );
+        }
     }
 }

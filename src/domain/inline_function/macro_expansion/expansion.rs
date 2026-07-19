@@ -18,7 +18,8 @@ pub(super) fn expand_unquote_expression(
 ) -> Result<String> {
     let literal_source = render_unquoted_source(view)?;
     let literal_tree =
-        crate::domain::sexpr::SyntaxTree::parse(&literal_source).context("invalid unquote form")?;
+        crate::domain::sexpr::SyntaxTree::parse_with_dialect(&literal_source, dialect)
+            .context("invalid unquote form")?;
     let expression = literal_tree
         .select_path(&crate::domain::sexpr::Path::root_child(0))?
         .view();
@@ -39,7 +40,7 @@ pub(super) fn expand_unquote_expression(
     )?;
     count_references_in_expanded_expression(dialect, &intermediate, reference_counts)?;
 
-    let intermediate_tree = parse_single_expression_tree(&intermediate)?;
+    let intermediate_tree = parse_single_expression_tree(dialect, &intermediate)?;
     let intermediate_expression = intermediate_tree
         .select_path(&crate::domain::sexpr::Path::root_child(0))?
         .view();
@@ -66,7 +67,7 @@ pub(super) fn count_references_in_expanded_expression(
     source: &str,
     reference_counts: &mut BTreeMap<String, usize>,
 ) -> Result<()> {
-    let expression_tree = parse_single_expression_tree(source)?;
+    let expression_tree = parse_single_expression_tree(dialect, source)?;
     let expression = expression_tree
         .select_path(&crate::domain::sexpr::Path::root_child(0))?
         .view();
@@ -82,9 +83,12 @@ pub(super) fn count_references_in_expanded_expression(
 }
 
 pub(super) fn parse_single_expression_tree(
+    dialect: Dialect,
     source: &str,
 ) -> Result<crate::domain::sexpr::SyntaxTree> {
-    Ok(crate::domain::sexpr::SyntaxTree::parse(source)?)
+    Ok(crate::domain::sexpr::SyntaxTree::parse_with_dialect(
+        source, dialect,
+    )?)
 }
 
 pub(super) fn expand_unquote_splicing(
@@ -101,8 +105,8 @@ pub(super) fn expand_unquote_splicing(
         argument_bindings,
         reference_counts,
     )?;
-    let expanded_tree =
-        crate::domain::sexpr::SyntaxTree::parse(&expanded).context("invalid ,@ expansion")?;
+    let expanded_tree = crate::domain::sexpr::SyntaxTree::parse_with_dialect(&expanded, dialect)
+        .context("invalid ,@ expansion")?;
     let expression = expanded_tree
         .select_path(&crate::domain::sexpr::Path::root_child(0))?
         .view();

@@ -6,6 +6,8 @@ fn cli_plans_symbol_macrolet_binding_rename_without_touching_expansion_reference
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -58,6 +60,8 @@ fn cli_plans_outer_binding_rename_through_symbol_macrolet_expansion_only() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

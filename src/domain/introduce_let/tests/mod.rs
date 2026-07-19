@@ -14,7 +14,7 @@ fn request_with_dialect<'a>(
     path: &str,
     all_occurrences: bool,
 ) -> IntroduceLetRequest<'a> {
-    let tree = SyntaxTree::parse(input).expect("parse");
+    let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse");
     let path = path.parse::<Path>().expect("path");
     let selection = tree.select_path(&path).expect("select");
     IntroduceLetRequest {
@@ -68,6 +68,8 @@ fn assert_plan_with_dialect(
         expected_skipped
     );
     assert_eq!(plan.rewritten, expected_rewritten);
+    SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+        .expect("rewritten output remains parseable");
 }
 
 fn assert_shadowed_error(input: &str, path: &str) {

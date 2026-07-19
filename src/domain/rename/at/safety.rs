@@ -12,7 +12,10 @@ pub(super) fn ensure_binding_target_is_available(
     binding_span: ByteSpan,
     input: &str,
 ) -> Result<()> {
-    let Ok(existing) = binding_rename_parts(Dialect::CommonLisp, view, to, input) else {
+    let semantic = Dialect::CommonLisp
+        .verify_rename_binding()
+        .expect("Common Lisp rename-binding semantics are verified");
+    let Ok(existing) = binding_rename_parts(semantic, view, to, input) else {
         return Ok(());
     };
     if existing.binding_span != binding_span && from != to {

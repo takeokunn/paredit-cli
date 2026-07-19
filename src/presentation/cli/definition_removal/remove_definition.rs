@@ -44,11 +44,11 @@ pub(in crate::presentation::cli) fn remove_definition(args: RemoveDefinitionArgs
         category: shape.category,
         parameter_count: shape.lambda_parameter_count(&view),
         body_form_count: Some(shape.body_form_count(&view)),
-        package: package_context_before_top_level(&tree, target_index)?,
+        package: package_context_before_top_level(&tree, dialect, target_index)?,
     };
     let rewritten = Edit::kill(&input.text, &tree, selection)?;
 
-    SyntaxTree::parse(&rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&rewritten, dialect).with_context(|| {
         format!(
             "file would become invalid after removing definition: {}",
             args.file.display()

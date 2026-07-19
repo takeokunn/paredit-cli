@@ -99,6 +99,8 @@ fn cli_rejects_replace_forms_overlapping_paths() {
     cmd.args([
         "refactor",
         "replace-forms",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--path",
@@ -118,6 +120,8 @@ fn cli_rejects_replace_forms_shape_mismatch_when_required() {
     cmd.args([
         "refactor",
         "replace-forms",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--path",

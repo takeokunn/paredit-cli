@@ -1,6 +1,6 @@
 use super::styles::ListStyle;
 use super::{Formatter, MAX_INLINE_WIDTH};
-use crate::domain::sexpr::tree::{Node, NodeKind, ReaderPrefix, SyntaxTree};
+use crate::domain::sexpr::tree::{Node, NodeKind, SyntaxTree};
 use crate::domain::sexpr::types::Delimiter;
 use crate::domain::sexpr::types::NodeId;
 
@@ -11,6 +11,9 @@ const MAX_RECURSIVE_FORMAT_DEPTH: usize = 256;
 enum TopLevelItem {
     Form {
         node_id: NodeId,
+        /// The last root node that belongs to this logical form. Metadata
+        /// descriptors and their target are separate parser nodes.
+        end_node_id: NodeId,
         /// Own-line comments emitted immediately above the form.
         leading: Vec<usize>,
         /// A comment trailing the form on the same source line, if any.
@@ -58,21 +61,35 @@ impl Formatter {
         let mut order: Vec<usize> = (0..comments.len()).collect();
         order.sort_by_key(|&index| comments[index].span.start().get());
 
+        let root_children = tree.root_children();
+        let mut node_index = 0usize;
         let mut cursor = 0usize;
         let mut items: Vec<TopLevelItem> = Vec::new();
 
-        for &node_id in tree.root_children() {
-            let node = tree.node(node_id);
-            let start = node.span.start().get();
-            let end = node.span.end().get();
+        while node_index < root_children.len() {
+            let node_id = root_children[node_index];
+            let start = tree.node(node_id).span.start().get();
+            let mut end_node_id = node_id;
 
+            while tree
+                .node(end_node_id)
+                .reader_prefixes
+                .iter()
+                .any(|prefix| matches!(prefix, crate::domain::sexpr::tree::ReaderPrefix::Metadata))
+                && node_index + 1 < root_children.len()
+            {
+                node_index += 1;
+                end_node_id = root_children[node_index];
+            }
+
+            let end = tree.node(end_node_id).span.end().get();
             let mut leading = Vec::new();
             while cursor < order.len() && comments[order[cursor]].span.start().get() < start {
                 leading.push(order[cursor]);
                 cursor += 1;
             }
 
-            let mut verbatim = false;
+            let mut verbatim = node_id != end_node_id;
             while cursor < order.len() && comments[order[cursor]].span.start().get() < end {
                 verbatim = true;
                 cursor += 1;
@@ -81,6 +98,7 @@ impl Formatter {
             let item_index = items.len();
             items.push(TopLevelItem::Form {
                 node_id,
+                end_node_id,
                 leading,
                 trailing: None,
                 verbatim,
@@ -98,6 +116,8 @@ impl Formatter {
                     cursor += 1;
                 }
             }
+
+            node_index += 1;
         }
 
         if cursor < order.len() {
@@ -112,6 +132,7 @@ impl Formatter {
         match item {
             TopLevelItem::Form {
                 node_id,
+                end_node_id,
                 leading,
                 trailing,
                 verbatim,
@@ -121,7 +142,9 @@ impl Formatter {
                     output.push('\n');
                 }
                 if *verbatim {
-                    output.push_str(&tree.source[tree.node(*node_id).span.as_range()]);
+                    let start = tree.node(*node_id).span.start().get();
+                    let end = tree.node(*end_node_id).span.end().get();
+                    output.push_str(&tree.source[start..end]);
                 } else {
                     self.format_node(tree, *node_id, 0, output);
                 }
@@ -163,7 +186,7 @@ impl Formatter {
                     output.push_str(node.span.slice(&tree.source));
                     return;
                 }
-                self.write_reader_prefixes(node, output);
+                self.write_reader_prefixes(tree, node, output);
                 let delimiter = self.list_delimiter(node);
                 output.push(delimiter.open());
                 output.push(delimiter.close());
@@ -177,7 +200,7 @@ impl Formatter {
                     output.push_str(node.span.slice(&tree.source));
                     return;
                 }
-                self.write_reader_prefixes(node, output);
+                self.write_reader_prefixes(tree, node, output);
                 if let Some(head) = self.head_text(tree, node_id) {
                     match self.style_for_head(head) {
                         ListStyle::Definition => {
@@ -309,8 +332,8 @@ impl Formatter {
                                 return None;
                             }
 
-                            for prefix in &node.reader_prefixes {
-                                push_bounded(&mut output, prefix.as_source())?;
+                            for span in &node.reader_prefix_spans {
+                                push_bounded(&mut output, span.slice(&tree.source))?;
                             }
                             let delimiter = self.list_delimiter(node);
                             push_char_bounded(&mut output, delimiter.open())?;
@@ -359,16 +382,23 @@ impl Formatter {
         })
     }
 
-    pub(super) fn write_reader_prefixes(&self, node: &Node, output: &mut String) {
-        for prefix in &node.reader_prefixes {
-            output.push_str(prefix.as_source());
+    pub(super) fn write_reader_prefixes(
+        &self,
+        tree: &SyntaxTree,
+        node: &Node,
+        output: &mut String,
+    ) {
+        for span in &node.reader_prefix_spans {
+            output.push_str(span.slice(&tree.source));
         }
     }
 
     pub(super) fn is_opaque_reader_form(&self, node: &Node) -> bool {
-        node.reader_prefixes
-            .iter()
-            .any(|prefix| matches!(prefix, ReaderPrefix::ReadEval))
+        node.opaque_reader_form
+            || node
+                .reader_prefixes
+                .iter()
+                .any(|prefix| prefix.is_opaque_reader_form())
     }
 
     pub(super) fn indent(&self, depth: usize) -> String {

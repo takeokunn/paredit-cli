@@ -67,7 +67,8 @@ pub(in crate::presentation::cli::refactor::workflow) fn build_refactor_preview(
         total_definitions += definition_count;
 
         let changed = rewritten != input.text;
-        let output_parse_ok = !changed || SyntaxTree::parse(&rewritten).is_ok();
+        let output_parse_ok =
+            !changed || SyntaxTree::parse_with_dialect(&rewritten, dialect).is_ok();
         let edit_count = edits.len();
         let preview = bounded_preview(&rewritten, request.max_preview_bytes);
         files.push(RefactorPreviewFile {

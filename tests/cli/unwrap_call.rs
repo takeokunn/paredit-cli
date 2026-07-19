@@ -6,6 +6,8 @@ fn cli_plans_unwrap_call_without_writing() {
     cmd.args([
         "refactor",
         "unwrap-call",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--function",
@@ -68,6 +70,8 @@ fn cli_rejects_unwrap_call_function_mismatch() {
     cmd.args([
         "refactor",
         "unwrap-call",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--function",
@@ -147,6 +151,8 @@ fn assert_unwrap_call_property(input: String) -> Result<(), TestCaseError> {
         .args([
             "refactor",
             "unwrap-call",
+            "--dialect",
+            "common-lisp",
             "--path",
             "0",
             "--function",

@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
 
 use crate::domain::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope, local_callable_scope_at_path,
+    common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
+    local_callable_scope_at_path,
 };
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::definition::{definition_shape, macro_expander_body_range};
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::call_identity::{call_reference_eq, is_local_call_bound};
 use crate::domain::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,
 };
@@ -73,12 +74,19 @@ pub(super) fn collect_wrap_explicit_call_sites(
             anyhow::bail!("call-path {path} is not in an executable reader context");
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
-        if is_local_callable_bound(&local_callables, function.as_str()) {
+        if is_local_call_bound(dialect, &local_callables, function.as_str()) {
             anyhow::bail!("call-path {path} is shadowed by a local callable named {function}");
         }
-        let site =
-            wrap_call_site_from_view(&view, input, path.to_string(), function, wrapper, template)
-                .with_context(|| format!("call-path {path} is not a call to {function}"))?;
+        let site = wrap_call_site_from_view(
+            &view,
+            dialect,
+            input,
+            path.to_string(),
+            function,
+            wrapper,
+            template,
+        )
+        .with_context(|| format!("call-path {path} is not a call to {function}"))?;
         if call_site_is_already_wrapped(tree, dialect, path, wrapper)? {
             skipped_already_wrapped.push(site);
         } else {
@@ -142,9 +150,14 @@ fn collect_wrap_call_sites_from_view(
     }
 
     let current_head = list_head(view);
-    if !is_local_callable_bound(local_callables, collection.function.as_str()) {
+    if !is_local_call_bound(
+        collection.dialect,
+        local_callables,
+        collection.function.as_str(),
+    ) {
         if let Some(site) = wrap_call_site_from_view(
             view,
+            collection.dialect,
             collection.input,
             path.to_string(),
             collection.function,
@@ -152,7 +165,7 @@ fn collect_wrap_call_sites_from_view(
             collection.template,
         ) {
             if parent_head.is_some_and(|head| {
-                common_lisp_symbol_reference_eq(head, collection.wrapper.as_str())
+                call_reference_eq(collection.dialect, head, collection.wrapper.as_str())
             }) {
                 collection.skipped_already_wrapped.push(site);
             } else if current_head
@@ -241,6 +254,6 @@ fn call_site_is_already_wrapped(
     let Some(head) = list_head(&parent) else {
         return Ok(false);
     };
-    Ok(common_lisp_symbol_reference_eq(head, wrapper.as_str())
+    Ok(call_reference_eq(dialect, head, wrapper.as_str())
         && definition_shape(dialect, &parent, head).is_none())
 }

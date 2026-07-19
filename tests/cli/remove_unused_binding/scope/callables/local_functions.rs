@@ -6,6 +6,8 @@ fn cli_plans_remove_unused_flet_binding_ignoring_definition_body_reference() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -30,6 +32,8 @@ fn cli_rejects_recursive_labels_binding() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",

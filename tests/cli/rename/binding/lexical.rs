@@ -6,6 +6,8 @@ fn cli_plans_binding_rename_without_shadowed_inner_binding() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--from",
@@ -33,6 +35,8 @@ fn cli_plans_let_star_binding_rename_through_later_binding_values() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -114,6 +118,8 @@ fn cli_plans_common_lisp_bare_let_binding_rename_without_touching_later_init() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -139,6 +145,8 @@ fn cli_plans_common_lisp_bare_let_star_binding_rename_through_later_init() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -164,6 +172,8 @@ fn cli_plans_outer_let_binding_rename_without_touching_inner_bare_binding() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

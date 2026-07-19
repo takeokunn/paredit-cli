@@ -24,7 +24,8 @@ pub struct MergeNestedFletPlan {
 }
 
 pub fn plan_merge_nested_flet(request: MergeNestedFletRequest<'_>) -> Result<MergeNestedFletPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    flet_composition::validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let plan = flet_composition::plan(DomainRequest {
         input: request.input,
@@ -40,4 +41,34 @@ pub fn plan_merge_nested_flet(request: MergeNestedFletRequest<'_>) -> Result<Mer
         rewritten: plan.rewritten,
         changed: plan.changed,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_dialect_before_parsing_and_uses_dialect_parser() {
+        let plan = plan_merge_nested_flet(MergeNestedFletRequest {
+            input: r"#\) (flet ((left () 1)) (flet ((right () 2)) (+ (left) (right))))",
+            dialect: Dialect::CommonLisp,
+            path: "1".parse().expect("path"),
+        })
+        .expect("Common Lisp");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten input");
+
+        for dialect in [Dialect::EmacsLisp, Dialect::Unknown] {
+            let error = plan_merge_nested_flet(MergeNestedFletRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert_eq!(
+                error.to_string(),
+                "merge-nested-flet supports only Common Lisp"
+            );
+        }
+    }
 }

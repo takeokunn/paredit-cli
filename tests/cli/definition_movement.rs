@@ -432,3 +432,129 @@ fn cli_writes_top_level_form_move_before_anchor() {
         .expect("anchor form should exist");
     assert!(moved_index < anchor_index);
 }
+
+#[test]
+fn cli_moves_common_lisp_character_literal_with_its_reader_policy() {
+    let dir = fresh_temp_dir("move-form-common-lisp-character");
+    let from_file = dir.join("source.lisp");
+    let to_file = dir.join("destination.lisp");
+    fs::write(
+        &from_file,
+        "(defparameter *keep* :ok)\n(defparameter *close* #\\))\n",
+    )
+    .expect("write Common Lisp source fixture");
+    fs::write(&to_file, "(defparameter *existing* :ok)\n")
+        .expect("write Common Lisp destination fixture");
+
+    paredit()
+        .args([
+            "refactor",
+            "move-form",
+            "--from-file",
+            from_file.to_str().unwrap(),
+            "--to-file",
+            to_file.to_str().unwrap(),
+            "--path",
+            "1",
+            "--write",
+        ])
+        .assert()
+        .success();
+
+    assert!(!fs::read_to_string(&from_file).unwrap().contains("*close*"));
+    assert!(
+        fs::read_to_string(&to_file)
+            .unwrap()
+            .contains("(defparameter *close* #\\))")
+    );
+}
+
+#[test]
+fn cli_inserts_emacs_lisp_character_literal_with_its_reader_policy() {
+    let dir = fresh_temp_dir("insert-top-level-emacs-lisp-character");
+    let file = dir.join("source.el");
+    fs::write(&file, "(defvar existing nil)\n").expect("write Emacs Lisp fixture");
+
+    paredit()
+        .args([
+            "refactor",
+            "insert-top-level",
+            "--file",
+            file.to_str().unwrap(),
+            "--with",
+            "(defconst close ?\\))",
+            "--write",
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        fs::read_to_string(&file)
+            .unwrap()
+            .contains("(defconst close ?\\))")
+    );
+}
+
+#[test]
+fn cli_moves_unknown_dialect_form_with_generic_reader_compatibility() {
+    let dir = fresh_temp_dir("move-form-unknown-dialect");
+    let from_file = dir.join("source.txt");
+    let to_file = dir.join("destination.txt");
+    fs::write(&from_file, "(keep #?value)\n(move #?other)\n")
+        .expect("write unknown-dialect source fixture");
+    fs::write(&to_file, "(existing #?value)\n").expect("write unknown-dialect destination fixture");
+
+    paredit()
+        .args([
+            "refactor",
+            "move-form",
+            "--from-file",
+            from_file.to_str().unwrap(),
+            "--to-file",
+            to_file.to_str().unwrap(),
+            "--path",
+            "1",
+            "--write",
+        ])
+        .assert()
+        .success();
+
+    assert!(!fs::read_to_string(&from_file).unwrap().contains("(move"));
+    assert!(
+        fs::read_to_string(&to_file)
+            .unwrap()
+            .contains("(move #?other)")
+    );
+}
+
+#[test]
+fn cli_does_not_inject_common_lisp_package_when_moving_definition_to_emacs_lisp() {
+    let dir = fresh_temp_dir("move-definition-common-lisp-to-emacs-lisp");
+    let from_file = dir.join("source.lisp");
+    let to_file = dir.join("destination.el");
+    fs::write(
+        &from_file,
+        "(in-package #:demo)\n(defun keep () :ok)\n(defun moved () :moved)\n",
+    )
+    .expect("write Common Lisp source fixture");
+    fs::write(&to_file, "(defvar close ?\\))\n").expect("write Emacs Lisp destination fixture");
+
+    paredit()
+        .args([
+            "refactor",
+            "move-definition",
+            "--from-file",
+            from_file.to_str().unwrap(),
+            "--to-file",
+            to_file.to_str().unwrap(),
+            "--path",
+            "2",
+            "--write",
+        ])
+        .assert()
+        .success();
+
+    let destination = fs::read_to_string(&to_file).expect("read Emacs Lisp destination");
+    assert!(destination.contains("(defun moved () :moved)"));
+    assert!(!destination.contains("in-package"));
+}

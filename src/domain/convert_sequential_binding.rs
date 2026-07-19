@@ -35,6 +35,13 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
+pub(crate) fn require_supported_dialect(dialect: Dialect, command: &str) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("{command} currently supports only Common Lisp");
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 enum Conversion {
     Do,
@@ -85,10 +92,8 @@ fn plan_conversion(
     conversion: Conversion,
 ) -> Result<ConvertSequentialBindingPlan> {
     let command = conversion.command();
-    if request.dialect != Dialect::CommonLisp {
-        bail!("{command} currently supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input)
+    require_supported_dialect(request.dialect, command)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .with_context(|| format!("{command} input is not a valid S-expression document"))?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
@@ -147,7 +152,7 @@ fn plan_conversion(
     }
     let head = &form.children[0];
     let rewritten = replace_span(request.input, head.span, conversion.target_head());
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .with_context(|| format!("{command} output is not a valid S-expression document"))?;
     Ok(ConvertSequentialBindingPlan {
         dialect: request.dialect,
@@ -271,15 +276,34 @@ mod tests {
     }
 
     #[test]
-    fn independent_bindings_parse_after_conversion() {
-        let input = "(do* ((x (first) (next-x)) (y (second) (next-y))) ((done-p x y) y) (work x))";
+    fn independent_bindings_preserve_reader_forms_and_validate_as_common_lisp() {
+        let input =
+            "(do* ((x (first) (next-x)) (y (second) (next-y))) ((done-p x y) y) (work x)) #\\)";
         let plan = plan_convert_do_star_to_do(request(input, Dialect::CommonLisp)).unwrap();
         assert_eq!(plan.binding_names.len(), 2);
-        SyntaxTree::parse(&plan.rewritten).unwrap();
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp).unwrap();
     }
 
     #[test]
-    fn rejects_dependency_duplicates_malformed_forms_and_other_dialects() {
+    fn unsupported_dialects_fail_before_parsing_input() {
+        for dialect in [
+            Dialect::EmacsLisp,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan_convert_do_star_to_do(request(")", dialect)).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "convert-do-star-to-do currently supports only Common Lisp"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_dependency_duplicates_and_malformed_forms() {
         assert!(
             plan_convert_do_star_to_do(request(
                 "(do* ((x 1) (y (+ x 1))) ((done-p)))",
@@ -300,10 +324,6 @@ mod tests {
                 Dialect::CommonLisp
             ))
             .is_err()
-        );
-        assert!(
-            plan_convert_do_star_to_do(request("(do* ((x 1)) ((done-p)))", Dialect::Clojure))
-                .is_err()
         );
     }
 }

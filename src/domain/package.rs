@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 
+use crate::domain::dialect::Dialect;
 use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
@@ -28,8 +29,18 @@ use sort_options::defpackage_option_sort_edits;
 pub use sort_options::PackageOptionSortOrder;
 pub use types::*;
 
+fn ensure_common_lisp_package_refactoring(dialect: Dialect) -> Result<()> {
+    anyhow::ensure!(
+        dialect == Dialect::CommonLisp,
+        "package refactoring currently supports only Common Lisp"
+    );
+    Ok(())
+}
+
 pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    ensure_common_lisp_package_refactoring(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edit =
         find_defpackage_export_edit(&tree, request.dialect, request.package, request.symbol)?;
@@ -38,7 +49,7 @@ pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
     } else {
         replace_span(request.input, edit.insertion_span, &edit.replacement)
     };
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("add-export output is not a valid S-expression document")?;
 
     Ok(AddExportPlan {
@@ -55,11 +66,13 @@ pub fn plan_add_export(request: AddExportRequest<'_>) -> Result<AddExportPlan> {
 }
 
 pub fn plan_rename_package(request: RenamePackageRequest<'_>) -> Result<RenamePackagePlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    ensure_common_lisp_package_refactoring(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let occurrences = package_rename_occurrences(&tree, request.dialect, request.from, request.to)?;
     let rewritten = rewrite_package_occurrences(request.input, &occurrences);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("rename-package output is not a valid S-expression document")?;
 
     Ok(RenamePackagePlan {
@@ -72,7 +85,9 @@ pub fn plan_rename_package(request: RenamePackageRequest<'_>) -> Result<RenamePa
 pub fn plan_sort_package_exports(
     request: SortPackageExportsRequest<'_>,
 ) -> Result<SortPackageExportsPlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    ensure_common_lisp_package_refactoring(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits =
         defpackage_export_sort_edits(request.input, &tree, request.dialect, request.package)?;
@@ -86,7 +101,7 @@ pub fn plan_sort_package_exports(
         })
         .collect::<Vec<_>>();
     let rewritten = rewrite_spans(request.input, &replacements);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("sort-package-exports output is not a valid S-expression document")?;
 
     let exports = edits
@@ -113,7 +128,9 @@ pub fn plan_sort_package_exports(
 pub fn plan_sort_package_options(
     request: SortPackageOptionsRequest<'_>,
 ) -> Result<SortPackageOptionsPlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    ensure_common_lisp_package_refactoring(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits = defpackage_option_sort_edits(
         request.input,
@@ -132,7 +149,7 @@ pub fn plan_sort_package_options(
         })
         .collect::<Vec<_>>();
     let rewritten = rewrite_spans(request.input, &replacements);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("sort-package-options output is not a valid S-expression document")?;
 
     let packages = edits
@@ -157,7 +174,9 @@ pub fn plan_sort_package_options(
 pub fn plan_merge_package_options(
     request: MergePackageOptionsRequest<'_>,
 ) -> Result<MergePackageOptionsPlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    ensure_common_lisp_package_refactoring(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let edits =
         defpackage_option_merge_edits(request.input, &tree, request.dialect, request.package)?;
@@ -178,7 +197,7 @@ pub fn plan_merge_package_options(
         })
         .collect::<Vec<_>>();
     let rewritten = rewrite_spans(request.input, &replacements);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("merge-package-options output is not a valid S-expression document")?;
 
     let merges = edits
@@ -213,3 +232,152 @@ pub fn plan_merge_package_options(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod dialect_tests {
+    use anyhow::Result;
+
+    use super::*;
+    use crate::domain::sexpr::SymbolName;
+
+    const VALID_INPUT: &str =
+        "(defpackage demo (:use cl) (:export z) (:export a))\n(in-package demo)\n";
+    const DIALECT_MATRIX: [(Dialect, bool); 7] = [
+        (Dialect::CommonLisp, true),
+        (Dialect::EmacsLisp, false),
+        (Dialect::Scheme, false),
+        (Dialect::Clojure, false),
+        (Dialect::Janet, false),
+        (Dialect::Fennel, false),
+        (Dialect::Unknown, false),
+    ];
+
+    #[derive(Clone, Copy, Debug)]
+    enum PackageOperation {
+        AddExport,
+        RenamePackage,
+        SortExports,
+        SortOptions,
+        MergeOptions,
+    }
+
+    impl PackageOperation {
+        fn run(self, input: &str, dialect: Dialect) -> Result<String> {
+            let package = SymbolName::new("demo").expect("valid package name");
+
+            match self {
+                Self::AddExport => {
+                    let symbol = SymbolName::new("z").expect("valid export name");
+                    plan_add_export(AddExportRequest {
+                        input,
+                        dialect,
+                        package: Some(&package),
+                        symbol: &symbol,
+                    })
+                    .map(|plan| plan.rewritten)
+                }
+                Self::RenamePackage => {
+                    let renamed = SymbolName::new("renamed").expect("valid package name");
+                    plan_rename_package(RenamePackageRequest {
+                        input,
+                        dialect,
+                        from: &package,
+                        to: &renamed,
+                    })
+                    .map(|plan| plan.rewritten)
+                }
+                Self::SortExports => plan_sort_package_exports(SortPackageExportsRequest {
+                    input,
+                    dialect,
+                    package: Some(&package),
+                })
+                .map(|plan| plan.rewritten),
+                Self::SortOptions => plan_sort_package_options(SortPackageOptionsRequest {
+                    input,
+                    dialect,
+                    package: Some(&package),
+                    order: PackageOptionSortOrder::Canonical,
+                })
+                .map(|plan| plan.rewritten),
+                Self::MergeOptions => plan_merge_package_options(MergePackageOptionsRequest {
+                    input,
+                    dialect,
+                    package: Some(&package),
+                })
+                .map(|plan| plan.rewritten),
+            }
+        }
+    }
+
+    const OPERATIONS: [PackageOperation; 5] = [
+        PackageOperation::AddExport,
+        PackageOperation::RenamePackage,
+        PackageOperation::SortExports,
+        PackageOperation::SortOptions,
+        PackageOperation::MergeOptions,
+    ];
+
+    fn assert_common_lisp_support_error(
+        operation: PackageOperation,
+        dialect: Dialect,
+        error: anyhow::Error,
+    ) {
+        assert!(
+            error.to_string().contains("supports only Common Lisp"),
+            "{operation:?} returned the wrong error for {dialect:?}: {error:#}"
+        );
+    }
+
+    #[test]
+    fn package_operations_follow_the_dialect_support_matrix() {
+        for operation in OPERATIONS {
+            for (dialect, supported) in DIALECT_MATRIX {
+                let result = operation.run(VALID_INPUT, dialect);
+
+                if supported {
+                    let rewritten = result.unwrap_or_else(|error| {
+                        panic!("{operation:?} should support {dialect:?}: {error:#}")
+                    });
+                    SyntaxTree::parse_with_dialect(&rewritten, dialect).unwrap_or_else(|error| {
+                        panic!("{operation:?} output should reparse with {dialect:?}: {error:#}")
+                    });
+                } else {
+                    assert_common_lisp_support_error(
+                        operation,
+                        dialect,
+                        result.expect_err("unsupported dialect should fail"),
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unsupported_package_operations_reject_before_parsing() {
+        for operation in OPERATIONS {
+            for (dialect, supported) in DIALECT_MATRIX {
+                if supported {
+                    continue;
+                }
+
+                let error = operation
+                    .run(")", dialect)
+                    .expect_err("unsupported dialect should fail before parsing");
+                assert_common_lisp_support_error(operation, dialect, error);
+            }
+        }
+    }
+
+    #[test]
+    fn rename_package_preserves_common_lisp_closing_paren_character_literal() {
+        let input = "#\\)\n(defpackage demo (:export old))\n(in-package demo)\n";
+        let rewritten = PackageOperation::RenamePackage
+            .run(input, Dialect::CommonLisp)
+            .expect("Common Lisp character literal should parse");
+
+        assert!(rewritten.starts_with("#\\)\n"));
+        assert!(rewritten.contains("(defpackage renamed"));
+        SyntaxTree::parse_with_dialect(&rewritten, Dialect::CommonLisp)
+            .expect("rewritten output should reparse as Common Lisp");
+    }
+}

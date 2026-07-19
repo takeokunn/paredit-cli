@@ -54,8 +54,8 @@ fn plan(request: RenameControlRequest<'_>, kind: ControlKind) -> Result<RenameCo
     }
     require_unqualified(request.from.as_str(), operation)?;
     require_unqualified(request.to.as_str(), operation)?;
-    let tree =
-        SyntaxTree::parse(request.input).context("input is not a valid S-expression document")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
@@ -86,7 +86,8 @@ fn plan(request: RenameControlRequest<'_>, kind: ControlKind) -> Result<RenameCo
     for span in edits {
         rewritten = replace_span(&rewritten, span, request.to.as_str());
     }
-    SyntaxTree::parse(&rewritten).context("renamed output is not a valid S-expression document")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("renamed output is not a valid S-expression document")?;
     Ok(RenameControlPlan {
         dialect: request.dialect,
         path: request.path,
@@ -309,15 +310,44 @@ fn contains_quoted_form(view: &ExpressionView) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn req<'a>(input: &'a str, from: &str, to: &str) -> RenameControlRequest<'a> {
+
+    const DIALECTS: [Dialect; 7] = [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Clojure,
+        Dialect::Janet,
+        Dialect::Fennel,
+        Dialect::Unknown,
+    ];
+
+    fn req_for_dialect<'a>(
+        input: &'a str,
+        dialect: Dialect,
+        from: &str,
+        to: &str,
+    ) -> RenameControlRequest<'a> {
         RenameControlRequest {
             input,
-            dialect: Dialect::CommonLisp,
+            dialect,
             path: "0".parse().unwrap(),
             from: from.parse().unwrap(),
             to: to.parse().unwrap(),
         }
     }
+
+    fn req<'a>(input: &'a str, from: &str, to: &str) -> RenameControlRequest<'a> {
+        req_for_dialect(input, Dialect::CommonLisp, from, to)
+    }
+
+    fn assert_support_error(result: Result<RenameControlPlan>, operation: &str) {
+        let error = result.expect_err("unsupported dialect must fail");
+        assert_eq!(
+            error.to_string(),
+            format!("{operation} supports only Common Lisp")
+        );
+    }
+
     #[test]
     fn renames_block_references_but_not_shadowed_ones() {
         let p = plan_rename_block(req(
@@ -331,10 +361,12 @@ mod tests {
             "(block done (return-from done 1) (block out (return-from out 2)))"
         );
     }
+
     #[test]
     fn rejects_block_capture() {
         assert!(plan_rename_block(req("(block out (return-from done 1))", "out", "done")).is_err());
     }
+
     #[test]
     fn renames_tag_and_go_but_not_shadowed_go() {
         let p = plan_rename_tag(req(
@@ -348,8 +380,64 @@ mod tests {
             "(tagbody next (go next) (tagbody start (go start)))"
         );
     }
+
     #[test]
     fn rejects_duplicate_tags() {
         assert!(plan_rename_tag(req("(tagbody x x (go x))", "x", "y")).is_err());
+    }
+
+    #[test]
+    fn support_matrix_is_common_lisp_only_for_both_operations() {
+        for dialect in DIALECTS {
+            let block = plan_rename_block(req_for_dialect(
+                "(block out (return-from out 1))",
+                dialect,
+                "out",
+                "done",
+            ));
+            let tag = plan_rename_tag(req_for_dialect(
+                "(tagbody start (go start))",
+                dialect,
+                "start",
+                "next",
+            ));
+            if dialect == Dialect::CommonLisp {
+                assert!(block.is_ok(), "rename-block must support {dialect:?}");
+                assert!(tag.is_ok(), "rename-tag must support {dialect:?}");
+            } else {
+                assert_support_error(block, "rename-block");
+                assert_support_error(tag, "rename-tag");
+            }
+        }
+    }
+
+    #[test]
+    fn unsupported_dialect_gate_precedes_parsing_for_both_operations() {
+        for dialect in DIALECTS
+            .into_iter()
+            .filter(|dialect| *dialect != Dialect::CommonLisp)
+        {
+            assert_support_error(
+                plan_rename_block(req_for_dialect(")", dialect, "out", "done")),
+                "rename-block",
+            );
+            assert_support_error(
+                plan_rename_tag(req_for_dialect(")", dialect, "start", "next")),
+                "rename-tag",
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_common_lisp_delimiter_character_literals() {
+        let plan = plan_rename_block(req(
+            "(block out #\\) (return-from out #\\)))",
+            "out",
+            "done",
+        ))
+        .expect("rename block containing character literals");
+        assert_eq!(plan.rewritten, "(block done #\\) (return-from done #\\)))");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten output must parse with the request dialect");
     }
 }

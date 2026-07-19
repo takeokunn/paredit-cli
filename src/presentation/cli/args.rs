@@ -44,6 +44,9 @@ pub(super) struct RepairArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
     pub(super) file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
     /// Write the repaired document back to --file instead of stdout.
     #[arg(long)]
     pub(super) write: bool,
@@ -57,6 +60,9 @@ pub(crate) struct TargetArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
     pub(super) file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
     /// Select by child index path, for example 0.2.1.
     #[arg(long, conflicts_with = "at")]
     pub(super) path: Option<Path>,
@@ -84,6 +90,9 @@ pub(super) struct ReplaceArgs {
     /// Input file. Reads stdin when omitted.
     #[arg(short, long)]
     pub(super) file: Option<PathBuf>,
+    /// Override extension-based dialect detection.
+    #[arg(long)]
+    pub(super) dialect: Option<DialectArg>,
     /// Select by child index path, for example 0.2.1.
     #[arg(long, conflicts_with = "at")]
     pub(super) path: Option<Path>,

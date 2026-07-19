@@ -6,6 +6,8 @@ fn cli_plans_loop_for_in_binding_rename_without_touching_source() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -31,6 +33,8 @@ fn cli_plans_loop_with_binding_rename_without_touching_init() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -56,6 +60,8 @@ fn cli_plans_loop_destructuring_binding_rename_without_touching_source() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -81,6 +87,8 @@ fn cli_plans_outer_binding_rename_without_touching_loop_shadow() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -106,6 +114,8 @@ fn cli_plans_outer_binding_rename_without_touching_loop_destructuring_shadow() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

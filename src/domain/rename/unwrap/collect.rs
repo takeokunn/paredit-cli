@@ -1,12 +1,13 @@
 use anyhow::Result;
 
 use crate::domain::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope, local_callable_names, local_callable_scope_at_path,
+    common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
+    local_callable_names, local_callable_scope_at_path,
 };
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::definition::macro_expander_body_range;
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::call_identity::is_local_call_bound;
 use crate::domain::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,
 };
@@ -61,7 +62,7 @@ pub(super) fn collect_unwrap_explicit_call_sites(
             anyhow::bail!("call-path {path} is not in an executable reader context");
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
-        if is_local_callable_bound(&local_callables, function.as_str()) {
+        if is_local_call_bound(dialect, &local_callables, function.as_str()) {
             anyhow::bail!("call-path {path} is shadowed by a local callable named {function}");
         }
         match unwrap_call_site_from_view(
@@ -216,7 +217,8 @@ impl<'a> UnwrapCollection<'a> {
                         continue;
                     }
 
-                    if !is_local_callable_bound(&local_callables, self.function.as_str()) {
+                    if !is_local_call_bound(self.dialect, &local_callables, self.function.as_str())
+                    {
                         let materialized_paths = &mut self.traversal_stats.materialized_paths;
                         match unwrap_call_site_from_view(
                             view,
@@ -386,7 +388,8 @@ mod tests {
         let mut input = "(".repeat(DEPTH);
         input.push_str("leaf");
         input.push_str(&")".repeat(DEPTH));
-        let tree = SyntaxTree::parse(&input).expect("deep expression parses");
+        let tree = SyntaxTree::parse_with_dialect(&input, Dialect::CommonLisp)
+            .expect("deep expression parses");
         let view = tree
             .select_path(&Path::root_child(0))
             .expect("root expression")

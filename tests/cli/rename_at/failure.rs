@@ -1,29 +1,42 @@
 #[test]
 fn cli_rename_at_rejects_non_common_lisp_dialects_without_writing() {
-    let input = "(let ((value (lambda () 1))) (list value (value)))\n";
-    let dir = fresh_temp_dir("rename-at-scheme-rejected");
-    let file = dir.join("input.scm");
-    fs::write(&file, input).expect("write non-Common-Lisp rename-at fixture");
+    let input = "(";
+    for (dialect, extension) in [
+        ("emacs-lisp", "el"),
+        ("scheme", "scm"),
+        ("clojure", "clj"),
+        ("janet", "janet"),
+        ("fennel", "fnl"),
+    ] {
+        let dir = fresh_temp_dir(&format!("rename-at-{dialect}-rejected"));
+        let file = dir.join(format!("input.{extension}"));
+        fs::write(&file, input).expect("write malformed non-Common-Lisp rename-at fixture");
 
-    let mut cmd = paredit();
-    cmd.arg("refactor")
-        .arg("rename-at")
-        .arg("--file")
-        .arg(&file)
-        .arg("--at")
-        .arg(byte_offset(input, "value (lambda").to_string())
-        .arg("--to")
-        .arg("thunk")
-        .arg("--dialect")
-        .arg("scheme")
-        .arg("--write")
-        .assert()
-        .failure();
+        let mut cmd = paredit();
+        cmd.arg("refactor")
+            .arg("rename-at")
+            .arg("--file")
+            .arg(&file)
+            .arg("--at")
+            .arg("0")
+            .arg("--to")
+            .arg("thunk")
+            .arg("--dialect")
+            .arg(dialect)
+            .arg("--write")
+            .assert()
+            .failure()
+            .stderr(
+                predicate::str::contains("rename-at currently supports Common Lisp only")
+                    .and(predicate::str::contains("failed to parse input").not()),
+            );
 
-    assert_eq!(
-        fs::read_to_string(file).expect("read unchanged non-Common-Lisp fixture"),
-        input
-    );
+        assert_eq!(
+            fs::read_to_string(&file).expect("read unchanged non-Common-Lisp fixture"),
+            input,
+            "dialect: {dialect}"
+        );
+    }
 }
 
 #[test]

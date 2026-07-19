@@ -23,7 +23,8 @@ fn plans_private_unused_definition_removal() {
     assert_eq!(plan.removal_count, 1);
     assert_eq!(plan.skipped_count, 0);
     assert!(!plan.files[0].rewritten.contains(stale_form));
-    SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
+    SyntaxTree::parse_with_dialect(&plan.files[0].rewritten, plan.files[0].dialect)
+        .expect("rewrite must stay parseable");
 }
 
 #[test]
@@ -215,7 +216,8 @@ fn ignores_vector_literals_that_do_not_overlap_the_removal_span() {
     assert_eq!(plan.removal_count, 1);
     assert!(!plan.files[0].rewritten.contains(stale_form));
     assert!(plan.files[0].rewritten.contains(vector_form));
-    SyntaxTree::parse(&plan.files[0].rewritten).expect("rewrite must stay parseable");
+    SyntaxTree::parse_with_dialect(&plan.files[0].rewritten, plan.files[0].dialect)
+        .expect("rewrite must stay parseable");
 }
 
 #[test]
@@ -249,4 +251,165 @@ fn keeps_definitions_referenced_from_another_input_file() {
     assert_eq!(plan.skipped_count, 0);
     assert!(plan.files[0].rewritten.contains(shared_form));
     assert_eq!(plan.files[1].rewritten, consumer_text);
+}
+
+#[test]
+fn removes_unused_definitions_for_every_known_dialect_and_reparses_outputs() {
+    let fixtures = [
+        (
+            "common-lisp.lisp",
+            Dialect::CommonLisp,
+            "(defun cl-unused () 1)\n",
+            "(defun cl-unused () 1)",
+            "defun",
+            "cl-unused",
+        ),
+        (
+            "emacs-lisp.el",
+            Dialect::EmacsLisp,
+            "(defun el-unused () 1)\n",
+            "(defun el-unused () 1)",
+            "defun",
+            "el-unused",
+        ),
+        (
+            "scheme.scm",
+            Dialect::Scheme,
+            "(define scheme-unused (lambda () 1))\n",
+            "(define scheme-unused (lambda () 1))",
+            "define",
+            "scheme-unused",
+        ),
+        (
+            "clojure.clj",
+            Dialect::Clojure,
+            "(defn clj-unused [] 1)\n",
+            "(defn clj-unused [] 1)",
+            "defn",
+            "clj-unused",
+        ),
+        (
+            "janet.janet",
+            Dialect::Janet,
+            "(defn janet-unused [] 1)\n",
+            "(defn janet-unused [] 1)",
+            "defn",
+            "janet-unused",
+        ),
+        (
+            "fennel.fnl",
+            Dialect::Fennel,
+            "(fn fennel-unused [] 1)\n",
+            "(fn fennel-unused [] 1)",
+            "fn",
+            "fennel-unused",
+        ),
+    ];
+    let files = fixtures
+        .iter()
+        .map(|(path, dialect, text, form, head, name)| {
+            let mut item = definition(text, form, name, DefinitionCategory::Function);
+            item.head = (*head).to_owned();
+            item.package = None;
+            file_with_dialect(PathBuf::from(path), *dialect, None, text, vec![item])
+        })
+        .collect();
+    let request = RemoveUnusedDefinitionsRequest {
+        files,
+        package_definitions: Vec::new(),
+        include_protected: false,
+        include_exported: false,
+    };
+
+    let plan = plan_remove_unused_definitions(request).expect("plan should build");
+
+    assert_eq!(plan.candidate_count, fixtures.len());
+    assert_eq!(plan.removal_count, fixtures.len());
+    assert_eq!(plan.skipped_count, 0);
+    for ((_, dialect, _, form, _, _), file) in fixtures.iter().zip(&plan.files) {
+        assert_eq!(file.dialect, *dialect);
+        assert!(!file.rewritten.contains(form));
+        SyntaxTree::parse_with_dialect(&file.rewritten, file.dialect)
+            .expect("rewritten fixture must parse with its dialect");
+    }
+}
+
+#[test]
+fn uses_the_input_dialect_for_reader_syntax_during_removal() {
+    let text = "(defun el-reader () [?\\)])\n";
+    let form = "(defun el-reader () [?\\)])";
+    assert!(SyntaxTree::parse_with_dialect(text, Dialect::EmacsLisp).is_ok());
+    assert!(SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).is_err());
+    let mut item = definition(text, form, "el-reader", DefinitionCategory::Function);
+    item.package = None;
+    let request = RemoveUnusedDefinitionsRequest {
+        files: vec![file_with_dialect(
+            PathBuf::from("reader.el"),
+            Dialect::EmacsLisp,
+            None,
+            text,
+            vec![item],
+        )],
+        package_definitions: Vec::new(),
+        include_protected: false,
+        include_exported: false,
+    };
+
+    let plan = plan_remove_unused_definitions(request).expect("plan should build");
+
+    assert_eq!(plan.removal_count, 1);
+    assert!(!plan.files[0].rewritten.contains(form));
+}
+
+#[test]
+fn common_lisp_symbol_matching_is_package_aware_but_scheme_is_exact() {
+    let common_lisp_text = "(defun Foo () 1)\n(pkg:foo)\n";
+    let common_lisp_form = "(defun Foo () 1)";
+    let common_lisp_request = RemoveUnusedDefinitionsRequest {
+        files: vec![file_with_dialect(
+            PathBuf::from("symbols.lisp"),
+            Dialect::CommonLisp,
+            Some("app"),
+            common_lisp_text,
+            vec![definition(
+                common_lisp_text,
+                common_lisp_form,
+                "Foo",
+                DefinitionCategory::Function,
+            )],
+        )],
+        package_definitions: Vec::new(),
+        include_protected: false,
+        include_exported: false,
+    };
+    let scheme_text = "(define Foo (lambda () 1))\n(pkg:foo)\n";
+    let scheme_form = "(define Foo (lambda () 1))";
+    let mut scheme_definition = definition(
+        scheme_text,
+        scheme_form,
+        "Foo",
+        DefinitionCategory::Function,
+    );
+    scheme_definition.head = "define".to_owned();
+    scheme_definition.package = None;
+    let scheme_request = RemoveUnusedDefinitionsRequest {
+        files: vec![file_with_dialect(
+            PathBuf::from("symbols.scm"),
+            Dialect::Scheme,
+            None,
+            scheme_text,
+            vec![scheme_definition],
+        )],
+        package_definitions: Vec::new(),
+        include_protected: false,
+        include_exported: false,
+    };
+
+    let common_lisp_plan =
+        plan_remove_unused_definitions(common_lisp_request).expect("plan should build");
+    let scheme_plan = plan_remove_unused_definitions(scheme_request).expect("plan should build");
+
+    assert_eq!(common_lisp_plan.candidate_count, 0);
+    assert_eq!(scheme_plan.candidate_count, 1);
+    assert_eq!(scheme_plan.removal_count, 1);
 }

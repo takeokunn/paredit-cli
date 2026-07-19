@@ -1,16 +1,16 @@
 use anyhow::Result;
 
 use crate::domain::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope,
+    common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
 };
-use crate::domain::common_lisp::{CommonLispLocalCallableForm, common_lisp_symbol_reference_eq};
+use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
     ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
 };
 
 use super::super::syntax::{list_head, spans_overlap};
+use super::inline_function_symbol_reference_eq;
 
 struct InlineCallTraversal<'a> {
     dialect: Dialect,
@@ -70,9 +70,17 @@ fn collect_function_call_paths(
         && view.delimiter == Some(Delimiter::Paren)
         && !spans_overlap(context.definition_span, view.span)
         && list_head(view).is_some_and(|head| {
-            common_lisp_symbol_reference_eq(head, context.function_name.as_str())
+            inline_function_symbol_reference_eq(
+                context.dialect,
+                head,
+                context.function_name.as_str(),
+            )
         })
-        && !is_local_callable_bound(local_callables, context.function_name.as_str())
+        && !is_inline_function_local_callable_bound(
+            context.dialect,
+            local_callables,
+            context.function_name.as_str(),
+        )
     {
         output.push(path.clone());
     }
@@ -80,6 +88,12 @@ fn collect_function_call_paths(
     for (index, child) in view.children.iter().enumerate() {
         collect_function_call_paths(child, path.child(index), context, local_callables, output);
     }
+}
+
+fn is_inline_function_local_callable_bound(dialect: Dialect, scope: &[String], head: &str) -> bool {
+    scope
+        .iter()
+        .any(|name| inline_function_symbol_reference_eq(dialect, name, head))
 }
 
 fn collect_local_callable_function_call_paths(

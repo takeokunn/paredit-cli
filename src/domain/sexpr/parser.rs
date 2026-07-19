@@ -1,12 +1,17 @@
 use thiserror::Error;
 
+use crate::domain::dialect::Dialect;
+
+use super::reader_policy::{DialectReaderPolicy, ReaderMacro};
 use super::tree::{Comment, Node, NodeKind, ReaderPrefix, SyntaxTree};
-use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId, is_symbol_boundary};
+use super::types::{ByteOffset, ByteSpan, Delimiter, NodeId};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParseError {
     #[error("unexpected closing delimiter '{delimiter}' at byte {position}")]
     UnexpectedClose { delimiter: char, position: usize },
+    #[error("unsupported reader dispatch '{dispatch}' at byte {position}")]
+    UnsupportedReaderDispatch { dispatch: String, position: usize },
     #[error("mismatched closing delimiter '{found}' at byte {position}; expected '{expected}'")]
     MismatchedClose {
         found: char,
@@ -40,6 +45,7 @@ pub(in crate::domain::sexpr) struct Parser<'a> {
     nodes: Vec<Node>,
     stack: Vec<NodeId>,
     comments: Vec<Comment>,
+    policy: DialectReaderPolicy,
     /// Nesting depth of `#;` datum comments currently being skipped. While
     /// positive, inner trivia is folded into the enclosing datum comment span
     /// instead of being recorded as separate comments.
@@ -49,7 +55,7 @@ pub(in crate::domain::sexpr) struct Parser<'a> {
 #[derive(Debug, Clone, Copy)]
 struct PrefixToken {
     kind: ReaderPrefix,
-    start: ByteOffset,
+    span: ByteSpan,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,16 +71,22 @@ enum SkipFrame {
 
 impl<'a> Parser<'a> {
     pub(in crate::domain::sexpr) fn new(input: &'a str) -> Self {
+        Self::with_dialect(input, Dialect::Unknown)
+    }
+
+    pub(in crate::domain::sexpr) fn with_dialect(input: &'a str, dialect: Dialect) -> Self {
         let root = Node {
             kind: NodeKind::Root,
             delimiter: None,
             reader_prefixes: Vec::new(),
+            reader_prefix_spans: Vec::new(),
             parent: None,
             children: Vec::new(),
             span: ByteSpan::new(ByteOffset::new(0), ByteOffset::new(input.len())),
             open: None,
             close: None,
             symbol_offset: 0,
+            opaque_reader_form: false,
         };
         Self {
             input,
@@ -83,6 +95,7 @@ impl<'a> Parser<'a> {
             nodes: vec![root],
             stack: vec![NodeId::ROOT],
             comments: Vec::new(),
+            policy: DialectReaderPolicy::new(dialect),
             suppress_depth: 0,
         }
     }
@@ -136,7 +149,9 @@ impl<'a> Parser<'a> {
 
     fn skip_trivia(&mut self) -> std::result::Result<(), ParseError> {
         loop {
-            while self.pos.get() < self.bytes.len() && self.current_byte().is_ascii_whitespace() {
+            while self.pos.get() < self.bytes.len()
+                && self.policy.is_whitespace(self.current_byte())
+            {
                 self.advance();
             }
             if self.pos.get() < self.bytes.len() && self.current_byte_is_block_comment() {
@@ -145,13 +160,16 @@ impl<'a> Parser<'a> {
                 self.record_comment(start, self.pos);
                 continue;
             }
-            if self.pos.get() < self.bytes.len() && self.current_byte() == b';' {
-                let start = self.pos;
-                while self.pos.get() < self.bytes.len() && self.current_byte() != b'\n' {
-                    self.advance();
+            if self.pos.get() < self.bytes.len() {
+                if let Some(width) = self.policy.line_comment_width(self.bytes, self.pos.get()) {
+                    let start = self.pos;
+                    self.advance_by(width);
+                    while self.pos.get() < self.bytes.len() && self.current_byte() != b'\n' {
+                        self.advance();
+                    }
+                    self.record_comment(start, self.pos);
+                    continue;
                 }
-                self.record_comment(start, self.pos);
-                continue;
             }
             break;
         }
@@ -177,10 +195,14 @@ impl<'a> Parser<'a> {
     fn is_line_start(&self, start: usize) -> bool {
         let mut index = start;
         while index > 0 {
-            match self.bytes[index - 1] {
-                b'\n' => return true,
-                b' ' | b'\t' | b'\r' | b'\x0c' => index -= 1,
-                _ => return false,
+            let byte = self.bytes[index - 1];
+            if byte == b'\n' {
+                return true;
+            }
+            if self.policy.is_whitespace(byte) {
+                index -= 1;
+            } else {
+                return false;
             }
         }
         true
@@ -192,7 +214,7 @@ impl<'a> Parser<'a> {
             return;
         };
         let id = NodeId::new(self.nodes.len());
-        let Some(delimiter) = Delimiter::from_open(self.current_byte()) else {
+        let Some(delimiter) = self.policy.delimiter_from_open(self.current_byte()) else {
             debug_assert!(
                 false,
                 "open_list_with_prefixes called on non-opening delimiter"
@@ -201,18 +223,22 @@ impl<'a> Parser<'a> {
         };
         let start = prefixes
             .first()
-            .map(|prefix| prefix.start)
+            .map(|prefix| prefix.span.start())
             .unwrap_or(self.pos);
+        let reader_prefixes = prefixes.iter().map(|prefix| prefix.kind).collect();
+        let reader_prefix_spans = prefixes.iter().map(|prefix| prefix.span).collect();
         self.nodes.push(Node {
             kind: NodeKind::List,
             delimiter: Some(delimiter),
-            reader_prefixes: prefixes.into_iter().map(|prefix| prefix.kind).collect(),
+            reader_prefixes,
+            reader_prefix_spans,
             parent: Some(parent),
             children: Vec::new(),
             span: ByteSpan::new(start, ByteOffset::new(self.pos.get() + 1)),
             open: Some(self.pos),
             close: None,
             symbol_offset: 0,
+            opaque_reader_form: false,
         });
         self.nodes[parent.get()].children.push(id);
         self.stack.push(id);
@@ -220,7 +246,7 @@ impl<'a> Parser<'a> {
     }
 
     fn close_list(&mut self) -> std::result::Result<(), ParseError> {
-        let Some(delimiter) = Delimiter::from_close(self.current_byte()) else {
+        let Some(delimiter) = self.policy.delimiter_from_close(self.current_byte()) else {
             debug_assert!(false, "close_list called on non-closing delimiter");
             return Ok(());
         };
@@ -294,29 +320,54 @@ impl<'a> Parser<'a> {
         prefixes: Vec<PrefixToken>,
     ) -> std::result::Result<(), ParseError> {
         let start = self.pos;
-        if self.current_byte_is_feature_dispatch() {
-            self.advance();
-            self.advance();
+        if self.policy.is_legacy()
+            && matches!(
+                self.policy
+                    .classify_reader_macro(self.bytes, self.pos.get()),
+                Some(ReaderMacro::MultiDatum { .. })
+            )
+        {
+            self.advance_by(2);
             self.push_atom(prefixes, start, self.pos);
             return Ok(());
         }
+        self.consume_atom_body()?;
+        self.push_atom(prefixes, start, self.pos);
+        Ok(())
+    }
+
+    fn consume_atom_body(&mut self) -> std::result::Result<(), ParseError> {
+        self.consume_character_literal();
         while self.pos.get() < self.bytes.len() {
             let byte = self.current_byte();
-            if byte == b'\\' {
+            if self.policy.supports_symbol_escapes() && byte == b'\\' {
                 self.consume_single_escape()?;
                 continue;
             }
-            if byte == b'|' {
+            if self.policy.supports_symbol_escapes() && byte == b'|' {
                 self.consume_multiple_escape()?;
                 continue;
             }
-            if is_symbol_boundary(byte) {
+            if self.policy.is_atom_boundary(self.bytes, self.pos.get()) {
                 break;
             }
             self.advance();
         }
-        self.push_atom(prefixes, start, self.pos);
         Ok(())
+    }
+
+    fn consume_character_literal(&mut self) {
+        let Some(prefix_width) = self
+            .policy
+            .character_literal_prefix_width(self.bytes, self.pos.get())
+        else {
+            return;
+        };
+        self.advance_by(prefix_width);
+        let Some(character) = self.input[self.pos.get()..].chars().next() else {
+            return;
+        };
+        self.advance_by(character.len_utf8());
     }
 
     /// Consumes a Lisp single-escape (`\`) and the following character literally.
@@ -365,30 +416,65 @@ impl<'a> Parser<'a> {
             return;
         };
         let id = NodeId::new(self.nodes.len());
-        let span_start = prefixes.first().map(|prefix| prefix.start).unwrap_or(start);
+        let span_start = prefixes
+            .first()
+            .map(|prefix| prefix.span.start())
+            .unwrap_or(start);
         // `start` is the position after `consume_reader_prefixes` already ran
         // `skip_trivia()`, so this is the true start of the atom's own
         // content even when whitespace or a comment separates a reader
         // prefix from what it prefixes (`#' foo` is valid, if unusual, CL
         // syntax).
         let symbol_offset = start.get() - span_start.get();
+        let reader_prefixes = prefixes.iter().map(|prefix| prefix.kind).collect();
+        let reader_prefix_spans = prefixes.iter().map(|prefix| prefix.span).collect();
         self.nodes.push(Node {
             kind: NodeKind::Atom,
             delimiter: None,
-            reader_prefixes: prefixes.into_iter().map(|prefix| prefix.kind).collect(),
+            reader_prefixes,
+            reader_prefix_spans,
             parent: Some(parent),
             children: Vec::new(),
             span: ByteSpan::new(span_start, end),
             open: None,
             close: None,
             symbol_offset,
+            opaque_reader_form: false,
+        });
+        self.nodes[parent.get()].children.push(id);
+    }
+
+    fn push_opaque_reader_form(&mut self, start: ByteOffset, end: ByteOffset) {
+        let Some(&parent) = self.stack.last() else {
+            debug_assert!(
+                false,
+                "parser stack unexpectedly empty when pushing reader form"
+            );
+            return;
+        };
+        let id = NodeId::new(self.nodes.len());
+        self.nodes.push(Node {
+            kind: NodeKind::Atom,
+            delimiter: None,
+            reader_prefixes: Vec::new(),
+            reader_prefix_spans: Vec::new(),
+            parent: Some(parent),
+            children: Vec::new(),
+            span: ByteSpan::new(start, end),
+            open: None,
+            close: None,
+            symbol_offset: 0,
+            opaque_reader_form: true,
         });
         self.nodes[parent.get()].children.push(id);
     }
 
     fn form(&mut self) -> std::result::Result<(), ParseError> {
-        if self.current_byte_is_reader_comment() {
-            self.skip_reader_comment()?;
+        if let Some(ReaderMacro::Discard { width }) = self
+            .policy
+            .classify_reader_macro(self.bytes, self.pos.get())
+        {
+            self.skip_reader_comment(width)?;
             return Ok(());
         }
         let mut prefixes = Vec::new();
@@ -397,22 +483,48 @@ impl<'a> Parser<'a> {
             if self.pos.get() >= self.bytes.len() {
                 break;
             }
-            if !self.current_byte_is_reader_comment() {
-                break;
+            match self
+                .policy
+                .classify_reader_macro(self.bytes, self.pos.get())
+            {
+                Some(ReaderMacro::Discard { width }) => {
+                    self.skip_reader_comment(width)?;
+                    self.skip_trivia()?;
+                }
+                _ => break,
             }
-            self.skip_reader_comment()?;
-            self.skip_trivia()?;
         }
         if self.pos.get() >= self.bytes.len() {
             let missing_at = prefixes
                 .first()
-                .map(|prefix| prefix.start.get())
+                .map(|prefix| prefix.span.start().get())
                 .unwrap_or(self.pos.get());
             return Err(ParseError::MissingReaderForm(missing_at));
         }
+        match self
+            .policy
+            .classify_reader_macro(self.bytes, self.pos.get())
+        {
+            Some(ReaderMacro::MultiDatum {
+                width,
+                payload_forms,
+            }) if !self.policy.is_legacy() => {
+                self.opaque_reader_form_with_prefixes(prefixes, width, payload_forms)?;
+                return Ok(());
+            }
+            Some(ReaderMacro::UnsupportedDispatch { width }) => {
+                return Err(self.unsupported_reader_error(width));
+            }
+            _ => {}
+        }
         match self.current_byte() {
-            byte if Delimiter::from_open(byte).is_some() => self.open_list_with_prefixes(prefixes),
-            byte if Delimiter::from_close(byte).is_some() => self.close_list()?,
+            byte if self.policy.delimiter_from_open(byte).is_some() => {
+                self.open_list_with_prefixes(prefixes)
+            }
+            byte if self.policy.delimiter_from_close(byte).is_some() => self.close_list()?,
+            byte if DialectReaderPolicy::is_raw_delimiter(byte) => {
+                return Err(self.raw_delimiter_error());
+            }
             b'"' => self.atom_string_with_prefixes(prefixes)?,
             _ => self.atom_with_prefixes(prefixes)?,
         }
@@ -421,10 +533,19 @@ impl<'a> Parser<'a> {
 
     fn consume_reader_prefixes(&mut self) -> std::result::Result<Vec<PrefixToken>, ParseError> {
         let mut prefixes = Vec::new();
-        while let Some(kind) = self.current_reader_prefix() {
+        while let Some(ReaderMacro::Prefix {
+            semantic: kind,
+            width,
+        }) = self
+            .policy
+            .classify_reader_macro(self.bytes, self.pos.get())
+        {
             let start = self.pos;
-            self.advance_reader_prefix(kind);
-            prefixes.push(PrefixToken { kind, start });
+            self.advance_by(width);
+            prefixes.push(PrefixToken {
+                kind,
+                span: ByteSpan::new(start, self.pos),
+            });
             self.skip_trivia()?;
             if self.pos.get() >= self.bytes.len() {
                 break;
@@ -433,16 +554,35 @@ impl<'a> Parser<'a> {
         Ok(prefixes)
     }
 
-    fn skip_reader_comment(&mut self) -> std::result::Result<(), ParseError> {
+    fn skip_reader_comment(&mut self, width: usize) -> std::result::Result<(), ParseError> {
         let start = self.pos;
-        self.advance();
-        self.advance();
+        self.advance_by(width);
         self.suppress_depth += 1;
         let result = self.skip_form(start.get());
         self.suppress_depth -= 1;
         result?;
         // Only the outermost datum comment records; nested `#;`/`#_` are folded in.
         self.record_comment(start, self.pos);
+        Ok(())
+    }
+
+    fn opaque_reader_form_with_prefixes(
+        &mut self,
+        prefixes: Vec<PrefixToken>,
+        width: usize,
+        payload_forms: usize,
+    ) -> std::result::Result<(), ParseError> {
+        let start = prefixes
+            .first()
+            .map(|prefix| prefix.span.start())
+            .unwrap_or(self.pos);
+        let reader_start = self.pos.get();
+        self.advance_by(width);
+        self.suppress_depth += 1;
+        let result = (0..payload_forms).try_for_each(|_| self.skip_form(reader_start));
+        self.suppress_depth -= 1;
+        result?;
+        self.push_opaque_reader_form(start, self.pos);
         Ok(())
     }
 
@@ -458,9 +598,15 @@ impl<'a> Parser<'a> {
                     }
 
                     let mut prefix_start = None;
-                    while let Some(prefix) = self.current_reader_prefix() {
+                    let mut additional_discarded_forms = 0;
+                    while let Some(ReaderMacro::Prefix { semantic, width }) = self
+                        .policy
+                        .classify_reader_macro(self.bytes, self.pos.get())
+                    {
                         prefix_start.get_or_insert(self.pos.get());
-                        self.advance_reader_prefix(prefix);
+                        additional_discarded_forms +=
+                            self.policy.additional_discarded_forms_for_prefix(semantic);
+                        self.advance_by(width);
                         self.skip_trivia()?;
                         if self.pos.get() >= self.bytes.len() {
                             return Err(ParseError::MissingReaderForm(
@@ -469,55 +615,68 @@ impl<'a> Parser<'a> {
                         }
                     }
 
-                    if self.current_byte_is_reader_comment() {
-                        let comment_start = self.pos.get();
-                        self.advance();
-                        self.advance();
+                    for _ in 0..additional_discarded_forms {
                         Self::push_skip_frame(
                             &mut frames,
                             SkipFrame::Form {
                                 missing_at: prefix_start.unwrap_or(missing_at),
                             },
-                            comment_start,
+                            self.pos.get(),
                         )?;
-                        Self::push_skip_frame(
-                            &mut frames,
-                            SkipFrame::Form {
-                                missing_at: comment_start,
-                            },
-                            comment_start,
-                        )?;
-                        continue;
                     }
 
-                    if self.current_byte_is_feature_dispatch() {
-                        let dispatch_start = self.pos.get();
-                        self.advance();
-                        self.advance();
-                        // A feature conditional is one reader form even though the
-                        // normal syntax tree exposes its three parts as siblings.
-                        // The guarded datum is pushed first because frames are LIFO.
-                        Self::push_skip_frame(
-                            &mut frames,
-                            SkipFrame::Form {
-                                missing_at: dispatch_start,
-                            },
-                            dispatch_start,
-                        )?;
-                        Self::push_skip_frame(
-                            &mut frames,
-                            SkipFrame::Form {
-                                missing_at: dispatch_start,
-                            },
-                            dispatch_start,
-                        )?;
-                        continue;
+                    match self
+                        .policy
+                        .classify_reader_macro(self.bytes, self.pos.get())
+                    {
+                        Some(ReaderMacro::Discard { width }) => {
+                            let comment_start = self.pos.get();
+                            self.advance_by(width);
+                            Self::push_skip_frame(
+                                &mut frames,
+                                SkipFrame::Form {
+                                    missing_at: prefix_start.unwrap_or(missing_at),
+                                },
+                                comment_start,
+                            )?;
+                            Self::push_skip_frame(
+                                &mut frames,
+                                SkipFrame::Form {
+                                    missing_at: comment_start,
+                                },
+                                comment_start,
+                            )?;
+                            continue;
+                        }
+                        Some(ReaderMacro::MultiDatum {
+                            width,
+                            payload_forms,
+                        }) => {
+                            let dispatch_start = self.pos.get();
+                            self.advance_by(width);
+                            for _ in 0..payload_forms {
+                                Self::push_skip_frame(
+                                    &mut frames,
+                                    SkipFrame::Form {
+                                        missing_at: dispatch_start,
+                                    },
+                                    dispatch_start,
+                                )?;
+                            }
+                            continue;
+                        }
+                        Some(ReaderMacro::UnsupportedDispatch { width }) => {
+                            return Err(self.unsupported_reader_error(width));
+                        }
+                        Some(ReaderMacro::Prefix { .. }) | None => {}
                     }
 
                     match self.current_byte() {
-                        byte if Delimiter::from_open(byte).is_some() => {
+                        byte if self.policy.delimiter_from_open(byte).is_some() => {
                             let open_pos = self.pos;
-                            let expected_close = Delimiter::from_open(byte)
+                            let expected_close = self
+                                .policy
+                                .delimiter_from_open(byte)
                                 .expect("opening delimiter checked above")
                                 .close() as u8;
                             self.advance();
@@ -530,13 +689,18 @@ impl<'a> Parser<'a> {
                                 open_pos.get(),
                             )?;
                         }
-                        byte if Delimiter::from_close(byte).is_some() => {
-                            let delimiter = Delimiter::from_close(byte)
+                        byte if self.policy.delimiter_from_close(byte).is_some() => {
+                            let delimiter = self
+                                .policy
+                                .delimiter_from_close(byte)
                                 .expect("closing delimiter checked above");
                             return Err(ParseError::UnexpectedClose {
                                 delimiter: delimiter.close(),
                                 position: self.pos.get(),
                             });
+                        }
+                        byte if DialectReaderPolicy::is_raw_delimiter(byte) => {
+                            return Err(self.raw_delimiter_error());
                         }
                         b'"' => self.skip_string()?,
                         _ => self.skip_atom()?,
@@ -641,86 +805,13 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_atom(&mut self) -> std::result::Result<(), ParseError> {
-        while self.pos.get() < self.bytes.len() {
-            let byte = self.current_byte();
-            if byte == b'\\' {
-                self.consume_single_escape()?;
-                continue;
-            }
-            if byte == b'|' {
-                self.consume_multiple_escape()?;
-                continue;
-            }
-            if is_symbol_boundary(byte) {
-                break;
-            }
-            self.advance();
-        }
-        Ok(())
-    }
-
-    /// `#+`/`#-` (CLHS 2.4.8/2.4.9 feature-conditional dispatch) must scan as
-    /// their own fixed two-byte token, distinct from the feature expression
-    /// that follows. Without this, `#+sbcl` glues into one opaque atom while
-    /// `#+(and sbcl x86-64)` splits at the list delimiter, so equivalent
-    /// feature conditionals produce inconsistent tree shapes: the guarded
-    /// feature symbol is findable/renameable in one spelling but hidden
-    /// inside an opaque token in the other.
-    fn current_byte_is_feature_dispatch(&self) -> bool {
-        self.current_byte() == b'#' && matches!(self.peek_byte(), Some(b'+') | Some(b'-'))
-    }
-
-    /// Matches Scheme/Common Lisp `#;` datum comments and Clojure `#_`
-    /// discard forms. Both are two-byte dispatch macros that read and
-    /// discard exactly one following form, so they share the same skip
-    /// path and are recorded as comments rather than tree nodes.
-    fn current_byte_is_reader_comment(&self) -> bool {
-        self.current_byte() == b'#' && matches!(self.peek_byte(), Some(b';') | Some(b'_'))
+        self.consume_atom_body()
     }
 
     fn current_byte_is_block_comment(&self) -> bool {
-        self.current_byte() == b'#' && self.peek_byte() == Some(b'|')
-    }
-
-    fn current_reader_prefix(&self) -> Option<ReaderPrefix> {
-        if self.pos.get() >= self.bytes.len() {
-            return None;
-        }
-        match self.current_byte() {
-            b'\'' => Some(ReaderPrefix::Quote),
-            b'`' => Some(ReaderPrefix::Quasiquote),
-            b',' if self.peek_byte() == Some(b'@') => Some(ReaderPrefix::UnquoteSplicing),
-            b',' => Some(ReaderPrefix::Unquote),
-            b'^' => Some(ReaderPrefix::Metadata),
-            b'#' if self.peek_byte() == Some(b'.') => Some(ReaderPrefix::ReadEval),
-            b'#' if self.peek_byte() == Some(b'\'') => Some(ReaderPrefix::Function),
-            b'#' if self.peek_byte() == Some(b'?') && self.peek_byte_at(2) == Some(b'@') => {
-                Some(ReaderPrefix::ReaderConditionalSplicing)
-            }
-            b'#' if self.peek_byte() == Some(b'?') => Some(ReaderPrefix::ReaderConditional),
-            b'#' if Delimiter::from_open(self.peek_byte().unwrap_or(0)).is_some() => {
-                Some(ReaderPrefix::HashLiteral)
-            }
-            _ => None,
-        }
-    }
-
-    fn advance_reader_prefix(&mut self, prefix: ReaderPrefix) {
-        let width = match prefix {
-            ReaderPrefix::ReaderConditionalSplicing => 3,
-            ReaderPrefix::UnquoteSplicing
-            | ReaderPrefix::Function
-            | ReaderPrefix::ReadEval
-            | ReaderPrefix::ReaderConditional => 2,
-            ReaderPrefix::Quote
-            | ReaderPrefix::Quasiquote
-            | ReaderPrefix::Unquote
-            | ReaderPrefix::HashLiteral
-            | ReaderPrefix::Metadata => 1,
-        };
-        for _ in 0..width {
-            self.advance();
-        }
+        self.policy.supports_block_comments()
+            && self.current_byte() == b'#'
+            && self.peek_byte() == Some(b'|')
     }
 
     fn current_byte(&self) -> u8 {
@@ -731,11 +822,31 @@ impl<'a> Parser<'a> {
         self.bytes.get(self.pos.get() + 1).copied()
     }
 
-    fn peek_byte_at(&self, offset: usize) -> Option<u8> {
-        self.bytes.get(self.pos.get() + offset).copied()
-    }
-
     fn advance(&mut self) {
         self.pos = ByteOffset::new(self.pos.get() + 1);
+    }
+
+    fn advance_by(&mut self, width: usize) {
+        self.pos = ByteOffset::new(self.pos.get() + width);
+    }
+
+    fn unsupported_reader_error(&self, width: usize) -> ParseError {
+        let start = self.pos.get();
+        let end = start.saturating_add(width).min(self.input.len());
+        ParseError::UnsupportedReaderDispatch {
+            dispatch: self.input[start..end].to_owned(),
+            position: start,
+        }
+    }
+
+    fn raw_delimiter_error(&self) -> ParseError {
+        let start = self.pos.get();
+        ParseError::UnexpectedClose {
+            delimiter: self.input[start..]
+                .chars()
+                .next()
+                .unwrap_or(char::REPLACEMENT_CHARACTER),
+            position: start,
+        }
     }
 }

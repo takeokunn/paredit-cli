@@ -8,10 +8,18 @@ use crate::domain::sexpr::SyntaxTree;
 use super::*;
 
 fn request(input: &str, strategy: SortDefinitionsStrategy) -> SortDefinitionsRequest<'_> {
+    request_for_dialect(input, Dialect::CommonLisp, strategy)
+}
+
+fn request_for_dialect(
+    input: &str,
+    dialect: Dialect,
+    strategy: SortDefinitionsStrategy,
+) -> SortDefinitionsRequest<'_> {
     SortDefinitionsRequest {
         file: PathBuf::from("core.lisp"),
         input,
-        dialect: Dialect::CommonLisp,
+        dialect,
         strategy,
         write: false,
     }
@@ -35,6 +43,81 @@ fn sorts_contiguous_definitions_by_name() {
     assert!(alpha < beta);
     assert!(beta < zeta);
     assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+}
+
+#[test]
+fn sorts_definitions_for_every_known_dialect_and_reparses_with_the_same_dialect() {
+    let fixtures = [
+        (
+            Dialect::CommonLisp,
+            "(in-package #:demo)\n\n(defun zeta () :zeta)\n(defun alpha () :alpha)\n",
+            "(defun alpha",
+            "(defun zeta",
+        ),
+        (
+            Dialect::EmacsLisp,
+            "(defun zeta () 'zeta)\n(defun alpha () 'alpha)\n",
+            "(defun alpha",
+            "(defun zeta",
+        ),
+        (
+            Dialect::Scheme,
+            "(define zeta (lambda () 'zeta))\n(define alpha (lambda () 'alpha))\n",
+            "(define alpha",
+            "(define zeta",
+        ),
+        (
+            Dialect::Clojure,
+            "(defn zeta [] #?(:clj :zeta :cljs :zeta))\n(defn alpha [] :alpha)\n",
+            "(defn alpha",
+            "(defn zeta",
+        ),
+        (
+            Dialect::Janet,
+            "(defn zeta [] :zeta)\n(defn alpha [] :alpha)\n",
+            "(defn alpha",
+            "(defn zeta",
+        ),
+        (
+            Dialect::Fennel,
+            "(fn zeta [] :zeta)\n(fn alpha [] :alpha)\n",
+            "(fn alpha",
+            "(fn zeta",
+        ),
+    ];
+
+    for (dialect, input, alpha_marker, zeta_marker) in fixtures {
+        let plan = plan_sort_definitions(request_for_dialect(
+            input,
+            dialect,
+            SortDefinitionsStrategy::Name,
+        ))
+        .unwrap_or_else(|error| panic!("{dialect:?} sort failed: {error:#}"));
+
+        assert!(plan.changed, "{dialect:?} fixture was not sorted");
+        assert!(
+            plan.rewritten.find(alpha_marker).unwrap() < plan.rewritten.find(zeta_marker).unwrap(),
+            "{dialect:?} output was not sorted: {}",
+            plan.rewritten
+        );
+        SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+            .unwrap_or_else(|error| panic!("{dialect:?} output did not reparse: {error:#}"));
+    }
+}
+
+#[test]
+fn rejects_unknown_dialect_before_parsing_malformed_input() {
+    let error = plan_sort_definitions(request_for_dialect(
+        "(",
+        Dialect::Unknown,
+        SortDefinitionsStrategy::Name,
+    ))
+    .unwrap_err();
+
+    assert!(
+        error.to_string().contains("unknown dialect"),
+        "unexpected gate error: {error:#}"
+    );
 }
 
 #[test]

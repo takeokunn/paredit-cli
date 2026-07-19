@@ -4,6 +4,8 @@ use super::assert_extract_function_inference;
 fn cli_infers_extract_function_params_without_common_lisp_flet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -48,6 +50,8 @@ fn cli_infers_extract_function_params_without_emacs_lisp_flet_shadowing() {
 fn cli_infers_extract_function_params_without_common_lisp_labels_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -70,6 +74,8 @@ fn cli_infers_extract_function_params_without_common_lisp_labels_shadowing() {
 fn cli_infers_extract_function_params_without_common_lisp_macrolet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -92,6 +98,8 @@ fn cli_infers_extract_function_params_without_common_lisp_macrolet_shadowing() {
 fn cli_infers_extract_function_params_without_cl_user_macrolet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -114,6 +122,8 @@ fn cli_infers_extract_function_params_without_cl_user_macrolet_shadowing() {
 fn cli_infers_extract_function_params_without_common_lisp_package_macrolet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -136,6 +146,8 @@ fn cli_infers_extract_function_params_without_common_lisp_package_macrolet_shado
 fn cli_infers_extract_function_params_without_common_lisp_compiler_macrolet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -158,6 +170,8 @@ fn cli_infers_extract_function_params_without_common_lisp_compiler_macrolet_shad
 fn cli_infers_extract_function_params_without_common_lisp_package_compiler_macrolet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -180,6 +194,8 @@ fn cli_infers_extract_function_params_without_common_lisp_package_compiler_macro
 fn cli_infers_extract_function_params_without_cl_user_compiler_macrolet_shadowing() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",

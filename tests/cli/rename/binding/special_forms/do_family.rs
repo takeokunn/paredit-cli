@@ -6,6 +6,8 @@ fn cli_plans_do_binding_rename_across_steps_end_clause_and_body() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -59,6 +61,8 @@ fn cli_plans_outer_binding_rename_without_touching_do_scope() {
 fn cli_plans_do_star_binding_rename_across_later_inits_steps_end_clause_and_body() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

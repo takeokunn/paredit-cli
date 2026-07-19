@@ -5,6 +5,7 @@ mod edit;
 mod formatter;
 mod parser;
 pub mod reader;
+mod reader_policy;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;

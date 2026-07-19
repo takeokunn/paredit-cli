@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
 
 use crate::domain::callable_scope::{
-    common_lisp_local_callable_form, is_local_callable_bound, local_callable_binding_body_scope,
-    local_callable_body_scope, local_callable_scope_at_path,
+    common_lisp_local_callable_form, local_callable_binding_body_scope, local_callable_body_scope,
+    local_callable_scope_at_path,
 };
 use crate::domain::common_lisp::CommonLispLocalCallableForm;
 use crate::domain::definition::macro_expander_body_range;
 use crate::domain::dialect::Dialect;
+use crate::domain::rename::call_identity::is_local_call_bound;
 use crate::domain::rename::reader::{
     apply_reader_prefix_context, executable_reader_context_at_path,
 };
@@ -54,7 +55,7 @@ pub(super) fn collect_explicit_replace_call_sites(
             anyhow::bail!("call-path {path} is not in an executable reader context");
         }
         let local_callables = local_callable_scope_at_path(tree, dialect, path)?;
-        if is_local_callable_bound(&local_callables, from.as_str()) {
+        if is_local_call_bound(dialect, &local_callables, from.as_str()) {
             anyhow::bail!("call-path {path} is shadowed by a local callable named {from}");
         }
         let site = replace_call_site_from_view(&view, dialect, input, path.to_string(), from, to)
@@ -119,7 +120,7 @@ fn collect_replace_call_sites_from_view(
     let macro_expander_body =
         head.and_then(|head| macro_expander_body_range(ctx.dialect, view, head));
 
-    if !is_local_callable_bound(local_callables, ctx.from.as_str()) {
+    if !is_local_call_bound(ctx.dialect, local_callables, ctx.from.as_str()) {
         if let Some(site) = replace_call_site_from_view(
             view,
             ctx.dialect,

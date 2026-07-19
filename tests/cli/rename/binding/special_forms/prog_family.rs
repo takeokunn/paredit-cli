@@ -6,6 +6,8 @@ fn cli_plans_prog_star_binding_rename_across_later_inits_and_body() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

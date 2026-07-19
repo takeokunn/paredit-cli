@@ -26,11 +26,21 @@ fn file_with_text(
     text: &str,
     definitions: Vec<UnusedDefinitionDefinition>,
 ) -> RemoveUnusedDefinitionInputFile {
-    let tree = SyntaxTree::parse(text).expect("fixture must parse");
+    file_with_dialect(path, Dialect::CommonLisp, Some("app"), text, definitions)
+}
+
+fn file_with_dialect(
+    path: PathBuf,
+    dialect: Dialect,
+    package: Option<&str>,
+    text: &str,
+    definitions: Vec<UnusedDefinitionDefinition>,
+) -> RemoveUnusedDefinitionInputFile {
+    let tree = SyntaxTree::parse_with_dialect(text, dialect).expect("fixture must parse");
     RemoveUnusedDefinitionInputFile {
         path,
-        dialect: Dialect::CommonLisp,
-        package: Some("app".to_owned()),
+        dialect,
+        package: package.map(str::to_owned),
         definitions,
         atoms: tree.atom_occurrences(),
         text: text.to_owned(),

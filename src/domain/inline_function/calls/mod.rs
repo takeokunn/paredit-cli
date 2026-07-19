@@ -55,6 +55,7 @@ pub(super) fn resolve_function_call_paths(
 }
 
 pub(super) fn parse_inline_function_call(
+    dialect: Dialect,
     view: ExpressionView,
     function_name: &SymbolName,
     input: &str,
@@ -68,7 +69,7 @@ pub(super) fn parse_inline_function_call(
             .context("inline-function call must not be empty")?,
     )
     .context("inline-function call must start with an atom")?;
-    if !common_lisp_symbol_reference_eq(head, function_name.as_str()) {
+    if !inline_function_symbol_reference_eq(dialect, head, function_name.as_str()) {
         anyhow::bail!(
             "inline-function call head '{}' does not match selected definition '{}'",
             head,
@@ -105,7 +106,7 @@ fn validate_explicit_function_call_paths(
         let head = list_head(&view)
             .context("inline-function call must not be empty")?
             .to_owned();
-        if !common_lisp_symbol_reference_eq(&head, function_name.as_str()) {
+        if !inline_function_symbol_reference_eq(dialect, &head, function_name.as_str()) {
             anyhow::bail!(
                 "{command} --call-path {call_path} head '{}' does not match selected definition '{}'",
                 head,
@@ -121,6 +122,22 @@ fn validate_explicit_function_call_paths(
     }
 
     Ok(())
+}
+
+pub(super) fn inline_function_symbol_reference_eq(
+    dialect: Dialect,
+    left: &str,
+    right: &str,
+) -> bool {
+    match dialect {
+        Dialect::CommonLisp => common_lisp_symbol_reference_eq(left, right),
+        Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => left == right,
+        Dialect::Unknown => false,
+    }
 }
 
 pub(super) fn validate_or_resolve_function_call_paths(

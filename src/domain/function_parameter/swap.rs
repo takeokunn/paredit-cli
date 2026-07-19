@@ -29,7 +29,7 @@ pub fn plan_swap_function_parameters(
         anyhow::bail!("swap-function-parameters requires two distinct parameter names");
     }
 
-    let tree = SyntaxTree::parse(request.input)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target = parse_swap_function_parameters_definition(
         request.dialect,
@@ -145,7 +145,7 @@ pub fn plan_swap_function_parameters(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("swap-function-parameters output is not a valid S-expression document")?;
 
     let changed = rewritten != request.input;

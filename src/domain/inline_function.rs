@@ -44,7 +44,8 @@ struct InlineFunctionParts {
 }
 
 pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<InlineFunctionPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    ensure_inline_function_dialect_supported(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let definition_selection = tree.select_path(&request.definition_path)?;
     let definition_span = definition_selection.span();
@@ -119,7 +120,7 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     }
     let rewritten = apply_byte_span_edits(request.input, edits)?;
 
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("inline-function output is not a valid S-expression document")?;
 
     Ok(InlineFunctionPlan {
@@ -138,6 +139,21 @@ pub fn plan_inline_function(request: InlineFunctionRequest<'_>) -> Result<Inline
     })
 }
 
+pub(crate) const fn supports_inline_function_dialect(dialect: Dialect) -> bool {
+    matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp)
+}
+
+fn ensure_inline_function_dialect_supported(dialect: Dialect) -> Result<()> {
+    if supports_inline_function_dialect(dialect) {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "inline-function does not support dialect {}",
+            dialect.label()
+        )
+    }
+}
+
 fn inline_function_parts(
     dialect: Dialect,
     input: &str,
@@ -150,7 +166,7 @@ fn inline_function_parts(
         parse_inline_function_definition(dialect, input, definition_selection.clone())?;
     validate_macro_environment_parameters(dialect, input, &definition)?;
     let function_name = definition.name.clone();
-    let call = parse_inline_function_call(call_selection.clone(), &function_name, input)?;
+    let call = parse_inline_function_call(dialect, call_selection.clone(), &function_name, input)?;
     let bindings = bind_inline_function_arguments(
         dialect,
         &definition.params,
@@ -174,7 +190,8 @@ fn inline_function_parts(
             )?;
             let (argument_param_names, argument_args): (Vec<_>, Vec<_>) =
                 bindings.argument_bindings.into_iter().unzip();
-            let replacement_tree = SyntaxTree::parse(&intermediate_replacement)?;
+            let replacement_tree =
+                SyntaxTree::parse_with_dialect(&intermediate_replacement, dialect)?;
             let replacement_body = replacement_view_for_inline_function(&replacement_tree)?;
             let (replacement, argument_parameters) = substitute_inline_function_body(
                 dialect,
@@ -265,9 +282,10 @@ fn validate_macro_environment_parameters(
         )?;
 
         for (context, default_value) in &initialization_expressions {
-            let default_tree = SyntaxTree::parse(default_value).with_context(|| {
-                format!("inline-function could not parse {context}: {default_value}")
-            })?;
+            let default_tree = SyntaxTree::parse_with_dialect(default_value, dialect)
+                .with_context(|| {
+                    format!("inline-function could not parse {context}: {default_value}")
+                })?;
             let default_expression = default_tree
                 .select_path(&crate::domain::sexpr::Path::root_child(0))?
                 .view();

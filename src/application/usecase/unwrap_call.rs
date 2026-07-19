@@ -31,7 +31,8 @@ pub struct UnwrapCallPlan {
 }
 
 pub fn plan_unwrap_call(request: UnwrapCallRequest<'_>) -> Result<UnwrapCallPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    crate::domain::unwrap_call::validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_overlapping_common_lisp_reader_time_forms(
         &tree,
         request.dialect,
@@ -65,8 +66,8 @@ mod tests {
     use crate::domain::sexpr::Path;
     use proptest::prelude::*;
 
-    fn target(input: &str) -> ExpressionView {
-        let tree = SyntaxTree::parse(input).expect("parse");
+    fn target(input: &str, dialect: Dialect) -> ExpressionView {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse");
         tree.select_path(&"0".parse::<Path>().expect("path"))
             .expect("select")
             .view()
@@ -79,7 +80,7 @@ mod tests {
             input,
             dialect: Dialect::CommonLisp,
             path: Some("0".parse().expect("path")),
-            target: target(input),
+            target: target(input, Dialect::CommonLisp),
             expected_function: Some(SymbolName::new("with-cache").expect("symbol")),
             argument_index: 0,
         })
@@ -99,7 +100,7 @@ mod tests {
             input,
             dialect: Dialect::EmacsLisp,
             path: Some("0".parse().expect("path")),
-            target: target(input),
+            target: target(input, Dialect::EmacsLisp),
             expected_function: None,
             argument_index: 1,
         })
@@ -117,13 +118,59 @@ mod tests {
             input,
             dialect: Dialect::CommonLisp,
             path: Some("0".parse().expect("path")),
-            target: target(input),
+            target: target(input, Dialect::CommonLisp),
             expected_function: Some(SymbolName::new("with-transaction").expect("symbol")),
             argument_index: 0,
         })
         .expect_err("mismatch");
 
         assert!(err.to_string().contains("expected function"));
+    }
+
+    #[test]
+    fn accepts_reader_forms_for_all_known_dialects() {
+        let cases = [
+            (Dialect::CommonLisp, r"(wrap #\))", r"#\)"),
+            (Dialect::EmacsLisp, r"(wrap ?\))", r"?\)"),
+            (Dialect::Scheme, "(wrap #u8(1 2))", "#u8(1 2)"),
+            (
+                Dialect::Clojure,
+                r#"(wrap #inst "2020-01-01")"#,
+                r#"#inst "2020-01-01""#,
+            ),
+            (Dialect::Janet, "(wrap ;value)", ";value"),
+            (Dialect::Fennel, "(wrap #(value))", "#(value)"),
+        ];
+
+        for (dialect, input, expected_replacement) in cases {
+            let plan = plan_unwrap_call(UnwrapCallRequest {
+                input,
+                dialect,
+                path: Some("0".parse().expect("path")),
+                target: target(input, dialect),
+                expected_function: Some(SymbolName::new("wrap").expect("symbol")),
+                argument_index: 0,
+            })
+            .unwrap_or_else(|error| panic!("{}: {error}", dialect.label()));
+
+            assert_eq!(plan.replacement, expected_replacement);
+            assert_eq!(plan.rewritten, expected_replacement);
+        }
+    }
+
+    #[test]
+    fn unknown_dialect_gate_precedes_parsing_and_span_safety() {
+        let err = plan_unwrap_call(UnwrapCallRequest {
+            input: ")",
+            dialect: Dialect::Unknown,
+            path: Some("0".parse().expect("path")),
+            target: target("(wrap value)", Dialect::CommonLisp),
+            expected_function: None,
+            argument_index: 0,
+        })
+        .expect_err("unknown dialect");
+
+        assert_eq!(err.to_string(), "unwrap-call requires a known dialect");
     }
 
     fn symbol_strategy() -> impl Strategy<Value = String> {
@@ -152,7 +199,7 @@ mod tests {
                 input: &input,
                 dialect: Dialect::Clojure,
                 path: Some("0".parse().expect("path")),
-                target: target(&input),
+                target: target(&input, Dialect::Clojure),
                 expected_function: Some(SymbolName::new(&wrapper).expect("symbol")),
                 argument_index: 0,
             })
@@ -160,7 +207,9 @@ mod tests {
 
             prop_assert_eq!(plan.replacement, format!("({callee} {value})"));
             prop_assert_eq!(&plan.rewritten, &format!("({callee} {value})"));
-            prop_assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+            prop_assert!(
+                SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::Clojure).is_ok()
+            );
             prop_assert!(plan.changed);
         }
     }

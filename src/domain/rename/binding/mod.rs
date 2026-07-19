@@ -5,13 +5,14 @@ mod lambda_like;
 mod rewrite;
 mod scope;
 mod scoped;
+mod semantic;
 mod types;
 mod value_like;
 
 use anyhow::{Context, Result};
 
 use crate::domain::common_lisp::CommonLispBindingRefactorForm;
-use crate::domain::dialect::Dialect;
+use crate::domain::dialect::{RenameBindingOperation, VerifiedSemanticPolicy};
 use crate::domain::sexpr::{ByteSpan, ExpressionView, SymbolName};
 
 use lambda_like::{
@@ -42,14 +43,22 @@ pub(super) fn collect_shadow_aware_special_form(
 }
 
 pub(super) fn binding_rename_parts(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<RenameBindingOperation>,
     view: &ExpressionView,
     from: &SymbolName,
     input: &str,
 ) -> Result<BindingRenameParts> {
+    let dialect = semantic.dialect();
     let form = super::selection::list_head(view)
         .context("selected form is not a supported binding form")?
         .to_owned();
+
+    if dialect != crate::domain::dialect::Dialect::CommonLisp
+        && (semantic.scope_shape(view).is_some() || semantic.definition_shape(view).is_some())
+    {
+        return semantic::semantic_binding_rename_parts(semantic, view, from, form, input);
+    }
+
     let Some(refactor_form) = dialect.common_lisp_binding_refactor_form_for_head(&form) else {
         anyhow::bail!("selected form is not a supported binding form");
     };

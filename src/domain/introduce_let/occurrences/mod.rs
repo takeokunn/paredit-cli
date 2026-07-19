@@ -4,7 +4,7 @@ mod local_callable;
 mod variable;
 
 use crate::domain::{
-    dialect::Dialect,
+    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
     sexpr::{ByteOffset, ByteSpan, ChildIndex, ExpressionView},
 };
 
@@ -37,13 +37,14 @@ pub(super) struct EquivalentExpressionSpans {
 }
 
 pub(super) fn collect_equivalent_expression_spans(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     target: &ExpressionView,
     binding_name: &str,
     shadowed_by_binding: bool,
     output: &mut EquivalentExpressionSpans,
 ) {
+    let dialect = semantic.dialect();
     if expressions_equivalent(view, target) {
         record_equivalent_span(output, view.span, shadowed_by_binding);
         return;
@@ -52,7 +53,7 @@ pub(super) fn collect_equivalent_expression_spans(
     for (index, child) in view.children.iter().enumerate() {
         if let_star_bindings_child_index(dialect, view) == Some(index) {
             collect_let_star_binding_spans(
-                dialect,
+                semantic,
                 child,
                 target,
                 binding_name,
@@ -64,7 +65,7 @@ pub(super) fn collect_equivalent_expression_spans(
 
         if iteration_bindings_child_index(dialect, view) == Some(index) {
             collect_iteration_binding_spans(
-                dialect,
+                semantic,
                 child,
                 target,
                 binding_name,
@@ -76,7 +77,7 @@ pub(super) fn collect_equivalent_expression_spans(
 
         if variable_bindings_child_index(dialect, view) == Some(index) {
             let mut ctx = VariableBindingContext {
-                dialect,
+                semantic,
                 target,
                 binding_name,
                 has_step_forms: variable_binding_form_has_step_forms(dialect, view),
@@ -93,7 +94,7 @@ pub(super) fn collect_equivalent_expression_spans(
 
         if local_callable_bindings_child_index(dialect, view) == Some(index) {
             collect_local_callable_binding_spans(
-                dialect,
+                semantic,
                 child,
                 target,
                 binding_name,
@@ -104,9 +105,9 @@ pub(super) fn collect_equivalent_expression_spans(
         }
 
         let child_shadowed =
-            shadowed_by_binding || child_shadowed_by_binding(dialect, view, binding_name, index);
+            shadowed_by_binding || child_shadowed_by_binding(semantic, view, binding_name, index);
         collect_equivalent_expression_spans(
-            dialect,
+            semantic,
             child,
             target,
             binding_name,
@@ -117,12 +118,13 @@ pub(super) fn collect_equivalent_expression_spans(
 }
 
 pub(super) fn is_span_shadowed_by_binding(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     target_span: ByteSpan,
     binding_name: &str,
     shadowed_by_binding: bool,
 ) -> bool {
+    let dialect = semantic.dialect();
     if view.span == target_span {
         return shadowed_by_binding;
     }
@@ -130,7 +132,7 @@ pub(super) fn is_span_shadowed_by_binding(
     view.children.iter().enumerate().any(|(index, child)| {
         if let_star_bindings_child_index(dialect, view) == Some(index) {
             return is_span_shadowed_by_let_star_bindings(
-                dialect,
+                semantic,
                 child,
                 target_span,
                 binding_name,
@@ -140,7 +142,7 @@ pub(super) fn is_span_shadowed_by_binding(
 
         if iteration_bindings_child_index(dialect, view) == Some(index) {
             return is_span_shadowed_by_iteration_bindings(
-                dialect,
+                semantic,
                 child,
                 target_span,
                 binding_name,
@@ -150,7 +152,7 @@ pub(super) fn is_span_shadowed_by_binding(
 
         if variable_bindings_child_index(dialect, view) == Some(index) {
             return is_span_shadowed_by_variable_bindings(
-                dialect,
+                semantic,
                 child,
                 target_span,
                 binding_name,
@@ -162,7 +164,7 @@ pub(super) fn is_span_shadowed_by_binding(
 
         if local_callable_bindings_child_index(dialect, view) == Some(index) {
             return is_span_shadowed_by_local_callable_binding(
-                dialect,
+                semantic,
                 child,
                 target_span,
                 binding_name,
@@ -171,18 +173,19 @@ pub(super) fn is_span_shadowed_by_binding(
         }
 
         let child_shadowed =
-            shadowed_by_binding || child_shadowed_by_binding(dialect, view, binding_name, index);
-        is_span_shadowed_by_binding(dialect, child, target_span, binding_name, child_shadowed)
+            shadowed_by_binding || child_shadowed_by_binding(semantic, view, binding_name, index);
+        is_span_shadowed_by_binding(semantic, child, target_span, binding_name, child_shadowed)
     })
 }
 
 pub(super) fn is_path_shadowed_by_binding(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     target_path: &[ChildIndex],
     binding_name: &str,
     shadowed_by_binding: bool,
 ) -> bool {
+    let dialect = semantic.dialect();
     let Some((index, rest)) = target_path.split_first() else {
         return shadowed_by_binding;
     };
@@ -193,7 +196,7 @@ pub(super) fn is_path_shadowed_by_binding(
 
     if let_star_bindings_child_index(dialect, view) == Some(index) {
         return is_path_shadowed_by_let_star_bindings(
-            dialect,
+            semantic,
             child,
             rest,
             binding_name,
@@ -203,7 +206,7 @@ pub(super) fn is_path_shadowed_by_binding(
 
     if iteration_bindings_child_index(dialect, view) == Some(index) {
         return is_path_shadowed_by_iteration_bindings(
-            dialect,
+            semantic,
             child,
             rest,
             binding_name,
@@ -213,7 +216,7 @@ pub(super) fn is_path_shadowed_by_binding(
 
     if variable_bindings_child_index(dialect, view) == Some(index) {
         return is_path_shadowed_by_variable_bindings(
-            dialect,
+            semantic,
             child,
             rest,
             binding_name,
@@ -225,7 +228,7 @@ pub(super) fn is_path_shadowed_by_binding(
 
     if local_callable_bindings_child_index(dialect, view) == Some(index) {
         return is_path_shadowed_by_local_callable_binding(
-            dialect,
+            semantic,
             child,
             rest,
             binding_name,
@@ -234,11 +237,11 @@ pub(super) fn is_path_shadowed_by_binding(
     }
 
     let child_shadowed =
-        shadowed_by_binding || child_shadowed_by_binding(dialect, view, binding_name, index);
+        shadowed_by_binding || child_shadowed_by_binding(semantic, view, binding_name, index);
     if rest.is_empty() {
         child_shadowed
     } else {
-        is_path_shadowed_by_binding(dialect, child, rest, binding_name, child_shadowed)
+        is_path_shadowed_by_binding(semantic, child, rest, binding_name, child_shadowed)
     }
 }
 

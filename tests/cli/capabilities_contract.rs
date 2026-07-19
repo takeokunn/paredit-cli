@@ -1,14 +1,61 @@
 use super::*;
 
-fn capabilities_json() -> serde_json::Value {
+fn capabilities_json_with_args(args: &[&str]) -> serde_json::Value {
     let output = paredit()
         .args(["inspect", "capabilities"])
+        .args(args)
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
     serde_json::from_slice(&output).expect("capabilities emits valid JSON")
+}
+
+fn capabilities_json() -> serde_json::Value {
+    capabilities_json_with_args(&[])
+}
+
+#[test]
+fn capabilities_defaults_to_unchanged_schema_v1_shape() {
+    let report = capabilities_json();
+    let explicit_v1 = capabilities_json_with_args(&["--schema-version", "1"]);
+
+    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report, explicit_v1);
+    assert!(report.get("dialect_contract").is_none());
+
+    let mut keys = report
+        .as_object()
+        .expect("capabilities report is an object")
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        ["about", "commands", "name", "schema_version", "version"]
+    );
+
+    let capabilities = report["commands"]
+        .as_array()
+        .expect("commands")
+        .iter()
+        .find(|command| command["name"] == "inspect")
+        .and_then(|inspect| inspect["commands"].as_array())
+        .and_then(|commands| {
+            commands
+                .iter()
+                .find(|command| command["name"] == "capabilities")
+        })
+        .expect("inspect capabilities command");
+    assert!(
+        capabilities["args"]
+            .as_array()
+            .expect("inspect capabilities args")
+            .iter()
+            .all(|arg| arg["id"] != "schema_version")
+    );
 }
 
 #[test]

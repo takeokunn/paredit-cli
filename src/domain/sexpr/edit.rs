@@ -7,12 +7,16 @@ use super::types::{ByteOffset, ByteSpan, NodeId};
 pub struct Edit;
 
 impl Edit {
-    pub fn normalize_changed_line_trivia(input: &str, rewritten: String) -> Result<String> {
+    pub fn normalize_changed_line_trivia(
+        input: &str,
+        rewritten: String,
+        dialect: crate::domain::dialect::Dialect,
+    ) -> Result<String> {
         if input == rewritten {
             return Ok(rewritten);
         }
 
-        let tree = SyntaxTree::parse(&rewritten)?;
+        let tree = SyntaxTree::parse_with_dialect(&rewritten, dialect)?;
         let prefix = common_prefix_len(input, &rewritten);
         let suffix = common_suffix_len(input, &rewritten, prefix);
         let changed_end = rewritten.len().saturating_sub(suffix);

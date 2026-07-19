@@ -23,14 +23,15 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
         anyhow::bail!("split-file requires at least one --path, --name, or --kind selector");
     }
 
-    let from_tree = SyntaxTree::parse(request.from_input)
+    let from_tree = SyntaxTree::parse_with_dialect(request.from_input, request.from_dialect)
         .with_context(|| format!("failed to parse {}", request.from_file.display()))?;
-    let to_tree = SyntaxTree::parse(request.to_input).with_context(|| {
-        format!(
-            "destination file is not a valid S-expression document: {}",
-            request.to_file.display()
-        )
-    })?;
+    let to_tree = SyntaxTree::parse_with_dialect(request.to_input, request.to_dialect)
+        .with_context(|| {
+            format!(
+                "destination file is not a valid S-expression document: {}",
+                request.to_file.display()
+            )
+        })?;
 
     let mut seen_paths = std::collections::BTreeSet::new();
     let mut selected_paths = std::collections::BTreeMap::new();
@@ -125,15 +126,24 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
         items.iter().map(|item| item.removal_span),
     )?;
 
-    let mut running_package = package_context_before_top_level(
-        &to_tree,
-        request.to_dialect,
-        to_tree.root_children().len(),
-    )?;
+    let destination_is_common_lisp =
+        request.to_dialect == crate::domain::dialect::Dialect::CommonLisp;
+    let mut running_package = if destination_is_common_lisp {
+        package_context_before_top_level(
+            &to_tree,
+            request.to_dialect,
+            to_tree.root_children().len(),
+        )?
+    } else {
+        None
+    };
     let definition_texts = items
         .iter()
         .map(|item| match &item.definition.package {
-            Some(package) if running_package.as_deref() != Some(package.as_str()) => {
+            Some(package)
+                if destination_is_common_lisp
+                    && running_package.as_deref() != Some(package.as_str()) =>
+            {
                 running_package = Some(package.clone());
                 format!("(in-package {package})\n\n{}", item.definition_text)
             }
@@ -152,13 +162,13 @@ pub fn plan_split_file(request: SplitFileRequest<'_>) -> Result<SplitFilePlan> {
     }
     let to_rewritten = append_top_level_definitions(request.to_input, &definition_texts);
 
-    SyntaxTree::parse(&from_rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&from_rewritten, request.from_dialect).with_context(|| {
         format!(
             "source file would become invalid after splitting definitions: {}",
             request.from_file.display()
         )
     })?;
-    SyntaxTree::parse(&to_rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&to_rewritten, request.to_dialect).with_context(|| {
         format!(
             "destination file would become invalid after receiving definitions: {}",
             request.to_file.display()

@@ -109,6 +109,8 @@ fn cli_rejects_rename_binding_write_without_file() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--from",
@@ -129,6 +131,8 @@ fn cli_rejects_missing_binding_rename_target() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

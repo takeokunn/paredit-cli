@@ -4,6 +4,8 @@ use super::assert_extract_function_inference;
 fn cli_infers_extract_function_params() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -24,6 +26,8 @@ fn cli_infers_extract_function_params() {
 fn cli_infers_extract_function_params_without_call_heads_or_literals() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -44,6 +48,8 @@ fn cli_infers_extract_function_params_without_call_heads_or_literals() {
 fn cli_does_not_infer_common_lisp_function_literals() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -64,6 +70,8 @@ fn cli_does_not_infer_common_lisp_function_literals() {
 fn cli_infers_extract_function_params_without_local_let_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -106,6 +114,8 @@ fn cli_infers_extract_function_params_without_emacs_lisp_local_let_bindings() {
 fn cli_infers_extract_function_params_without_sequential_let_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",

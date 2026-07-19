@@ -4,6 +4,8 @@ use super::*;
 fn cli_plans_parameterized_extract_function() {
     let mut cmd = paredit();
     cmd.args(["refactor", "extract-function",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",
@@ -41,6 +43,8 @@ fn cli_merges_explicit_and_inferred_extract_function_params() {
     cmd.args([
         "refactor",
         "extract-function",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",

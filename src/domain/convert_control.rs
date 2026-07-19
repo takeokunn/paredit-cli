@@ -26,7 +26,7 @@ pub struct ConvertIfToCondPlan {
 
 pub fn plan_convert_if_to_cond(request: ConvertIfToCondRequest<'_>) -> Result<ConvertIfToCondPlan> {
     require_supported_dialect(request.dialect, "convert-if-to-cond")?;
-    let tree = SyntaxTree::parse(request.input)
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("convert-if-to-cond input is not a valid S-expression document")?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
@@ -47,7 +47,7 @@ pub fn plan_convert_if_to_cond(request: ConvertIfToCondRequest<'_>) -> Result<Co
         None => format!("(cond ({test} {then}))"),
     };
     let rewritten = replace_span(request.input, form.span, &replacement);
-    parse_output(&rewritten, "convert-if-to-cond")?;
+    parse_output(&rewritten, request.dialect, "convert-if-to-cond")?;
 
     Ok(ConvertIfToCondPlan {
         dialect: request.dialect,
@@ -78,7 +78,7 @@ pub struct ConvertCondToIfPlan {
 
 pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<ConvertCondToIfPlan> {
     require_supported_dialect(request.dialect, "convert-cond-to-if")?;
-    let tree = SyntaxTree::parse(request.input)
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("convert-cond-to-if input is not a valid S-expression document")?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
@@ -109,7 +109,7 @@ pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<Co
     }
     let replacement = replacement.ok_or_else(|| anyhow!("convert-cond-to-if has no clauses"))?;
     let rewritten = replace_span(request.input, form.span, &replacement);
-    parse_output(&rewritten, "convert-cond-to-if")?;
+    parse_output(&rewritten, request.dialect, "convert-cond-to-if")?;
 
     Ok(ConvertCondToIfPlan {
         dialect: request.dialect,
@@ -121,7 +121,7 @@ pub fn plan_convert_cond_to_if(request: ConvertCondToIfRequest<'_>) -> Result<Co
     })
 }
 
-fn require_supported_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+pub(crate) fn require_supported_dialect(dialect: Dialect, operation: &str) -> Result<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         bail!("{operation} currently supports only Common Lisp and Emacs Lisp");
     }
@@ -161,8 +161,8 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     rewritten
 }
 
-fn parse_output(rewritten: &str, operation: &str) -> Result<()> {
-    SyntaxTree::parse(rewritten)
+fn parse_output(rewritten: &str, dialect: Dialect, operation: &str) -> Result<()> {
+    SyntaxTree::parse_with_dialect(rewritten, dialect)
         .with_context(|| format!("{operation} output is not a valid S-expression document"))?;
     Ok(())
 }
@@ -243,5 +243,64 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn dialect_support_matrix_is_enforced_before_parsing_and_reparses_output() {
+        for (dialect, prefix) in [(Dialect::CommonLisp, "#\\)"), (Dialect::EmacsLisp, "?\\)")] {
+            let if_input = format!("{prefix} (if ready yes no)");
+            let if_plan = plan_convert_if_to_cond(ConvertIfToCondRequest {
+                input: &if_input,
+                dialect,
+                path: "1".parse().expect("path"),
+            })
+            .expect("supported if conversion");
+            SyntaxTree::parse_with_dialect(&if_plan.rewritten, dialect)
+                .expect("dialect-specific cond output");
+
+            let cond_input = format!("{prefix} (cond (ready yes) ((quote t) no))");
+            let cond_plan = plan_convert_cond_to_if(ConvertCondToIfRequest {
+                input: &cond_input,
+                dialect,
+                path: "1".parse().expect("path"),
+            })
+            .expect("supported cond conversion");
+            SyntaxTree::parse_with_dialect(&cond_plan.rewritten, dialect)
+                .expect("dialect-specific if output");
+        }
+
+        for dialect in [
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let if_error = plan_convert_if_to_cond(ConvertIfToCondRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported if conversion");
+            assert!(
+                if_error
+                    .to_string()
+                    .contains("currently supports only Common Lisp and Emacs Lisp"),
+                "{dialect:?}: {if_error:#}"
+            );
+
+            let cond_error = plan_convert_cond_to_if(ConvertCondToIfRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported cond conversion");
+            assert!(
+                cond_error
+                    .to_string()
+                    .contains("currently supports only Common Lisp and Emacs Lisp"),
+                "{dialect:?}: {cond_error:#}"
+            );
+        }
     }
 }

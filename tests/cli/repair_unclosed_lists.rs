@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn repair_unclosed_lists_writes_only_required_closers() {
     let dir = fresh_temp_dir("repair-unclosed-lists");
-    let file = dir.join("source.lisp");
+    let file = dir.join("source.clj");
     fs::write(&file, "(outer [inner {leaf}").expect("write fixture");
 
     paredit()

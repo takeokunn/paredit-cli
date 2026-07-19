@@ -1,9 +1,9 @@
 //! Common Lisp reader-conditional dispatch detection.
 //!
-//! The S-expression parser intentionally represents `#+` and `#-` as atom
-//! siblings of their feature expression and guarded datum. This module owns
-//! the Common Lisp meaning of those dispatch atoms without changing that
-//! general-purpose parser representation.
+//! Legacy S-expression trees represent `#+` and `#-` as atom siblings of their
+//! feature expression and guarded datum. Dialect-aware Common Lisp trees keep
+//! the complete conditional as one opaque atom. This module owns the semantic
+//! query across both representations.
 
 mod dispatch;
 mod query;

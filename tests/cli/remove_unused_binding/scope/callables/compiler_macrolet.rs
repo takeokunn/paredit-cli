@@ -6,6 +6,8 @@ fn cli_plans_remove_unused_compiler_macrolet_without_counting_expander_body_refe
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -35,6 +37,8 @@ fn cli_plans_remove_unused_cl_compiler_macrolet_without_counting_expander_body_r
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -63,7 +67,11 @@ fn cli_plans_remove_unused_cl_compiler_macrolet_without_counting_expander_body_r
 #[test]
 fn cli_plans_remove_unused_cl_user_compiler_macrolet_without_counting_expander_body_reference() {
     let mut cmd = paredit();
-    cmd.args(["refactor", "remove-unused-binding",
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -93,6 +101,8 @@ fn cli_rejects_referenced_compiler_macrolet_binding() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",

@@ -47,6 +47,8 @@ mod definition_removal;
 mod definition_report;
 #[path = "cli/dependency_report.rs"]
 mod dependency_report;
+#[path = "cli/dialect_contract.rs"]
+mod dialect_contract;
 #[path = "cli/duplicate_report.rs"]
 mod duplicate_report;
 #[path = "cli/edit_transpose.rs"]

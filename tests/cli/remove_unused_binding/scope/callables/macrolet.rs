@@ -6,6 +6,8 @@ fn cli_plans_remove_unused_macrolet_without_counting_expander_body_reference() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -33,6 +35,8 @@ fn cli_plans_remove_unused_cl_macrolet_without_counting_expander_body_reference(
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -60,6 +64,8 @@ fn cli_plans_remove_unused_cl_user_macrolet_without_counting_expander_body_refer
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -89,6 +95,8 @@ fn cli_rejects_referenced_macrolet_binding() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",

@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::dialect::Dialect;
 
 #[test]
 fn formats_short_atom_lists_inline() {
@@ -59,6 +60,47 @@ fn preserves_common_lisp_reader_prefixes() {
         Formatter::new(2).format(&tree),
         "'(alpha beta)\n\n`(list ,item ,@rest)\n\n#'(lambda (value)\n  value)\n"
     );
+}
+
+#[test]
+fn preserves_dialect_reader_prefix_spellings() {
+    let cases = [
+        (Dialect::Janet, ";(value)", ";(value)\n"),
+        (Dialect::Fennel, "#(value)", "#(value)\n"),
+    ];
+
+    for (dialect, input, expected) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid reader form");
+        assert_eq!(
+            Formatter::new(2).format(&tree),
+            expected,
+            "{}",
+            dialect.label()
+        );
+    }
+}
+
+#[test]
+fn preserves_multi_datum_reader_forms_verbatim() {
+    let cases = [
+        (Dialect::CommonLisp, "#+feature (guarded value)"),
+        (Dialect::Clojure, "^:private target"),
+        (Dialect::Clojure, r#"^{:doc "x"} target"#),
+        (Dialect::Scheme, "#u8(1 2 3)"),
+        (Dialect::Clojure, r##"#"foo.*""##),
+        (Dialect::Clojure, r#"#:person{:first "Ada"}"#),
+        (Dialect::Clojure, r#"#inst "2020-01-01""#),
+    ];
+
+    for (dialect, input) in cases {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("valid reader form");
+        assert_eq!(
+            Formatter::new(2).format(&tree),
+            format!("{input}\n"),
+            "{}",
+            dialect.label()
+        );
+    }
 }
 
 #[test]
@@ -250,6 +292,16 @@ fn keeps_short_defsystem_forms_on_one_line() {
         Formatter::new(2).format(&tree),
         "(defsystem \"foo\" :description \"short\" :version \"0.1.0\" :depends-on (:asdf))\n"
     );
+}
+
+#[test]
+fn preserves_reader_prefix_on_short_defsystem_idempotently() {
+    let tree = SyntaxTree::parse("'(defsystem x)").expect("valid");
+    let formatted = Formatter::new(2).format(&tree);
+    assert_eq!(formatted, "'(defsystem x)\n");
+
+    let reparsed = SyntaxTree::parse(&formatted).expect("formatted output is valid");
+    assert_eq!(Formatter::new(2).format(&reparsed), formatted);
 }
 
 #[test]

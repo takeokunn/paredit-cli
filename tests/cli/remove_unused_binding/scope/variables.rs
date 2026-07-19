@@ -6,6 +6,8 @@ fn cli_plans_remove_unused_binding_ignoring_shadowed_lambda_parameter() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -29,6 +31,8 @@ fn cli_rejects_remove_unused_let_star_binding_used_later() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -48,6 +52,8 @@ fn cli_keeps_let_star_binding_used_by_later_binding_in_all_bindings() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--all-bindings",

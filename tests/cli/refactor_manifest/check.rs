@@ -84,6 +84,153 @@ fn cli_checks_refactor_manifest_without_writing_or_diffing() {
 }
 
 #[test]
+fn cli_refactor_manifest_round_trips_file_dialect() {
+    let cases = [
+        (
+            "common-lisp-character-literal",
+            "lisp",
+            "common-lisp",
+            "(old-name #\\))\n",
+        ),
+        (
+            "emacs-lisp-character-literal",
+            "el",
+            "emacs-lisp",
+            "(old-name ?\\))\n",
+        ),
+    ];
+
+    for (case_name, extension, expected_dialect, original) in cases {
+        let dir = fresh_temp_dir(case_name);
+        let source = dir.join(format!("source.{extension}"));
+        let manifest_file = dir.join("rename.preview.json");
+        fs::write(&source, original).expect("write dialect fixture");
+
+        let preview_output = paredit()
+            .args([
+                "refactor",
+                "preview",
+                "--from",
+                "old-name",
+                "--to",
+                "new-name",
+                "--mode",
+                "symbol",
+                "--fail-on-parse-error",
+                "--output",
+                "json",
+            ])
+            .arg(&source)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&preview_output).expect("preview output parses");
+        assert_eq!(
+            manifest["files"][0]["dialect"].as_str(),
+            Some(expected_dialect)
+        );
+        fs::write(&manifest_file, preview_output).expect("write refactor manifest");
+
+        for command in ["check", "diff"] {
+            paredit()
+                .args(["refactor", command])
+                .arg("--manifest")
+                .arg(&manifest_file)
+                .arg("--root")
+                .arg(&dir)
+                .arg("--output")
+                .arg("json")
+                .assert()
+                .success()
+                .stdout(predicate::str::contains("\"can_apply\": true"));
+        }
+
+        paredit()
+            .args(["refactor", "apply"])
+            .arg("--manifest")
+            .arg(&manifest_file)
+            .arg("--root")
+            .arg(&dir)
+            .arg("--write")
+            .arg("--output")
+            .arg("json")
+            .assert()
+            .success();
+
+        assert_eq!(
+            fs::read_to_string(&source).expect("read rewritten dialect fixture"),
+            original.replace("old-name", "new-name")
+        );
+    }
+}
+
+#[test]
+fn cli_refactor_manifest_requires_valid_file_dialect() {
+    let dir = fresh_temp_dir("refactor manifest dialect validation");
+    let source = dir.join("core.lisp");
+    fs::write(&source, "(old-name value)\n").expect("write dialect validation fixture");
+    let preview_output = paredit()
+        .args([
+            "refactor", "preview", "--from", "old-name", "--to", "new-name", "--mode", "symbol",
+            "--output", "json",
+        ])
+        .arg(&source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&preview_output).expect("preview output parses");
+
+    for (case_name, dialect, expected_error) in [
+        (
+            "missing",
+            None,
+            "missing required manifest field files[0].dialect",
+        ),
+        (
+            "invalid",
+            Some("not-a-dialect"),
+            "manifest field files[0].dialect has invalid dialect",
+        ),
+    ] {
+        let mut malformed = manifest.clone();
+        let file = malformed["files"][0]
+            .as_object_mut()
+            .expect("manifest file entry");
+        match dialect {
+            Some(label) => {
+                file.insert("dialect".into(), serde_json::Value::String(label.into()));
+            }
+            None => {
+                file.remove("dialect");
+            }
+        }
+
+        let manifest_file = dir.join(format!("{case_name}.preview.json"));
+        fs::write(
+            &manifest_file,
+            serde_json::to_vec_pretty(&malformed).expect("serialize malformed manifest"),
+        )
+        .expect("write malformed manifest");
+
+        paredit()
+            .args(["refactor", "check"])
+            .arg("--manifest")
+            .arg(&manifest_file)
+            .arg("--root")
+            .arg(&dir)
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains(expected_error));
+    }
+}
+
+#[test]
 fn cli_refactor_check_rejects_unexpected_manifest_hash_without_writing() {
     let dir = fresh_temp_dir("refactor check-manifest-hash");
     let lisp_file = dir.join("core.lisp");

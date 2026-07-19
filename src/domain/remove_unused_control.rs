@@ -31,7 +31,8 @@ pub fn plan_remove_unused_block(
     request: RemoveUnusedControlRequest<'_>,
 ) -> Result<RemoveUnusedControlPlan> {
     prepare(&request, "remove-unused-block")?;
-    let tree = SyntaxTree::parse(request.input).context("input is not valid")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("input is not valid")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     require_known_expression_context(&tree, &request.path)?;
     let form = tree.select_path(&request.path)?.view();
@@ -61,7 +62,8 @@ pub fn plan_remove_unused_tag(
     request: RemoveUnusedControlRequest<'_>,
 ) -> Result<RemoveUnusedControlPlan> {
     prepare(&request, "remove-unused-tag")?;
-    let tree = SyntaxTree::parse(request.input).context("input is not valid")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("input is not valid")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let form = tree.select_path(&request.path)?.view();
     reject_unsafe(&tree, &form, "remove-unused-tag")?;
@@ -106,7 +108,8 @@ fn finish(
     replacement: &str,
 ) -> Result<RemoveUnusedControlPlan> {
     let rewritten = replace_span(request.input, span, replacement);
-    SyntaxTree::parse(&rewritten).context("rewritten output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("rewritten output is not valid")?;
     Ok(RemoveUnusedControlPlan {
         dialect: request.dialect,
         path: request.path,
@@ -315,24 +318,38 @@ fn contains_head(view: &ExpressionView, expected: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     fn request<'a>(input: &'a str, path: &str, name: &str) -> RemoveUnusedControlRequest<'a> {
+        request_with_dialect(input, Dialect::CommonLisp, path, name)
+    }
+
+    fn request_with_dialect<'a>(
+        input: &'a str,
+        dialect: Dialect,
+        path: &str,
+        name: &str,
+    ) -> RemoveUnusedControlRequest<'a> {
         RemoveUnusedControlRequest {
             input,
-            dialect: Dialect::CommonLisp,
+            dialect,
             path: path.parse().expect("path"),
             name: name.to_owned(),
         }
     }
+
     #[test]
-    fn removes_unused_block_with_multiple_body_forms() {
+    fn removes_unused_block_with_common_lisp_reader_literal_outside_target() {
         let plan = plan_remove_unused_block(request(
-            "(if ok (block out (first) (second)) nil)",
+            r"(if ok (block out (first) (second)) nil) #\)",
             "0.2",
             "out",
         ))
-        .unwrap();
-        assert_eq!(plan.rewritten, "(if ok (progn (first) (second)) nil)");
+        .expect("plan");
+        assert_eq!(plan.rewritten, r"(if ok (progn (first) (second)) nil) #\)");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten input");
     }
+
     #[test]
     fn ignores_shadowed_return_from() {
         plan_remove_unused_block(request(
@@ -342,6 +359,7 @@ mod tests {
         ))
         .unwrap();
     }
+
     #[test]
     fn rejects_referenced_block_and_unknown_context() {
         assert!(
@@ -354,6 +372,7 @@ mod tests {
         );
         assert!(plan_remove_unused_block(request("(list (block out 1))", "0.1", "out")).is_err());
     }
+
     #[test]
     fn removes_symbol_and_integer_tags() {
         assert_eq!(
@@ -369,9 +388,47 @@ mod tests {
             "(tagbody  (print 1))"
         );
     }
+
+    #[test]
+    fn removes_unused_tag_with_common_lisp_reader_literal_outside_target() {
+        let plan = plan_remove_unused_tag(request(r"(tagbody start (print 1)) #\)", "0", "start"))
+            .expect("plan");
+        assert_eq!(plan.rewritten, r"(tagbody  (print 1)) #\)");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten input");
+    }
+
     #[test]
     fn rejects_referenced_tag_but_ignores_nested_shadow() {
         assert!(plan_remove_unused_tag(request("(tagbody x (go x))", "0", "x")).is_err());
         plan_remove_unused_tag(request("(tagbody x (tagbody x (go x)))", "0", "x")).unwrap();
+    }
+
+    #[test]
+    fn rejects_unsupported_dialects_before_parsing_for_both_operations() {
+        for dialect in [
+            Dialect::EmacsLisp,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let block_error =
+                plan_remove_unused_block(request_with_dialect(")", dialect, "0", "out"))
+                    .expect_err("dialect must be rejected");
+            assert_eq!(
+                block_error.to_string(),
+                "remove-unused-block supports only Common Lisp"
+            );
+
+            let tag_error =
+                plan_remove_unused_tag(request_with_dialect(")", dialect, "0", "start"))
+                    .expect_err("dialect must be rejected");
+            assert_eq!(
+                tag_error.to_string(),
+                "remove-unused-tag supports only Common Lisp"
+            );
+        }
     }
 }

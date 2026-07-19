@@ -24,6 +24,21 @@ pub struct ConvertFletToLabelsPlan {
     pub changed: bool,
 }
 
+pub(crate) fn validate_convert_flet_to_labels_dialect(dialect: Dialect) -> Result<()> {
+    validate_common_lisp_dialect(dialect, "convert-flet-to-labels")
+}
+
+pub(crate) fn validate_convert_labels_to_flet_dialect(dialect: Dialect) -> Result<()> {
+    validate_common_lisp_dialect(dialect, "convert-labels-to-flet")
+}
+
+fn validate_common_lisp_dialect(dialect: Dialect, operation: &str) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("{operation} supports only Common Lisp");
+    }
+    Ok(())
+}
+
 pub fn plan_convert_flet_to_labels(
     request: ConvertFletToLabelsRequest<'_>,
 ) -> Result<ConvertFletToLabelsPlan> {
@@ -39,7 +54,7 @@ pub fn plan_convert_flet_to_labels(
         }
     }
     let rewritten = replace_head(request.input, &form, replace_flet_name(&head));
-    parse_output(&rewritten, "convert-flet-to-labels")?;
+    parse_output(&rewritten, request.dialect, "convert-flet-to-labels")?;
     Ok(ConvertFletToLabelsPlan {
         dialect: request.dialect,
         path: request.path,
@@ -82,7 +97,7 @@ pub fn plan_convert_labels_to_flet(
         }
     }
     let rewritten = replace_head(request.input, &form, replace_labels_name(&head));
-    parse_output(&rewritten, "convert-labels-to-flet")?;
+    parse_output(&rewritten, request.dialect, "convert-labels-to-flet")?;
     Ok(ConvertLabelsToFletPlan {
         dialect: request.dialect,
         path: request.path,
@@ -107,10 +122,8 @@ fn analyze_bindings<'a, R>(
 where
     R: BindingRequest<'a> + ?Sized,
 {
-    if request.dialect() != Dialect::CommonLisp {
-        bail!("{operation} supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input())
+    validate_common_lisp_dialect(request.dialect(), operation)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input(), request.dialect())
         .with_context(|| format!("{operation} input is not a valid S-expression document"))?;
     let form = tree.select_path(request.path())?.view();
     if tree.has_comment_in(form.span) {
@@ -245,8 +258,8 @@ fn replace_head(input: &str, form: &ExpressionView, replacement: String) -> Stri
     output
 }
 
-fn parse_output(rewritten: &str, operation: &str) -> Result<()> {
-    SyntaxTree::parse(rewritten)
+fn parse_output(rewritten: &str, dialect: Dialect, operation: &str) -> Result<()> {
+    SyntaxTree::parse_with_dialect(rewritten, dialect)
         .with_context(|| format!("{operation} output is not a valid S-expression document"))?;
     Ok(())
 }
@@ -255,26 +268,59 @@ fn parse_output(rewritten: &str, operation: &str) -> Result<()> {
 mod tests {
     use super::*;
 
+    const DIALECTS: [Dialect; 7] = [
+        Dialect::CommonLisp,
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Clojure,
+        Dialect::Janet,
+        Dialect::Fennel,
+        Dialect::Unknown,
+    ];
+
+    fn flet_request(input: &str, dialect: Dialect) -> ConvertFletToLabelsRequest<'_> {
+        ConvertFletToLabelsRequest {
+            input,
+            dialect,
+            path: "0".parse().expect("path"),
+        }
+    }
+
+    fn labels_request(input: &str, dialect: Dialect) -> ConvertLabelsToFletRequest<'_> {
+        ConvertLabelsToFletRequest {
+            input,
+            dialect,
+            path: "0".parse().expect("path"),
+        }
+    }
+
+    fn assert_support_error<T>(result: Result<T>, operation: &str) {
+        let error = result.err().expect("unsupported dialect must fail");
+        assert_eq!(
+            error.to_string(),
+            format!("{operation} supports only Common Lisp")
+        );
+    }
+
     #[test]
     fn converts_capture_free_and_non_recursive_forms() {
-        let flet = plan_convert_flet_to_labels(ConvertFletToLabelsRequest {
-            input: "(flet ((work () 1)) (work))",
-            dialect: Dialect::CommonLisp,
-            path: "0".parse().expect("path"),
-        })
+        let flet = plan_convert_flet_to_labels(flet_request(
+            "(flet ((work () 1)) (work))",
+            Dialect::CommonLisp,
+        ))
         .expect("flet plan");
         assert_eq!(flet.rewritten, "(labels ((work () 1)) (work))");
-        let labels = plan_convert_labels_to_flet(ConvertLabelsToFletRequest {
-            input: "(labels ((work () 1)) (work))",
-            dialect: Dialect::CommonLisp,
-            path: "0".parse().expect("path"),
-        })
+
+        let labels = plan_convert_labels_to_flet(labels_request(
+            "(labels ((work () 1)) (work))",
+            Dialect::CommonLisp,
+        ))
         .expect("labels plan");
         assert_eq!(labels.rewritten, "(flet ((work () 1)) (work))");
     }
 
     #[test]
-    fn rejects_recursion_duplicates_malformed_forms_and_other_dialects() {
+    fn rejects_recursion_duplicates_and_malformed_forms() {
         for input in [
             "(labels ((walk () (walk))) (walk))",
             "(labels ((walk () (function walk))) (walk))",
@@ -284,27 +330,68 @@ mod tests {
             "(flet ((work () ; keep\n 1)) (work))",
         ] {
             assert!(
-                plan_convert_labels_to_flet(ConvertLabelsToFletRequest {
-                    input,
-                    dialect: Dialect::CommonLisp,
-                    path: "0".parse().expect("path"),
-                })
-                .is_err()
-                    || plan_convert_flet_to_labels(ConvertFletToLabelsRequest {
-                        input,
-                        dialect: Dialect::CommonLisp,
-                        path: "0".parse().expect("path"),
-                    })
-                    .is_err()
+                plan_convert_labels_to_flet(labels_request(input, Dialect::CommonLisp)).is_err()
+                    || plan_convert_flet_to_labels(flet_request(input, Dialect::CommonLisp))
+                        .is_err()
             );
         }
-        assert!(
-            plan_convert_flet_to_labels(ConvertFletToLabelsRequest {
-                input: "(flet ((work () 1)) (work))",
-                dialect: Dialect::EmacsLisp,
-                path: "0".parse().expect("path"),
-            })
-            .is_err()
-        );
+    }
+
+    #[test]
+    fn support_matrix_is_common_lisp_only_for_both_conversions() {
+        for dialect in DIALECTS {
+            let flet =
+                plan_convert_flet_to_labels(flet_request("(flet ((work () 1)) (work))", dialect));
+            let labels = plan_convert_labels_to_flet(labels_request(
+                "(labels ((work () 1)) (work))",
+                dialect,
+            ));
+
+            if dialect == Dialect::CommonLisp {
+                assert!(flet.is_ok(), "Common Lisp flet conversion must succeed");
+                assert!(labels.is_ok(), "Common Lisp labels conversion must succeed");
+            } else {
+                assert_support_error(flet, "convert-flet-to-labels");
+                assert_support_error(labels, "convert-labels-to-flet");
+            }
+        }
+    }
+
+    #[test]
+    fn unsupported_dialect_gate_precedes_parsing_for_both_conversions() {
+        for dialect in DIALECTS
+            .into_iter()
+            .filter(|dialect| *dialect != Dialect::CommonLisp)
+        {
+            assert_support_error(
+                plan_convert_flet_to_labels(flet_request(")", dialect)),
+                "convert-flet-to-labels",
+            );
+            assert_support_error(
+                plan_convert_labels_to_flet(labels_request(")", dialect)),
+                "convert-labels-to-flet",
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_common_lisp_delimiter_character_literals() {
+        let flet = plan_convert_flet_to_labels(flet_request(
+            "(flet ((work () #\\))) (work))",
+            Dialect::CommonLisp,
+        ))
+        .expect("flet character literal plan");
+        assert_eq!(flet.rewritten, "(labels ((work () #\\))) (work))");
+        SyntaxTree::parse_with_dialect(&flet.rewritten, Dialect::CommonLisp)
+            .expect("flet output must reparse as Common Lisp");
+
+        let labels = plan_convert_labels_to_flet(labels_request(
+            "(labels ((work () #\\))) (work))",
+            Dialect::CommonLisp,
+        ))
+        .expect("labels character literal plan");
+        assert_eq!(labels.rewritten, "(flet ((work () #\\))) (work))");
+        SyntaxTree::parse_with_dialect(&labels.rewritten, Dialect::CommonLisp)
+            .expect("labels output must reparse as Common Lisp");
     }
 }

@@ -3,7 +3,15 @@ use super::*;
 #[test]
 fn cli_plans_inline_function_with_all_calls() {
     assert_inline_success(
-        &["--definition-path", "0", "--all-calls", "--output", "json"],
+        &[
+            "--dialect",
+            "common-lisp",
+            "--definition-path",
+            "0",
+            "--all-calls",
+            "--output",
+            "json",
+        ],
         "(defun area (width height) (* width height))\n\
          (defun render () (area 10 20))\n\
          (defun summarize () (+ (area 3 4) 1))",

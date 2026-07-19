@@ -9,6 +9,7 @@ pub(super) struct ExtractFunctionBindingEntry {
 }
 
 pub(super) fn extract_function_binding_entries(
+    semantic: super::ExtractFunctionSemantic,
     binding_form: &ExpressionView,
 ) -> Option<Vec<ExtractFunctionBindingEntry>> {
     match binding_form.delimiter {
@@ -21,7 +22,7 @@ pub(super) fn extract_function_binding_entries(
                     .children
                     .chunks_exact(2)
                     .map(|pair| ExtractFunctionBindingEntry {
-                        names: extract_function_pattern_names(&pair[0]),
+                        names: extract_function_pattern_names(semantic, &pair[0]),
                         value: Some(pair[1].clone()),
                     })
                     .collect(),
@@ -38,7 +39,7 @@ pub(super) fn extract_function_binding_entries(
                             return None;
                         }
                         return Some(ExtractFunctionBindingEntry {
-                            names: extract_function_pattern_names(pair),
+                            names: extract_function_pattern_names(semantic, pair),
                             value: None,
                         });
                     }
@@ -46,7 +47,7 @@ pub(super) fn extract_function_binding_entries(
                         return None;
                     }
                     Some(ExtractFunctionBindingEntry {
-                        names: extract_function_pattern_names(&pair.children[0]),
+                        names: extract_function_pattern_names(semantic, &pair.children[0]),
                         value: pair.children.get(1).cloned(),
                     })
                 })

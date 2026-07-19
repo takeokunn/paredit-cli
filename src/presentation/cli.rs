@@ -12,6 +12,7 @@ mod call_report;
 mod capabilities;
 mod command;
 mod conditional_conversion;
+mod contract;
 mod convert_cond_to_if;
 mod convert_flet_to_labels;
 mod convert_if_to_cond;

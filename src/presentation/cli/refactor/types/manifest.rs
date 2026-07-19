@@ -13,6 +13,7 @@ pub(in crate::presentation::cli) struct RefactorApplyManifest {
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct RefactorApplyManifestFile {
     pub(in crate::presentation::cli) path: PathBuf,
+    pub(in crate::presentation::cli) dialect: Dialect,
     pub(in crate::presentation::cli) changed: bool,
     pub(in crate::presentation::cli) output_parse_ok: bool,
     pub(in crate::presentation::cli) input_hash: String,

@@ -6,6 +6,8 @@ fn cli_plans_extract_function_for_common_lisp() {
     cmd.args([
         "refactor",
         "extract-function",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",
@@ -16,7 +18,7 @@ fn cli_plans_extract_function_for_common_lisp() {
     .write_stdin("(defun render () (+ 1 2))")
     .assert()
     .success()
-    .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
+    .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
     .stdout(predicate::str::contains("\"call\": \"(compute-sum)\""))
     .stdout(predicate::str::contains(
         "\"definition\": \"(defun compute-sum () (+ 1 2))\"",
@@ -30,6 +32,8 @@ fn cli_plans_extract_function_for_common_lisp() {
 fn cli_plans_extract_function_for_common_lisp_macrolet_body() {
     let mut cmd = paredit();
     cmd.args(["refactor", "extract-function",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",
@@ -56,6 +60,8 @@ fn cli_plans_extract_function_for_common_lisp_macrolet_body() {
 fn cli_plans_extract_function_for_common_lisp_symbol_macrolet_body() {
     let mut cmd = paredit();
     cmd.args(["refactor", "extract-function",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",

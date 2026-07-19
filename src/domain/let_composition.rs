@@ -239,12 +239,18 @@ fn select(
     path: &Path,
     operation: &str,
 ) -> Result<(SyntaxTree, ExpressionView)> {
+    validate_dialect(dialect, operation)?;
+    let tree = SyntaxTree::parse_with_dialect(input, dialect)
+        .context("input is not a valid S-expression document")?;
+    let view = tree.select_path(path)?.view();
+    Ok((tree, view))
+}
+
+pub(crate) fn validate_dialect(dialect: Dialect, operation: &str) -> Result<()> {
     if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         bail!("{operation} supports only Common Lisp and Emacs Lisp");
     }
-    let tree = SyntaxTree::parse(input).context("input is not a valid S-expression document")?;
-    let view = tree.select_path(path)?.view();
-    Ok((tree, view))
+    Ok(())
 }
 fn require_form(
     dialect: Dialect,
@@ -381,7 +387,8 @@ fn finish(
     operation: &str,
 ) -> Result<LetCompositionPlan> {
     let rewritten = replace_span(input, span, &replacement);
-    SyntaxTree::parse(&rewritten).with_context(|| format!("{operation} output is not valid"))?;
+    SyntaxTree::parse_with_dialect(&rewritten, dialect)
+        .with_context(|| format!("{operation} output is not valid"))?;
     Ok(LetCompositionPlan {
         dialect,
         path,
@@ -451,7 +458,7 @@ mod tests {
                 path: path(),
             })
             .expect("merge");
-            SyntaxTree::parse(&merged.rewritten).expect("merged output");
+            SyntaxTree::parse_with_dialect(&merged.rewritten, dialect).expect("merged output");
             let split = plan_split_let(SplitLetRequest {
                 input: "(let ((x 1) (y 2)) (+ x y))",
                 dialect,
@@ -462,7 +469,7 @@ mod tests {
             assert_eq!(split.binding_index.get(), 1);
             assert_eq!(split.outer_binding_count, 1);
             assert_eq!(split.inner_binding_count, 1);
-            SyntaxTree::parse(&split.rewritten).expect("split output");
+            SyntaxTree::parse_with_dialect(&split.rewritten, dialect).expect("split output");
         }
     }
 
@@ -525,5 +532,86 @@ mod tests {
         })
         .expect("let* merge");
         assert_eq!(plan.rewritten, "(let* ((x 1) (y (+ x 1))) y)");
+    }
+
+    #[test]
+    fn supported_dialects_handle_reader_collisions_and_reparse_output() {
+        for (dialect, prefix) in [(Dialect::CommonLisp, "#\\)"), (Dialect::EmacsLisp, "?\\)")] {
+            let path: Path = "1".parse().expect("path");
+
+            let merged = plan_merge_nested_let(MergeNestedLetRequest {
+                input: &format!("{prefix} (let ((x 1)) (let ((y 2)) (+ x y)))"),
+                dialect,
+                path: path.clone(),
+            })
+            .expect("merge");
+            SyntaxTree::parse_with_dialect(&merged.rewritten, dialect).expect("merged output");
+
+            let merged_star = plan_merge_nested_let_star(MergeNestedLetStarRequest {
+                input: &format!("{prefix} (let* ((x 1)) (let* ((y (+ x 1))) y))"),
+                dialect,
+                path: path.clone(),
+            })
+            .expect("let* merge");
+            SyntaxTree::parse_with_dialect(&merged_star.rewritten, dialect)
+                .expect("let* merged output");
+
+            let split = plan_split_let(SplitLetRequest {
+                input: &format!("{prefix} (let ((x 1) (y 2)) (+ x y))"),
+                dialect,
+                path,
+                binding_index: BindingIndex::new(1).expect("binding index"),
+            })
+            .expect("split");
+            SyntaxTree::parse_with_dialect(&split.rewritten, dialect).expect("split output");
+        }
+    }
+
+    #[test]
+    fn unsupported_dialects_are_rejected_before_parsing() {
+        for dialect in [
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let merge_error = plan_merge_nested_let(MergeNestedLetRequest {
+                input: ")",
+                dialect,
+                path: path(),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                merge_error
+                    .to_string()
+                    .contains("supports only Common Lisp and Emacs Lisp")
+            );
+
+            let merge_star_error = plan_merge_nested_let_star(MergeNestedLetStarRequest {
+                input: ")",
+                dialect,
+                path: path(),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                merge_star_error
+                    .to_string()
+                    .contains("supports only Common Lisp and Emacs Lisp")
+            );
+
+            let split_error = plan_split_let(SplitLetRequest {
+                input: ")",
+                dialect,
+                path: path(),
+                binding_index: BindingIndex::new(1).expect("binding index"),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                split_error
+                    .to_string()
+                    .contains("supports only Common Lisp and Emacs Lisp")
+            );
+        }
     }
 }

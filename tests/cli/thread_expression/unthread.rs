@@ -6,6 +6,8 @@ fn cli_plans_unthread_first_expression_without_writing() {
     cmd.args([
         "refactor",
         "unthread-expression",
+        "--dialect",
+        "clojure",
         "--path",
         "0",
         "--output",
@@ -58,14 +60,21 @@ fn cli_writes_unthread_last_expression_for_clojure_file() {
 #[test]
 fn cli_rejects_unthread_unrecognized_operator_without_explicit_confirmation() {
     let mut cmd = paredit();
-    cmd.args(["refactor", "unthread-expression", "--path", "0"])
-        .write_stdin("(my-> value step)")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "not a recognized threading operator",
-        ))
-        .stderr(predicate::str::contains("--operator"));
+    cmd.args([
+        "refactor",
+        "unthread-expression",
+        "--dialect",
+        "clojure",
+        "--path",
+        "0",
+    ])
+    .write_stdin("(my-> value step)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "not a recognized threading operator",
+    ))
+    .stderr(predicate::str::contains("--operator"));
 }
 
 #[test]
@@ -74,6 +83,8 @@ fn cli_rejects_unthread_custom_operator_without_style() {
     cmd.args([
         "refactor",
         "unthread-expression",
+        "--dialect",
+        "clojure",
         "--path",
         "0",
         "--operator",

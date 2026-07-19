@@ -130,4 +130,47 @@ fn rejects_package_syntax_in_replacement_symbol() {
         Some(&RenameAtError::UnsupportedPackageSyntax)
     );
 }
+
+#[test]
+fn support_predicate_accepts_only_common_lisp() {
+    assert!(super::super::supports_rename_at_dialect(
+        Dialect::CommonLisp
+    ));
+
+    for dialect in [
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Clojure,
+        Dialect::Janet,
+        Dialect::Fennel,
+        Dialect::Unknown,
+    ] {
+        assert!(!super::super::supports_rename_at_dialect(dialect));
+    }
+}
+
+#[test]
+fn rejects_unsupported_dialects_before_parsing_malformed_input() {
+    for dialect in [
+        Dialect::EmacsLisp,
+        Dialect::Scheme,
+        Dialect::Clojure,
+        Dialect::Janet,
+        Dialect::Fennel,
+        Dialect::Unknown,
+    ] {
+        let error = plan_rename_at(RenameAtRequest {
+            input: "(",
+            dialect,
+            at: ByteOffset::new(0),
+            to: SymbolName::new("bar").unwrap(),
+        })
+        .unwrap_err();
+
+        assert_eq!(
+            error.downcast_ref::<RenameAtError>(),
+            Some(&RenameAtError::UnsupportedDialect)
+        );
+    }
+}
 use super::*;

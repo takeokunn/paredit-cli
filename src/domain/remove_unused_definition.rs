@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::domain::dialect::Dialect;
 use crate::domain::mutation_safety::reject_overlapping_common_lisp_reader_time_forms;
 use crate::domain::sexpr::SyntaxTree;
 
@@ -23,6 +24,15 @@ pub use types::{
 pub fn plan_remove_unused_definitions(
     request: RemoveUnusedDefinitionsRequest,
 ) -> Result<RemoveUnusedDefinitionsPlan> {
+    for file in &request.files {
+        if file.dialect == Dialect::Unknown {
+            anyhow::bail!(
+                "remove-unused-definition does not support dialect unknown: {}",
+                file.path.display()
+            );
+        }
+    }
+
     let exported_symbols = collect_exported_symbol_index(&request.package_definitions);
     let unused_reports = collect_unused_definition_candidates(&request.files)?;
     let mut files = Vec::with_capacity(request.files.len());
@@ -62,6 +72,12 @@ fn plan_file_removals(
 ) -> Result<RemoveUnusedDefinitionsFilePlan> {
     let mut removals = Vec::new();
     let mut skipped = Vec::new();
+    let empty_exported_symbols = std::collections::HashMap::new();
+    let exported_symbols = if file.dialect == Dialect::CommonLisp {
+        exported_symbols
+    } else {
+        &empty_exported_symbols
+    };
 
     for item in report
         .definitions
@@ -137,7 +153,7 @@ fn rewrite_file_without_unused_definitions(
     for removal in removals {
         let expanded = expand_definition_removal(&rewritten, removal.definition.span);
         removal.removal_span = expanded;
-        let tree = SyntaxTree::parse(&rewritten).with_context(|| {
+        let tree = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).with_context(|| {
             format!(
                 "file would become invalid before removing unused definitions: {}",
                 file.path.display()
@@ -147,7 +163,7 @@ fn rewrite_file_without_unused_definitions(
         rewritten = replace_span(&rewritten, expanded, "");
     }
 
-    SyntaxTree::parse(&rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&rewritten, file.dialect).with_context(|| {
         format!(
             "file would become invalid after removing unused definitions: {}",
             file.path.display()

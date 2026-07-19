@@ -17,7 +17,7 @@ pub(in crate::presentation::cli) fn check(args: AnalyzeArgs) -> Result<()> {
         OutputFormat::Json => {
             let (input, dialect) = read_input_and_dialect(args.file, args.dialect)?;
             let file = input.file.as_deref().map(|path| path.display().to_string());
-            let parse_error = SyntaxTree::parse(&input.text).err();
+            let parse_error = SyntaxTree::parse_with_dialect(&input.text, dialect).err();
             let report = json!({
                 "schema_version": 1,
                 "status": if parse_error.is_none() { "ok" } else { "error" },
