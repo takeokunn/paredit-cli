@@ -27,7 +27,8 @@ pub struct FlattenPrognPlan {
 
 pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPrognPlan> {
     require_supported(request.dialect, "flatten-progn")?;
-    let tree = SyntaxTree::parse(request.input).context("flatten-progn input is not valid")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("flatten-progn input is not valid")?;
     let form = tree.select_path(&request.path)?.view();
     require_head(request.dialect, &form, "progn", "flatten-progn")?;
     if tree.has_comment_in(form.span) || contains_prefix(&form) {
@@ -65,7 +66,8 @@ pub fn plan_flatten_progn(request: FlattenPrognRequest<'_>) -> Result<FlattenPro
         ),
     };
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("flatten-progn output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("flatten-progn output is not valid")?;
     Ok(FlattenPrognPlan {
         dialect: request.dialect,
         path: request.path,
@@ -99,7 +101,7 @@ pub fn plan_eliminate_empty_binding_form(
     request: EliminateEmptyBindingFormRequest<'_>,
 ) -> Result<EliminateEmptyBindingFormPlan> {
     require_supported(request.dialect, "eliminate-empty-binding-form")?;
-    let tree = SyntaxTree::parse(request.input)
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("eliminate-empty-binding-form input is not valid")?;
     let form = tree.select_path(&request.path)?.view();
     if form.kind != ExpressionKind::List
@@ -138,7 +140,8 @@ pub fn plan_eliminate_empty_binding_form(
         ),
     };
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("eliminate-empty-binding-form output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("eliminate-empty-binding-form output is not valid")?;
     Ok(EliminateEmptyBindingFormPlan {
         dialect: request.dialect,
         path: request.path,
@@ -150,7 +153,7 @@ pub fn plan_eliminate_empty_binding_form(
     })
 }
 
-fn require_supported(dialect: Dialect, operation: &str) -> Result<()> {
+pub(crate) fn require_supported(dialect: Dialect, operation: &str) -> Result<()> {
     if matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
         Ok(())
     } else {
@@ -206,31 +209,78 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn flatten_round_trips_across_dialects() {
-        for dialect in [Dialect::CommonLisp, Dialect::EmacsLisp] {
+    fn flatten_round_trips_across_dialects_with_reader_literals_outside_target() {
+        for (dialect, reader_literal) in
+            [(Dialect::CommonLisp, r"#\)"), (Dialect::EmacsLisp, r"?\)")]
+        {
+            let input = format!("(progn a (progn b c)) {reader_literal}");
             let plan = plan_flatten_progn(FlattenPrognRequest {
-                input: "(list (progn a (progn b c)))",
+                input: &input,
                 dialect,
-                path: "0.1".parse().unwrap(),
+                path: "0".parse().expect("path"),
             })
-            .unwrap();
+            .expect("plan");
             assert_eq!(plan.result_form_count, 3);
-            assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+            assert_eq!(plan.rewritten, format!("(progn a b c) {reader_literal}"));
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect).expect("rewritten input");
         }
     }
+
     #[test]
-    fn eliminate_preserves_body_cardinality() {
-        let plan = plan_eliminate_empty_binding_form(EliminateEmptyBindingFormRequest {
-            input: "(if ok (let () a b) nil)",
-            dialect: Dialect::CommonLisp,
-            path: "0.2".parse().unwrap(),
-        })
-        .unwrap();
-        assert_eq!(plan.body_form_count, 2);
-        assert!(plan.introduced_progn);
-        assert!(SyntaxTree::parse(&plan.rewritten).is_ok());
+    fn eliminate_round_trips_across_dialects_with_reader_literals_outside_target() {
+        for (dialect, reader_literal) in
+            [(Dialect::CommonLisp, r"#\)"), (Dialect::EmacsLisp, r"?\)")]
+        {
+            let input = format!("(let () a b) {reader_literal}");
+            let plan = plan_eliminate_empty_binding_form(EliminateEmptyBindingFormRequest {
+                input: &input,
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect("plan");
+            assert_eq!(plan.body_form_count, 2);
+            assert!(plan.introduced_progn);
+            assert_eq!(plan.rewritten, format!("(progn a b) {reader_literal}"));
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect).expect("rewritten input");
+        }
     }
+
+    #[test]
+    fn rejects_unsupported_dialects_before_parsing_for_both_operations() {
+        for dialect in [
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let flatten_error = plan_flatten_progn(FlattenPrognRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("dialect must be rejected");
+            assert_eq!(
+                flatten_error.to_string(),
+                "flatten-progn supports only Common Lisp and Emacs Lisp"
+            );
+
+            let eliminate_error =
+                plan_eliminate_empty_binding_form(EliminateEmptyBindingFormRequest {
+                    input: ")",
+                    dialect,
+                    path: "0".parse().expect("path"),
+                })
+                .expect_err("dialect must be rejected");
+            assert_eq!(
+                eliminate_error.to_string(),
+                "eliminate-empty-binding-form supports only Common Lisp and Emacs Lisp"
+            );
+        }
+    }
+
     #[test]
     fn rejects_unsupported_forms() {
         assert!(

@@ -282,3 +282,71 @@ fn plan_split_file_preserves_unselected_common_lisp_vector_literals() {
     assert!(SyntaxTree::parse(&plan.from_rewritten).is_ok());
     assert!(SyntaxTree::parse(&plan.to_rewritten).is_ok());
 }
+
+#[test]
+fn plan_split_file_uses_each_file_dialect_for_character_literal_collisions() {
+    for (case_name, dialect, character_literal) in [
+        ("Common Lisp", Dialect::CommonLisp, "#\\)"),
+        ("Emacs Lisp", Dialect::EmacsLisp, "?\\)"),
+    ] {
+        let from_input =
+            format!("(defun keep () {character_literal})\n\n(defun moved () :moved)\n");
+        let to_input = format!("(defun existing () {character_literal})\n");
+        let mut request = split_request(&from_input, &to_input);
+        request.from_dialect = dialect;
+        request.to_dialect = dialect;
+        request.paths = vec![Path::from_indexes(vec![1])];
+
+        let plan = plan_split_file(request)
+            .unwrap_or_else(|error| panic!("{case_name} split should succeed: {error:#}"));
+
+        assert!(plan.from_rewritten.contains(character_literal));
+        assert!(plan.to_rewritten.contains(character_literal));
+        assert!(plan.to_rewritten.contains("(defun moved () :moved)"));
+        SyntaxTree::parse_with_dialect(&plan.from_rewritten, dialect)
+            .unwrap_or_else(|error| panic!("{case_name} source output should parse: {error:#}"));
+        SyntaxTree::parse_with_dialect(&plan.to_rewritten, dialect).unwrap_or_else(|error| {
+            panic!("{case_name} destination output should parse: {error:#}")
+        });
+    }
+}
+
+#[test]
+fn plan_split_file_preserves_unknown_generic_syntax_compatibility() {
+    let mut request = split_request(
+        "(defn keep [] :kept)\n\n(defn moved [] :moved)\n",
+        "(defn existing [] :existing)\n",
+    );
+    request.from_dialect = Dialect::Unknown;
+    request.to_dialect = Dialect::Unknown;
+    request.paths = vec![Path::from_indexes(vec![1])];
+
+    let plan = plan_split_file(request).expect("Unknown dialect should retain generic parsing");
+
+    assert!(plan.from_rewritten.contains("(defn keep [] :kept)"));
+    assert!(plan.to_rewritten.contains("(defn moved [] :moved)"));
+    SyntaxTree::parse_with_dialect(&plan.from_rewritten, Dialect::Unknown)
+        .expect("Unknown source output should parse");
+    SyntaxTree::parse_with_dialect(&plan.to_rewritten, Dialect::Unknown)
+        .expect("Unknown destination output should parse");
+}
+
+#[test]
+fn plan_split_file_does_not_inject_common_lisp_package_into_non_common_lisp_destination() {
+    let mut request = split_request(
+        "(in-package #:demo)\n\n(defun moved () :moved)\n",
+        "(setq destination-ready t)\n",
+    );
+    request.from_dialect = Dialect::CommonLisp;
+    request.to_dialect = Dialect::EmacsLisp;
+    request.paths = vec![Path::from_indexes(vec![1])];
+
+    let plan = plan_split_file(request).expect("Common Lisp to Emacs Lisp split should succeed");
+
+    assert!(!plan.to_rewritten.contains("(in-package"));
+    assert!(plan.to_rewritten.contains("(defun moved () :moved)"));
+    SyntaxTree::parse_with_dialect(&plan.from_rewritten, Dialect::CommonLisp)
+        .expect("Common Lisp source output should parse");
+    SyntaxTree::parse_with_dialect(&plan.to_rewritten, Dialect::EmacsLisp)
+        .expect("Emacs Lisp destination output should parse");
+}

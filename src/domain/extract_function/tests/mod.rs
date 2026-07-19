@@ -16,7 +16,7 @@ fn infer_at_dialect(
     path: &[usize],
     explicit: &[&str],
 ) -> Vec<String> {
-    let tree = SyntaxTree::parse(input).expect("parse fixture");
+    let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse fixture");
     let selection = tree
         .select_path(&Path::from_indexes(path.to_vec()))
         .expect("select fixture");
@@ -35,7 +35,25 @@ fn plan_at(
     explicit: &[&str],
     infer_params: bool,
 ) -> ExtractFunctionPlan {
-    let tree = SyntaxTree::parse(input).expect("parse fixture");
+    plan_at_dialect(
+        Dialect::CommonLisp,
+        input,
+        path,
+        name,
+        explicit,
+        infer_params,
+    )
+}
+
+fn plan_at_dialect(
+    dialect: Dialect,
+    input: &str,
+    path: &[usize],
+    name: &str,
+    explicit: &[&str],
+    infer_params: bool,
+) -> ExtractFunctionPlan {
+    let tree = SyntaxTree::parse_with_dialect(input, dialect).expect("parse fixture");
     let selection = tree
         .select_path(&Path::from_indexes(path.to_vec()))
         .expect("select fixture");
@@ -48,7 +66,7 @@ fn plan_at(
         input,
         selection,
         path: Some(Path::from_indexes(path.to_vec())),
-        dialect: Dialect::CommonLisp,
+        dialect,
         name: SymbolName::new(name).expect("symbol fixture"),
         explicit_params,
         infer_params,

@@ -49,6 +49,8 @@ fn assert_thread_expression_property(
         .args([
             "refactor",
             "thread-expression",
+            "--dialect",
+            "clojure",
             "--path",
             "0",
             "--style",
@@ -92,6 +94,8 @@ fn assert_unthread_expression_property(input: String) -> Result<(), TestCaseErro
         .args([
             "refactor",
             "unthread-expression",
+            "--dialect",
+            "clojure",
             "--path",
             "0",
             "--output",

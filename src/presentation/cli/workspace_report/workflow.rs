@@ -59,7 +59,7 @@ pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) 
             }
         };
 
-        match SyntaxTree::parse(&text) {
+        match SyntaxTree::parse_with_dialect(&text, dialect) {
             Ok(tree) => {
                 let (package, definitions) = collect_definition_forms(&tree, dialect)
                     .with_context(|| format!("failed to analyze {}", file.display()))?;

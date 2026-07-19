@@ -18,6 +18,25 @@ fn cli_requires_file_for_remove_unused_binding_writes() {
 }
 
 #[test]
+fn cli_rejects_remove_unused_binding_for_unknown_stdin_dialect() {
+    let mut cmd = paredit();
+    cmd.args([
+        "refactor",
+        "remove-unused-binding",
+        "--path",
+        "0",
+        "--name",
+        "unused",
+    ])
+    .write_stdin("(let ((unused 1)) :ok)")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains(
+        "remove-unused-binding does not support dialect unknown",
+    ));
+}
+
+#[test]
 fn cli_requires_drop_value_permission_for_remove_unused_binding_writes() {
     let dir = fresh_temp_dir("remove-unused-binding-permission");
     let lisp_file = dir.join("render.lisp");
@@ -48,6 +67,8 @@ fn cli_rejects_remove_unused_binding_with_references() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -87,6 +108,8 @@ fn cli_rejects_remove_all_unused_bindings_when_none_unused() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--all-bindings",

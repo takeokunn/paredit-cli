@@ -38,10 +38,8 @@ pub(crate) struct Plan {
 }
 
 pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
-    if request.dialect != Dialect::CommonLisp {
-        bail!("inline-local-function currently supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input)
+    validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-local-function input is not a valid S-expression document")?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
@@ -126,7 +124,7 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         .join(" ");
     let replacement = format!("(let ({bindings}) {body})");
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("inline-local-function output is not a valid S-expression document")?;
     Ok(Plan {
         dialect: request.dialect,
@@ -139,6 +137,13 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         changed: rewritten != request.input,
         rewritten,
     })
+}
+
+pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("inline-local-function currently supports only Common Lisp");
+    }
+    Ok(())
 }
 
 fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
@@ -233,5 +238,60 @@ mod tests {
         assert!(plan("(flet ((f (x) (+ x x))) (f (effect)))").is_err());
         assert!(plan("(flet ((f (x) (go done))) (f 1))").is_err());
         assert!(plan("(labels ((f (x) x)) (f 1))").is_err());
+    }
+
+    #[test]
+    fn supports_only_common_lisp_before_input_validation() {
+        let cases = [
+            (Dialect::CommonLisp, true),
+            (Dialect::EmacsLisp, false),
+            (Dialect::Scheme, false),
+            (Dialect::Clojure, false),
+            (Dialect::Janet, false),
+            (Dialect::Fennel, false),
+            (Dialect::Unknown, false),
+        ];
+
+        for (dialect, supported) in cases {
+            let input = if supported {
+                "(flet ((identity (x) x)) (identity value))"
+            } else {
+                ")"
+            };
+            let result = super::plan(Request {
+                input,
+                dialect,
+                path: Path::from_indexes(vec![0]),
+            });
+
+            if supported {
+                let plan = result.expect("Common Lisp should be supported");
+                assert_eq!(plan.dialect, dialect);
+                SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+                    .expect("rewritten Common Lisp should parse");
+            } else {
+                let error = match result {
+                    Ok(_) => panic!("{dialect:?} should be rejected"),
+                    Err(error) => error,
+                };
+                assert_eq!(
+                    error.to_string(),
+                    "inline-local-function currently supports only Common Lisp"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_common_lisp_reader_atoms() {
+        let input = "(flet ((render (x) (list x #\\) #:done #x2a))) (render (next)))";
+        let plan = plan(input).unwrap();
+
+        assert_eq!(
+            plan.rewritten,
+            "(let ((x (next))) (list x #\\) #:done #x2a))"
+        );
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten Common Lisp reader atoms should parse");
     }
 }

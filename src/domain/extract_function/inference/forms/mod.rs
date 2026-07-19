@@ -3,18 +3,19 @@ mod callable;
 mod control;
 
 use crate::domain::common_lisp::{CommonLispLetBindingForm, CommonLispValueScopeForm};
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::syntax::{atom_text, list_head};
+use super::ExtractFunctionSemantic;
 
 pub(super) fn collect_inferred_extract_function_special_form(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
     params: &mut Vec<String>,
 ) -> bool {
+    let dialect = semantic.dialect();
     if view.kind != ExpressionKind::List || view.delimiter != Some(Delimiter::Paren) {
         return false;
     }
@@ -31,7 +32,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         CommonLispValueScopeForm::Let(CommonLispLetBindingForm::Parallel)
         | CommonLispValueScopeForm::Let(CommonLispLetBindingForm::SymbolMacro) => {
             bindings::collect_inferred_extract_function_let(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -40,7 +41,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Let(CommonLispLetBindingForm::Sequential) => {
             bindings::collect_inferred_extract_function_let_star(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -49,7 +50,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Value => {
             bindings::collect_inferred_extract_function_value_binding(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -58,7 +59,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Clause => {
             bindings::collect_inferred_extract_function_clause_form(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -67,7 +68,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Handler(form) => {
             bindings::collect_inferred_extract_function_handler_bind(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -77,7 +78,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Iteration => {
             bindings::collect_inferred_extract_function_iteration_binding(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -88,7 +89,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
             if dialect.common_lisp_variable_binding_has_step_forms_for_head(head) =>
         {
             control::collect_inferred_extract_function_do(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -98,7 +99,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Variable(form) => {
             control::collect_inferred_extract_function_prog(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -107,7 +108,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
             )
         }
         CommonLispValueScopeForm::Slot => bindings::collect_inferred_extract_function_slot_binding(
-            dialect,
+            semantic,
             view,
             explicit_params,
             bound_params,
@@ -115,7 +116,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         ),
         CommonLispValueScopeForm::Resource(resource_form) => {
             bindings::collect_inferred_extract_function_resource_binding(
-                dialect,
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -125,7 +126,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         }
         CommonLispValueScopeForm::Lambda | CommonLispValueScopeForm::FunctionLiteral => {
             callable::collect_inferred_extract_function_lambda(
-                dialect,
+                semantic,
                 view,
                 1,
                 explicit_params,
@@ -134,7 +135,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
             )
         }
         CommonLispValueScopeForm::Definition => callable::collect_inferred_extract_function_lambda(
-            dialect,
+            semantic,
             view,
             2,
             explicit_params,
@@ -143,6 +144,7 @@ pub(super) fn collect_inferred_extract_function_special_form(
         ),
         CommonLispValueScopeForm::LocalCallable(_) => {
             callable::collect_inferred_extract_function_local_callable_form(
+                semantic,
                 view,
                 explicit_params,
                 bound_params,
@@ -153,26 +155,26 @@ pub(super) fn collect_inferred_extract_function_special_form(
 }
 
 pub(super) fn extend_extract_function_bound_params<'a>(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     bound_params: &[String],
     names: impl Iterator<Item = &'a str>,
 ) -> Vec<String> {
     let mut extended = bound_params.to_vec();
     for name in names {
-        push_extract_function_bound_param(dialect, &mut extended, name);
+        push_extract_function_bound_param(semantic, &mut extended, name);
     }
     extended
 }
 
 pub(super) fn push_extract_function_bound_param(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     bound_params: &mut Vec<String>,
     name: &str,
 ) {
     if super::symbols::is_extract_function_param_candidate(name)
         && !bound_params
             .iter()
-            .any(|param| super::extract_function_param_name_eq(dialect, param, name))
+            .any(|param| super::extract_function_param_name_eq(semantic, param, name))
     {
         bound_params.push(name.to_owned());
     }

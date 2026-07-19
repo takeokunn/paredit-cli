@@ -53,7 +53,7 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
     let replacement = request.name.as_str().to_owned();
     let definition = format!("({head} {} {selected})", request.name);
     let replaced = replace_span_checked(request.input, span, &replacement)?;
-    let replaced_tree = SyntaxTree::parse(&replaced)
+    let replaced_tree = SyntaxTree::parse_with_dialect(&replaced, request.dialect)
         .context("replacement output is not a valid S-expression document")?;
     let (rewritten, anchor_span) = insert_top_level_form(
         &replaced,
@@ -63,7 +63,7 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         request.anchor_path.as_ref(),
         "extract-constant",
     )?;
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("extracted output is not a valid S-expression document")?;
 
     Ok(Plan {
@@ -161,4 +161,79 @@ fn find_path(view: &ExpressionView, target: ByteSpan, path: &mut Vec<usize>) -> 
         path.pop();
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    fn extraction_plan(input: &str, dialect: Dialect) -> Result<Plan> {
+        let tree = SyntaxTree::parse_with_dialect(input, dialect)?;
+        let path: Path = "0.1".parse()?;
+        let selection = tree.select_path(&path)?;
+        plan(Request {
+            input,
+            tree: &tree,
+            selection,
+            path,
+            dialect,
+            name: SymbolName::new("answer")?,
+            insert: TopLevelInsert::Append,
+            anchor_path: None,
+        })
+    }
+
+    #[test]
+    fn dialect_matrix_gates_unsupported_dialects_before_parsing() {
+        assert_eq!(dialect_head(Dialect::CommonLisp).unwrap(), "defconstant");
+        assert_eq!(dialect_head(Dialect::EmacsLisp).unwrap(), "defconst");
+
+        for dialect in [
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let parse_attempted = Cell::new(false);
+            let error = dialect_head(dialect)
+                .and_then(|_| {
+                    parse_attempted.set(true);
+                    SyntaxTree::parse_with_dialect(")", dialect)?;
+                    Ok("")
+                })
+                .expect_err("dialect must be rejected");
+            assert!(!parse_attempted.get());
+            assert_eq!(
+                error.to_string(),
+                "extract-constant supports only common-lisp and emacs-lisp"
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_reader_character_literals_in_each_supported_dialect() {
+        for (dialect, input, definition) in [
+            (
+                Dialect::CommonLisp,
+                r"(print #\))",
+                r"(defconstant answer #\))",
+            ),
+            (
+                Dialect::EmacsLisp,
+                r"(message ?\))",
+                r"(defconst answer ?\))",
+            ),
+        ] {
+            let plan = extraction_plan(input, dialect).expect("extraction plan");
+            assert_eq!(plan.definition, definition);
+            assert!(plan.rewritten.contains(definition));
+            SyntaxTree::parse_with_dialect(&plan.definition, dialect)
+                .expect("generated definition must use the request dialect");
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+                .expect("rewritten output must use the request dialect");
+        }
+    }
 }

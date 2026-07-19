@@ -13,6 +13,8 @@ fn cli_requires_file_for_inline_function_writes() {
 fn cli_plans_inline_function_with_parameters() {
     assert_inline_success(
         &[
+            "--dialect",
+            "common-lisp",
             "--definition-path",
             "0",
             "--call-path",
@@ -36,7 +38,14 @@ fn cli_plans_inline_function_with_parameters() {
 #[test]
 fn cli_rejects_inline_function_duplicate_evaluation_without_flag() {
     assert_inline_failure(
-        &["--definition-path", "0", "--call-path", "1.3"],
+        &[
+            "--dialect",
+            "common-lisp",
+            "--definition-path",
+            "0",
+            "--call-path",
+            "1.3",
+        ],
         Some("(defun twice (x) (+ x x))\n(defun render () (twice (expensive)))"),
         &["inline-function would duplicate argument"],
     );
@@ -46,6 +55,8 @@ fn cli_rejects_inline_function_duplicate_evaluation_without_flag() {
 fn cli_rejects_inline_function_all_calls_with_explicit_call_path() {
     assert_inline_failure(
         &[
+            "--dialect",
+            "common-lisp",
             "--definition-path",
             "0",
             "--call-path",

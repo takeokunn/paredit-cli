@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, bail};
 use serde_json::json;
 
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::SyntaxTree;
 
 use super::super::shared::{read_input_dialect_and_tree, write_file_with_rollback};
@@ -16,7 +17,8 @@ pub(in crate::presentation::cli) fn insert_top_level(args: InsertTopLevelArgs) -
         bail!("--insert before/after requires --anchor-path");
     }
 
-    let replacement_tree = SyntaxTree::parse(&args.with)
+    let dialect = Dialect::detect(Some(&args.file), args.dialect.map(Into::into));
+    let replacement_tree = SyntaxTree::parse_with_dialect(&args.with, dialect)
         .context("--with must contain a valid, complete top-level S-expression")?;
     if replacement_tree.root_children().len() != 1 {
         bail!("--with must contain exactly one top-level S-expression");
@@ -33,7 +35,8 @@ pub(in crate::presentation::cli) fn insert_top_level(args: InsertTopLevelArgs) -
         "insert-top-level",
     )?;
 
-    SyntaxTree::parse(&rewritten).context("insertion produced invalid Lisp syntax")?;
+    SyntaxTree::parse_with_dialect(&rewritten, dialect)
+        .context("insertion produced invalid Lisp syntax")?;
 
     let changed = input.text != rewritten;
     let written = args.write && changed;

@@ -6,6 +6,8 @@ fn cli_plans_binding_rename_inside_quasiquote_preserving_unquote_prefixes() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -31,6 +33,8 @@ fn cli_plans_binding_rename_only_after_matching_nested_unquote_depth() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

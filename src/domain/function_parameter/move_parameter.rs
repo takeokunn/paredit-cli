@@ -21,7 +21,7 @@ use super::types::{MoveFunctionParameterPlan, MoveFunctionParameterRequest};
 pub fn plan_move_function_parameter(
     request: MoveFunctionParameterRequest<'_>,
 ) -> Result<MoveFunctionParameterPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target =
         parse_move_function_parameter_definition(request.dialect, &tree, &request.definition_path)?;
@@ -121,7 +121,7 @@ pub fn plan_move_function_parameter(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("move-function-parameter output is not a valid S-expression document")?;
 
     let changed = rewritten != request.input;

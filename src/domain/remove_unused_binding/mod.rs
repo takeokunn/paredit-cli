@@ -34,8 +34,11 @@ pub fn plan_remove_unused_binding(
     if request.name.is_none() && !request.all_bindings {
         anyhow::bail!("remove-unused-binding requires --name or --all-bindings");
     }
+    if request.dialect == Dialect::Unknown {
+        anyhow::bail!("remove-unused-binding does not support dialect unknown");
+    }
 
-    let input_tree = SyntaxTree::parse(request.input)
+    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("remove-unused-binding input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
     let parsed_target = input_tree
@@ -54,7 +57,7 @@ pub fn plan_remove_unused_binding(
         request.all_bindings,
     )?;
     let rewritten = replace_span(request.input, parts.form_span, &parts.replacement);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("remove-unused-binding output is not a valid S-expression document")?;
 
     let bindings = parts
@@ -130,7 +133,7 @@ fn remove_unused_binding_parts(
 
     let binding_form = &target.children[1];
     let candidates = binding_removal_candidates(dialect, refactor_form, binding_form)?;
-    let input_tree = SyntaxTree::parse(input)
+    let input_tree = SyntaxTree::parse_with_dialect(input, dialect)
         .context("remove-unused-binding input is not a valid S-expression document")?;
     let selected = if all_bindings {
         let mut unused = Vec::new();
@@ -191,7 +194,7 @@ fn remove_unused_binding_parts(
         })?;
         let candidate = candidates
             .iter()
-            .find(|candidate| common_lisp_symbol_reference_eq(&candidate.name, name.as_str()))
+            .find(|candidate| binding_name_matches(dialect, &candidate.name, name.as_str()))
             .with_context(|| {
                 format!(
                     "binding {} was not found in selected binding form",
@@ -241,7 +244,7 @@ fn remove_unused_binding_parts(
                 .map(|binding| (binding.binding_span, String::new()))
                 .collect(),
         )?;
-        format_single_replacement_form(&replacement)?
+        format_single_replacement_form(&replacement, dialect)?
     };
 
     Ok(RemoveUnusedBindingParts {
@@ -271,8 +274,20 @@ fn ensure_variable_binding_form_consistency(
     Ok(())
 }
 
-fn format_single_replacement_form(input: &str) -> Result<String> {
-    let tree = SyntaxTree::parse(input)
+fn binding_name_matches(dialect: Dialect, candidate: &str, expected: &str) -> bool {
+    match dialect {
+        Dialect::CommonLisp => common_lisp_symbol_reference_eq(candidate, expected),
+        Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => candidate == expected,
+        Dialect::Unknown => false,
+    }
+}
+
+fn format_single_replacement_form(input: &str, dialect: Dialect) -> Result<String> {
+    let tree = SyntaxTree::parse_with_dialect(input, dialect)
         .context("remove-unused-binding replacement is not a valid S-expression form")?;
     if tree.root_children().len() != 1 {
         anyhow::bail!("remove-unused-binding replacement must contain exactly one form");

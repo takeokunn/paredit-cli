@@ -79,6 +79,37 @@ fn cli_reports_workspace_inventory_with_include_flags() {
 }
 
 #[test]
+fn cli_applies_detected_reader_policy_and_preserves_unknown_parsing() {
+    let dir = fresh_temp_dir("workspace report-reader-policy");
+    let common_lisp_file = dir.join("common.lisp");
+    let emacs_lisp_file = dir.join("emacs.el");
+    let invalid_common_lisp_file = dir.join("invalid.lisp");
+    let unknown_file = dir.join("generic.txt");
+    fs::write(&common_lisp_file, "(defun cl-char () #\\))\n").expect("write common lisp fixture");
+    fs::write(&emacs_lisp_file, "(defun el-char () ?\\))\n").expect("write emacs lisp fixture");
+    fs::write(&invalid_common_lisp_file, "#?value\n").expect("write invalid common lisp fixture");
+    fs::write(&unknown_file, "#?value\n").expect("write unknown fixture");
+
+    let mut cmd = paredit();
+    cmd.args(["inspect", "workspace"])
+        .arg("--include-unknown")
+        .arg("--output")
+        .arg("json")
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"file_count\": 4"))
+        .stdout(predicate::str::contains("\"parsed_count\": 3"))
+        .stdout(predicate::str::contains("\"parse_error_count\": 1"))
+        .stdout(predicate::str::contains("\"definition_count\": 2"))
+        .stdout(predicate::str::contains(
+            invalid_common_lisp_file.display().to_string(),
+        ))
+        .stdout(predicate::str::contains(unknown_file.display().to_string()))
+        .stdout(predicate::str::contains("\"dialect\": \"unknown\""));
+}
+
+#[test]
 fn cli_reports_workspace_inventory_for_binary_unknown_files() {
     let dir = fresh_temp_dir("workspace report-binary");
 

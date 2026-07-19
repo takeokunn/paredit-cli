@@ -1,6 +1,7 @@
 use super::*;
 use crate::domain::common_lisp::{
     CommonLispReaderConditionalKind, common_lisp_reader_conditional_dispatches,
+    common_lisp_reader_conditional_forms,
 };
 
 #[test]
@@ -109,4 +110,40 @@ fn does_not_confuse_clojure_conditionals_or_reader_comments_with_common_lisp_dis
 
         assert!(common_lisp_reader_conditional_dispatches(&tree).is_empty());
     }
+}
+
+#[test]
+fn collects_complete_forms_from_legacy_and_dialect_aware_trees() {
+    let input = "#+sbcl (compile-file source) #-(and sbcl x86-64) (load source)";
+    let legacy = SyntaxTree::parse(input).expect("legacy parse succeeds");
+    let dialect_aware = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)
+        .expect("Common Lisp parse succeeds");
+
+    for tree in [&legacy, &dialect_aware] {
+        let forms = common_lisp_reader_conditional_forms(tree);
+
+        assert_eq!(forms.len(), 2);
+        assert_eq!(forms[0].kind, CommonLispReaderConditionalKind::Include);
+        assert_eq!(forms[1].kind, CommonLispReaderConditionalKind::Exclude);
+        assert_eq!(forms[0].dispatch_span.slice(input), "#+");
+        assert_eq!(forms[1].dispatch_span.slice(input), "#-");
+        assert_eq!(forms[0].span.slice(input), "#+sbcl (compile-file source)");
+        assert_eq!(
+            forms[1].span.slice(input),
+            "#-(and sbcl x86-64) (load source)"
+        );
+    }
+}
+
+#[test]
+fn reports_dispatch_spans_from_dialect_aware_opaque_forms() {
+    let input = "#+sbcl selected #-sbcl rejected";
+    let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)
+        .expect("Common Lisp parse succeeds");
+
+    let dispatches = common_lisp_reader_conditional_dispatches(&tree);
+
+    assert_eq!(dispatches.len(), 2);
+    assert_eq!(dispatches[0].span.slice(input), "#+");
+    assert_eq!(dispatches[1].span.slice(input), "#-");
 }

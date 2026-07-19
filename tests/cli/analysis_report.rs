@@ -121,6 +121,49 @@ fn cli_check_reports_ok_as_json() {
 }
 
 #[test]
+fn cli_check_json_applies_reader_policy_and_preserves_unknown_parsing() {
+    for (dialect, input) in [
+        ("common-lisp", "(list #\\))"),
+        ("emacs-lisp", "(list ?\\))"),
+    ] {
+        let mut cmd = paredit();
+        cmd.args(["inspect", "check", "--dialect", dialect, "--output", "json"])
+            .write_stdin(input)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("\"status\": \"ok\""))
+            .stdout(predicate::str::contains(format!(
+                "\"dialect\": \"{dialect}\""
+            )));
+    }
+
+    let mut known = paredit();
+    known
+        .args([
+            "inspect",
+            "check",
+            "--dialect",
+            "common-lisp",
+            "--output",
+            "json",
+        ])
+        .write_stdin("#?value")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"status\": \"error\""))
+        .stdout(predicate::str::contains("unsupported reader dispatch"));
+
+    let mut unknown = paredit();
+    unknown
+        .args(["inspect", "check", "--output", "json"])
+        .write_stdin("#?value")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\": \"ok\""))
+        .stdout(predicate::str::contains("\"dialect\": \"unknown\""));
+}
+
+#[test]
 fn cli_check_reports_parse_error_as_json_and_exits_nonzero() {
     let mut cmd = paredit();
     cmd.args(["inspect", "check", "--output", "json"])

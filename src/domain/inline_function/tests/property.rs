@@ -19,7 +19,7 @@ proptest! {
             &plan.rewritten,
             &format!("(defun {name} ({param}) (+ {param} {addend}))\n(print (+ {argument} {addend}))")
         );
-        SyntaxTree::parse(&plan.rewritten)
+        SyntaxTree::parse_with_dialect(&plan.rewritten, plan.dialect)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
     }
 
@@ -40,7 +40,7 @@ proptest! {
             &plan.rewritten,
             &format!("(defun {name} ({param}) (+ {param} {param}))\n(print (+ ({callee}) ({callee})))")
         );
-        SyntaxTree::parse(&plan.rewritten)
+        SyntaxTree::parse_with_dialect(&plan.rewritten, plan.dialect)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
     }
 }

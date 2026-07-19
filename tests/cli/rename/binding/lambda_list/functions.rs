@@ -6,6 +6,8 @@ fn cli_plans_lambda_parameter_rename_without_shadow_capture() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -32,6 +34,8 @@ fn cli_plans_defun_parameter_rename() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -112,6 +116,8 @@ fn cli_plans_defmethod_specialized_parameter_rename_without_touching_specializer
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -135,6 +141,8 @@ fn cli_plans_defmethod_specialized_parameter_rename_without_touching_specializer
 fn cli_plans_defmethod_qualifier_parameter_rename() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -160,6 +168,8 @@ fn cli_plans_defmethod_qualifier_parameter_rename() {
 fn cli_plans_cl_defmethod_optional_parameter_rename_without_touching_default_form() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "emacs-lisp",
         "--path",
         "0",
         "--from",

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::thread;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 
 use crate::domain::common_lisp::CommonLispPackageDeclarationForm;
 use crate::domain::definition::{DefinitionCategory, definition_shape};
@@ -161,14 +161,23 @@ pub fn build_parsed_definition_file(
 pub fn collect_unused_definition_candidates(
     files: &[ParsedDefinitionFile],
 ) -> Result<Vec<UnusedDefinitionFile>> {
-    let views: Vec<_> = files
+    for file in files {
+        if file.dialect == Dialect::Unknown {
+            anyhow::bail!(
+                "unused-definition analysis does not support dialect unknown: {}",
+                file.path.display()
+            );
+        }
+    }
+
+    let views: Vec<Option<ExpressionView>> = files
         .iter()
         .map(|file| {
-            SyntaxTree::parse(&file.text)
-                .ok()
-                .map(|tree| tree.root_view())
+            SyntaxTree::parse_with_dialect(&file.text, file.dialect)
+                .with_context(|| format!("failed to parse {}", file.path.display()))
+                .map(|tree| Some(tree.root_view()))
         })
-        .collect();
+        .collect::<Result<_>>()?;
 
     let package_form_spans: Vec<Vec<ByteSpan>> = files
         .iter()
@@ -404,6 +413,12 @@ pub fn evaluate_unused_definition_policy(
 mod tests {
     use super::*;
 
+    fn parsed_file(path: &str, dialect: Dialect, text: &str) -> ParsedDefinitionFile {
+        let tree = SyntaxTree::parse_with_dialect(text, dialect).expect("fixture must parse");
+        build_parsed_definition_file(PathBuf::from(path), dialect, &tree, text)
+            .expect("fixture report must build")
+    }
+
     #[test]
     fn validates_unused_definition_threshold() {
         assert!(UnusedDefinitionPolicyOptions::new(true, Some(1)).is_ok());
@@ -411,5 +426,122 @@ mod tests {
             UnusedDefinitionPolicyOptions::new(false, Some(0)).unwrap_err(),
             "require-unused-definitions must be greater than zero"
         );
+    }
+
+    #[test]
+    fn collects_unused_definitions_for_every_known_dialect() {
+        let fixtures = [
+            (
+                "common-lisp.lisp",
+                Dialect::CommonLisp,
+                "(defun cl-unused () 1)\n",
+            ),
+            (
+                "emacs-lisp.el",
+                Dialect::EmacsLisp,
+                "(defun el-unused () 1)\n",
+            ),
+            (
+                "scheme.scm",
+                Dialect::Scheme,
+                "(define scheme-unused (lambda () 1))\n",
+            ),
+            ("clojure.clj", Dialect::Clojure, "(defn clj-unused [] 1)\n"),
+            ("janet.janet", Dialect::Janet, "(defn janet-unused [] 1)\n"),
+            ("fennel.fnl", Dialect::Fennel, "(fn fennel-unused [] 1)\n"),
+        ];
+        let files: Vec<_> = fixtures
+            .iter()
+            .map(|(path, dialect, text)| parsed_file(path, *dialect, text))
+            .collect();
+
+        let reports = collect_unused_definition_candidates(&files).expect("report must build");
+
+        assert_eq!(reports.len(), fixtures.len());
+        assert_eq!(unused_definition_candidate_count(&reports), fixtures.len());
+        for ((_, dialect, _), report) in fixtures.iter().zip(&reports) {
+            assert_eq!(report.dialect, *dialect);
+            assert_eq!(report.definitions.len(), 1);
+            assert!(report.definitions[0].references.is_empty());
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_dialect_before_parsing_any_file() {
+        let files = vec![
+            ParsedDefinitionFile {
+                path: PathBuf::from("broken.lisp"),
+                dialect: Dialect::CommonLisp,
+                package: None,
+                definitions: Vec::new(),
+                atoms: Vec::new(),
+                text: "(defun broken ()".to_owned(),
+            },
+            ParsedDefinitionFile {
+                path: PathBuf::from("unknown.lisp"),
+                dialect: Dialect::Unknown,
+                package: None,
+                definitions: Vec::new(),
+                atoms: Vec::new(),
+                text: "()".to_owned(),
+            },
+        ];
+
+        let error = collect_unused_definition_candidates(&files).expect_err("input must fail");
+
+        assert_eq!(
+            error.to_string(),
+            "unused-definition analysis does not support dialect unknown: unknown.lisp"
+        );
+    }
+
+    #[test]
+    fn propagates_malformed_input_errors() {
+        let files = vec![ParsedDefinitionFile {
+            path: PathBuf::from("broken.lisp"),
+            dialect: Dialect::CommonLisp,
+            package: None,
+            definitions: Vec::new(),
+            atoms: Vec::new(),
+            text: "(defun broken ()".to_owned(),
+        }];
+
+        let error = collect_unused_definition_candidates(&files).expect_err("input must fail");
+
+        assert_eq!(error.to_string(), "failed to parse broken.lisp");
+    }
+
+    #[test]
+    fn parses_reader_syntax_with_the_input_dialect() {
+        let text = "(defun el-reader () [?\\)])\n";
+        assert!(SyntaxTree::parse_with_dialect(text, Dialect::EmacsLisp).is_ok());
+        assert!(SyntaxTree::parse_with_dialect(text, Dialect::CommonLisp).is_err());
+        let files = vec![parsed_file("reader.el", Dialect::EmacsLisp, text)];
+
+        let reports = collect_unused_definition_candidates(&files).expect("report must build");
+
+        assert_eq!(unused_definition_candidate_count(&reports), 1);
+    }
+
+    #[test]
+    fn common_lisp_symbol_matching_is_package_aware_but_scheme_is_exact() {
+        let common_lisp = vec![parsed_file(
+            "symbols.lisp",
+            Dialect::CommonLisp,
+            "(defun Foo () 1)\n(pkg:foo)\n",
+        )];
+        let scheme = vec![parsed_file(
+            "symbols.scm",
+            Dialect::Scheme,
+            "(define Foo (lambda () 1))\n(pkg:foo)\n",
+        )];
+
+        let common_lisp_report =
+            collect_unused_definition_candidates(&common_lisp).expect("report must build");
+        let scheme_report =
+            collect_unused_definition_candidates(&scheme).expect("report must build");
+
+        assert_eq!(unused_definition_candidate_count(&common_lisp_report), 0);
+        assert_eq!(unused_definition_candidate_count(&scheme_report), 1);
     }
 }

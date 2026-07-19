@@ -20,3 +20,22 @@ fn assert_format_output(fixture_name: &str, file_name: &str, input: &str, expect
         .success()
         .stdout(predicate::str::contains(expected));
 }
+
+#[test]
+fn cli_formats_janet_hash_comment_without_changing_output() {
+    let input = "# keep this comment\n(foo)\n";
+    let dir = fresh_temp_dir("format-janet-hash-comment");
+    let file = dir.join(Path::new("source.janet"));
+    fs::write(&file, input).expect("write source fixture");
+
+    let mut cmd = paredit();
+    cmd.arg("edit")
+        .arg("format")
+        .arg("--dialect")
+        .arg("janet")
+        .arg("--file")
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::eq(input));
+}

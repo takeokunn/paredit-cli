@@ -9,6 +9,7 @@ fn assert_plan_output(args: &[&str], input: &str, checks: &[&str]) {
     let mut assert = cmd
         .arg("refactor")
         .args(args)
+        .args(["--dialect", "common-lisp"])
         .write_stdin(input)
         .assert()
         .success();

@@ -3,7 +3,7 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteSpan, ExpressionKind, ExpressionView, SymbolName};
 
 use super::body::collect_body_forms;
-use super::collect_unshadowed_symbol_references_in_context;
+use super::{collect_unshadowed_symbol_references_in_context, symbol_name_matches};
 use crate::domain::lexical_scope::patterns::binding_pattern_names;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -24,6 +24,20 @@ pub(super) fn collect_lambda_list_references(
 ) -> bool {
     if parameter_form.kind != ExpressionKind::List {
         return false;
+    }
+
+    if matches!(
+        dialect,
+        Dialect::Scheme | Dialect::Clojure | Dialect::Janet | Dialect::Fennel
+    ) {
+        return collect_simple_parameter_list_references(
+            dialect,
+            parameter_form,
+            body_forms,
+            symbol,
+            input,
+            output,
+        );
     }
 
     let mut mode = LambdaListMode::Required;
@@ -55,6 +69,26 @@ pub(super) fn collect_lambda_list_references(
     }
 
     collect_body_forms(dialect, body_forms, symbol, input, output);
+    true
+}
+
+fn collect_simple_parameter_list_references(
+    dialect: Dialect,
+    parameter_form: &ExpressionView,
+    body_forms: &[ExpressionView],
+    symbol: &SymbolName,
+    input: &str,
+    output: &mut Vec<ByteSpan>,
+) -> bool {
+    let is_shadowed = parameter_form.children.iter().any(|parameter| {
+        lambda_list_binding_names(parameter, LambdaListMode::Required)
+            .iter()
+            .any(|name| symbol_name_matches(dialect, name, symbol.as_str()))
+    });
+
+    if !is_shadowed {
+        collect_body_forms(dialect, body_forms, symbol, input, output);
+    }
     true
 }
 

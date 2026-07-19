@@ -6,6 +6,8 @@ fn cli_plans_with_slots_binding_rename_preserving_slot_name() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -59,6 +61,8 @@ fn cli_plans_outer_binding_rename_without_touching_with_slots_shadow() {
 fn cli_plans_with_accessors_binding_rename_preserving_accessor_name() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -84,6 +88,8 @@ fn cli_plans_with_accessors_binding_rename_preserving_accessor_name() {
 fn cli_plans_outer_binding_rename_without_touching_with_accessors_shadow() {
     let mut cmd = paredit();
     cmd.args(["refactor", "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",
@@ -112,6 +118,8 @@ fn cli_rejects_ambiguous_with_slots_binding_rename() {
     cmd.args([
         "refactor",
         "rename-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--from",

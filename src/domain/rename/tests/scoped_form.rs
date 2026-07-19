@@ -19,7 +19,31 @@ fn plans_rename_in_form_only_inside_selected_form() {
         plan.rewritten,
         "(list product (list product other))\n(list value)"
     );
-    SyntaxTree::parse(&plan.rewritten).unwrap();
+    SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp).unwrap();
+}
+
+#[test]
+fn rename_in_form_preserves_dialect_reader_collisions() {
+    let cases = [(
+        Dialect::Janet,
+        "(list value)\n# ignored ))",
+        "(list product)\n# ignored ))",
+    )];
+
+    for (dialect, input, expected) in cases {
+        let plan = plan_rename_in_form(RenameInFormRequest {
+            input,
+            dialect,
+            target: RenameTarget::Path(Path::from_indexes(vec![0])),
+            from: SymbolName::new("value").unwrap(),
+            to: SymbolName::new("product").unwrap(),
+        })
+        .expect("plan");
+
+        assert_eq!(plan.rewritten, expected);
+        SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+            .expect("rewritten output remains parseable");
+    }
 }
 
 proptest! {

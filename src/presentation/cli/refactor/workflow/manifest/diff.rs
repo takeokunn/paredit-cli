@@ -48,7 +48,7 @@ pub(in crate::presentation::cli) fn refactor_diff(args: RefactorDiffArgs) -> Res
         let rewritten = apply_byte_span_edits(&input, edits)?;
         let output_hash = stable_text_hash(&rewritten);
         let output_hash_matches = output_hash == file.output_hash;
-        let output_parse_ok = SyntaxTree::parse(&rewritten).is_ok();
+        let output_parse_ok = SyntaxTree::parse_with_dialect(&rewritten, file.dialect).is_ok();
         let changed = rewritten != input;
         let manifest_flags_match =
             changed == file.changed && output_parse_ok == file.output_parse_ok;

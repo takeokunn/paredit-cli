@@ -1,13 +1,12 @@
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::ExpressionView;
 
 use super::{
-    extend_extract_function_bound_params, iteration_spec_bound_name, iteration_spec_init_form,
-    iteration_spec_step_form, push_extract_function_bound_param,
+    ExtractFunctionSemantic, extend_extract_function_bound_params, iteration_spec_bound_name,
+    iteration_spec_init_form, iteration_spec_step_form, push_extract_function_bound_param,
 };
 
 pub(super) fn collect_inferred_extract_function_do(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -19,15 +18,27 @@ pub(super) fn collect_inferred_extract_function_do(
     };
 
     let body_bound_params = if sequential_scope {
-        collect_sequential_do_inits(dialect, binding_form, explicit_params, bound_params, params)
+        collect_sequential_do_inits(
+            semantic,
+            binding_form,
+            explicit_params,
+            bound_params,
+            params,
+        )
     } else {
-        collect_parallel_do_inits(dialect, binding_form, explicit_params, bound_params, params)
+        collect_parallel_do_inits(
+            semantic,
+            binding_form,
+            explicit_params,
+            bound_params,
+            params,
+        )
     };
 
     for spec in &binding_form.children {
         if let Some(step_form) = iteration_spec_step_form(spec) {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 step_form,
                 false,
                 explicit_params,
@@ -39,7 +50,7 @@ pub(super) fn collect_inferred_extract_function_do(
 
     for body in &view.children[2..] {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             body,
             false,
             explicit_params,
@@ -51,7 +62,7 @@ pub(super) fn collect_inferred_extract_function_do(
 }
 
 pub(super) fn collect_inferred_extract_function_prog(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -63,14 +74,26 @@ pub(super) fn collect_inferred_extract_function_prog(
     };
 
     let body_bound_params = if sequential_scope {
-        collect_sequential_do_inits(dialect, binding_form, explicit_params, bound_params, params)
+        collect_sequential_do_inits(
+            semantic,
+            binding_form,
+            explicit_params,
+            bound_params,
+            params,
+        )
     } else {
-        collect_parallel_do_inits(dialect, binding_form, explicit_params, bound_params, params)
+        collect_parallel_do_inits(
+            semantic,
+            binding_form,
+            explicit_params,
+            bound_params,
+            params,
+        )
     };
 
     for body in &view.children[2..] {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             body,
             false,
             explicit_params,
@@ -82,7 +105,7 @@ pub(super) fn collect_inferred_extract_function_prog(
 }
 
 fn collect_sequential_do_inits(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     binding_form: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -92,7 +115,7 @@ fn collect_sequential_do_inits(
     for spec in &binding_form.children {
         if let Some(init_form) = iteration_spec_init_form(spec) {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 init_form,
                 false,
                 explicit_params,
@@ -101,14 +124,14 @@ fn collect_sequential_do_inits(
             );
         }
         if let Some(name) = iteration_spec_bound_name(spec) {
-            push_extract_function_bound_param(dialect, &mut body_bound_params, name);
+            push_extract_function_bound_param(semantic, &mut body_bound_params, name);
         }
     }
     body_bound_params
 }
 
 fn collect_parallel_do_inits(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     binding_form: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -117,7 +140,7 @@ fn collect_parallel_do_inits(
     for spec in &binding_form.children {
         if let Some(init_form) = iteration_spec_init_form(spec) {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 init_form,
                 false,
                 explicit_params,
@@ -127,7 +150,7 @@ fn collect_parallel_do_inits(
         }
     }
     extend_extract_function_bound_params(
-        dialect,
+        semantic,
         bound_params,
         binding_form
             .children

@@ -6,6 +6,8 @@ fn cli_plans_remove_unused_with_slots_without_counting_instance_expression() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",
@@ -31,6 +33,8 @@ fn cli_plans_remove_unused_with_accessors_without_counting_instance_expression()
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--name",

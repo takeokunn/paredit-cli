@@ -375,6 +375,118 @@ fn treats_emacs_lisp_flet_lambda_list_as_local_to_function_body() {
 }
 
 #[test]
+fn resolver_binding_scopes_preserve_dialect_visibility() {
+    let cases = [
+        (
+            Dialect::EmacsLisp,
+            "(let* ((first seed) (second first)) (list first second outer))",
+            &["seed", "outer"][..],
+        ),
+        (
+            Dialect::Scheme,
+            "(let ((first seed) (second first)) (list first second outer))",
+            &["seed", "first", "outer"][..],
+        ),
+        (
+            Dialect::Clojure,
+            "(let [first seed second first] [first second outer])",
+            &["seed", "outer"][..],
+        ),
+        (
+            Dialect::Janet,
+            "(let [first seed second first] [first second outer])",
+            &["seed", "outer"][..],
+        ),
+        (
+            Dialect::Fennel,
+            "(let [first seed second first] [first second outer])",
+            &["seed", "outer"][..],
+        ),
+    ];
+
+    for (dialect, input, expected) in cases {
+        assert_eq!(
+            infer_at_dialect(dialect, input, &[0], &[]),
+            expected,
+            "{dialect:?}"
+        );
+    }
+}
+
+#[test]
+fn verified_dialects_exclude_callable_parameters() {
+    let cases = [
+        (Dialect::CommonLisp, "(lambda (local) (list local outer))"),
+        (Dialect::EmacsLisp, "(lambda (local) (list local outer))"),
+        (Dialect::Scheme, "(lambda (local) (list local outer))"),
+        (Dialect::Clojure, "(fn [local] [local outer])"),
+        (Dialect::Janet, "(fn [local] [local outer])"),
+        (Dialect::Fennel, "(fn [local] [local outer])"),
+    ];
+
+    for (dialect, input) in cases {
+        assert_eq!(
+            infer_at_dialect(dialect, input, &[0], &[]),
+            ["outer"],
+            "{dialect:?}"
+        );
+    }
+}
+
+#[test]
+fn verified_dialects_exclude_definition_parameters() {
+    let cases = [
+        (
+            Dialect::CommonLisp,
+            "(defun render (local) (list local outer))",
+        ),
+        (
+            Dialect::EmacsLisp,
+            "(defun render (local) (list local outer))",
+        ),
+        (
+            Dialect::Scheme,
+            "(define (render local) (list local outer))",
+        ),
+        (Dialect::Clojure, "(defn render [local] [local outer])"),
+        (Dialect::Janet, "(defn render [local] [local outer])"),
+        (Dialect::Fennel, "(fn render [local] [local outer])"),
+    ];
+
+    for (dialect, input) in cases {
+        assert_eq!(
+            infer_at_dialect(dialect, input, &[0], &[]),
+            ["outer"],
+            "{dialect:?}"
+        );
+    }
+}
+
+#[test]
+fn treats_scheme_named_let_name_and_parameters_as_local() {
+    let params = infer_at_dialect(
+        Dialect::Scheme,
+        "(let loop ((local seed)) (list loop local outer))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["seed", "outer"]);
+}
+
+#[test]
+fn treats_clojure_named_multi_arity_fn_bindings_as_local() {
+    let params = infer_at_dialect(
+        Dialect::Clojure,
+        "(fn render ([local] [render local outer]) ([local other] [render local other extra]))",
+        &[0],
+        &[],
+    );
+
+    assert_eq!(params, vec!["outer", "extra"]);
+}
+
+#[test]
 fn treats_define_setf_expander_macro_lambda_list_as_local_to_expander_body() {
     let params = infer_at(
         "(define-setf-expander slot (&whole whole &environment env target) (list whole env target outer))",
@@ -416,8 +528,9 @@ fn keeps_flet_callable_name_as_free_value_reference() {
 
 #[test]
 fn excludes_destructured_lambda_parameters_and_explicit_params() {
-    let params = infer_at(
-        "(lambda [{:keys [inner]}] (+ inner outer ignored))",
+    let params = infer_at_dialect(
+        Dialect::CommonLisp,
+        "(lambda ((inner)) (+ inner outer ignored))",
         &[0],
         &["ignored"],
     );

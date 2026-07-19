@@ -24,10 +24,9 @@ pub(crate) struct Plan {
 }
 
 pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
-    if request.dialect != Dialect::CommonLisp {
-        bail!("merge-nested-flet supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input).context("merge-nested-flet input is not valid")?;
+    validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("merge-nested-flet input is not valid")?;
     let outer = tree.select_path(&request.path)?.view();
     require_flet(&outer, "selected form")?;
     reject_unsafe(&tree, &outer)?;
@@ -73,7 +72,8 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
     let body = &request.input[inner_defs.span.end().get()..inner.span.end().get() - 1];
     let replacement = format!("({head} ({left}{separator}{right}){body})");
     let rewritten = replace_span(request.input, outer.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("merge-nested-flet output is not valid")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("merge-nested-flet output is not valid")?;
     Ok(Plan {
         dialect: request.dialect,
         path: request.path,
@@ -83,6 +83,13 @@ pub(crate) fn plan(request: Request<'_>) -> Result<Plan> {
         changed: rewritten != request.input,
         rewritten,
     })
+}
+
+pub(crate) fn validate_dialect(dialect: Dialect) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("merge-nested-flet supports only Common Lisp");
+    }
+    Ok(())
 }
 fn require_flet(view: &ExpressionView, role: &str) -> Result<()> {
     if view.kind != ExpressionKind::List
@@ -196,6 +203,7 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     fn request(input: &str, dialect: Dialect) -> Request<'_> {
         Request {
             input,
@@ -203,20 +211,40 @@ mod tests {
             path: "0".parse().expect("path"),
         }
     }
+
     #[test]
-    fn merges_independent_definitions() {
-        let plan = plan(request(
-            "(flet ((parse (x) (list x))) (flet ((emit (x) (print x))) (emit (parse value))))",
-            Dialect::CommonLisp,
-        ))
-        .expect("plan");
+    fn merges_independent_definitions_with_common_lisp_reader_literal() {
+        let input =
+            r"(flet ((parse (x) (list x))) (flet ((emit (x) (print x))) (emit (parse value)))) #\)";
+        let plan = plan(request(input, Dialect::CommonLisp)).expect("plan");
         assert_eq!(
             plan.rewritten,
-            "(flet ((parse (x) (list x)) (emit (x) (print x))) (emit (parse value)))"
+            r"(flet ((parse (x) (list x)) (emit (x) (print x))) (emit (parse value))) #\)"
         );
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten input");
     }
+
     #[test]
-    fn rejects_scope_capture_duplicates_unsafe_syntax_and_dialect() {
+    fn rejects_unsupported_dialects_before_parsing() {
+        for dialect in [
+            Dialect::EmacsLisp,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan(request(")", dialect)).expect_err("dialect must be rejected");
+            assert_eq!(
+                error.to_string(),
+                "merge-nested-flet supports only Common Lisp"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_scope_capture_duplicates_and_unsafe_syntax() {
         for input in [
             "(flet ((parse (x) x)) (flet ((emit (x) (parse x))) (emit value)))",
             "(flet ((work () 1)) (flet ((work () 2)) (work)))",
@@ -224,12 +252,5 @@ mod tests {
         ] {
             assert!(plan(request(input, Dialect::CommonLisp)).is_err());
         }
-        assert!(
-            plan(request(
-                "(flet ((left () 1)) (flet ((right () 2)) (right)))",
-                Dialect::EmacsLisp
-            ))
-            .is_err()
-        );
     }
 }

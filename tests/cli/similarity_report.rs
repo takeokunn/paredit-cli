@@ -256,6 +256,45 @@ fn cli_dialect_override_includes_unknown_extensions() {
 }
 
 #[test]
+fn cli_applies_detected_reader_policy_to_similarity_inputs() {
+    let dir = fresh_temp_dir("similarity-reader-policy");
+    let common_lisp_file = dir.join("common.lisp");
+    let emacs_lisp_file = dir.join("emacs.el");
+    let invalid_common_lisp_file = dir.join("invalid.lisp");
+    fs::write(&common_lisp_file, "(list #\\))\n(list #\\))\n").unwrap();
+    fs::write(&emacs_lisp_file, "(list ?\\))\n(list ?\\))\n").unwrap();
+    fs::write(&invalid_common_lisp_file, "#?value\n").unwrap();
+
+    let output = paredit()
+        .args(["inspect", "similarity"])
+        .arg("--threshold=1")
+        .arg("--min-node-count=2")
+        .arg("--error-policy=skip")
+        .arg(&dir)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["summary"]["scanned_files"], 3);
+    assert_eq!(report["summary"]["processed_files"], 2);
+    assert_eq!(report["summary"]["skipped_error_files"], 1);
+    let errors = report["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(
+        errors[0]["path"],
+        invalid_common_lisp_file.display().to_string()
+    );
+    assert_eq!(errors[0]["stage"], "parse");
+    assert!(
+        errors[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("unsupported reader dispatch")
+    );
+}
+
+#[test]
 fn cli_json_contract_reports_options_summary_and_pair_count() {
     let dir = fresh_temp_dir("similarity-json-contract");
     let file = dir.join("suite.lisp");

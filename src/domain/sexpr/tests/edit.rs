@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::dialect::Dialect;
 
 #[test]
 fn replaces_expression() {
@@ -233,7 +234,7 @@ fn normalizes_trailing_trivia_only_on_changed_lines() {
     let rewritten = "(alpha gamma) \n(unchanged) \n".to_owned();
 
     assert_eq!(
-        Edit::normalize_changed_line_trivia(input, rewritten).unwrap(),
+        Edit::normalize_changed_line_trivia(input, rewritten, Dialect::CommonLisp).unwrap(),
         "(alpha gamma)\n(unchanged) \n"
     );
 }
@@ -244,7 +245,60 @@ fn preserves_trailing_spaces_inside_multiline_atoms_and_block_comments() {
     let rewritten = "(print \"new  \nvalue\")\n#| new  \ncomment |#\n".to_owned();
 
     assert_eq!(
-        Edit::normalize_changed_line_trivia(input, rewritten.clone()).unwrap(),
+        Edit::normalize_changed_line_trivia(input, rewritten.clone(), Dialect::CommonLisp).unwrap(),
         rewritten
+    );
+}
+
+#[test]
+fn preserves_changed_line_trivia_inside_clojure_discard() {
+    let input = "#_(old  \n  \\)) kept\n";
+    let rewritten = "#_(new  \n  \\)) kept\n".to_owned();
+
+    assert_eq!(
+        Edit::normalize_changed_line_trivia(input, rewritten.clone(), Dialect::Clojure).unwrap(),
+        rewritten
+    );
+}
+
+#[test]
+fn preserves_changed_line_trivia_inside_clojure_tagged_literal() {
+    let input = "#inst  \n\"1985-04-12T23:20:50.52-00:00\"\n";
+    let rewritten = "#inst   \n\"1986-04-12T23:20:50.52-00:00\"\n".to_owned();
+
+    assert_eq!(
+        Edit::normalize_changed_line_trivia(input, rewritten.clone(), Dialect::Clojure).unwrap(),
+        rewritten
+    );
+}
+
+#[test]
+fn preserves_changed_line_trivia_inside_common_lisp_dispatch() {
+    let input = "#S  \n(point :x 1)\n";
+    let rewritten = "#S   \n(point :x 2)\n".to_owned();
+
+    assert_eq!(
+        Edit::normalize_changed_line_trivia(input, rewritten.clone(), Dialect::CommonLisp).unwrap(),
+        rewritten
+    );
+}
+
+#[test]
+fn unknown_dialect_keeps_generic_compatibility_and_rejects_malformed_changes() {
+    let normalized = Edit::normalize_changed_line_trivia(
+        "(alpha beta)  \n",
+        "(alpha gamma)  \n".to_owned(),
+        Dialect::Unknown,
+    )
+    .expect("generic changed document remains supported");
+    assert_eq!(normalized, "(alpha gamma)\n");
+
+    assert!(
+        Edit::normalize_changed_line_trivia(
+            "(alpha beta)",
+            "(alpha gamma".to_owned(),
+            Dialect::Unknown,
+        )
+        .is_err()
     );
 }

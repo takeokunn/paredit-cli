@@ -27,7 +27,8 @@ pub struct SplitLetPlan {
 }
 
 pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    let_composition::validate_dialect(request.dialect, "split-let")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let binding_index = BindingIndex::new(request.binding_index)?;
     let plan = let_composition::plan_split_let(DomainRequest {
@@ -46,4 +47,38 @@ pub fn plan_split_let(request: SplitLetRequest<'_>) -> Result<SplitLetPlan> {
         rewritten: plan.rewritten,
         changed: plan.changed,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_dialect_before_parsing_and_uses_dialect_parser() {
+        for (dialect, prefix) in [(Dialect::CommonLisp, r"#\)"), (Dialect::EmacsLisp, r"?\)")] {
+            let input = format!("{prefix} (let ((x 1) (y 2)) (+ x y))");
+            let plan = plan_split_let(SplitLetRequest {
+                input: &input,
+                dialect,
+                path: "1".parse().expect("path"),
+                binding_index: 1,
+            })
+            .expect("supported dialect");
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect).expect("rewritten input");
+        }
+
+        for dialect in [Dialect::Scheme, Dialect::Unknown] {
+            let error = plan_split_let(SplitLetRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+                binding_index: 0,
+            })
+            .expect_err("unsupported dialect");
+            assert_eq!(
+                error.to_string(),
+                "split-let supports only Common Lisp and Emacs Lisp"
+            );
+        }
+    }
 }

@@ -18,7 +18,7 @@ pub(super) fn destructure_argument_entries(
     argument: &str,
     allow_drop_arguments: bool,
 ) -> Result<Vec<(String, String)>> {
-    let tree = SyntaxTree::parse(argument).with_context(|| {
+    let tree = SyntaxTree::parse_with_dialect(argument, dialect).with_context(|| {
         format!("inline-function could not parse macro destructuring argument: {argument}")
     })?;
     let argument_expression = tree

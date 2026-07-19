@@ -4,6 +4,8 @@ use super::assert_extract_function_inference;
 fn cli_infers_extract_function_params_without_common_lisp_lambda_list_init_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -26,6 +28,8 @@ fn cli_infers_extract_function_params_without_common_lisp_lambda_list_init_bindi
 fn cli_infers_extract_function_params_without_define_setf_expander_macro_lambda_list_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0",
             "--name",
@@ -48,6 +52,8 @@ fn cli_infers_extract_function_params_without_define_setf_expander_macro_lambda_
 fn cli_infers_extract_function_params_without_define_compiler_macro_lambda_list_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0",
             "--name",
@@ -71,6 +77,8 @@ fn cli_infers_extract_function_params_without_package_qualified_compiler_macro_l
  {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0",
             "--name",

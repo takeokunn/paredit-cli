@@ -28,12 +28,13 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
         read_input_dialect_and_tree(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
     let to_dialect = detect_dialect(&to_input, args.dialect);
-    let to_tree = SyntaxTree::parse(&to_input.text).with_context(|| {
-        format!(
-            "destination file is not a valid S-expression document: {}",
-            args.to_file.display()
-        )
-    })?;
+    let to_tree =
+        SyntaxTree::parse_with_dialect(&to_input.text, to_dialect).with_context(|| {
+            format!(
+                "destination file is not a valid S-expression document: {}",
+                args.to_file.display()
+            )
+        })?;
 
     let target_index = top_level_path_index(&args.path, "move-form")?;
     if target_index >= from_tree.root_children().len() {
@@ -56,13 +57,13 @@ pub(in crate::presentation::cli) fn move_form(args: MoveFormArgs) -> Result<()> 
         "move-form",
     )?;
 
-    SyntaxTree::parse(&from_rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&from_rewritten, from_dialect).with_context(|| {
         format!(
             "source file would become invalid after moving form: {}",
             args.from_file.display()
         )
     })?;
-    SyntaxTree::parse(&to_rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&to_rewritten, to_dialect).with_context(|| {
         format!(
             "destination file would become invalid after receiving form: {}",
             args.to_file.display()

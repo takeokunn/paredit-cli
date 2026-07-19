@@ -40,7 +40,7 @@ pub fn plan_inline_symbol_macro(
     if request.dialect != Dialect::CommonLisp {
         bail!("inline-symbol-macro currently supports only Common Lisp");
     }
-    let tree = SyntaxTree::parse(request.input)
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-symbol-macro input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let form = tree.select_path(&request.path)?.view();
@@ -220,5 +220,39 @@ mod tests {
     fn rejects_reader_prefixes() {
         let error = plan("(symbol-macrolet ((x 1)) (list x 'x))").expect_err("reject quote");
         assert!(error.to_string().contains("reader prefixes"));
+    }
+
+    #[test]
+    fn dialect_matrix_preserves_common_lisp_gate_precedence() {
+        let cases = [
+            (Dialect::CommonLisp, r"(symbol-macrolet ((x #\))) (list x))"),
+            (Dialect::EmacsLisp, ")"),
+            (Dialect::Scheme, ")"),
+            (Dialect::Clojure, ")"),
+            (Dialect::Janet, ")"),
+            (Dialect::Fennel, ")"),
+            (Dialect::Unknown, ")"),
+        ];
+
+        for (dialect, input) in cases {
+            let result = plan_inline_symbol_macro(InlineSymbolMacroRequest {
+                input,
+                dialect,
+                path: "0".parse().unwrap(),
+            });
+
+            if dialect == Dialect::CommonLisp {
+                let plan = result.unwrap();
+                assert_eq!(plan.rewritten, r"(list #\))");
+                assert!(
+                    SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp).is_ok()
+                );
+            } else {
+                assert_eq!(
+                    result.unwrap_err().to_string(),
+                    "inline-symbol-macro currently supports only Common Lisp"
+                );
+            }
+        }
     }
 }

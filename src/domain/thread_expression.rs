@@ -11,6 +11,7 @@ mod types;
 pub use types::{ThreadExpressionPlan, ThreadExpressionRequest, ThreadExpressionStep, ThreadStyle};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::dialect::Dialect;
 use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 use anyhow::{Context, Result};
@@ -21,11 +22,30 @@ use syntax::list_head;
 pub fn plan_thread_expression(
     request: ThreadExpressionRequest<'_>,
 ) -> Result<ThreadExpressionPlan> {
+    match request.dialect {
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => {}
+        Dialect::Unknown => {
+            anyhow::bail!("thread-expression does not support dialect unknown");
+        }
+    }
+
     reject_common_lisp_reader_conditionals(request.tree, request.dialect)?;
 
-    if list_head(&request.target)
-        .is_some_and(|head| common_lisp_symbol_reference_eq(head, request.operator.as_str()))
-    {
+    let already_threaded = list_head(&request.target).is_some_and(|head| match request.dialect {
+        Dialect::CommonLisp => common_lisp_symbol_reference_eq(head, request.operator.as_str()),
+        Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => head == request.operator.as_str(),
+        Dialect::Unknown => false,
+    });
+    if already_threaded {
         anyhow::bail!(
             "thread-expression selection is already threaded with {}",
             request.operator
@@ -46,9 +66,11 @@ pub fn plan_thread_expression(
         anyhow::bail!("thread-expression target did not produce any pipeline steps");
     }
     let replacement = thread_expression_replacement(&request.operator, &parts.base, &parts.steps);
-    SyntaxTree::parse(&replacement).context("thread-expression replacement does not parse")?;
+    SyntaxTree::parse_with_dialect(&replacement, request.dialect)
+        .context("thread-expression replacement does not parse")?;
     let rewritten = replace_span(request.input, request.target.span, &replacement);
-    SyntaxTree::parse(&rewritten).context("thread-expression rewritten output does not parse")?;
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
+        .context("thread-expression rewritten output does not parse")?;
     let changed = rewritten != request.input;
 
     Ok(ThreadExpressionPlan {

@@ -17,10 +17,13 @@ pub(in crate::domain::rename::at) fn binding_candidates(
     from: &SymbolName,
     to: &SymbolName,
 ) -> Result<Vec<Candidate>> {
+    let semantic = Dialect::CommonLisp
+        .verify_rename_binding()
+        .expect("Common Lisp rename-binding semantics are verified");
     let selected_span = tree.select_path(path)?.span();
     let mut candidates = Vec::new();
     for view in ancestor_views(root_view, path)?.into_iter().rev() {
-        let Ok(parts) = binding_rename_parts(Dialect::CommonLisp, view, from, input) else {
+        let Ok(parts) = binding_rename_parts(semantic, view, from, input) else {
             continue;
         };
         let reference_spans: Vec<_> = parts

@@ -48,7 +48,18 @@ pub struct UnwrapFunctionCallsPlan {
 pub fn plan_unwrap_function_calls(
     request: UnwrapFunctionCallsRequest<'_>,
 ) -> Result<UnwrapFunctionCallsPlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    match request.dialect {
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => {}
+        Dialect::Unknown => anyhow::bail!("unwrap-function-calls requires a known dialect"),
+    }
+
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     let (calls, skipped_non_unary_wrapper, skipped_nested) = match &request.scope {
         UnwrapFunctionCallsScope::AllCalls => collect_unwrap_all_call_sites(
             &tree,
@@ -71,7 +82,7 @@ pub fn plan_unwrap_function_calls(
         .map(|site| (site.span, site.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("unwrapped output is not a valid S-expression document")?;
 
     Ok(UnwrapFunctionCallsPlan {

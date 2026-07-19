@@ -36,7 +36,7 @@ pub fn plan_inline_literal_constant(
     if request.dialect != Dialect::CommonLisp {
         bail!("inline-literal-constant supports only Common Lisp");
     }
-    let tree = SyntaxTree::parse(request.input)
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("inline-literal-constant input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let definition = tree.select_path(&request.path)?.view();
@@ -85,7 +85,7 @@ pub fn plan_inline_literal_constant(
         rewritten.replace_range(span.start().get()..span.end().get(), &replacement);
     }
     let rewritten = collapse_removed_definition_gap(&rewritten);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("inline-literal-constant output is not a valid S-expression document")?;
 
     Ok(InlineLiteralConstantPlan {
@@ -326,5 +326,38 @@ mod tests {
     fn permits_literal_reference_in_non_place_argument() {
         let result = plan("(defconstant +step+ 2) (incf value +step+)").unwrap();
         assert_eq!(result.rewritten, " (incf value 2)");
+    }
+
+    #[test]
+    fn dialect_support_matrix_is_enforced_before_parsing_and_reparses_output() {
+        let plan = plan_inline_literal_constant(InlineLiteralConstantRequest {
+            input: "#\\)\n(defconstant +x+ 1)\n(print +x+)",
+            dialect: Dialect::CommonLisp,
+            path: "1".parse().expect("path"),
+        })
+        .expect("Common Lisp");
+        assert!(plan.rewritten.starts_with("#\\)"));
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("Common Lisp output");
+
+        for dialect in [
+            Dialect::EmacsLisp,
+            Dialect::Scheme,
+            Dialect::Clojure,
+            Dialect::Janet,
+            Dialect::Fennel,
+            Dialect::Unknown,
+        ] {
+            let error = plan_inline_literal_constant(InlineLiteralConstantRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert!(
+                error.to_string().contains("supports only Common Lisp"),
+                "{dialect:?}: {error:#}"
+            );
+        }
     }
 }

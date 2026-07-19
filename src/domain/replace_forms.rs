@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
+use crate::domain::dialect::Dialect;
 use crate::domain::form_shape::duplicate_shape;
 use crate::domain::mutation_safety::{
     reject_common_lisp_reader_conditionals, reject_overlapping_common_lisp_reader_time_forms,
@@ -19,14 +20,16 @@ use validation::{
 };
 
 pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFormsPlan> {
-    let input_tree = SyntaxTree::parse(request.input)
+    ensure_supported_dialect(request.dialect)?;
+
+    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("replace-forms input is not a valid S-expression document")?;
     anyhow::ensure!(
         &input_tree == request.tree,
         "replace-forms input does not match the source used to build the syntax tree"
     );
 
-    let replacement_tree = SyntaxTree::parse(request.replacement)
+    let replacement_tree = SyntaxTree::parse_with_dialect(request.replacement, request.dialect)
         .context("--with must be a valid S-expression document")?;
     // The replacement becomes source code in the rewritten document, so it
     // must satisfy the same reader-time safety contract as the input tree.
@@ -52,7 +55,7 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
     )?;
 
     let rewritten = rewrite_replace_targets(request.input, &targets, request.replacement);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("replace-forms output is not a valid S-expression document")?;
 
     let changed = rewritten != request.input;
@@ -65,4 +68,16 @@ pub fn plan_replace_forms(request: ReplaceFormsRequest<'_>) -> Result<ReplaceFor
         changed,
         rewritten,
     })
+}
+
+fn ensure_supported_dialect(dialect: Dialect) -> Result<()> {
+    match dialect {
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => Ok(()),
+        Dialect::Unknown => bail!("replace-forms requires a known dialect"),
+    }
 }

@@ -10,6 +10,7 @@ mod types;
 use anyhow::{Context, Result, bail};
 
 use super::mutation_safety::reject_common_lisp_reader_conditionals;
+use crate::domain::dialect::{IntroduceLetOperation, VerifiedSemanticPolicy};
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use occurrences::{
@@ -20,15 +21,19 @@ use rewrite::{introduced_let, replace_span, replace_spans_within_span};
 pub use types::{IntroduceLetPlan, IntroduceLetRequest};
 
 pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceLetPlan> {
-    let input_tree = SyntaxTree::parse(request.input)
+    let semantic = request
+        .dialect
+        .verify_introduce_let()
+        .context("introduce-let is not supported for this dialect")?;
+    let input_tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("introduce-let input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&input_tree, request.dialect)?;
 
     let selected_span = request.target.span;
     let binding_value = selected_span.slice(request.input).to_owned();
     let enclosing = request.enclosing_span.slice(request.input);
-    let enclosing_tree =
-        SyntaxTree::parse(enclosing).context("failed to parse enclosing list for introduce-let")?;
+    let enclosing_tree = SyntaxTree::parse_with_dialect(enclosing, request.dialect)
+        .context("failed to parse enclosing list for introduce-let")?;
     let enclosing_view = enclosing_tree.select_path(&Path::root_child(0))?.view();
 
     let selected_relative_span = ByteSpan::new(
@@ -36,7 +41,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
         ByteOffset::new(selected_span.end().get() - request.enclosing_span.start().get()),
     );
 
-    if selected_path_shadowed_by_binding(&request)? {
+    if selected_path_shadowed_by_binding(semantic, &request)? {
         bail!(
             "introduce-let target is inside an existing binding for '{}'; choose a different --name",
             request.name.as_str()
@@ -46,7 +51,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     let (occurrence_spans, skipped_shadowed_occurrence_spans) = if request.all_occurrences {
         let mut collection = EquivalentExpressionSpans::default();
         collect_equivalent_expression_spans(
-            request.dialect,
+            semantic,
             &enclosing_view,
             &request.target,
             request.name.as_str(),
@@ -62,7 +67,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
         )
     } else {
         if is_span_shadowed_by_binding(
-            request.dialect,
+            semantic,
             &enclosing_view,
             selected_relative_span,
             request.name.as_str(),
@@ -97,7 +102,7 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     );
     let rewritten = replace_span(request.input, request.enclosing_span, &replacement);
 
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("introduced-let output is not a valid S-expression document")?;
 
     let changed = rewritten != request.input;
@@ -117,7 +122,10 @@ pub fn plan_introduce_let(request: IntroduceLetRequest<'_>) -> Result<IntroduceL
     })
 }
 
-fn selected_path_shadowed_by_binding(request: &IntroduceLetRequest<'_>) -> Result<bool> {
+fn selected_path_shadowed_by_binding(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    request: &IntroduceLetRequest<'_>,
+) -> Result<bool> {
     let Some(path) = &request.path else {
         return Ok(false);
     };
@@ -125,14 +133,14 @@ fn selected_path_shadowed_by_binding(request: &IntroduceLetRequest<'_>) -> Resul
         return Ok(false);
     };
 
-    let tree =
-        SyntaxTree::parse(request.input).context("failed to parse document for introduce-let")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse document for introduce-let")?;
     let top_level_view = tree
         .select_path(&Path::root_child(top_level_index.get()))?
         .view();
 
     Ok(is_path_shadowed_by_binding(
-        request.dialect,
+        semantic,
         &top_level_view,
         relative_path,
         request.name.as_str(),

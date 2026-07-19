@@ -33,7 +33,7 @@ pub(super) fn substitute_expression(
     params: &[String],
     args: &[String],
 ) -> Result<String> {
-    let tree = SyntaxTree::parse(input)?;
+    let tree = SyntaxTree::parse_with_dialect(input, dialect)?;
     if tree.root_children().len() != 1 {
         anyhow::bail!("inline-function default value must be a single S-expression");
     }

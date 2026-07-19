@@ -203,11 +203,12 @@ fn process_file(
         source: source.into(),
     })?;
     let dialect = Dialect::detect(Some(file), dialect.map(Into::into));
-    let tree = SyntaxTree::parse(&text).map_err(|source| ProcessingError {
-        path: file.to_path_buf(),
-        stage: "parse",
-        source: source.into(),
-    })?;
+    let tree =
+        SyntaxTree::parse_with_dialect(&text, dialect).map_err(|source| ProcessingError {
+            path: file.to_path_buf(),
+            stage: "parse",
+            source: source.into(),
+        })?;
     let mut candidates = Vec::new();
     let omitted_candidates =
         collect_similarity_candidates(&tree, &text, file, dialect, options, &mut candidates)

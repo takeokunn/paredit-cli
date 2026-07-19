@@ -3,6 +3,7 @@ use std::fmt;
 use anyhow::{Result, anyhow};
 
 use crate::domain::common_lisp::common_lisp_symbol_reference_eq;
+use crate::domain::dialect::Dialect;
 
 use super::parser::{ParseError, Parser};
 use super::types::{ByteOffset, ByteSpan, Delimiter, ExpressionPath, NodeId, SymbolName};
@@ -53,6 +54,9 @@ pub(in crate::domain::sexpr) struct Node {
     pub(in crate::domain::sexpr) kind: NodeKind,
     pub(in crate::domain::sexpr) delimiter: Option<Delimiter>,
     pub(in crate::domain::sexpr) reader_prefixes: Vec<ReaderPrefix>,
+    /// Exact source ranges for `reader_prefixes`, kept separately from their
+    /// normalized semantics so dialect-specific spellings round-trip.
+    pub(in crate::domain::sexpr) reader_prefix_spans: Vec<ByteSpan>,
     pub(in crate::domain::sexpr) parent: Option<NodeId>,
     pub(in crate::domain::sexpr) children: Vec<NodeId>,
     pub(in crate::domain::sexpr) span: ByteSpan,
@@ -66,6 +70,9 @@ pub(in crate::domain::sexpr) struct Node {
     /// prefix's fixed source length — it must be recorded while parsing.
     /// Meaningless (`0`) for non-atom nodes.
     pub(in crate::domain::sexpr) symbol_offset: usize,
+    /// Reader forms that consume multiple datums are represented by one
+    /// verbatim atom node so their payload cannot become editable siblings.
+    pub(in crate::domain::sexpr) opaque_reader_form: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -349,6 +356,18 @@ impl SyntaxTree {
         parser.parse()
     }
 
+    /// Parses source using the lexical and reader-macro rules of `dialect`.
+    ///
+    /// [`Self::parse`] intentionally retains the historical permissive reader;
+    /// callers that know the file dialect should use this entry point.
+    pub fn parse_with_dialect(
+        input: &str,
+        dialect: Dialect,
+    ) -> std::result::Result<Self, ParseError> {
+        let mut parser = Parser::with_dialect(input, dialect);
+        parser.parse()
+    }
+
     /// Returns the direct children of the virtual root document node.
     pub fn root_children(&self) -> &[NodeId] {
         &self.node(NodeId::ROOT).children
@@ -410,10 +429,11 @@ impl SyntaxTree {
         let mut pending = self.node(NodeId::ROOT).children.clone();
         while let Some(node_id) = pending.pop() {
             let node = self.node(node_id);
-            if node
-                .reader_prefixes
-                .iter()
-                .any(|prefix| prefix.is_opaque_reader_form())
+            if node.opaque_reader_form
+                || node
+                    .reader_prefixes
+                    .iter()
+                    .any(|prefix| prefix.is_opaque_reader_form())
             {
                 continue;
             }
@@ -451,10 +471,11 @@ impl SyntaxTree {
         while let Some((node_id, parent_id, index)) = pending.pop() {
             parent_steps[node_id.get()] = Some((parent_id, index));
             let node = self.node(node_id);
-            if node
-                .reader_prefixes
-                .iter()
-                .any(|prefix| prefix.is_opaque_reader_form())
+            if node.opaque_reader_form
+                || node
+                    .reader_prefixes
+                    .iter()
+                    .any(|prefix| prefix.is_opaque_reader_form())
             {
                 continue;
             }
@@ -646,10 +667,11 @@ impl SyntaxTree {
             pending.push(Frame::Leave);
 
             let node = self.node(node_id);
-            if node
-                .reader_prefixes
-                .iter()
-                .any(|prefix| prefix.is_opaque_reader_form())
+            if node.opaque_reader_form
+                || node
+                    .reader_prefixes
+                    .iter()
+                    .any(|prefix| prefix.is_opaque_reader_form())
             {
                 continue;
             }
@@ -686,7 +708,10 @@ impl SyntaxTree {
 
     fn atom_text(&self, node_id: NodeId) -> Option<&str> {
         let node = self.node(node_id);
-        if node.kind != NodeKind::Atom || !node.reader_prefixes.is_empty() {
+        if node.kind != NodeKind::Atom
+            || node.opaque_reader_form
+            || !node.reader_prefixes.is_empty()
+        {
             return None;
         }
         Some(node.span.slice(&self.source))

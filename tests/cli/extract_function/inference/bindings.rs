@@ -4,6 +4,8 @@ use super::assert_extract_function_inference;
 fn cli_infers_extract_function_params_without_symbol_macrolet_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -26,6 +28,8 @@ fn cli_infers_extract_function_params_without_symbol_macrolet_bindings() {
 fn cli_infers_extract_function_params_without_package_qualified_symbol_macrolet_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",
@@ -114,6 +118,8 @@ fn cli_infers_extract_function_params_without_clojure_destructuring_lambda_bindi
 fn cli_infers_extract_function_params_without_bare_symbol_let_bindings() {
     assert_extract_function_inference(
         &[
+            "--dialect",
+            "common-lisp",
             "--path",
             "0.3",
             "--name",

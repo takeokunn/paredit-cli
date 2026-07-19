@@ -21,7 +21,7 @@ mod macos_acl;
 pub(crate) use diff::unified_diff;
 pub(crate) use io::{AnchoredExpectedWrite, write_files_with_rollback_expected_anchored};
 pub(crate) use io::{
-    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty, read_input,
+    ExpectedWriteTarget, MAX_SOURCE_INPUT_BYTES, parse_document, read_file_or_empty,
     read_input_and_dialect, read_input_dialect_and_tree, read_text_file_with_expected_target,
     read_text_file_with_limit, read_text_with_limit, write_artifact_with_rollback,
     write_file_with_rollback, write_files_with_rollback, write_files_with_rollback_expected,
@@ -135,8 +135,13 @@ fn ensure_non_overlapping_spans(spans: impl IntoIterator<Item = ByteSpan>) -> Re
 
 pub(crate) fn package_context_before_top_level(
     tree: &SyntaxTree,
+    dialect: Dialect,
     target_index: usize,
 ) -> Result<Option<String>> {
+    if dialect != Dialect::CommonLisp {
+        return Ok(None);
+    }
+
     let mut current_package = None;
     for index in 0..target_index {
         let path = Path::from_indexes(vec![index]);
@@ -189,27 +194,27 @@ pub(crate) fn edit_target(
     f: fn(&str, &SyntaxTree, Selection<'_>) -> Result<String>,
 ) -> Result<()> {
     let target = args.target;
-    let input = read_input(target.file)?;
-    let tree = parse_document(&input)?;
+    let (input, dialect) = read_input_and_dialect(target.file, target.dialect)?;
+    let tree = parse_document(&input, dialect)?;
     let selection = resolve_target(&tree, target.path.as_ref(), target.at)?;
     let rewritten = f(&input.text, &tree, selection)?;
-    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten)?;
-    emit_document(&input, args.write, args.diff, rewritten)
+    let rewritten = Edit::normalize_changed_line_trivia(&input.text, rewritten, dialect)?;
+    emit_document(&input, dialect, args.write, args.diff, rewritten)
 }
 
 /// Print the rewritten document to stdout, or with `write` persist it back to
-/// the source file after confirming the result still parses as a balanced
-/// document. With `diff`, stdout carries a unified diff against the input
-/// instead of the whole rewritten document.
+/// the source file after confirming the result reparses with the input dialect.
+/// With `diff`, stdout carries a unified diff instead of the whole document.
 pub(crate) fn emit_document(
     input: &SourceInput,
+    dialect: Dialect,
     write: bool,
     diff: bool,
     rewritten: String,
 ) -> Result<()> {
     if write {
         let path = require_output_file(input.file.as_ref())?.clone();
-        SyntaxTree::parse(&rewritten)
+        SyntaxTree::parse_with_dialect(&rewritten, dialect)
             .context("refusing to write: rewritten source does not reparse")?;
         if diff {
             print!("{}", unified_diff(&path, &input.text, &rewritten));

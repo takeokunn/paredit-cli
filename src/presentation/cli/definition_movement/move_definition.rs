@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use crate::application::usecase::definition_report::DefinitionReportItem;
 use crate::application::usecase::leading_trivia::first_newline_or;
 use crate::domain::definition::definition_shape;
+use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path, SyntaxTree};
 
 use super::super::shared::{
@@ -32,12 +33,13 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         read_input_dialect_and_tree(Some(args.from_file.clone()), args.dialect)?;
     let (to_input, to_file_existed) = read_file_or_empty(&args.to_file)?;
     let to_dialect = detect_dialect(&to_input, args.dialect);
-    SyntaxTree::parse(&to_input.text).with_context(|| {
-        format!(
-            "destination file is not a valid S-expression document: {}",
-            args.to_file.display()
-        )
-    })?;
+    let to_tree =
+        SyntaxTree::parse_with_dialect(&to_input.text, to_dialect).with_context(|| {
+            format!(
+                "destination file is not a valid S-expression document: {}",
+                args.to_file.display()
+            )
+        })?;
 
     let target_index = match args.path.indexes() {
         [index] => index.get(),
@@ -80,7 +82,7 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         .slice(&from_input.text)
         .trim_start_matches('\n')
         .to_owned();
-    let source_package = package_context_before_top_level(&from_tree, target_index)?;
+    let source_package = package_context_before_top_level(&from_tree, from_dialect, target_index)?;
     let definition = DefinitionReportItem {
         path: args.path.to_string(),
         span,
@@ -102,23 +104,26 @@ pub(in crate::presentation::cli) fn move_definition(args: MoveDefinitionArgs) ->
         &from_input.text[..move_span.start().get()],
         &from_input.text[move_span.end().get()..]
     );
-    let to_tree = SyntaxTree::parse(&to_input.text)?;
-    let dest_package = package_context_before_top_level(&to_tree, to_tree.root_children().len())?;
+    let dest_package =
+        package_context_before_top_level(&to_tree, to_dialect, to_tree.root_children().len())?;
     let appended = match &source_package {
-        Some(package) if dest_package.as_deref() != Some(package.as_str()) => {
+        Some(package)
+            if to_dialect == Dialect::CommonLisp
+                && dest_package.as_deref() != Some(package.as_str()) =>
+        {
             format!("(in-package {package})\n\n{definition_text}")
         }
         _ => definition_text.clone(),
     };
     let to_rewritten = append_top_level_form(&to_input.text, &appended);
 
-    SyntaxTree::parse(&from_rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&from_rewritten, from_dialect).with_context(|| {
         format!(
             "source file would become invalid after moving definition: {}",
             args.from_file.display()
         )
     })?;
-    SyntaxTree::parse(&to_rewritten).with_context(|| {
+    SyntaxTree::parse_with_dialect(&to_rewritten, to_dialect).with_context(|| {
         format!(
             "destination file would become invalid after receiving definition: {}",
             args.to_file.display()

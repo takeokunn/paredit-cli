@@ -8,7 +8,7 @@ fn renames_global_function_from_call_head() {
 
 #[test]
 fn renames_global_definition_calls_and_callable_designators() {
-    let input = "(defun render (x) (render x)) (list #'render (function render))";
+    let input = "(defun render (x) (render x)) (list #'render (function render) #:render)";
     let plan = plan_rename_at(RenameAtRequest {
         input,
         dialect: Dialect::CommonLisp,
@@ -19,7 +19,7 @@ fn renames_global_definition_calls_and_callable_designators() {
     assert_eq!(plan.namespace, RenameAtNamespace::Function);
     assert_eq!(
         plan.rewritten,
-        "(defun draw (x) (draw x)) (list #'draw (function draw))"
+        "(defun draw (x) (draw x)) (list #'draw (function draw) #:render)"
     );
 }
 

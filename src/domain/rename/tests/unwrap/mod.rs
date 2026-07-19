@@ -70,6 +70,7 @@ macro_rules! assert_shadowed_unwrap_explicit_path {
 }
 
 mod basic_forms;
+mod dialect_contract;
 mod local_callables;
 mod macro_forms;
 mod property;

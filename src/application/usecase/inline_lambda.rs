@@ -30,7 +30,8 @@ pub struct InlineLambdaPlan {
 }
 
 pub fn plan_inline_lambda(request: InlineLambdaRequest<'_>) -> Result<InlineLambdaPlan> {
-    let tree = SyntaxTree::parse(request.input)?;
+    inline_lambda::validate_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let plan = inline_lambda::plan(DomainRequest {
         input: request.input,
@@ -54,4 +55,34 @@ pub fn plan_inline_lambda(request: InlineLambdaRequest<'_>) -> Result<InlineLamb
         rewritten: plan.rewritten,
         changed: plan.changed,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_dialect_before_parsing_and_uses_dialect_parser() {
+        let plan = plan_inline_lambda(InlineLambdaRequest {
+            input: r"#\) ((lambda (x) x) 1)",
+            dialect: Dialect::CommonLisp,
+            path: "1".parse().expect("path"),
+        })
+        .expect("Common Lisp");
+        SyntaxTree::parse_with_dialect(&plan.rewritten, Dialect::CommonLisp)
+            .expect("rewritten input");
+
+        for dialect in [Dialect::EmacsLisp, Dialect::Unknown] {
+            let error = plan_inline_lambda(InlineLambdaRequest {
+                input: ")",
+                dialect,
+                path: "0".parse().expect("path"),
+            })
+            .expect_err("unsupported dialect");
+            assert_eq!(
+                error.to_string(),
+                "inline-lambda currently supports only Common Lisp"
+            );
+        }
+    }
 }

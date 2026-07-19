@@ -54,7 +54,11 @@ impl Formatter {
         }
         let delimiter = self.list_delimiter(node);
         let mut output = String::new();
-        self.write_reader_prefixes(node, &mut output);
+        let reader_prefix_len = node
+            .reader_prefix_spans
+            .iter()
+            .map(|span| span.slice(&tree.source).len())
+            .sum::<usize>();
         output.push(delimiter.open());
         for (position, child) in node.children.iter().enumerate() {
             if position > 0 {
@@ -63,7 +67,7 @@ impl Formatter {
             output.push_str(&self.compact_node(tree, *child)?);
         }
         output.push(delimiter.close());
-        (output.len() <= MAX_INLINE_WIDTH).then_some(output)
+        (output.len().saturating_add(reader_prefix_len) <= MAX_INLINE_WIDTH).then_some(output)
     }
 
     pub(in crate::domain::sexpr::formatter) fn format_definition(

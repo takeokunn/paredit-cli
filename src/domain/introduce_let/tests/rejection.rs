@@ -1,6 +1,20 @@
 use super::*;
 
 #[test]
+fn rejects_unknown_dialect_before_introduce_let_planning() {
+    let mut request = request("(+ width height)", "0.1", false);
+    request.dialect = Dialect::Unknown;
+
+    let error = plan_introduce_let(request).expect_err("unknown dialect should be rejected");
+
+    assert!(
+        error
+            .to_string()
+            .contains("introduce-let is not supported for this dialect")
+    );
+}
+
+#[test]
 fn rejects_selected_expression_inside_shadowing_binding_form() {
     assert_shadowed_error(
         "(defun render () (let ((product 1)) (* width height)))",

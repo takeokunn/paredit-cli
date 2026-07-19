@@ -158,3 +158,107 @@ fn package_qualified_compiler_macrolet_expander_bodies_remain_outer_references()
 
     assert_eq!(reference_texts(input, "m"), vec!["m", "m", "m"]);
 }
+
+#[test]
+fn common_lisp_lambda_parameters_preserve_shadowing_contract() {
+    assert!(
+        reference_texts_with_dialect("(lambda (value) value)", Dialect::CommonLisp, "value",)
+            .is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(lambda (other) value)", Dialect::CommonLisp, "value",),
+        ["value"]
+    );
+}
+
+#[test]
+fn emacs_lisp_lambda_parameters_preserve_shadowing_contract() {
+    assert!(
+        reference_texts_with_dialect("(lambda (value) value)", Dialect::EmacsLisp, "value",)
+            .is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(lambda (other) value)", Dialect::EmacsLisp, "value",),
+        ["value"]
+    );
+}
+
+#[test]
+fn scheme_variadic_lambda_atom_shadows_its_body() {
+    assert!(
+        reference_texts_with_dialect("(lambda value value)", Dialect::Scheme, "value",).is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(lambda other value)", Dialect::Scheme, "value"),
+        ["value"]
+    );
+}
+
+#[test]
+fn clojure_anonymous_fn_parameters_shadow_their_body() {
+    assert!(
+        reference_texts_with_dialect("(fn [value] value)", Dialect::Clojure, "value",).is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(fn [other] value)", Dialect::Clojure, "value"),
+        ["value"]
+    );
+}
+
+#[test]
+fn clojure_named_fn_name_and_parameters_shadow_their_body() {
+    assert!(
+        reference_texts_with_dialect(
+            "(fn recur-name [value] (list recur-name value))",
+            Dialect::Clojure,
+            "recur-name",
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(fn recur-name [other] value)", Dialect::Clojure, "value",),
+        ["value"]
+    );
+}
+
+#[test]
+fn clojure_multi_arity_fn_scopes_each_parameter_clause() {
+    assert_eq!(
+        reference_texts_with_dialect(
+            "(fn ([value] value) ([other] value))",
+            Dialect::Clojure,
+            "value",
+        ),
+        ["value"]
+    );
+    assert!(
+        reference_texts_with_dialect(
+            "(fn recur-name ([value] recur-name) ([other] recur-name))",
+            Dialect::Clojure,
+            "recur-name",
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn janet_fn_vector_parameters_shadow_their_body() {
+    assert!(
+        reference_texts_with_dialect("(fn [value] value)", Dialect::Janet, "value",).is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(fn [other] value)", Dialect::Janet, "value"),
+        ["value"]
+    );
+}
+
+#[test]
+fn fennel_fn_vector_parameters_shadow_their_body() {
+    assert!(
+        reference_texts_with_dialect("(fn [value] value)", Dialect::Fennel, "value",).is_empty()
+    );
+    assert_eq!(
+        reference_texts_with_dialect("(fn [other] value)", Dialect::Fennel, "value"),
+        ["value"]
+    );
+}

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+use crate::dialect::Dialect;
 use crate::domain::mutation_safety::reject_common_lisp_reader_conditionals;
 use crate::domain::sexpr::SyntaxTree;
 
@@ -19,8 +20,8 @@ use definition_insertion::{DefinitionInsertionPlan, resolve_definition_insertion
 pub fn plan_add_function_parameter(
     request: AddFunctionParameterRequest<'_>,
 ) -> Result<AddFunctionParameterPlan> {
-    let argument = validate_argument(&request.argument)?;
-    let tree = SyntaxTree::parse(request.input)?;
+    let argument = validate_argument(&request.argument, request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let target = parse_add_function_parameter_definition(
         request.dialect,
@@ -96,7 +97,7 @@ pub fn plan_add_function_parameter(
     sorted_call_spans.sort_by_key(|span| span.start());
     ensure_non_overlapping_spans(sorted_call_spans)?;
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("add-function-parameter output is not a valid S-expression document")?;
 
     let changed = rewritten != request.input;
@@ -118,12 +119,12 @@ pub fn plan_add_function_parameter(
     })
 }
 
-fn validate_argument(argument: &str) -> Result<String> {
+fn validate_argument(argument: &str, dialect: Dialect) -> Result<String> {
     let argument = argument.trim().to_owned();
     if argument.is_empty() {
         anyhow::bail!("--argument must not be empty");
     }
-    let argument_tree = SyntaxTree::parse(&argument)
+    let argument_tree = SyntaxTree::parse_with_dialect(&argument, dialect)
         .context("add-function-parameter argument is not a valid S-expression")?;
     if argument_tree.root_children().len() != 1 {
         anyhow::bail!("--argument must contain exactly one top-level S-expression");

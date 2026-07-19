@@ -16,8 +16,12 @@ pub use error::RenameAtError;
 use selection::AtomPathIndex;
 pub use types::{RenameAtNamespace, RenameAtPlan, RenameAtRequest};
 
+pub(crate) const fn supports_rename_at_dialect(dialect: Dialect) -> bool {
+    matches!(dialect, Dialect::CommonLisp)
+}
+
 pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
-    if request.dialect != Dialect::CommonLisp {
+    if !supports_rename_at_dialect(request.dialect) {
         return Err(RenameAtError::UnsupportedDialect.into());
     }
     if request.at.get() >= request.input.len() || !request.input.is_char_boundary(request.at.get())
@@ -25,7 +29,8 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
         return Err(RenameAtError::InvalidSelection.into());
     }
 
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect).map_err(RenameAtError::from)?;
     let atom_occurrences = tree.atom_occurrence_index();
     let atom_paths = AtomPathIndex::new(&atom_occurrences);
@@ -77,7 +82,7 @@ pub fn plan_rename_at(request: RenameAtRequest<'_>) -> Result<RenameAtPlan> {
             .ok_or_else(|| anyhow::anyhow!("one candidate"))?,
         _ => return Err(RenameAtError::Ambiguous.into()),
     };
-    SyntaxTree::parse(&candidate.rewritten)
+    SyntaxTree::parse_with_dialect(&candidate.rewritten, request.dialect)
         .context("renamed output is not a valid S-expression document")?;
     Ok(RenameAtPlan {
         dialect: request.dialect,

@@ -1,16 +1,15 @@
 use std::iter;
 
 use crate::domain::common_lisp::CommonLispResourceBindingForm;
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::super::syntax::atom_text;
 use super::super::bindings::extract_function_binding_entries;
 use super::super::patterns::parameter_names;
-use super::{extend_extract_function_bound_params, slot_spec_bound_name};
+use super::{ExtractFunctionSemantic, extend_extract_function_bound_params, slot_spec_bound_name};
 
 pub(super) fn collect_inferred_extract_function_let(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -21,21 +20,21 @@ pub(super) fn collect_inferred_extract_function_let(
     };
     if binding_form.delimiter == Some(Delimiter::Bracket) {
         return collect_inferred_extract_function_let_star(
-            dialect,
+            semantic,
             view,
             explicit_params,
             bound_params,
             params,
         );
     }
-    let Some(bindings) = extract_function_binding_entries(binding_form) else {
+    let Some(bindings) = extract_function_binding_entries(semantic, binding_form) else {
         return false;
     };
 
     for binding in &bindings {
         if let Some(value) = &binding.value {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 value,
                 false,
                 explicit_params,
@@ -46,14 +45,14 @@ pub(super) fn collect_inferred_extract_function_let(
     }
 
     let body_bound_params = extend_extract_function_bound_params(
-        dialect,
+        semantic,
         bound_params,
         bindings
             .iter()
             .flat_map(|binding| binding.names.iter().map(String::as_str)),
     );
     collect_bodies(
-        dialect,
+        semantic,
         &view.children[2..],
         explicit_params,
         &body_bound_params,
@@ -63,7 +62,7 @@ pub(super) fn collect_inferred_extract_function_let(
 }
 
 pub(super) fn collect_inferred_extract_function_let_star(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -72,7 +71,7 @@ pub(super) fn collect_inferred_extract_function_let_star(
     let Some(binding_form) = view.children.get(1) else {
         return false;
     };
-    let Some(bindings) = extract_function_binding_entries(binding_form) else {
+    let Some(bindings) = extract_function_binding_entries(semantic, binding_form) else {
         return false;
     };
 
@@ -80,7 +79,7 @@ pub(super) fn collect_inferred_extract_function_let_star(
     for binding in &bindings {
         if let Some(value) = &binding.value {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 value,
                 false,
                 explicit_params,
@@ -89,12 +88,12 @@ pub(super) fn collect_inferred_extract_function_let_star(
             );
         }
         for name in &binding.names {
-            super::push_extract_function_bound_param(dialect, &mut current_bound_params, name);
+            super::push_extract_function_bound_param(semantic, &mut current_bound_params, name);
         }
     }
 
     collect_bodies(
-        dialect,
+        semantic,
         &view.children[2..],
         explicit_params,
         &current_bound_params,
@@ -104,7 +103,7 @@ pub(super) fn collect_inferred_extract_function_let_star(
 }
 
 pub(super) fn collect_inferred_extract_function_value_binding(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -118,7 +117,7 @@ pub(super) fn collect_inferred_extract_function_value_binding(
     };
 
     super::super::collect_inferred_extract_function_params(
-        dialect,
+        semantic,
         value_form,
         false,
         explicit_params,
@@ -126,14 +125,14 @@ pub(super) fn collect_inferred_extract_function_value_binding(
         params,
     );
 
-    let names = parameter_names(binding_form);
+    let names = parameter_names(semantic, binding_form);
     let body_bound_params = extend_extract_function_bound_params(
-        dialect,
+        semantic,
         bound_params,
         names.iter().map(String::as_str),
     );
     collect_bodies(
-        dialect,
+        semantic,
         &view.children[3..],
         explicit_params,
         &body_bound_params,
@@ -143,7 +142,7 @@ pub(super) fn collect_inferred_extract_function_value_binding(
 }
 
 pub(super) fn collect_inferred_extract_function_clause_form(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -154,7 +153,7 @@ pub(super) fn collect_inferred_extract_function_clause_form(
     };
 
     super::super::collect_inferred_extract_function_params(
-        dialect,
+        semantic,
         protected_form,
         false,
         explicit_params,
@@ -165,7 +164,7 @@ pub(super) fn collect_inferred_extract_function_clause_form(
     for clause in &view.children[2..] {
         if clause.kind != ExpressionKind::List || clause.delimiter != Some(Delimiter::Paren) {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 clause,
                 false,
                 explicit_params,
@@ -178,14 +177,14 @@ pub(super) fn collect_inferred_extract_function_clause_form(
         let Some(parameter_form) = clause.children.get(1) else {
             continue;
         };
-        let names = parameter_names(parameter_form);
+        let names = parameter_names(semantic, parameter_form);
         let clause_bound_params = extend_extract_function_bound_params(
-            dialect,
+            semantic,
             bound_params,
             names.iter().map(String::as_str),
         );
         collect_bodies(
-            dialect,
+            semantic,
             &clause.children[2..],
             explicit_params,
             &clause_bound_params,
@@ -196,7 +195,7 @@ pub(super) fn collect_inferred_extract_function_clause_form(
 }
 
 pub(super) fn collect_inferred_extract_function_handler_bind(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -214,7 +213,7 @@ pub(super) fn collect_inferred_extract_function_handler_bind(
 
         if let Some(function_form) = spec.children.get(1) {
             super::super::collect_inferred_extract_function_params(
-                dialect,
+                semantic,
                 function_form,
                 false,
                 explicit_params,
@@ -225,7 +224,7 @@ pub(super) fn collect_inferred_extract_function_handler_bind(
 
         if include_restart_options {
             collect_inferred_extract_function_restart_option_values(
-                dialect,
+                semantic,
                 spec,
                 explicit_params,
                 bound_params,
@@ -235,7 +234,7 @@ pub(super) fn collect_inferred_extract_function_handler_bind(
     }
 
     collect_bodies(
-        dialect,
+        semantic,
         &view.children[2..],
         explicit_params,
         bound_params,
@@ -245,7 +244,7 @@ pub(super) fn collect_inferred_extract_function_handler_bind(
 }
 
 fn collect_inferred_extract_function_restart_option_values(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     spec: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -254,7 +253,7 @@ fn collect_inferred_extract_function_restart_option_values(
     let mut index = 2;
     while index + 1 < spec.children.len() {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             &spec.children[index + 1],
             false,
             explicit_params,
@@ -266,7 +265,7 @@ fn collect_inferred_extract_function_restart_option_values(
 }
 
 pub(super) fn collect_inferred_extract_function_iteration_binding(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -278,7 +277,7 @@ pub(super) fn collect_inferred_extract_function_iteration_binding(
 
     if let Some(source_form) = binding_form.children.get(1) {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             source_form,
             false,
             explicit_params,
@@ -288,7 +287,7 @@ pub(super) fn collect_inferred_extract_function_iteration_binding(
     }
 
     let body_bound_params = extend_extract_function_bound_params(
-        dialect,
+        semantic,
         bound_params,
         binding_form
             .children
@@ -299,7 +298,7 @@ pub(super) fn collect_inferred_extract_function_iteration_binding(
 
     if let Some(result_form) = binding_form.children.get(2) {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             result_form,
             false,
             explicit_params,
@@ -309,7 +308,7 @@ pub(super) fn collect_inferred_extract_function_iteration_binding(
     }
 
     collect_bodies(
-        dialect,
+        semantic,
         &view.children[2..],
         explicit_params,
         &body_bound_params,
@@ -319,7 +318,7 @@ pub(super) fn collect_inferred_extract_function_iteration_binding(
 }
 
 pub(super) fn collect_inferred_extract_function_slot_binding(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -333,7 +332,7 @@ pub(super) fn collect_inferred_extract_function_slot_binding(
     };
 
     super::super::collect_inferred_extract_function_params(
-        dialect,
+        semantic,
         instance_form,
         false,
         explicit_params,
@@ -342,12 +341,12 @@ pub(super) fn collect_inferred_extract_function_slot_binding(
     );
 
     let body_bound_params = extend_extract_function_bound_params(
-        dialect,
+        semantic,
         bound_params,
         slot_specs.children.iter().filter_map(slot_spec_bound_name),
     );
     collect_bodies(
-        dialect,
+        semantic,
         &view.children[3..],
         explicit_params,
         &body_bound_params,
@@ -357,7 +356,7 @@ pub(super) fn collect_inferred_extract_function_slot_binding(
 }
 
 fn collect_bodies(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     bodies: &[ExpressionView],
     explicit_params: &[String],
     bound_params: &[String],
@@ -365,7 +364,7 @@ fn collect_bodies(
 ) {
     for body in bodies {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             body,
             false,
             explicit_params,
@@ -376,7 +375,7 @@ fn collect_bodies(
 }
 
 pub(super) fn collect_inferred_extract_function_resource_binding(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -392,7 +391,7 @@ pub(super) fn collect_inferred_extract_function_resource_binding(
 
     for initializer in binding_spec.children.iter().skip(1) {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             initializer,
             false,
             explicit_params,
@@ -402,10 +401,10 @@ pub(super) fn collect_inferred_extract_function_resource_binding(
     }
 
     let body_bound_params =
-        extend_extract_function_bound_params(dialect, bound_params, iter::once(binding_name));
+        extend_extract_function_bound_params(semantic, bound_params, iter::once(binding_name));
     for body_form in view.children.iter().skip(resource_form.body_start_index()) {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             body_form,
             false,
             explicit_params,

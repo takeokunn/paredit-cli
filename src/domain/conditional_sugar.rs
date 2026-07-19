@@ -32,14 +32,19 @@ fn replace_span(input: &str, span: ByteSpan, replacement: &str) -> String {
     output
 }
 
+pub(crate) fn require_supported_dialect(dialect: Dialect) -> Result<()> {
+    if !matches!(dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
+        bail!("conditional conversion supports only Common Lisp and Emacs Lisp");
+    }
+    Ok(())
+}
+
 fn prepare<'a>(
     request: &ConditionalConversionRequest<'a>,
     head: &str,
 ) -> Result<(SyntaxTree, ExpressionView)> {
-    if !matches!(request.dialect, Dialect::CommonLisp | Dialect::EmacsLisp) {
-        bail!("conditional conversion supports only Common Lisp and Emacs Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input)
+    require_supported_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("conditional conversion input is not a valid S-expression document")?;
     let form = tree.select_path(&request.path)?.view();
     if tree.has_comment_in(form.span) {
@@ -71,7 +76,7 @@ fn finish(
     replacement: String,
 ) -> Result<ConditionalConversionPlan> {
     let rewritten = replace_span(request.input, form.span, &replacement);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("conditional conversion output is not a valid S-expression document")?;
     Ok(ConditionalConversionPlan {
         dialect: request.dialect,
@@ -181,20 +186,32 @@ mod tests {
     }
 
     #[test]
-    fn conversions_preserve_parseability_and_dialect_boundary() {
-        for dialect in [Dialect::CommonLisp, Dialect::EmacsLisp] {
-            let plan = plan_convert_when_to_if(request("(when ok one two)", dialect)).unwrap();
+    fn supported_dialects_preserve_reader_forms_and_validate_with_the_same_dialect() {
+        for (dialect, input) in [
+            (Dialect::CommonLisp, "(when ok one two) #\\)"),
+            (Dialect::EmacsLisp, "(when ok one two) ?\\)"),
+        ] {
+            let plan = plan_convert_when_to_if(request(input, dialect)).unwrap();
             assert!(plan.changed);
             assert_eq!(plan.body_count, 2);
-            SyntaxTree::parse(&plan.rewritten).unwrap();
+            SyntaxTree::parse_with_dialect(&plan.rewritten, dialect).unwrap();
         }
+    }
+
+    #[test]
+    fn unsupported_dialects_fail_before_parsing_input() {
         for dialect in [
+            Dialect::Scheme,
             Dialect::Clojure,
             Dialect::Janet,
             Dialect::Fennel,
-            Dialect::Scheme,
+            Dialect::Unknown,
         ] {
-            assert!(plan_convert_when_to_if(request("(when ok one)", dialect)).is_err());
+            let error = plan_convert_when_to_if(request(")", dialect)).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "conditional conversion supports only Common Lisp and Emacs Lisp"
+            );
         }
     }
 

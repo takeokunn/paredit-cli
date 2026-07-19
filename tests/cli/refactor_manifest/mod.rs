@@ -53,6 +53,35 @@ fn preview_manifest_out_writes_manifest_and_reports_matching_hash() {
     assert!(rewritten.contains("(defun new-name (x) x)"), "{rewritten}");
 }
 
+#[test]
+fn refactor_manifest_round_trip_has_no_dialect_agnostic_parse_calls() {
+    let sources = [
+        (
+            "preview",
+            include_str!("../../../src/presentation/cli/refactor/workflow/preview/build.rs"),
+        ),
+        (
+            "check",
+            include_str!("../../../src/presentation/cli/refactor/manifest/check.rs"),
+        ),
+        (
+            "diff",
+            include_str!("../../../src/presentation/cli/refactor/workflow/manifest/diff.rs"),
+        ),
+        (
+            "apply",
+            include_str!("../../../src/presentation/cli/refactor/workflow/manifest/apply.rs"),
+        ),
+    ];
+
+    for (workflow, source) in sources {
+        assert!(
+            !source.contains("SyntaxTree::parse("),
+            "{workflow} must parse rewritten source with its manifest dialect"
+        );
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn preview_manifest_out_refuses_symlink_without_modifying_its_target() {

@@ -6,6 +6,8 @@ fn cli_plans_thread_first_expression_without_writing() {
     cmd.args([
         "refactor",
         "thread-expression",
+        "--dialect",
+        "clojure",
         "--path",
         "0",
         "--style",
@@ -59,6 +61,8 @@ fn cli_rejects_thread_expression_write_without_file() {
     cmd.args([
         "refactor",
         "thread-expression",
+        "--dialect",
+        "clojure",
         "--path",
         "0",
         "--style",
@@ -77,6 +81,8 @@ fn cli_rejects_already_threaded_expression() {
     cmd.args([
         "refactor",
         "thread-expression",
+        "--dialect",
+        "clojure",
         "--path",
         "0",
         "--style",

@@ -41,6 +41,9 @@ pub fn value_capture(
     if free_vars.is_empty() {
         return Vec::new();
     }
+    if dialect == Dialect::Unknown {
+        return free_vars;
+    }
 
     let base = scope_span.slice(input);
     let scope_start = scope_span.start().get();
@@ -55,25 +58,26 @@ pub fn value_capture(
         .collect();
     sites.sort_unstable();
 
-    let Ok(original) = SyntaxTree::parse(base) else {
-        return Vec::new();
+    let Ok(original) = SyntaxTree::parse_with_dialect(base, dialect) else {
+        return free_vars;
     };
     let original_root = original.root_view();
     let Some(original_form) = original_root.children.first() else {
-        return Vec::new();
+        return free_vars;
     };
 
     let mut captured = Vec::new();
     for symbol in &free_vars {
         let original_free = count_unshadowed(dialect, original_form, symbol, base);
         let probed = splice_all(base, &sites, symbol.as_str());
-        let Ok(tree) = SyntaxTree::parse(&probed) else {
+        let Ok(tree) = SyntaxTree::parse_with_dialect(&probed, dialect) else {
             // A value that cannot be safely re-inserted is treated as unsafe.
             captured.push(symbol.clone());
             continue;
         };
         let root = tree.root_view();
         let Some(form) = root.children.first() else {
+            captured.push(symbol.clone());
             continue;
         };
         let probed_free = count_unshadowed(dialect, form, symbol, &probed);

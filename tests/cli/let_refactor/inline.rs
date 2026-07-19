@@ -17,13 +17,15 @@ fn cli_plans_inline_let_for_common_lisp() {
         "inline-let",
         "--path",
         "0.3",
+        "--dialect",
+        "common-lisp",
         "--output",
         "json",
     ])
     .write_stdin("(defun render () (let ((product (* width height))) (+ product margin)))")
     .assert()
     .success()
-    .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
+    .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
     .stdout(predicate::str::contains("\"binding_name\": \"product\""))
     .stdout(predicate::str::contains(
         "\"binding_value\": \"(* width height)\"",
@@ -42,6 +44,8 @@ fn cli_plans_inline_let_for_common_lisp_symbol_macrolet() {
         "inline-let",
         "--path",
         "0.3",
+        "--dialect",
+        "common-lisp",
         "--output",
         "json",
     ])
@@ -50,7 +54,7 @@ fn cli_plans_inline_let_for_common_lisp_symbol_macrolet() {
     )
     .assert()
     .success()
-    .stdout(predicate::str::contains("\"dialect\": \"unknown\""))
+    .stdout(predicate::str::contains("\"dialect\": \"common-lisp\""))
     .stdout(predicate::str::contains("\"binding_name\": \"product\""))
     .stdout(predicate::str::contains(
         "\"binding_value\": \"(* width height)\"",
@@ -70,6 +74,8 @@ fn cli_plans_inline_let_with_multiple_body_expressions() {
         "--path",
         "0.3",
         "--allow-duplicate-evaluation",
+        "--dialect",
+        "common-lisp",
         "--output",
         "json",
     ])
@@ -146,11 +152,18 @@ fn cli_writes_inline_let_for_emacs_lisp_cl_symbol_macrolet_file() {
 #[test]
 fn cli_rejects_inline_let_duplicate_evaluation_by_default() {
     let mut cmd = paredit();
-    cmd.args(["refactor", "inline-let", "--path", "0"])
-        .write_stdin("(let ((x (compute))) (+ x x))")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("would duplicate"));
+    cmd.args([
+        "refactor",
+        "inline-let",
+        "--path",
+        "0",
+        "--dialect",
+        "common-lisp",
+    ])
+    .write_stdin("(let ((x (compute))) (+ x x))")
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("would duplicate"));
 }
 
 #[test]
@@ -162,6 +175,8 @@ fn cli_allows_inline_let_duplicate_evaluation_when_explicit() {
         "--path",
         "0",
         "--allow-duplicate-evaluation",
+        "--dialect",
+        "common-lisp",
         "--output",
         "json",
     ])
@@ -173,34 +188,72 @@ fn cli_allows_inline_let_duplicate_evaluation_when_explicit() {
 }
 
 #[test]
-fn cli_plans_inline_let_for_clojure_vector_binding() {
-    let mut cmd = paredit();
-    cmd.args([
-        "refactor",
-        "inline-let",
-        "--dialect",
-        "clojure",
-        "--path",
-        "0",
-        "--output",
-        "json",
-    ])
-    .write_stdin("(let [product (* width height)] (+ product margin))")
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("\"dialect\": \"clojure\""))
-    .stdout(predicate::str::contains("\"binding_name\": \"product\""))
-    .stdout(predicate::str::contains("(+ (* width height) margin)"));
+fn cli_plans_inline_let_for_all_known_stdin_dialects() {
+    for (dialect, input) in [
+        (
+            "common-lisp",
+            "(let ((product (* width height))) (+ product margin))",
+        ),
+        (
+            "emacs-lisp",
+            "(let ((product (* width height))) (+ product margin))",
+        ),
+        (
+            "scheme",
+            "(let ((product (* width height))) (+ product margin))",
+        ),
+        (
+            "clojure",
+            "(let [product (* width height)] (+ product margin))",
+        ),
+        (
+            "janet",
+            "(let [product (* width height)] (+ product margin))",
+        ),
+        (
+            "fennel",
+            "(let [product (* width height)] (+ product margin))",
+        ),
+    ] {
+        let mut cmd = paredit();
+        cmd.args([
+            "refactor",
+            "inline-let",
+            "--dialect",
+            dialect,
+            "--path",
+            "0",
+            "--output",
+            "json",
+        ])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(format!(
+            "\"dialect\": \"{dialect}\""
+        )))
+        .stdout(predicate::str::contains("\"binding_name\": \"product\""))
+        .stdout(predicate::str::contains("(+ (* width height) margin)"));
+    }
 }
 
 #[test]
 fn cli_plans_inline_let_without_touching_shadowed_lambda_parameter() {
     let mut cmd = paredit();
-    cmd.args(["refactor", "inline-let", "--path", "0", "--output", "json"])
-        .write_stdin("(let ((x 1)) (list x (lambda (x) x)))")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("\"binding_name\": \"x\""))
-        .stdout(predicate::str::contains("\"reference_count\": 1"))
-        .stdout(predicate::str::contains("(list 1 (lambda (x) x))"));
+    cmd.args([
+        "refactor",
+        "inline-let",
+        "--path",
+        "0",
+        "--dialect",
+        "common-lisp",
+        "--output",
+        "json",
+    ])
+    .write_stdin("(let ((x 1)) (list x (lambda (x) x)))")
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("\"binding_name\": \"x\""))
+    .stdout(predicate::str::contains("\"reference_count\": 1"))
+    .stdout(predicate::str::contains("(list 1 (lambda (x) x))"));
 }

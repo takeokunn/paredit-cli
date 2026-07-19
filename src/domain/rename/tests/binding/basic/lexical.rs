@@ -1,6 +1,25 @@
 use super::*;
 
 #[test]
+fn rejects_unknown_dialect_before_binding_rename_planning() {
+    let input = "(let ((value 1)) value)";
+    let error = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::Unknown,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("product").unwrap(),
+    })
+    .expect_err("unknown dialect should be rejected");
+
+    assert!(
+        error
+            .to_string()
+            .contains("rename-binding is not supported for this dialect")
+    );
+}
+
+#[test]
 fn plans_binding_rename_without_shadowed_inner_binding() {
     let input = "(let ((value 1)) (+ value (let ((value 2)) value) value))";
     let plan = plan_rename_binding(RenameBindingRequest {
@@ -319,6 +338,24 @@ fn plans_janet_vector_let_binding_rename_through_later_binding_values() {
     let plan = plan_rename_binding(RenameBindingRequest {
         input,
         dialect: Dialect::Janet,
+        target: RenameTarget::Path(Path::from_indexes(vec![0])),
+        from: SymbolName::new("value").unwrap(),
+        to: SymbolName::new("seed").unwrap(),
+    })
+    .unwrap();
+
+    assert_eq!(plan.form, "let");
+    assert_eq!(plan.references.len(), 2);
+    assert_eq!(plan.rewritten, "(let [seed 1 next (+ seed 1)] [seed next])");
+    SyntaxTree::parse(&plan.rewritten).unwrap();
+}
+
+#[test]
+fn plans_fennel_vector_let_binding_rename_through_later_binding_values() {
+    let input = "(let [value 1 next (+ value 1)] [value next])";
+    let plan = plan_rename_binding(RenameBindingRequest {
+        input,
+        dialect: Dialect::Fennel,
         target: RenameTarget::Path(Path::from_indexes(vec![0])),
         from: SymbolName::new("value").unwrap(),
         to: SymbolName::new("seed").unwrap(),

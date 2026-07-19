@@ -3,6 +3,7 @@ use crate::domain::sexpr::{Path, SyntaxTree};
 use super::*;
 
 mod common_lisp;
+mod dialect;
 mod property;
 
 fn path(value: &str) -> Path {

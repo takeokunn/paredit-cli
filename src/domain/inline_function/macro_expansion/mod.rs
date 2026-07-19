@@ -101,7 +101,7 @@ fn expand_plain_macro_body(
     )?;
     count_references_in_expanded_expression(dialect, &intermediate, reference_counts)?;
 
-    let intermediate_tree = expansion::parse_single_expression_tree(&intermediate)?;
+    let intermediate_tree = expansion::parse_single_expression_tree(dialect, &intermediate)?;
     let intermediate_expression = intermediate_tree
         .select_path(&crate::domain::sexpr::Path::root_child(0))?
         .view();

@@ -60,6 +60,37 @@ fn cli_writes_definition_removal() {
 }
 
 #[test]
+fn cli_reparses_definition_removal_with_the_source_dialect() {
+    let dir = fresh_temp_dir("remove-definition-reader-policy");
+    let cases = [
+        ("common.lisp", "(defun keep () #\\))\n"),
+        ("emacs.el", "(defun keep () ?\\))\n"),
+    ];
+
+    for (file_name, keep_definition) in cases {
+        let file = dir.join(file_name);
+        fs::write(&file, format!("{keep_definition}(defun stale () :stale)\n"))
+            .expect("write fixture");
+
+        let mut cmd = paredit();
+        cmd.arg("refactor")
+            .arg("remove-definition")
+            .arg("--file")
+            .arg(&file)
+            .arg("--path")
+            .arg("1")
+            .arg("--write")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("\"written\": true"));
+
+        let rewritten = fs::read_to_string(&file).expect("read rewritten fixture");
+        assert!(rewritten.contains(keep_definition.trim()));
+        assert!(!rewritten.contains("stale"));
+    }
+}
+
+#[test]
 fn cli_plans_unused_definition_removal_without_writing() {
     let dir = fresh_temp_dir("remove-unused-definitions-plan");
     let file = dir.join("core.lisp");

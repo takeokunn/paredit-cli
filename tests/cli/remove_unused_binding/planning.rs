@@ -6,6 +6,8 @@ fn cli_plans_remove_unused_binding_without_writing() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",
@@ -32,6 +34,8 @@ fn cli_plans_remove_unused_binding_alongside_a_bare_symbol_sibling_binding() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--name",
@@ -55,6 +59,8 @@ fn cli_plans_remove_all_unused_bindings_without_writing() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0.3",
         "--all-bindings",
@@ -79,6 +85,8 @@ fn cli_plans_remove_all_unused_bindings_with_multiple_body_expressions() {
     cmd.args([
         "refactor",
         "remove-unused-binding",
+        "--dialect",
+        "common-lisp",
         "--path",
         "0",
         "--all-bindings",

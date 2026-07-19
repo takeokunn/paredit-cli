@@ -152,6 +152,56 @@ fn assert_edit_output(subcommand: &str, path: &str, expected: &str) {
 }
 
 #[test]
+fn edit_replace_keeps_generic_stdin_compatibility_without_dialect_flag() {
+    paredit()
+        .args(["edit", "replace", "--path", "1", "--with", "(new)"])
+        .write_stdin("(old) (keep)\n")
+        .assert()
+        .success()
+        .stdout(predicate::eq("(old) (new)\n"));
+}
+
+#[test]
+fn edit_replace_uses_explicit_clojure_dialect_for_stdin_reader_forms() {
+    paredit()
+        .args([
+            "edit",
+            "replace",
+            "--dialect",
+            "clojure",
+            "--path",
+            "1",
+            "--with",
+            "(new)",
+        ])
+        .write_stdin("#inst \"1985-04-12T23:20:50.52-00:00\" (old)\n")
+        .assert()
+        .success()
+        .stdout(predicate::eq(
+            "#inst \"1985-04-12T23:20:50.52-00:00\" (new)\n",
+        ));
+}
+
+#[test]
+fn edit_replace_uses_explicit_common_lisp_dialect_for_stdin_reader_forms() {
+    paredit()
+        .args([
+            "edit",
+            "replace",
+            "--dialect",
+            "common-lisp",
+            "--path",
+            "1",
+            "--with",
+            "(new)",
+        ])
+        .write_stdin("#S(point :x 1) (old)\n")
+        .assert()
+        .success()
+        .stdout(predicate::eq("#S(point :x 1) (new)\n"));
+}
+
+#[test]
 fn edit_splice_removes_one_list_pair() {
     assert_edit_output("splice", "0.1", "(a b c d e)");
 }

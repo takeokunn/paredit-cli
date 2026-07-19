@@ -38,12 +38,18 @@ fn parse_refactor_apply_manifest_file(
         .as_object()
         .with_context(|| format!("files[{index}] must be a JSON object"))?;
     let edits = required_array(object.get("edits"), &format!("files[{index}].edits"))?;
+    let dialect_field = format!("files[{index}].dialect");
+    let dialect_label = required_string(object.get("dialect"), &dialect_field)?;
+    let dialect = dialect_label.parse::<Dialect>().with_context(|| {
+        format!("manifest field {dialect_field} has invalid dialect {dialect_label:?}")
+    })?;
 
     Ok(RefactorApplyManifestFile {
         path: PathBuf::from(required_string(
             object.get("path"),
             &format!("files[{index}].path"),
         )?),
+        dialect,
         changed: required_bool(object.get("changed"), &format!("files[{index}].changed"))?,
         output_parse_ok: required_bool(
             object.get("output_parse_ok"),

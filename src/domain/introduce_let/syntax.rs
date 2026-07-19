@@ -1,12 +1,24 @@
 use crate::domain::common_lisp::{CommonLispValueScopeForm, common_lisp_symbol_reference_eq};
-use crate::domain::dialect::Dialect;
+use crate::domain::dialect::{
+    BinderShape, BodyShape, Dialect, IntroduceLetOperation, ParameterShape, RelativeNodePath,
+    ScopeShape, VerifiedSemanticPolicy,
+};
 use crate::domain::sexpr::{Delimiter, ExpressionView};
 
 mod special;
 
 use special::special_declaration_shadows_child;
 
-pub(super) fn binding_form_binds_name(dialect: Dialect, view: &ExpressionView, name: &str) -> bool {
+pub(super) fn binding_form_binds_name(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    name: &str,
+) -> bool {
+    if semantic_scope_binds_name(semantic, view, name) {
+        return true;
+    }
+
+    let dialect = semantic.dialect();
     let Some(head) = list_head(view) else {
         return false;
     };
@@ -52,11 +64,12 @@ pub(super) fn binding_form_binds_name(dialect: Dialect, view: &ExpressionView, n
 }
 
 pub(super) fn child_shadowed_by_binding(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     view: &ExpressionView,
     name: &str,
     child_index: usize,
 ) -> bool {
+    let dialect = semantic.dialect();
     let Some(head) = list_head(view) else {
         return false;
     };
@@ -67,33 +80,210 @@ pub(super) fn child_shadowed_by_binding(
         return true;
     }
 
+    if semantic
+        .scope_shape(view)
+        .is_some_and(|shape| semantic_scope_shadows_child(semantic, view, shape, name, child_index))
+        || semantic.definition_shape(view).is_some_and(|shape| {
+            body_contains_child(shape.body(), child_index)
+                && shape.parameters().is_some_and(|parameters| {
+                    parameter_shape_contains_name(semantic, view, parameters, name)
+                })
+        })
+    {
+        return true;
+    }
+
     match form {
         Some(CommonLispValueScopeForm::Let(_)) => {
-            child_index >= 2 && binding_form_binds_name(dialect, view, name)
+            child_index >= 2 && binding_form_binds_name(semantic, view, name)
         }
         Some(CommonLispValueScopeForm::Lambda | CommonLispValueScopeForm::FunctionLiteral) => {
-            child_index >= 2 && binding_form_binds_name(dialect, view, name)
+            child_index >= 2 && binding_form_binds_name(semantic, view, name)
         }
         Some(CommonLispValueScopeForm::Definition) => {
-            child_index >= 3 && binding_form_binds_name(dialect, view, name)
+            child_index >= 3 && binding_form_binds_name(semantic, view, name)
         }
         Some(CommonLispValueScopeForm::Value) => {
-            child_index >= 3 && binding_form_binds_name(dialect, view, name)
+            child_index >= 3 && binding_form_binds_name(semantic, view, name)
         }
         Some(CommonLispValueScopeForm::Clause) => view
             .children
             .get(child_index)
             .is_some_and(|clause| child_index >= 2 && clause_binds_name(clause, name)),
         Some(CommonLispValueScopeForm::Iteration) => {
-            child_index >= 2 && binding_form_binds_name(dialect, view, name)
+            child_index >= 2 && binding_form_binds_name(semantic, view, name)
         }
         Some(CommonLispValueScopeForm::Variable(_)) => {
-            child_index >= 2 && binding_form_binds_name(dialect, view, name)
+            child_index >= 2 && binding_form_binds_name(semantic, view, name)
         }
         Some(CommonLispValueScopeForm::Slot) => {
-            child_index >= 3 && binding_form_binds_name(dialect, view, name)
+            child_index >= 3 && binding_form_binds_name(semantic, view, name)
         }
         _ => false,
+    }
+}
+
+fn semantic_scope_binds_name(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    name: &str,
+) -> bool {
+    let Some(shape) = semantic.scope_shape(view) else {
+        return false;
+    };
+
+    binder_shape_contains_name(semantic, view, shape.binders(), name)
+}
+
+fn semantic_scope_shadows_child(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    shape: ScopeShape,
+    name: &str,
+    child_index: usize,
+) -> bool {
+    match (shape.binders(), shape.body()) {
+        (
+            BinderShape::ParameterClauses {
+                name: local_name,
+                first_clause_index,
+                parameters,
+            },
+            BodyShape::ClauseChildrenFrom { .. },
+        ) if child_index >= first_clause_index => {
+            let Some(clause) = view.children.get(child_index) else {
+                return false;
+            };
+            local_name
+                .and_then(|path| resolve_relative(view, path))
+                .is_some_and(|node| semantic_pattern_contains_name(semantic, node, name))
+                || parameter_shape_contains_name(semantic, clause, parameters, name)
+        }
+        (binders, body) => {
+            body_contains_child(body, child_index)
+                && binder_shape_contains_name(semantic, view, binders, name)
+        }
+    }
+}
+
+fn binder_shape_contains_name(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    binders: BinderShape,
+    name: &str,
+) -> bool {
+    match binders {
+        BinderShape::BindingList {
+            container,
+            name: path,
+            ..
+        } => binding_list_contains_name(semantic, view, container, path, name),
+        BinderShape::NamedBindingList {
+            scope_name,
+            container,
+            name: path,
+            ..
+        } => {
+            resolve_relative(view, scope_name)
+                .is_some_and(|node| semantic_pattern_contains_name(semantic, node, name))
+                || binding_list_contains_name(semantic, view, container, path, name)
+        }
+        BinderShape::FlatPairs {
+            container,
+            first_name_index,
+            stride,
+            ..
+        } => resolve_relative(view, container).is_some_and(|bindings| {
+            bindings
+                .children
+                .iter()
+                .skip(first_name_index)
+                .step_by(stride)
+                .any(|node| semantic_pattern_contains_name(semantic, node, name))
+        }),
+        BinderShape::Parameters(parameters) => {
+            parameter_shape_contains_name(semantic, view, parameters, name)
+        }
+        BinderShape::NamedParameters {
+            name: local_name,
+            parameters,
+        } => {
+            resolve_relative(view, local_name)
+                .is_some_and(|node| semantic_pattern_contains_name(semantic, node, name))
+                || parameter_shape_contains_name(semantic, view, parameters, name)
+        }
+        BinderShape::ParameterClauses {
+            name: local_name,
+            first_clause_index,
+            parameters,
+        } => {
+            local_name
+                .and_then(|path| resolve_relative(view, path))
+                .is_some_and(|node| semantic_pattern_contains_name(semantic, node, name))
+                || view
+                    .children
+                    .iter()
+                    .skip(first_clause_index)
+                    .any(|clause| parameter_shape_contains_name(semantic, clause, parameters, name))
+        }
+    }
+}
+
+fn binding_list_contains_name(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    container: RelativeNodePath,
+    name_path: RelativeNodePath,
+    name: &str,
+) -> bool {
+    resolve_relative(view, container).is_some_and(|bindings| {
+        bindings.children.iter().any(|binding| {
+            resolve_relative(binding, name_path)
+                .is_some_and(|node| semantic_pattern_contains_name(semantic, node, name))
+        })
+    })
+}
+
+fn parameter_shape_contains_name(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    parameters: ParameterShape,
+    name: &str,
+) -> bool {
+    resolve_relative(view, parameters.container()).is_some_and(|container| {
+        container
+            .children
+            .iter()
+            .skip(parameters.first_parameter_index())
+            .any(|parameter| semantic_pattern_contains_name(semantic, parameter, name))
+    })
+}
+
+fn semantic_pattern_contains_name(
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
+    view: &ExpressionView,
+    name: &str,
+) -> bool {
+    atom_text(view).is_some_and(|text| semantic.identifiers_equal(text, name))
+        || view
+            .children
+            .iter()
+            .any(|child| semantic_pattern_contains_name(semantic, child, name))
+}
+
+fn resolve_relative(view: &ExpressionView, path: RelativeNodePath) -> Option<&ExpressionView> {
+    let child = view.children.get(path.child())?;
+    path.grandchild()
+        .map_or(Some(child), |grandchild| child.children.get(grandchild))
+}
+
+fn body_contains_child(body: BodyShape, child_index: usize) -> bool {
+    match body {
+        BodyShape::ChildrenFrom(first) => child_index >= first,
+        BodyShape::ChildrenAfter(path) => child_index > path.child(),
+        BodyShape::ClauseChildrenFrom {
+            first_clause_index, ..
+        } => child_index >= first_clause_index,
     }
 }
 

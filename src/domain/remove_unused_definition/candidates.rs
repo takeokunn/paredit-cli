@@ -4,6 +4,7 @@ use crate::domain::common_lisp::common_lisp_symbol_reference_needle;
 use crate::domain::definition_reference::{
     collect_package_form_spans, collect_reference_needles, collect_symbol_references,
 };
+use crate::domain::dialect::Dialect;
 use crate::domain::remove_unused_definition::types::{
     RemoveUnusedDefinitionInputFile, UnusedDefinitionDefinition,
 };
@@ -26,10 +27,19 @@ pub(super) struct DefinitionReference;
 pub(super) fn collect_unused_definition_candidates(
     files: &[RemoveUnusedDefinitionInputFile],
 ) -> Result<Vec<UnusedDefinitionFile>> {
+    for file in files {
+        if file.dialect == Dialect::Unknown {
+            anyhow::bail!(
+                "remove-unused-definition does not support dialect unknown: {}",
+                file.path.display()
+            );
+        }
+    }
+
     let parsed_files = files
         .iter()
         .map(|file| -> Result<_> {
-            let tree = SyntaxTree::parse(&file.text)
+            let tree = SyntaxTree::parse_with_dialect(&file.text, file.dialect)
                 .with_context(|| format!("failed to parse {}", file.path.display()))?;
             Ok((file, tree.root_view()))
         })

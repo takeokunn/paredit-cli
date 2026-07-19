@@ -14,7 +14,7 @@ fn cli_plans_introduce_let_for_common_lisp() {
         ],
         "(defun render () (+ (* width height) margin))",
         &[
-            "\"dialect\": \"unknown\"",
+            "\"dialect\": \"common-lisp\"",
             "\"binding_value\": \"(* width height)\"",
             "\"replacement\": \"(let ((product (* width height))) (+ product margin))\"",
             "(defun render () (let ((product (* width height))) (+ product margin)))",

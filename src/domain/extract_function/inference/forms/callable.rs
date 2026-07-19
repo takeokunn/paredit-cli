@@ -1,11 +1,10 @@
-use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{Delimiter, ExpressionKind, ExpressionView};
 
 use super::super::patterns::parameter_names;
-use super::extend_extract_function_bound_params;
+use super::{ExtractFunctionSemantic, extend_extract_function_bound_params};
 
 pub(super) fn collect_inferred_extract_function_lambda(
-    dialect: Dialect,
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     parameter_index: usize,
     explicit_params: &[String],
@@ -15,15 +14,15 @@ pub(super) fn collect_inferred_extract_function_lambda(
     let Some(parameter_form) = view.children.get(parameter_index) else {
         return false;
     };
-    let names = parameter_names(parameter_form);
+    let names = parameter_names(semantic, parameter_form);
     let body_bound_params = extend_extract_function_bound_params(
-        dialect,
+        semantic,
         bound_params,
         names.iter().map(String::as_str),
     );
     for body in &view.children[parameter_index + 1..] {
         super::super::collect_inferred_extract_function_params(
-            dialect,
+            semantic,
             body,
             false,
             explicit_params,
@@ -35,6 +34,7 @@ pub(super) fn collect_inferred_extract_function_lambda(
 }
 
 pub(super) fn collect_inferred_extract_function_local_callable_form(
+    semantic: ExtractFunctionSemantic,
     view: &ExpressionView,
     explicit_params: &[String],
     bound_params: &[String],
@@ -55,13 +55,15 @@ pub(super) fn collect_inferred_extract_function_local_callable_form(
             continue;
         };
         let lambda_bound_params = extend_extract_function_bound_params(
-            Dialect::CommonLisp,
+            semantic,
             bound_params,
-            parameter_names(parameter_form).iter().map(String::as_str),
+            parameter_names(semantic, parameter_form)
+                .iter()
+                .map(String::as_str),
         );
         for body in binding.children.iter().skip(2) {
             super::super::collect_inferred_extract_function_params(
-                Dialect::CommonLisp,
+                semantic,
                 body,
                 false,
                 explicit_params,
@@ -73,7 +75,7 @@ pub(super) fn collect_inferred_extract_function_local_callable_form(
 
     for body in &view.children[2..] {
         super::super::collect_inferred_extract_function_params(
-            Dialect::CommonLisp,
+            semantic,
             body,
             false,
             explicit_params,

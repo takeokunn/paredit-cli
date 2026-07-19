@@ -315,38 +315,69 @@ mod tests {
 
     #[test]
     fn classifies_common_lisp_and_emacs_definition_heads() {
-        assert_eq!(
-            classify_definition_head(Dialect::CommonLisp, "defun"),
-            Some(DefinitionCategory::Function)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::CommonLisp, "cl:defmacro"),
-            Some(DefinitionCategory::Macro)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::CommonLisp, "cl:defgeneric"),
-            Some(DefinitionCategory::GenericFunction)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::CommonLisp, "define-setf-expander"),
-            Some(DefinitionCategory::Macro)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::CommonLisp, "define-symbol-macro"),
-            Some(DefinitionCategory::Variable)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::CommonLisp, "asdf:defsystem"),
-            Some(DefinitionCategory::System)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::EmacsLisp, "defcustom"),
-            Some(DefinitionCategory::Customization)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::EmacsLisp, "define-minor-mode"),
-            Some(DefinitionCategory::Mode)
-        );
+        for (head, category) in [
+            ("defun", DefinitionCategory::Function),
+            ("DEFUN", DefinitionCategory::Function),
+            ("CL:DEFMACRO", DefinitionCategory::Macro),
+            ("cl:defgeneric", DefinitionCategory::GenericFunction),
+            ("define-setf-expander", DefinitionCategory::Macro),
+            ("define-symbol-macro", DefinitionCategory::Variable),
+            ("asdf:defsystem", DefinitionCategory::System),
+            ("deftest", DefinitionCategory::Test),
+        ] {
+            assert_eq!(
+                classify_definition_head(Dialect::CommonLisp, head),
+                Some(category),
+                "Common Lisp head {head}"
+            );
+        }
+
+        for (head, category) in [
+            ("defun", DefinitionCategory::Function),
+            ("defsubst", DefinitionCategory::Function),
+            ("cl-defun", DefinitionCategory::Function),
+            ("defmacro", DefinitionCategory::Macro),
+            ("cl-defmacro", DefinitionCategory::Macro),
+            ("cl-defgeneric", DefinitionCategory::GenericFunction),
+            ("cl-defmethod", DefinitionCategory::Method),
+            ("defvar", DefinitionCategory::Variable),
+            ("defconst", DefinitionCategory::Constant),
+            ("defcustom", DefinitionCategory::Customization),
+            ("defgroup", DefinitionCategory::Customization),
+            ("define-minor-mode", DefinitionCategory::Mode),
+            ("define-derived-mode", DefinitionCategory::Mode),
+            ("provide", DefinitionCategory::Package),
+            ("require", DefinitionCategory::Package),
+        ] {
+            assert_eq!(
+                classify_definition_head(Dialect::EmacsLisp, head),
+                Some(category),
+                "Emacs Lisp head {head}"
+            );
+        }
+    }
+
+    #[test]
+    fn classifies_common_lisp_definition_extensions_without_accepting_arbitrary_heads() {
+        for (head, expected) in [
+            (
+                "define-trading-strategy",
+                Some(DefinitionCategory::UnknownMacro),
+            ),
+            (
+                "CL:DEFINE-TRADING-STRATEGY",
+                Some(DefinitionCategory::UnknownMacro),
+            ),
+            ("deftest", Some(DefinitionCategory::Test)),
+            ("CL:DEFTEST", Some(DefinitionCategory::Test)),
+            ("trading-strategy", None),
+        ] {
+            assert_eq!(
+                classify_definition_head(Dialect::CommonLisp, head),
+                expected,
+                "Common Lisp extension head {head}"
+            );
+        }
     }
 
     #[test]
@@ -429,15 +460,66 @@ mod tests {
     }
 
     #[test]
-    fn classifies_clojure_and_custom_define_heads() {
-        assert_eq!(
-            classify_definition_head(Dialect::Clojure, "defn-"),
-            Some(DefinitionCategory::Function)
-        );
-        assert_eq!(
-            classify_definition_head(Dialect::Clojure, "defrecord"),
-            Some(DefinitionCategory::Struct)
-        );
+    fn classifies_scheme_clojure_janet_and_fennel_definition_heads() {
+        for (dialect, head, category) in [
+            (Dialect::Scheme, "define", DefinitionCategory::Function),
+            (Dialect::Scheme, "define-syntax", DefinitionCategory::Macro),
+            (
+                Dialect::Scheme,
+                "define-library",
+                DefinitionCategory::Package,
+            ),
+            (Dialect::Scheme, "lambda", DefinitionCategory::Function),
+            (Dialect::Scheme, "let", DefinitionCategory::Other),
+            (Dialect::Scheme, "let*", DefinitionCategory::Other),
+            (Dialect::Clojure, "ns", DefinitionCategory::Package),
+            (Dialect::Clojure, "def", DefinitionCategory::Variable),
+            (Dialect::Clojure, "defn", DefinitionCategory::Function),
+            (Dialect::Clojure, "defmacro", DefinitionCategory::Macro),
+            (Dialect::Clojure, "defrecord", DefinitionCategory::Struct),
+            (Dialect::Clojure, "deftype", DefinitionCategory::Class),
+            (Dialect::Clojure, "defprotocol", DefinitionCategory::Class),
+            (
+                Dialect::Clojure,
+                "defmulti",
+                DefinitionCategory::GenericFunction,
+            ),
+            (Dialect::Clojure, "defmethod", DefinitionCategory::Method),
+            (Dialect::Janet, "def", DefinitionCategory::Variable),
+            (Dialect::Janet, "def-", DefinitionCategory::Variable),
+            (Dialect::Janet, "defn", DefinitionCategory::Function),
+            (Dialect::Janet, "defn-", DefinitionCategory::Function),
+            (Dialect::Janet, "defmacro", DefinitionCategory::Macro),
+            (Dialect::Fennel, "fn", DefinitionCategory::Function),
+            (Dialect::Fennel, "lambda", DefinitionCategory::Function),
+            (Dialect::Fennel, "macro", DefinitionCategory::Macro),
+            (Dialect::Fennel, "local", DefinitionCategory::Variable),
+            (Dialect::Fennel, "global", DefinitionCategory::Variable),
+        ] {
+            assert_eq!(
+                classify_definition_head(dialect, head),
+                Some(category),
+                "{dialect:?} head {head}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_cross_dialect_definition_heads_but_keeps_unknown_compatibility() {
+        for (dialect, head) in [
+            (Dialect::Scheme, "defn"),
+            (Dialect::Fennel, "defconst"),
+            (Dialect::EmacsLisp, "ns"),
+            (Dialect::Clojure, "defn-"),
+            (Dialect::Janet, "defrecord"),
+        ] {
+            assert_eq!(
+                classify_definition_head(dialect, head),
+                None,
+                "{dialect:?} must reject foreign head {head}"
+            );
+        }
+
         assert_eq!(
             classify_definition_head(Dialect::Unknown, "define-widget"),
             Some(DefinitionCategory::Other)

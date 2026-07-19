@@ -1,5 +1,5 @@
 use crate::domain::{
-    dialect::Dialect,
+    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
     sexpr::{ByteSpan, ChildIndex, ExpressionView},
 };
 
@@ -10,7 +10,7 @@ use super::{
 use crate::domain::introduce_let::syntax::iteration_binding_child_shadowed;
 
 pub(super) fn collect_iteration_binding_spans(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target: &ExpressionView,
     binding_name: &str,
@@ -26,7 +26,7 @@ pub(super) fn collect_iteration_binding_spans(
         let child_shadowed = shadowed_by_binding
             || iteration_binding_child_shadowed(binding_form, binding_name, index);
         collect_equivalent_expression_spans(
-            dialect,
+            semantic,
             child,
             target,
             binding_name,
@@ -37,7 +37,7 @@ pub(super) fn collect_iteration_binding_spans(
 }
 
 pub(super) fn is_span_shadowed_by_iteration_bindings(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_span: ByteSpan,
     binding_name: &str,
@@ -54,12 +54,12 @@ pub(super) fn is_span_shadowed_by_iteration_bindings(
         .any(|(index, child)| {
             let child_shadowed = shadowed_by_binding
                 || iteration_binding_child_shadowed(binding_form, binding_name, index);
-            is_span_shadowed_by_binding(dialect, child, target_span, binding_name, child_shadowed)
+            is_span_shadowed_by_binding(semantic, child, target_span, binding_name, child_shadowed)
         })
 }
 
 pub(super) fn is_path_shadowed_by_iteration_bindings(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_path: &[ChildIndex],
     binding_name: &str,
@@ -78,6 +78,6 @@ pub(super) fn is_path_shadowed_by_iteration_bindings(
     if rest.is_empty() {
         child_shadowed
     } else {
-        is_path_shadowed_by_binding(dialect, child, rest, binding_name, child_shadowed)
+        is_path_shadowed_by_binding(semantic, child, rest, binding_name, child_shadowed)
     }
 }

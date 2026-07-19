@@ -46,15 +46,20 @@ pub struct ExtractLocalFunctionPlan {
     pub changed: bool,
 }
 
+fn ensure_common_lisp_dialect(dialect: Dialect) -> Result<()> {
+    if dialect != Dialect::CommonLisp {
+        bail!("extract-local-function currently supports only Common Lisp");
+    }
+    Ok(())
+}
+
 pub fn plan_extract_local_function(
     request: ExtractLocalFunctionRequest<'_>,
 ) -> Result<ExtractLocalFunctionPlan> {
     request.selection.validate_source(request.input)?;
     request.enclosing.validate_source(request.input)?;
-    if request.dialect != Dialect::CommonLisp {
-        bail!("extract-local-function currently supports only Common Lisp");
-    }
-    let tree = SyntaxTree::parse(request.input)
+    ensure_common_lisp_dialect(request.dialect)?;
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
         .context("extract-local-function input is not a valid S-expression document")?;
     reject_common_lisp_reader_conditionals(&tree, request.dialect)?;
     let path = request
@@ -114,7 +119,7 @@ pub fn plan_extract_local_function(
         enclosed
     );
     let rewritten = replace_span(request.input, enclosing_span, &replacement);
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("extracted local function output is not a valid S-expression document")?;
 
     Ok(ExtractLocalFunctionPlan {
@@ -1140,6 +1145,63 @@ mod tests {
             infer_params: true,
             recursive,
         })
+    }
+
+    #[test]
+    fn dialect_matrix_gates_unsupported_dialects_before_parsing() {
+        for (dialect, supported) in [
+            (Dialect::CommonLisp, true),
+            (Dialect::EmacsLisp, false),
+            (Dialect::Scheme, false),
+            (Dialect::Clojure, false),
+            (Dialect::Janet, false),
+            (Dialect::Fennel, false),
+            (Dialect::Unknown, false),
+        ] {
+            let parse_attempted = std::cell::Cell::new(false);
+            match ensure_common_lisp_dialect(dialect) {
+                Ok(()) => {
+                    parse_attempted.set(true);
+                    assert!(SyntaxTree::parse_with_dialect(")", dialect).is_err());
+                }
+                Err(error) => {
+                    assert!(!supported);
+                    assert_eq!(
+                        error.to_string(),
+                        "extract-local-function currently supports only Common Lisp"
+                    );
+                }
+            }
+
+            assert_eq!(parse_attempted.get(), supported);
+        }
+    }
+
+    #[test]
+    fn preserves_common_lisp_reader_character_literal() -> Result<()> {
+        let input = r"(progn (print #\)) (finish))";
+        let tree = SyntaxTree::parse_with_dialect(input, Dialect::CommonLisp)?;
+        let path: Path = "0.1".parse()?;
+        let enclosing_path: Path = "0".parse()?;
+        let selection = tree.select_path(&path)?;
+        let enclosing = tree.select_path(&enclosing_path)?;
+
+        let result = plan_extract_local_function(ExtractLocalFunctionRequest {
+            input,
+            selection,
+            path: Some(path),
+            enclosing,
+            enclosing_path,
+            dialect: Dialect::CommonLisp,
+            name: SymbolName::new("compute")?,
+            explicit_params: Vec::new(),
+            infer_params: true,
+            recursive: false,
+        })?;
+
+        assert!(result.rewritten.contains(r"#\)"));
+        SyntaxTree::parse_with_dialect(&result.rewritten, Dialect::CommonLisp)?;
+        Ok(())
     }
 
     #[test]

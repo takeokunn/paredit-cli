@@ -1,5 +1,5 @@
 use crate::domain::{
-    dialect::Dialect,
+    dialect::{IntroduceLetOperation, VerifiedSemanticPolicy},
     sexpr::{ByteSpan, ChildIndex, ExpressionView},
 };
 
@@ -10,7 +10,7 @@ use super::{
 use crate::domain::introduce_let::syntax::binding_pair_binds_name;
 
 pub(super) fn collect_let_star_binding_spans(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target: &ExpressionView,
     binding_name: &str,
@@ -25,7 +25,7 @@ pub(super) fn collect_let_star_binding_spans(
     let mut sequential_shadowed = shadowed_by_binding;
     for binding in &binding_form.children {
         collect_let_star_binding_spec_spans(
-            dialect,
+            semantic,
             binding,
             target,
             binding_name,
@@ -39,7 +39,7 @@ pub(super) fn collect_let_star_binding_spans(
 }
 
 fn collect_let_star_binding_spec_spans(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding: &ExpressionView,
     target: &ExpressionView,
     binding_name: &str,
@@ -53,7 +53,7 @@ fn collect_let_star_binding_spec_spans(
 
     for child in &binding.children {
         collect_equivalent_expression_spans(
-            dialect,
+            semantic,
             child,
             target,
             binding_name,
@@ -64,7 +64,7 @@ fn collect_let_star_binding_spec_spans(
 }
 
 pub(super) fn is_span_shadowed_by_let_star_bindings(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_span: ByteSpan,
     binding_name: &str,
@@ -78,7 +78,7 @@ pub(super) fn is_span_shadowed_by_let_star_bindings(
     for binding in &binding_form.children {
         if binding.span.contains_span(target_span) {
             return is_span_shadowed_by_binding(
-                dialect,
+                semantic,
                 binding,
                 target_span,
                 binding_name,
@@ -94,7 +94,7 @@ pub(super) fn is_span_shadowed_by_let_star_bindings(
 }
 
 pub(super) fn is_path_shadowed_by_let_star_bindings(
-    dialect: Dialect,
+    semantic: VerifiedSemanticPolicy<IntroduceLetOperation>,
     binding_form: &ExpressionView,
     target_path: &[ChildIndex],
     binding_name: &str,
@@ -112,7 +112,7 @@ pub(super) fn is_path_shadowed_by_let_star_bindings(
                 sequential_shadowed
             } else {
                 is_path_shadowed_by_binding(
-                    dialect,
+                    semantic,
                     binding,
                     rest,
                     binding_name,

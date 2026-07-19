@@ -3,29 +3,53 @@
 
 use anyhow::Result;
 use clap::builder::Command as ClapCommand;
-use clap::{Arg, ArgAction, Args, CommandFactory};
+use clap::{Arg, ArgAction, Args, CommandFactory, ValueEnum};
 use serde_json::{Value, json};
 
 use super::args::OutputFormat;
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CapabilitiesSchemaVersion {
+    #[value(name = "1")]
+    V1,
+    #[value(name = "2")]
+    V2,
+}
+
+impl CapabilitiesSchemaVersion {
+    const fn number(self) -> u8 {
+        match self {
+            Self::V1 => 1,
+            Self::V2 => 2,
+        }
+    }
+}
 
 #[derive(Debug, Args)]
 pub(super) struct CapabilitiesArgs {
     /// Output format. Defaults to json: this command exists for agent discovery.
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     pub(super) output: OutputFormat,
+
+    /// Machine-readable schema version.
+    #[arg(long, value_enum, default_value = "1")]
+    schema_version: CapabilitiesSchemaVersion,
 }
 
 pub(super) fn capabilities(args: CapabilitiesArgs) -> Result<()> {
     let root = super::Cli::command();
     match args.output {
         OutputFormat::Json => {
-            let report = json!({
-                "schema_version": 1,
+            let mut report = json!({
+                "schema_version": args.schema_version.number(),
                 "name": root.get_name(),
                 "version": root.get_version(),
                 "about": about_text(&root),
-                "commands": subcommand_reports(&root),
+                "commands": subcommand_reports(&root, args.schema_version),
             });
+            if matches!(args.schema_version, CapabilitiesSchemaVersion::V2) {
+                report["dialect_contract"] = super::contract::dialect_contract_report();
+            }
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
         OutputFormat::Text => {
@@ -37,16 +61,19 @@ pub(super) fn capabilities(args: CapabilitiesArgs) -> Result<()> {
     Ok(())
 }
 
-fn subcommand_reports(command: &ClapCommand) -> Vec<Value> {
+fn subcommand_reports(
+    command: &ClapCommand,
+    schema_version: CapabilitiesSchemaVersion,
+) -> Vec<Value> {
     command
         .get_subcommands()
         .filter(|subcommand| subcommand.get_name() != "help")
         .map(|subcommand| {
-            let nested = subcommand_reports(subcommand);
+            let nested = subcommand_reports(subcommand, schema_version);
             let mut report = json!({
                 "name": subcommand.get_name(),
                 "about": about_text(subcommand),
-                "args": argument_reports(subcommand),
+                "args": argument_reports(subcommand, schema_version),
             });
             if !nested.is_empty() {
                 report["commands"] = Value::Array(nested);
@@ -56,10 +83,18 @@ fn subcommand_reports(command: &ClapCommand) -> Vec<Value> {
         .collect()
 }
 
-fn argument_reports(command: &ClapCommand) -> Vec<Value> {
+fn argument_reports(
+    command: &ClapCommand,
+    schema_version: CapabilitiesSchemaVersion,
+) -> Vec<Value> {
     command
         .get_arguments()
-        .filter(|arg| !matches!(arg.get_id().as_str(), "help" | "version"))
+        .filter(|arg| {
+            !matches!(
+                (arg.get_id().as_str(), schema_version),
+                ("help" | "version", _) | ("schema_version", CapabilitiesSchemaVersion::V1)
+            )
+        })
         .map(|arg| {
             json!({
                 "id": arg.get_id().as_str(),

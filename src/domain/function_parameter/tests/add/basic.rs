@@ -23,6 +23,35 @@ fn adds_parameter_to_definition_and_call() {
 }
 
 #[test]
+fn add_parameter_preserves_dialect_reader_collisions() {
+    let cases = [(
+        Dialect::Janet,
+        "(defn area [w] w)\n(area 3)\n# ignored ))",
+        "[value # ignored ))\n next]",
+        "(defn area [w h] w)\n(area 3 [value # ignored ))\n next])\n# ignored ))",
+    )];
+
+    for (dialect, input, argument, expected) in cases {
+        let plan = plan_add_function_parameter(AddFunctionParameterRequest {
+            input,
+            dialect,
+            definition_path: path("0"),
+            name: symbol("h"),
+            argument: argument.to_owned(),
+            call_paths: vec![path("1")],
+            all_calls: false,
+            insert: FunctionParameterInsert::End,
+            section: FunctionParameterSection::Auto,
+        })
+        .expect("plan");
+
+        assert_eq!(plan.rewritten, expected);
+        SyntaxTree::parse_with_dialect(&plan.rewritten, dialect)
+            .expect("rewritten output remains parseable");
+    }
+}
+
+#[test]
 fn adds_parameter_to_package_qualified_common_lisp_definition() {
     let input = "(cl:defun area (w) w)\n(print (area 3))";
     let plan = plan_add_function_parameter(AddFunctionParameterRequest {

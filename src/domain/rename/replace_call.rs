@@ -40,7 +40,20 @@ pub struct ReplaceFunctionCallsPlan {
 pub fn plan_replace_function_calls(
     request: ReplaceFunctionCallsRequest<'_>,
 ) -> Result<ReplaceFunctionCallsPlan> {
-    let tree = SyntaxTree::parse(request.input).context("failed to parse input")?;
+    match request.dialect {
+        Dialect::CommonLisp
+        | Dialect::EmacsLisp
+        | Dialect::Scheme
+        | Dialect::Clojure
+        | Dialect::Janet
+        | Dialect::Fennel => {}
+        Dialect::Unknown => {
+            anyhow::bail!("replace-function-calls requires a known dialect");
+        }
+    }
+
+    let tree = SyntaxTree::parse_with_dialect(request.input, request.dialect)
+        .context("failed to parse input")?;
     let calls = match &request.scope {
         ReplaceFunctionCallsScope::AllCalls => collect_all_replace_call_sites(
             &tree,
@@ -63,7 +76,7 @@ pub fn plan_replace_function_calls(
         .map(|site| (site.head_span, site.replacement.clone()))
         .collect::<Vec<_>>();
     let rewritten = apply_byte_span_edits(request.input, edits)?;
-    SyntaxTree::parse(&rewritten)
+    SyntaxTree::parse_with_dialect(&rewritten, request.dialect)
         .context("replace-function-calls output is not a valid S-expression document")?;
 
     Ok(ReplaceFunctionCallsPlan {
