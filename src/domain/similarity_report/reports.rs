@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, VecDeque};
 use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
@@ -7,22 +7,92 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
 use std::thread;
 
 use crate::domain::form_similarity::{
-    MAX_REPORT_TREE_EDIT_OPERATIONS, MAX_TREE_SIMILARITY_WORKSPACES, TreeSimilarityError,
-    TreeSimilarityOperationBudget, TreeSimilarityWorkspace, reserve_tree_similarity_workspaces,
-    similarity_upper_bound, tree_similarity_with_workspace_and_budget,
+    MAX_REPORT_TREE_EDIT_OPERATIONS, MAX_TREE_SIMILARITY_WORKSPACES, StructuralTree,
+    TreeSimilarityError, TreeSimilarityOperationBudget, TreeSimilarityWorkspace,
+    reserve_tree_similarity_workspaces, similarity_upper_bound,
+    tree_similarity_with_workspace_and_budget,
 };
 use anyhow::{Result, anyhow};
 
 use super::options::MAX_STORED_RESULTS;
 
 use super::types::{
-    SimilarityCandidate, SimilarityComparisonScope, SimilarityFormReport, SimilarityOverlapPolicy,
-    SimilarityPairReport, SimilarityReport, SimilarityReportOptions, SimilarityReportSummary,
+    PairProcessingCounts, PairResultCounts, ReportLimit, SimilarityCandidate,
+    SimilarityComparisonScope, SimilarityFormReport, SimilarityOverlapPolicy, SimilarityPairReport,
+    SimilarityRatio, SimilarityReport, SimilarityReportOptions, SimilarityReportSummary,
+    SimilarityScore,
 };
 
 const MAX_SIMILARITY_WORKERS: usize = 8;
 const DEFAULT_MAX_RESULTS: usize = 10_000;
 const MAX_MATERIALIZED_RESULT_BYTES: usize = 64 * 1024 * 1024;
+const WORKER_SIMILARITY_CACHE_CAPACITY: usize = 256;
+
+fn similarity_cache_key(left: &StructuralTree, right: &StructuralTree) -> (u64, u64) {
+    let left = left.fingerprint();
+    let right = right.fingerprint();
+    (left.min(right), left.max(right))
+}
+
+struct SimilarityCacheEntry<'a, T> {
+    id: usize,
+    left: &'a T,
+    right: &'a T,
+    similarity: f64,
+}
+
+struct WorkerSimilarityCache<'a, T> {
+    entries: HashMap<(u64, u64), Vec<SimilarityCacheEntry<'a, T>>>,
+    insertion_order: VecDeque<((u64, u64), usize)>,
+    next_id: usize,
+}
+
+struct WorkerComparisonState<'a> {
+    workspace: TreeSimilarityWorkspace,
+    similarity_cache: WorkerSimilarityCache<'a, StructuralTree>,
+}
+
+impl<'a, T: Eq> WorkerSimilarityCache<'a, T> {
+    fn new() -> Self {
+        Self {
+            entries: HashMap::with_capacity(WORKER_SIMILARITY_CACHE_CAPACITY),
+            insertion_order: VecDeque::with_capacity(WORKER_SIMILARITY_CACHE_CAPACITY),
+            next_id: 0,
+        }
+    }
+
+    fn get(&self, key: (u64, u64), left: &T, right: &T) -> Option<f64> {
+        self.entries.get(&key)?.iter().find_map(|entry| {
+            let same_orientation = entry.left == left && entry.right == right;
+            let reverse_orientation = entry.left == right && entry.right == left;
+            (same_orientation || reverse_orientation).then_some(entry.similarity)
+        })
+    }
+
+    fn insert(&mut self, key: (u64, u64), left: &'a T, right: &'a T, similarity: f64) {
+        if self.insertion_order.len() == WORKER_SIMILARITY_CACHE_CAPACITY {
+            let Some((old_key, old_id)) = self.insertion_order.pop_front() else {
+                return;
+            };
+            if let Some(bucket) = self.entries.get_mut(&old_key) {
+                bucket.retain(|entry| entry.id != old_id);
+                if bucket.is_empty() {
+                    self.entries.remove(&old_key);
+                }
+            }
+        }
+        let id = self.next_id;
+        self.next_id = self.next_id.wrapping_add(1);
+        let entry = SimilarityCacheEntry {
+            id,
+            left,
+            right,
+            similarity,
+        };
+        self.entries.entry(key).or_default().push(entry);
+        self.insertion_order.push_back((key, id));
+    }
+}
 
 struct ResultBudget {
     retained: AtomicUsize,
@@ -140,43 +210,139 @@ impl Ord for RankedPairCandidate<'_> {
     }
 }
 
+enum RetainedPairStorage<'a> {
+    Buffered(Vec<RankedPairCandidate<'a>>),
+    Ranked(BinaryHeap<RankedPairCandidate<'a>>),
+}
+
 struct RetainedPairs<'a> {
-    heap: BinaryHeap<RankedPairCandidate<'a>>,
+    storage: RetainedPairStorage<'a>,
+    min_total_span_len: Option<usize>,
+    max_total_span_len: Option<usize>,
 }
 
 impl<'a> RetainedPairs<'a> {
     fn new() -> Self {
         Self {
-            heap: BinaryHeap::new(),
+            storage: RetainedPairStorage::Buffered(Vec::new()),
+            min_total_span_len: None,
+            max_total_span_len: None,
         }
     }
 
     fn len(&self) -> usize {
-        self.heap.len()
-    }
-
-    fn push_reserved(&mut self, pair: SimilarityPairCandidate<'a>) {
-        self.heap.push(RankedPairCandidate(pair));
-    }
-
-    fn replace_worst_if_better(&mut self, pair: SimilarityPairCandidate<'a>) {
-        if self
-            .heap
-            .peek()
-            .is_some_and(|worst| compare_pair_candidates(&pair, &worst.0).is_lt())
-        {
-            self.heap.pop();
-            self.heap.push(RankedPairCandidate(pair));
+        match &self.storage {
+            RetainedPairStorage::Buffered(pairs) => pairs.len(),
+            RetainedPairStorage::Ranked(pairs) => pairs.len(),
         }
     }
 
-    fn append(&mut self, other: &mut Self) {
-        self.heap.append(&mut other.heap);
+    fn any(&self, predicate: impl FnMut(&RankedPairCandidate<'a>) -> bool) -> bool {
+        match &self.storage {
+            RetainedPairStorage::Buffered(pairs) => pairs.iter().any(predicate),
+            RetainedPairStorage::Ranked(pairs) => pairs.iter().any(predicate),
+        }
+    }
+
+    fn retain(&mut self, mut predicate: impl FnMut(&RankedPairCandidate<'a>) -> bool) {
+        match &mut self.storage {
+            RetainedPairStorage::Buffered(pairs) => pairs.retain(&mut predicate),
+            RetainedPairStorage::Ranked(pairs) => pairs.retain(&mut predicate),
+        }
+    }
+
+    fn update_span_len_bounds(&mut self) {
+        let bounds = match &self.storage {
+            RetainedPairStorage::Buffered(pairs) => pairs.iter().fold(None, span_len_bounds),
+            RetainedPairStorage::Ranked(pairs) => pairs.iter().fold(None, span_len_bounds),
+        };
+        self.min_total_span_len = bounds.map(|(min, _)| min);
+        self.max_total_span_len = bounds.map(|(_, max)| max);
+    }
+
+    fn push_reserved(&mut self, pair: SimilarityPairCandidate<'a>) {
+        let total_span_len = pair_total_span_len(&pair);
+        self.min_total_span_len = Some(
+            self.min_total_span_len
+                .map_or(total_span_len, |current| current.min(total_span_len)),
+        );
+        self.max_total_span_len = Some(
+            self.max_total_span_len
+                .map_or(total_span_len, |current| current.max(total_span_len)),
+        );
+        match &mut self.storage {
+            RetainedPairStorage::Buffered(pairs) => pairs.push(RankedPairCandidate(pair)),
+            RetainedPairStorage::Ranked(pairs) => pairs.push(RankedPairCandidate(pair)),
+        }
+    }
+
+    fn push_maximal_reserved(&mut self, pair: SimilarityPairCandidate<'a>, budget: &ResultBudget) {
+        let total_span_len = pair_total_span_len(&pair);
+        if self
+            .max_total_span_len
+            .is_some_and(|max| max > total_span_len)
+            && self.any(|retained| pair_strictly_contains(&retained.0, &pair))
+        {
+            budget.release(1);
+            return;
+        }
+
+        let previous_len = self.len();
+        if self
+            .min_total_span_len
+            .is_some_and(|min| total_span_len > min)
+        {
+            self.retain(|retained| !pair_strictly_contains(&pair, &retained.0));
+        }
+        let removed = previous_len.saturating_sub(self.len());
+        if removed > 0 {
+            budget.release(removed);
+            self.update_span_len_bounds();
+        }
+        self.push_reserved(pair);
+    }
+
+    fn replace_worst_if_better(&mut self, pair: SimilarityPairCandidate<'a>) {
+        if let RetainedPairStorage::Buffered(_) = self.storage {
+            let RetainedPairStorage::Buffered(pairs) =
+                std::mem::replace(&mut self.storage, RetainedPairStorage::Buffered(Vec::new()))
+            else {
+                unreachable!("storage variant checked above");
+            };
+            self.storage = RetainedPairStorage::Ranked(BinaryHeap::from(pairs));
+        }
+        let RetainedPairStorage::Ranked(pairs) = &mut self.storage else {
+            unreachable!("buffer was converted to a ranked heap");
+        };
+        if pairs
+            .peek()
+            .is_some_and(|worst| compare_pair_candidates(&pair, &worst.0).is_lt())
+        {
+            pairs.pop();
+            pairs.push(RankedPairCandidate(pair));
+        }
     }
 
     fn into_pairs(self) -> Vec<SimilarityPairCandidate<'a>> {
-        self.heap.into_iter().map(|ranked| ranked.0).collect()
+        match self.storage {
+            RetainedPairStorage::Buffered(pairs) => {
+                pairs.into_iter().map(|ranked| ranked.0).collect()
+            }
+            RetainedPairStorage::Ranked(pairs) => {
+                pairs.into_iter().map(|ranked| ranked.0).collect()
+            }
+        }
     }
+}
+
+fn span_len_bounds(
+    bounds: Option<(usize, usize)>,
+    pair: &RankedPairCandidate<'_>,
+) -> Option<(usize, usize)> {
+    let span_len = pair_total_span_len(&pair.0);
+    Some(bounds.map_or((span_len, span_len), |(min, max)| {
+        (min.min(span_len), max.max(span_len))
+    }))
 }
 
 struct ComparisonCounts {
@@ -254,7 +420,7 @@ pub fn build_similarity_pairs_with_omissions(
     let mut result_budget_exceeded = false;
     let mut pairs = RetainedPairs::new();
     if groups.is_empty() {
-        return Ok(finalize_similarity_pairs(
+        return finalize_similarity_pairs(
             pairs.into_pairs(),
             ComparisonCounts {
                 possible_pairs,
@@ -266,7 +432,7 @@ pub fn build_similarity_pairs_with_omissions(
             comparison_limit_reached,
             omitted_candidates,
             options,
-        ));
+        );
     }
 
     let available_workers = thread::available_parallelism()
@@ -342,7 +508,7 @@ pub fn build_similarity_pairs_with_omissions(
     ensure_tree_edit_operation_budget(&result_budget)?;
     ensure_result_budget(result_budget_exceeded)?;
 
-    Ok(finalize_similarity_pairs(
+    finalize_similarity_pairs(
         pairs.into_pairs(),
         ComparisonCounts {
             possible_pairs,
@@ -354,7 +520,7 @@ pub fn build_similarity_pairs_with_omissions(
         comparison_limit_reached,
         omitted_candidates,
         options,
-    ))
+    )
 }
 
 fn build_similarity_pairs_sequential(
@@ -554,7 +720,7 @@ fn build_similarity_pairs_sequential(
 
     ensure_tree_edit_operation_budget(result_budget)?;
     ensure_result_budget(result_budget_exceeded)?;
-    Ok(finalize_similarity_pairs(
+    finalize_similarity_pairs(
         pairs.into_pairs(),
         ComparisonCounts {
             possible_pairs,
@@ -566,7 +732,7 @@ fn build_similarity_pairs_sequential(
         comparison_limit_reached,
         omitted_candidates,
         options,
-    ))
+    )
 }
 
 fn finalize_similarity_pairs(
@@ -575,21 +741,20 @@ fn finalize_similarity_pairs(
     comparison_limit_reached: bool,
     omitted_candidates: usize,
     options: &SimilarityReportOptions,
-) -> SimilarityReport {
+) -> Result<SimilarityReport> {
     let unprocessed_pairs = counts
         .possible_pairs
         .saturating_sub(counts.evaluated_pairs)
-        .saturating_sub(counts.pruned_by_size);
+        .saturating_sub(counts.pruned_by_size)
+        .saturating_sub(counts.resource_skipped_pairs);
     let suppressed_pairs = match options.overlap_policy() {
         SimilarityOverlapPolicy::All => 0,
-        SimilarityOverlapPolicy::Maximal => suppress_contained_pairs(&mut pairs),
-    };
-    let pre_truncation_pairs = match options.overlap_policy() {
-        SimilarityOverlapPolicy::All => counts.matched_pairs,
-        SimilarityOverlapPolicy::Maximal => pairs.len(),
+        SimilarityOverlapPolicy::Maximal => {
+            suppress_contained_pairs(&mut pairs);
+            counts.matched_pairs.saturating_sub(pairs.len())
+        }
     };
     let limit = options.max_results().unwrap_or(DEFAULT_MAX_RESULTS);
-    let mut truncated = pre_truncation_pairs > limit;
     if limit == 0 {
         pairs.clear();
     } else if pairs.len() > limit {
@@ -618,27 +783,27 @@ fn finalize_similarity_pairs(
         materialized_bytes = next;
         retained_by_bytes += 1;
     }
-    truncated |= retained_by_bytes < pairs.len();
     pairs.truncate(retained_by_bytes);
     let reported_pairs = pairs.len();
     let pairs = pairs.into_iter().map(materialize_pair).collect();
 
     let summary = SimilarityReportSummary::new(
-        omitted_candidates > 0,
-        omitted_candidates,
-        counts.possible_pairs,
-        counts.evaluated_pairs,
-        counts.pruned_by_size,
-        counts.resource_skipped_pairs,
-        comparison_limit_reached,
-        unprocessed_pairs,
-        counts.matched_pairs,
-        suppressed_pairs,
-        reported_pairs,
-        truncated,
-    );
+        ReportLimit::from_omitted(omitted_candidates),
+        PairProcessingCounts::new(
+            counts.possible_pairs,
+            counts.evaluated_pairs,
+            counts.pruned_by_size,
+            counts.resource_skipped_pairs,
+        )?,
+        ReportLimit::from_omitted(if comparison_limit_reached {
+            unprocessed_pairs
+        } else {
+            0
+        }),
+        PairResultCounts::new(counts.matched_pairs, suppressed_pairs, reported_pairs)?,
+    )?;
 
-    SimilarityReport::new(summary, pairs)
+    Ok(SimilarityReport::new(summary, pairs)?)
 }
 
 /// One schedulable unit of pair comparison. Large buckets are divided along
@@ -1057,7 +1222,11 @@ fn push_pair<'a>(
         }
         return;
     }
-    pairs.push_reserved(pair);
+    if limit.is_none() {
+        pairs.push_maximal_reserved(pair, budget);
+    } else {
+        pairs.push_reserved(pair);
+    }
 }
 
 #[cfg(test)]
@@ -1241,23 +1410,25 @@ fn merge_pairs<'a>(
     pairs: &mut RetainedPairs<'a>,
     matched_pairs: &mut usize,
     result_budget_exceeded: &mut bool,
-    mut other: GroupComparisonOutput<'a>,
+    other: GroupComparisonOutput<'a>,
     limit: Option<usize>,
     budget: &ResultBudget,
 ) {
     *matched_pairs = matched_pairs.saturating_add(other.matched_pairs);
     *result_budget_exceeded |= other.result_budget_exceeded;
     if let Some(limit) = limit {
-        for ranked in other.pairs.heap.drain() {
+        for pair in other.pairs.into_pairs() {
             if pairs.len() < limit {
-                pairs.heap.push(ranked);
+                pairs.push_reserved(pair);
             } else {
-                pairs.replace_worst_if_better(ranked.0);
+                pairs.replace_worst_if_better(pair);
                 budget.release(1);
             }
         }
     } else {
-        pairs.append(&mut other.pairs);
+        for pair in other.pairs.into_pairs() {
+            pairs.push_maximal_reserved(pair, budget);
+        }
     }
 }
 
@@ -1287,7 +1458,6 @@ fn stop_for_budget(output: &mut GroupComparisonOutput<'_>, budget: &ResultBudget
     output.result_budget_exceeded |= budget.cancelled();
     true
 }
-
 fn compare_work_items<'a>(
     items: &[WorkItem<'a>],
     threshold: f64,
@@ -1295,7 +1465,10 @@ fn compare_work_items<'a>(
     result_limit: Option<usize>,
     budget: &ResultBudget,
 ) -> GroupComparisonOutput<'a> {
-    let mut workspace = TreeSimilarityWorkspace::default();
+    let mut state = WorkerComparisonState {
+        workspace: TreeSimilarityWorkspace::default(),
+        similarity_cache: WorkerSimilarityCache::new(),
+    };
     let mut output = GroupComparisonOutput::new();
     for item in items {
         if stop_for_budget(&mut output, budget) {
@@ -1308,7 +1481,7 @@ fn compare_work_items<'a>(
                 threshold,
                 scope,
                 result_limit,
-                &mut workspace,
+                &mut state,
                 budget,
             ),
             WorkItem::AllRange { group, left_range } => compare_group_all_range_into(
@@ -1317,7 +1490,7 @@ fn compare_work_items<'a>(
                 left_range.clone(),
                 threshold,
                 result_limit,
-                &mut workspace,
+                &mut state,
                 budget,
             ),
             WorkItem::SameFileGroup(group) => compare_same_file_group_into(
@@ -1325,7 +1498,7 @@ fn compare_work_items<'a>(
                 group,
                 threshold,
                 result_limit,
-                &mut workspace,
+                &mut state.workspace,
                 budget,
             ),
             WorkItem::CrossFileRange {
@@ -1337,7 +1510,7 @@ fn compare_work_items<'a>(
                 left_range.clone(),
                 threshold,
                 result_limit,
-                &mut workspace,
+                &mut state.workspace,
                 budget,
             ),
         }
@@ -1384,7 +1557,7 @@ fn compare_group_into<'a>(
     threshold: f64,
     scope: SimilarityComparisonScope,
     result_limit: Option<usize>,
-    workspace: &mut TreeSimilarityWorkspace,
+    state: &mut WorkerComparisonState<'a>,
     budget: &ResultBudget,
 ) {
     match scope {
@@ -1394,49 +1567,78 @@ fn compare_group_into<'a>(
             0..group.len(),
             threshold,
             result_limit,
-            workspace,
+            state,
             budget,
         ),
-        SimilarityComparisonScope::SameFile => {
-            compare_group_same_file_into(output, group, threshold, result_limit, workspace, budget)
-        }
-        SimilarityComparisonScope::CrossFile => {
-            compare_group_cross_file_into(output, group, threshold, result_limit, workspace, budget)
-        }
+        SimilarityComparisonScope::SameFile => compare_group_same_file_into(
+            output,
+            group,
+            threshold,
+            result_limit,
+            &mut state.workspace,
+            budget,
+        ),
+        SimilarityComparisonScope::CrossFile => compare_group_cross_file_into(
+            output,
+            group,
+            threshold,
+            result_limit,
+            &mut state.workspace,
+            budget,
+        ),
     }
 }
-
 fn compare_group_all_range_into<'a>(
     output: &mut GroupComparisonOutput<'a>,
     group: &'a [SimilarityCandidate],
     left_range: Range<usize>,
     threshold: f64,
     result_limit: Option<usize>,
-    workspace: &mut TreeSimilarityWorkspace,
+    state: &mut WorkerComparisonState<'a>,
     budget: &ResultBudget,
 ) {
     for left_index in left_range {
         if stop_for_budget(output, budget) {
             break;
         }
-        for right_index in left_index + 1..group.len() {
+
+        let left = &group[left_index];
+        let right_start = left_index + 1;
+        let surviving_end = right_start
+            + size_bound_surviving_len(
+                &group[right_start..],
+                left.form.node_count,
+                threshold,
+                |candidate| candidate.form.node_count,
+            );
+
+        for right in &group[right_start..surviving_end] {
             if stop_for_budget(output, budget) {
                 break;
-            }
-            let left = &group[left_index];
-            let right = &group[right_index];
-            if size_bound_excludes(left.form.node_count, right.form.node_count, threshold) {
-                output.pruned_by_size = output.pruned_by_size.saturating_add(1);
-                continue;
             }
 
             output.evaluated_pairs = output.evaluated_pairs.saturating_add(1);
             if similarity_upper_bound(&left.tree, &right.tree) < threshold {
                 continue;
             }
-            let Ok(similarity) = budget.tree_similarity(&left.tree, &right.tree, workspace) else {
-                output.resource_skipped_pairs = output.resource_skipped_pairs.saturating_add(1);
-                continue;
+            let cache_key = similarity_cache_key(&left.tree, &right.tree);
+            let similarity = if let Some(similarity) =
+                state
+                    .similarity_cache
+                    .get(cache_key, &left.tree, &right.tree)
+            {
+                similarity
+            } else {
+                let Ok(similarity) =
+                    budget.tree_similarity(&left.tree, &right.tree, &mut state.workspace)
+                else {
+                    output.resource_skipped_pairs = output.resource_skipped_pairs.saturating_add(1);
+                    continue;
+                };
+                state
+                    .similarity_cache
+                    .insert(cache_key, &left.tree, &right.tree, similarity);
+                similarity
             };
             if similarity >= threshold {
                 let average_node_count =
@@ -1452,6 +1654,14 @@ fn compare_group_all_range_into<'a>(
                     budget,
                 );
             }
+        }
+
+        let pruned_count = group.len() - surviving_end;
+        if pruned_count > 0 {
+            if stop_for_budget(output, budget) {
+                break;
+            }
+            output.pruned_by_size = output.pruned_by_size.saturating_add(pruned_count);
         }
     }
 }
@@ -1683,6 +1893,17 @@ pub(super) fn compare_cross_file_group_pair<'a>(
     )
 }
 
+fn size_bound_surviving_len<T>(
+    sorted_right: &[T],
+    left_node_count: usize,
+    threshold: f64,
+    node_count: impl Fn(&T) -> usize,
+) -> usize {
+    sorted_right.partition_point(|right| {
+        !size_bound_excludes(left_node_count, node_count(right), threshold)
+    })
+}
+
 fn size_bound_excludes(left: usize, right: usize, threshold: f64) -> bool {
     let maximum = left.max(right) as f64;
     let difference = left.abs_diff(right) as f64;
@@ -1705,6 +1926,69 @@ fn same_file_pair_count(candidates: &[SimilarityCandidate]) -> usize {
         .values()
         .map(|&count| pair_count(count))
         .fold(0, usize::saturating_add)
+}
+
+fn pair_strictly_contains<P: PairLike>(outer: &P, inner: &P) -> bool {
+    let outer_left = outer.left_form();
+    let outer_right = outer.right_form();
+    let inner_left = inner.left_form();
+    let inner_right = inner.right_form();
+
+    let outer_swapped = outer_left.path > outer_right.path
+        || (outer_left.path == outer_right.path
+            && compare_form_endpoints(outer_left, outer_right).is_gt());
+    let inner_swapped = inner_left.path > inner_right.path
+        || (inner_left.path == inner_right.path
+            && compare_form_endpoints(inner_left, inner_right).is_gt());
+    let (outer_left, outer_right) = oriented_forms(outer, outer_swapped);
+    let (inner_left, inner_right) = oriented_forms(inner, inner_swapped);
+
+    outer_left.path == inner_left.path
+        && outer_right.path == inner_right.path
+        && ((outer_left.strictly_contains_span(inner_left)
+            && outer_right.contains_span(inner_right))
+            || (outer_left.contains_span(inner_left)
+                && outer_right.strictly_contains_span(inner_right)))
+}
+
+fn pair_total_span_len<P: PairLike>(pair: &P) -> usize {
+    let span_len = |form: &SimilarityFormReport| {
+        form.span
+            .end()
+            .get()
+            .saturating_sub(form.span.start().get())
+    };
+    span_len(pair.left_form()).saturating_add(span_len(pair.right_form()))
+}
+
+#[cfg(test)]
+pub(super) fn retain_maximal_frontier_for_test<P: PairLike>(pairs: &mut Vec<P>) -> usize {
+    let original_len = pairs.len();
+    let mut frontier = Vec::with_capacity(original_len);
+    let mut min_total_span_len = None::<usize>;
+    let mut max_total_span_len = None::<usize>;
+    for pair in pairs.drain(..) {
+        let total_span_len = pair_total_span_len(&pair);
+        if max_total_span_len.is_some_and(|max| max > total_span_len)
+            && frontier
+                .iter()
+                .any(|retained| pair_strictly_contains(retained, &pair))
+        {
+            continue;
+        }
+        if min_total_span_len.is_some_and(|min| total_span_len > min) {
+            frontier.retain(|retained| !pair_strictly_contains(&pair, retained));
+            min_total_span_len = frontier.iter().map(pair_total_span_len).min();
+            max_total_span_len = frontier.iter().map(pair_total_span_len).max();
+        }
+        min_total_span_len =
+            Some(min_total_span_len.map_or(total_span_len, |min| min.min(total_span_len)));
+        max_total_span_len =
+            Some(max_total_span_len.map_or(total_span_len, |max| max.max(total_span_len)));
+        frontier.push(pair);
+    }
+    *pairs = frontier;
+    original_len.saturating_sub(pairs.len())
 }
 
 pub(super) fn suppress_contained_pairs<P: PairLike>(pairs: &mut Vec<P>) -> usize {
@@ -1988,18 +2272,23 @@ impl PairLikeScore for SimilarityPairCandidate<'_> {
 
 impl PairLikeScore for SimilarityPairReport {
     fn similarity(&self) -> f64 {
-        self.similarity
+        self.similarity().as_f64()
     }
 
     fn score(&self) -> f64 {
-        self.score
+        self.score().as_f64()
     }
 }
 
 fn materialize_pair(pair: SimilarityPairCandidate<'_>) -> SimilarityPairReport {
+    let similarity = SimilarityRatio::try_from(pair.similarity)
+        .expect("computed similarity must be finite and normalized");
+    let score = SimilarityScore::try_from(pair.score)
+        .expect("computed similarity score must be finite and non-negative");
+
     SimilarityPairReport::from_shared(
-        pair.similarity,
-        pair.score,
+        similarity,
+        score,
         Arc::clone(&pair.left.form),
         Arc::clone(&pair.right.form),
     )
@@ -2007,7 +2296,7 @@ fn materialize_pair(pair: SimilarityPairCandidate<'_>) -> SimilarityPairReport {
 
 #[cfg(test)]
 mod arithmetic_tests {
-    use super::{ResultBudget, pair_count};
+    use super::{ResultBudget, pair_count, size_bound_excludes, size_bound_surviving_len};
 
     #[test]
     fn pair_count_is_exact_for_representable_results() {
@@ -2032,5 +2321,143 @@ mod arithmetic_tests {
         budget.release(1);
         assert!(budget.try_reserve());
         assert!(!budget.cancelled());
+    }
+
+    #[test]
+    fn size_bound_boundary_matches_sequential_predicate() {
+        let right_node_counts = [10, 11, 12, 14, 15, 20];
+        let threshold = 0.8;
+        let boundary = size_bound_surviving_len(&right_node_counts, 10, threshold, |count| *count);
+        let sequential_boundary = right_node_counts
+            .iter()
+            .take_while(|count| !size_bound_excludes(10, **count, threshold))
+            .count();
+
+        assert_eq!(boundary, sequential_boundary);
+        assert!(
+            right_node_counts[..boundary]
+                .iter()
+                .all(|count| !size_bound_excludes(10, *count, threshold))
+        );
+        assert!(
+            right_node_counts[boundary..]
+                .iter()
+                .all(|count| size_bound_excludes(10, *count, threshold))
+        );
+    }
+
+    #[test]
+    fn size_bound_boundary_excludes_all_candidates() {
+        let right_node_counts = [10, 20, 30];
+
+        assert_eq!(
+            size_bound_surviving_len(&right_node_counts, 1, 0.9, |count| *count),
+            0
+        );
+    }
+
+    #[test]
+    fn size_bound_boundary_excludes_no_candidates() {
+        let right_node_counts = [10, 15, 20];
+
+        assert_eq!(
+            size_bound_surviving_len(&right_node_counts, 10, 0.5, |count| *count),
+            right_node_counts.len()
+        );
+    }
+
+    #[test]
+    fn size_bound_boundary_preserves_threshold_endpoints() {
+        let right_node_counts = [2, 2, 3, 5];
+
+        assert_eq!(
+            size_bound_surviving_len(&right_node_counts, 2, 0.0, |count| *count),
+            right_node_counts.len()
+        );
+        assert_eq!(
+            size_bound_surviving_len(&right_node_counts, 2, 1.0, |count| *count),
+            2
+        );
+    }
+
+    #[cfg(test)]
+    mod worker_similarity_cache_tests {
+        use super::super::{WORKER_SIMILARITY_CACHE_CAPACITY, WorkerSimilarityCache};
+
+        #[test]
+        fn cache_reports_miss_then_symmetric_hit() {
+            let left = 1;
+            let right = 2;
+            let unrelated = 3;
+            let mut cache = WorkerSimilarityCache::new();
+            let key = (1, 2);
+
+            assert_eq!(cache.get(key, &left, &right), None);
+            cache.insert(key, &left, &right, 0.75);
+            assert_eq!(cache.get(key, &left, &right), Some(0.75));
+            assert_eq!(cache.get(key, &right, &left), Some(0.75));
+            assert_eq!(cache.get((1, 3), &left, &unrelated), None);
+            assert_eq!(cache.get(key, &left, &unrelated), None);
+        }
+
+        #[test]
+        fn cache_evicts_entries_at_its_fixed_capacity() {
+            let values: Vec<usize> = (0..=WORKER_SIMILARITY_CACHE_CAPACITY + 1).collect();
+            let mut cache = WorkerSimilarityCache::new();
+
+            for pair in values.windows(2) {
+                cache.insert(
+                    (pair[0] as u64, pair[1] as u64),
+                    &pair[0],
+                    &pair[1],
+                    pair[0] as f64,
+                );
+            }
+
+            assert_eq!(
+                cache.insertion_order.len(),
+                WORKER_SIMILARITY_CACHE_CAPACITY
+            );
+            assert_eq!(cache.get((0, 1), &values[0], &values[1]), None);
+            assert_eq!(
+                cache.get(
+                    (
+                        WORKER_SIMILARITY_CACHE_CAPACITY as u64,
+                        (WORKER_SIMILARITY_CACHE_CAPACITY + 1) as u64,
+                    ),
+                    &values[WORKER_SIMILARITY_CACHE_CAPACITY],
+                    &values[WORKER_SIMILARITY_CACHE_CAPACITY + 1]
+                ),
+                Some(WORKER_SIMILARITY_CACHE_CAPACITY as f64)
+            );
+        }
+
+        #[test]
+        fn cache_handles_collisions_and_evicts_only_the_oldest_bucket_entry() {
+            let values: Vec<usize> = (0..=(WORKER_SIMILARITY_CACHE_CAPACITY * 2 + 3)).collect();
+            let collision_key = (7, 11);
+            let mut cache = WorkerSimilarityCache::new();
+
+            cache.insert(collision_key, &values[0], &values[1], 0.25);
+            cache.insert(collision_key, &values[2], &values[3], 0.75);
+
+            assert_eq!(cache.get(collision_key, &values[0], &values[2]), None);
+            assert_eq!(cache.get(collision_key, &values[3], &values[2]), Some(0.75));
+
+            for index in 0..WORKER_SIMILARITY_CACHE_CAPACITY - 1 {
+                let left_index = index * 2 + 4;
+                let right_index = left_index + 1;
+                cache.insert(
+                    (index as u64 + 100, index as u64 + 101),
+                    &values[left_index],
+                    &values[right_index],
+                    index as f64,
+                );
+            }
+
+            assert_eq!(cache.get(collision_key, &values[0], &values[1]), None);
+            assert_eq!(cache.get(collision_key, &values[2], &values[3]), Some(0.75));
+            assert_eq!(cache.entries.get(&collision_key).map(Vec::len), Some(1));
+        }
     }
 }

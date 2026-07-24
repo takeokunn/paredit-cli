@@ -8,6 +8,7 @@ use super::preview::{
 };
 use super::verification::build_refactor_verification;
 use super::workspace::discover_workspace_refactor_scope;
+use crate::application::refactor::execute::RefactorExecutePostVerificationResult;
 
 pub(in crate::presentation::cli) fn workspace_refactor_execute(
     args: WorkspaceRefactorExecuteArgs,
@@ -42,16 +43,28 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         workspace: Some(workspace.workspace),
     })?;
 
-    let policy_passed = preview.policy.passed;
-    let policy_message = preview.policy.violations.join("; ");
-    let preflight_decision = build_refactor_execute_decision(RefactorExecuteGateInputs {
-        write_requested: args.write,
-        policy_passed,
-        outputs_parse: preview.summary.all_outputs_parse,
-        preflight_passed: true,
-    });
+    let policy_passed = preview.policy.passed();
+    let policy_message = preview.policy.violations().join("; ");
+    let mode = if args.write {
+        RefactorExecuteMode::Write
+    } else {
+        RefactorExecuteMode::DryRun
+    };
+    let policy_result = if policy_passed {
+        RefactorExecutePolicyResult::Passed
+    } else {
+        RefactorExecutePolicyResult::Failed
+    };
+    let output_parse_result = if preview.summary.all_outputs_parse() {
+        RefactorExecuteOutputParseResult::Parseable
+    } else {
+        RefactorExecuteOutputParseResult::Unparsable
+    };
+    let preflight_decision = build_refactor_execute_preflight_decision(
+        RefactorExecutePreflightInputs::new(mode, policy_result, output_parse_result),
+    );
 
-    let pre_verification = if preflight_decision.run_pre_verification {
+    let pre_verification = if preflight_decision.run_pre_verification() {
         Some(build_refactor_verification(
             &paths,
             None,
@@ -67,21 +80,26 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
     let pre_passed = pre_verification
         .as_ref()
         .is_none_or(|verification| verification.passed);
-    let execute_decision = build_refactor_execute_decision(RefactorExecuteGateInputs {
-        write_requested: args.write,
-        policy_passed,
-        outputs_parse: preview.summary.all_outputs_parse,
-        preflight_passed: pre_passed,
-    });
+    let pre_verification_result = if pre_passed {
+        RefactorExecutePreVerificationResult::Passed
+    } else {
+        RefactorExecutePreVerificationResult::Failed
+    };
+    let execute_decision = build_refactor_execute_decision(RefactorExecuteGateInputs::new(
+        mode,
+        policy_result,
+        output_parse_result,
+        pre_verification_result,
+    ));
 
-    if execute_decision.apply_preview {
+    if execute_decision.apply_preview() {
         write_refactor_preview(&mut preview)?;
     }
 
     let target_kind_hint = pre_verification
         .as_ref()
         .map(|verification| verification.target_kind);
-    let post_verification = if execute_decision.run_post_verification {
+    let post_verification = if execute_decision.run_post_verification() {
         Some(build_refactor_verification(
             &paths,
             None,
@@ -99,10 +117,15 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         .is_none_or(|verification| verification.passed);
     let outcome = WorkspaceRefactorExecuteOutcome::from_decision(
         execute_decision,
-        post_verification
-            .as_ref()
-            .map(|verification| verification.passed),
-    );
+        post_verification.as_ref().map(|verification| {
+            if verification.passed {
+                RefactorExecutePostVerificationResult::Passed
+            } else {
+                RefactorExecutePostVerificationResult::Failed
+            }
+        }),
+    )
+    .map_err(anyhow::Error::msg)?;
     let execution = WorkspaceRefactorExecute {
         preview,
         preflight_decision,
@@ -117,7 +140,7 @@ pub(in crate::presentation::cli) fn workspace_refactor_execute(
         "refactor workspace-execute",
         policy_passed,
         &policy_message,
-        execute_decision.write_parse_refused,
+        execute_decision.write_parse_refused(),
     )?;
 
     if !pre_passed {

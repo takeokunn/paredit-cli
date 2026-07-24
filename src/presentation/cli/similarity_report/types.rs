@@ -1,5 +1,6 @@
-use std::path::PathBuf;
 use std::str::FromStr;
+
+use crate::application::usecase::similarity_report::SimilarityErrorPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ErrorPolicy {
@@ -28,9 +29,11 @@ impl FromStr for ErrorPolicy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct FileProcessingError {
-    pub(super) path: PathBuf,
-    pub(super) stage: &'static str,
-    pub(super) message: String,
+impl From<ErrorPolicy> for SimilarityErrorPolicy {
+    fn from(value: ErrorPolicy) -> Self {
+        match value {
+            ErrorPolicy::Fail => Self::Fail,
+            ErrorPolicy::Skip => Self::Skip,
+        }
+    }
 }

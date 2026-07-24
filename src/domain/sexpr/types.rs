@@ -194,6 +194,27 @@ impl ChildIndex {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExpressionPath(Vec<ChildIndex>);
 
+#[derive(Debug, Clone, Copy)]
+pub(in crate::domain) struct NonEmptyExpressionPath<'a>(&'a [ChildIndex]);
+
+impl<'a> TryFrom<&'a ExpressionPath> for NonEmptyExpressionPath<'a> {
+    type Error = ();
+
+    fn try_from(path: &'a ExpressionPath) -> Result<Self, Self::Error> {
+        if path.0.is_empty() {
+            Err(())
+        } else {
+            Ok(Self(&path.0))
+        }
+    }
+}
+
+impl NonEmptyExpressionPath<'_> {
+    pub(crate) fn indexes(&self) -> impl ExactSizeIterator<Item = usize> + '_ {
+        self.0.iter().map(|index| index.get())
+    }
+}
+
 /// Backwards-compatible alias for tree paths used by the CLI and API.
 pub type Path = ExpressionPath;
 

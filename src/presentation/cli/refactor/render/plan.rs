@@ -47,20 +47,23 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
                 );
             }
             println!("safe_to_automate\t{}", summary.safe_to_automate);
-            println!("decision_status\t{}", plan.automation.status.label());
-            println!("decision_reason\t{}", safe_text!(plan.automation.reason));
+            println!("decision_status\t{}", plan.automation.status().label());
+            println!("decision_reason\t{}", safe_text!(plan.automation.reason()));
             println!(
                 "decision_next_action\t{}",
-                safe_text!(plan.automation.next_action)
+                safe_text!(plan.automation.next_action())
             );
             println!(
                 "decision_safe_to_automate\t{}",
-                plan.automation.safe_to_automate
+                plan.automation.safe_to_automate()
             );
-            println!("decision_policy_passed\t{}", plan.automation.policy_passed);
+            println!(
+                "decision_policy_passed\t{}",
+                plan.automation.policy_passed()
+            );
             println!(
                 "decision_blocking_gate_count\t{}",
-                plan.automation.blocking_gate_count
+                plan.automation.blocking_gate_count()
             );
             for step in plan.automation.steps() {
                 println!(
@@ -148,12 +151,12 @@ pub(in crate::presentation::cli) fn print_refactor_plan(
                 })),
                 "safe_to_automate": summary.safe_to_automate,
                 "decision": {
-                    "status": plan.automation.status.label(),
-                    "reason": plan.automation.reason.as_str(),
-                    "next_action": plan.automation.next_action,
-                    "safe_to_automate": plan.automation.safe_to_automate,
-                    "policy_passed": plan.automation.policy_passed,
-                    "blocking_gate_count": plan.automation.blocking_gate_count,
+                    "status": plan.automation.status().label(),
+                    "reason": plan.automation.reason(),
+                    "next_action": plan.automation.next_action(),
+                    "safe_to_automate": plan.automation.safe_to_automate(),
+                    "policy_passed": plan.automation.policy_passed(),
+                    "blocking_gate_count": plan.automation.blocking_gate_count(),
                     "steps": plan
                         .automation
                         .steps()

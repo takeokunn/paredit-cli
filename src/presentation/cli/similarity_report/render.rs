@@ -1,36 +1,32 @@
 use anyhow::Result;
 use serde_json::json;
 
-use crate::application::usecase::similarity_report::{SimilarityFormReport, SimilarityReport};
+use crate::application::usecase::similarity_report::{
+    SimilarityFormReport, SimilarityProcessingStage, SimilarityReportPlan,
+};
 use crate::domain::dialect::Dialect;
-use crate::infrastructure::workspace::WorkspaceDiscovery;
 
 use super::super::OutputFormat;
 use super::args::SimilarityReportArgs;
-use super::types::FileProcessingError;
 
 pub(super) fn print_similarity_report(
-    report: &SimilarityReport,
-    discovery: &WorkspaceDiscovery,
-    errors: &[FileProcessingError],
+    plan: &SimilarityReportPlan,
     args: &SimilarityReportArgs,
 ) -> Result<()> {
     match args.output {
-        OutputFormat::Text => print_text(report, discovery, errors, args),
+        OutputFormat::Text => print_text(plan, args),
         OutputFormat::Json => println!(
             "{}",
-            serde_json::to_string_pretty(&json_report(report, discovery, errors, args))?
+            serde_json::to_string_pretty(&json_report(plan, args))?
         ),
     }
     Ok(())
 }
 
-fn print_text(
-    report: &SimilarityReport,
-    discovery: &WorkspaceDiscovery,
-    errors: &[FileProcessingError],
-    args: &SimilarityReportArgs,
-) {
+fn print_text(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) {
+    let report = plan.report();
+    let inventory = plan.inventory();
+    let errors = plan.errors();
     let summary = &report.summary;
     println!("schema_version\t1");
     println!("threshold\t{:.6}", args.threshold);
@@ -43,42 +39,45 @@ fn print_text(
     println!("max_candidates\t{}", optional_usize(args.max_candidates));
     println!("max_results\t{}", optional_usize(args.max_results));
     println!("error_policy\t{}", args.error_policy.label());
-    println!("scanned_files\t{}", discovery.files().len());
+    println!("scanned_files\t{}", inventory.files.len());
     println!(
         "processed_files\t{}",
-        discovery.files().len() - errors.len()
+        inventory.files.len().saturating_sub(errors.len())
     );
     println!("skipped_error_files\t{}", errors.len());
-    println!("skipped_unknown\t{}", discovery.skipped_unknown_count());
-    println!("skipped_hidden\t{}", discovery.skipped_hidden_count());
-    println!("skipped_generated\t{}", discovery.skipped_generated_count());
-    println!("skipped_symlink\t{}", discovery.skipped_symlink_count());
-    println!("skipped_excluded\t{}", discovery.skipped_excluded_count());
-    println!("possible_pairs\t{}", summary.possible_pairs);
+    println!("skipped_unknown\t{}", inventory.skipped_unknown_count);
+    println!("skipped_hidden\t{}", inventory.skipped_hidden_count);
+    println!("skipped_generated\t{}", inventory.skipped_generated_count);
+    println!("skipped_symlink\t{}", inventory.skipped_symlink_count);
+    println!("skipped_excluded\t{}", inventory.skipped_excluded_count);
+    println!("possible_pairs\t{}", summary.possible_pairs());
     println!(
         "candidate_limit_reached\t{}",
-        summary.candidate_limit_reached
+        summary.candidate_limit_reached()
     );
-    println!("omitted_candidates\t{}", summary.omitted_candidates);
-    println!("evaluated_pairs\t{}", summary.evaluated_pairs);
-    println!("pruned_by_size\t{}", summary.pruned_by_size);
-    println!("resource_skipped_pairs\t{}", summary.resource_skipped_pairs);
+    println!("omitted_candidates\t{}", summary.omitted_candidates());
+    println!("evaluated_pairs\t{}", summary.evaluated_pairs());
+    println!("pruned_by_size\t{}", summary.pruned_by_size());
+    println!(
+        "resource_skipped_pairs\t{}",
+        summary.resource_skipped_pairs()
+    );
     println!(
         "comparison_limit_reached\t{}",
-        summary.comparison_limit_reached
+        summary.comparison_limit_reached()
     );
-    println!("unprocessed_pairs\t{}", summary.unprocessed_pairs);
-    println!("matched_pairs\t{}", summary.matched_pairs);
-    println!("suppressed_pairs\t{}", summary.suppressed_pairs);
-    println!("reported_pairs\t{}", summary.reported_pairs);
-    println!("pair_count\t{}", summary.reported_pairs);
-    println!("truncated\t{}", summary.truncated);
+    println!("unprocessed_pairs\t{}", summary.unprocessed_pairs());
+    println!("matched_pairs\t{}", summary.matched_pairs());
+    println!("suppressed_pairs\t{}", summary.suppressed_pairs());
+    println!("reported_pairs\t{}", summary.reported_pairs());
+    println!("pair_count\t{}", summary.reported_pairs());
+    println!("truncated\t{}", summary.truncated());
 
     for error in errors {
         println!(
             "error\t{}\t{}\t{}",
             safe_text!(error.path.display()),
-            safe_text!(error.stage),
+            safe_text!(cli_stage_label(error.stage)),
             safe_text!(error.message)
         );
     }
@@ -86,22 +85,21 @@ fn print_text(
     for pair in &report.pairs {
         println!(
             "pair\tsimilarity={:.6}\tscore={:.6}",
-            pair.similarity, pair.score
+            pair.similarity().as_f64(),
+            pair.score().as_f64()
         );
         print_text_form("left", &pair.left);
         print_text_form("right", &pair.right);
     }
 }
 
-fn json_report(
-    report: &SimilarityReport,
-    discovery: &WorkspaceDiscovery,
-    errors: &[FileProcessingError],
-    args: &SimilarityReportArgs,
-) -> serde_json::Value {
+fn json_report(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) -> serde_json::Value {
+    let report = plan.report();
+    let inventory = plan.inventory();
+    let errors = plan.errors();
     json!({
         "schema_version": 1,
-        "pair_count": report.summary.reported_pairs,
+        "pair_count": report.summary.reported_pairs(),
         "options": {
             "roots": args.roots.iter().map(|root| root.display().to_string()).collect::<Vec<_>>(),
             "dialect": args.dialect.map(|dialect| Dialect::from(dialect).label()),
@@ -123,35 +121,35 @@ fn json_report(
             "fail_on_duplicates": args.fail_on_duplicates,
         },
         "summary": {
-            "scanned_files": discovery.files().len(),
-            "processed_files": discovery.files().len() - errors.len(),
+            "scanned_files": inventory.files.len(),
+            "processed_files": inventory.files.len().saturating_sub(errors.len()),
             "skipped_error_files": errors.len(),
-            "skipped_unknown": discovery.skipped_unknown_count(),
-            "skipped_hidden": discovery.skipped_hidden_count(),
-            "skipped_generated": discovery.skipped_generated_count(),
-            "skipped_symlink": discovery.skipped_symlink_count(),
-            "skipped_excluded": discovery.skipped_excluded_count(),
-            "possible_pairs": report.summary.possible_pairs,
-            "candidate_limit_reached": report.summary.candidate_limit_reached,
-            "omitted_candidates": report.summary.omitted_candidates,
-            "evaluated_pairs": report.summary.evaluated_pairs,
-            "pruned_by_size": report.summary.pruned_by_size,
-            "resource_skipped_pairs": report.summary.resource_skipped_pairs,
-            "comparison_limit_reached": report.summary.comparison_limit_reached,
-            "unprocessed_pairs": report.summary.unprocessed_pairs,
-            "matched_pairs": report.summary.matched_pairs,
-            "suppressed_pairs": report.summary.suppressed_pairs,
-            "reported_pairs": report.summary.reported_pairs,
-            "truncated": report.summary.truncated,
+            "skipped_unknown": inventory.skipped_unknown_count,
+            "skipped_hidden": inventory.skipped_hidden_count,
+            "skipped_generated": inventory.skipped_generated_count,
+            "skipped_symlink": inventory.skipped_symlink_count,
+            "skipped_excluded": inventory.skipped_excluded_count,
+            "possible_pairs": report.summary.possible_pairs(),
+            "candidate_limit_reached": report.summary.candidate_limit_reached(),
+            "omitted_candidates": report.summary.omitted_candidates(),
+            "evaluated_pairs": report.summary.evaluated_pairs(),
+            "pruned_by_size": report.summary.pruned_by_size(),
+            "resource_skipped_pairs": report.summary.resource_skipped_pairs(),
+            "comparison_limit_reached": report.summary.comparison_limit_reached(),
+            "unprocessed_pairs": report.summary.unprocessed_pairs(),
+            "matched_pairs": report.summary.matched_pairs(),
+            "suppressed_pairs": report.summary.suppressed_pairs(),
+            "reported_pairs": report.summary.reported_pairs(),
+            "truncated": report.summary.truncated(),
         },
         "errors": errors.iter().map(|error| json!({
             "path": error.path.display().to_string(),
-            "stage": error.stage,
+            "stage": cli_stage_label(error.stage),
             "message": error.message,
         })).collect::<Vec<_>>(),
         "pairs": report.pairs.iter().map(|pair| json!({
-            "similarity": pair.similarity,
-            "score": pair.score,
+            "similarity": pair.similarity().as_f64(),
+            "score": pair.score().as_f64(),
             "left": form_json(&pair.left),
             "right": form_json(&pair.right),
         })).collect::<Vec<_>>(),
@@ -160,6 +158,13 @@ fn json_report(
 
 fn optional_usize(value: Option<usize>) -> String {
     value.map_or_else(|| "none".to_owned(), |value| value.to_string())
+}
+
+const fn cli_stage_label(stage: SimilarityProcessingStage) -> &'static str {
+    match stage {
+        SimilarityProcessingStage::Decode => "read",
+        _ => stage.label(),
+    }
 }
 
 fn print_text_form(side: &str, form: &SimilarityFormReport) {

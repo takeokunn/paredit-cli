@@ -101,18 +101,14 @@ pub(in crate::presentation::cli::refactor::workflow) fn build_refactor_preview(
         .map(|file| file.path.display().to_string())
         .collect::<Vec<_>>();
 
-    let summary = RefactorPreviewSummary {
-        file_count: files.len(),
-        changed_file_count: changed_files.len(),
+    let summary = RefactorPreviewSummary::new(
         changed_files,
-        unchanged_file_count: files.iter().filter(|file| !file.changed).count(),
-        written_file_count: 0,
-        definition_count: total_definitions,
-        target_occurrence_count: total_target_occurrences,
-        edit_count: files.iter().map(|file| file.edit_count).sum(),
-        parse_error_count: files.iter().filter(|file| !file.output_parse_ok).count(),
-        all_outputs_parse: files.iter().all(|file| file.output_parse_ok),
-    };
+        files.iter().filter(|file| !file.changed).count(),
+        total_definitions,
+        total_target_occurrences,
+        files.iter().map(|file| file.edit_count).sum(),
+        files.iter().filter(|file| !file.output_parse_ok).count(),
+    );
     let policy = evaluate_refactor_preview_policy(request.policy_options, &summary);
 
     Ok(RefactorPreview {

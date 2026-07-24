@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::path::Path as FsPath;
 use std::path::PathBuf;
 
@@ -5,6 +6,127 @@ use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{ByteOffset, ByteSpan, Path as SExprPath, SyntaxTree};
 
 use super::*;
+
+fn similarity_pair_report(
+    similarity: f64,
+    score: f64,
+    left: SimilarityFormReport,
+    right: SimilarityFormReport,
+) -> SimilarityPairReport {
+    SimilarityPairReport::new(
+        SimilarityRatio::try_from(similarity).unwrap(),
+        SimilarityScore::try_from(score).unwrap(),
+        left,
+        right,
+    )
+}
+
+#[test]
+fn similarity_value_objects_reject_invalid_numbers() {
+    assert!(SimilarityRatio::try_from(0.0).is_ok());
+    assert!(SimilarityRatio::try_from(1.0).is_ok());
+    assert!(SimilarityRatio::try_from(-0.01).is_err());
+    assert!(SimilarityRatio::try_from(1.01).is_err());
+    assert!(SimilarityRatio::try_from(f64::NAN).is_err());
+    assert!(SimilarityRatio::try_from(f64::INFINITY).is_err());
+
+    assert!(SimilarityScore::try_from(0.0).is_ok());
+    assert!(SimilarityScore::try_from(-0.01).is_err());
+    assert!(SimilarityScore::try_from(f64::NAN).is_err());
+    assert!(SimilarityScore::try_from(f64::INFINITY).is_err());
+}
+
+#[test]
+fn report_limits_encode_complete_and_limited_states_exclusively() {
+    let complete = ReportLimit::from_omitted(0);
+    assert_eq!(complete, ReportLimit::Complete);
+    assert!(!complete.reached());
+    assert_eq!(complete.omitted(), 0);
+
+    let limited = ReportLimit::from_omitted(3);
+    assert_eq!(limited, ReportLimit::Limited(NonZeroUsize::new(3).unwrap()));
+    assert!(limited.reached());
+    assert_eq!(limited.omitted(), 3);
+}
+
+#[test]
+fn report_summary_derives_truncation_from_result_counts() {
+    let complete = SimilarityReportSummary::new(
+        ReportLimit::Complete,
+        PairProcessingCounts::new(4, 4, 0, 0).unwrap(),
+        ReportLimit::Complete,
+        PairResultCounts::new(3, 1, 2).unwrap(),
+    )
+    .unwrap();
+    assert!(!complete.truncated());
+
+    let truncated = SimilarityReportSummary::new(
+        ReportLimit::Complete,
+        PairProcessingCounts::new(4, 4, 0, 0).unwrap(),
+        ReportLimit::Complete,
+        PairResultCounts::new(3, 1, 1).unwrap(),
+    )
+    .unwrap();
+    assert!(truncated.truncated());
+}
+
+#[test]
+fn report_count_types_reject_invalid_invariants() {
+    assert_eq!(
+        PairProcessingCounts::new(1, 1, 1, 0),
+        Err(InvalidSimilarityReport::ProcessedPairsExceedPossible {
+            possible: 1,
+            processed: 2,
+        })
+    );
+    assert_eq!(
+        PairResultCounts::new(1, 2, 0),
+        Err(InvalidSimilarityReport::SuppressedPairsExceedMatched {
+            matched: 1,
+            suppressed: 2,
+        })
+    );
+    assert_eq!(
+        PairResultCounts::new(2, 1, 2),
+        Err(InvalidSimilarityReport::ReportedPairsExceedAvailable {
+            available: 1,
+            reported: 2,
+        })
+    );
+}
+
+#[test]
+fn report_aggregates_reject_inconsistent_counts() {
+    let processing = PairProcessingCounts::new(4, 1, 1, 0).unwrap();
+    let results = PairResultCounts::new(0, 0, 0).unwrap();
+    assert_eq!(
+        SimilarityReportSummary::new(
+            ReportLimit::Complete,
+            processing,
+            ReportLimit::from_omitted(1),
+            results,
+        ),
+        Err(InvalidSimilarityReport::PairAccountingMismatch {
+            possible: 4,
+            accounted: 3,
+        })
+    );
+
+    let summary = SimilarityReportSummary::new(
+        ReportLimit::Complete,
+        PairProcessingCounts::new(0, 0, 0, 0).unwrap(),
+        ReportLimit::Complete,
+        PairResultCounts::new(1, 0, 1).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        SimilarityReport::new(summary, Vec::new()),
+        Err(InvalidSimilarityReport::ReportedPairCountMismatch {
+            reported: 1,
+            actual: 0,
+        })
+    );
+}
 
 fn candidates(file: &str, input: &str, min_node_count: usize) -> Vec<SimilarityCandidate> {
     let tree = SyntaxTree::parse(input).unwrap();
@@ -188,19 +310,19 @@ fn similarity_form_containment_is_span_based() {
 
 #[test]
 fn similarity_pair_containment_is_span_based_per_side() {
-    let outer = SimilarityPairReport::new(
+    let outer = similarity_pair_report(
         1.0,
         2.0,
         report_form("a.lisp", 0, 30),
         report_form("b.lisp", 10, 20),
     );
-    let inner = SimilarityPairReport::new(
+    let inner = similarity_pair_report(
         1.0,
         1.0,
         report_form("a.lisp", 5, 25),
         report_form("b.lisp", 12, 18),
     );
-    let sibling = SimilarityPairReport::new(
+    let sibling = similarity_pair_report(
         1.0,
         1.0,
         report_form("a.lisp", 0, 30),
@@ -362,11 +484,11 @@ fn comparison_scope_filters_pair_population() {
     let all = report(SimilarityComparisonScope::All);
     let same_file = report(SimilarityComparisonScope::SameFile);
     let cross_file = report(SimilarityComparisonScope::CrossFile);
-    assert_eq!(all.summary.possible_pairs, 3);
-    assert_eq!(same_file.summary.possible_pairs, 1);
-    assert_eq!(cross_file.summary.possible_pairs, 2);
-    assert_eq!(same_file.summary.evaluated_pairs, 1);
-    assert_eq!(cross_file.summary.evaluated_pairs, 2);
+    assert_eq!(all.summary.possible_pairs(), 3);
+    assert_eq!(same_file.summary.possible_pairs(), 1);
+    assert_eq!(cross_file.summary.possible_pairs(), 2);
+    assert_eq!(same_file.summary.evaluated_pairs(), 1);
+    assert_eq!(cross_file.summary.evaluated_pairs(), 2);
 }
 
 #[test]
@@ -479,16 +601,16 @@ fn split_scoped_comparisons_match_the_sequential_path() {
     )
     .unwrap();
     assert_eq!(scheduled, sequential);
-    assert_eq!(sequential.summary.evaluated_pairs, 4_800);
-    assert_eq!(sequential.summary.unprocessed_pairs, 0);
+    assert_eq!(sequential.summary.evaluated_pairs(), 4_800);
+    assert_eq!(sequential.summary.unprocessed_pairs(), 0);
 
     let mut reversed = values;
     reversed.reverse();
     let reversed = super::reports::build_similarity_pairs(reversed, &cross_file_options).unwrap();
     assert_eq!(scheduled, reversed);
-    assert_eq!(scheduled.summary.possible_pairs, 4_800);
-    assert_eq!(scheduled.summary.evaluated_pairs, 4_800);
-    assert_eq!(scheduled.summary.matched_pairs, 4_800);
+    assert_eq!(scheduled.summary.possible_pairs(), 4_800);
+    assert_eq!(scheduled.summary.evaluated_pairs(), 4_800);
+    assert_eq!(scheduled.summary.matched_pairs(), 4_800);
 }
 
 #[test]
@@ -498,7 +620,7 @@ fn threshold_is_inclusive() {
         crate::domain::form_similarity::tree_similarity(&values[0].tree, &values[1].tree).unwrap();
     let report = build_similarity_pairs(values, similarity, SimilarityOverlapPolicy::All, None);
     assert_eq!(report.pairs.len(), 1);
-    assert_eq!(report.summary.evaluated_pairs, 1);
+    assert_eq!(report.summary.evaluated_pairs(), 1);
 }
 
 #[test]
@@ -538,13 +660,13 @@ fn size_lower_bound_prunes_without_changing_inclusive_boundary() {
     values.extend(candidates("b.lisp", "(foo a b c)", 2));
 
     let pruned = build_similarity_pairs(values.clone(), 0.75, SimilarityOverlapPolicy::All, None);
-    assert_eq!(pruned.summary.possible_pairs, 1);
-    assert_eq!(pruned.summary.pruned_by_size, 1);
-    assert_eq!(pruned.summary.evaluated_pairs, 0);
+    assert_eq!(pruned.summary.possible_pairs(), 1);
+    assert_eq!(pruned.summary.pruned_by_size(), 1);
+    assert_eq!(pruned.summary.evaluated_pairs(), 0);
 
     let boundary = build_similarity_pairs(values, 0.6, SimilarityOverlapPolicy::All, None);
-    assert_eq!(boundary.summary.pruned_by_size, 0);
-    assert_eq!(boundary.summary.evaluated_pairs, 1);
+    assert_eq!(boundary.summary.pruned_by_size(), 0);
+    assert_eq!(boundary.summary.evaluated_pairs(), 1);
 
     let disabled = build_similarity_pairs(
         candidates("a.lisp", "(foo a) (foo a b c)", 2),
@@ -552,12 +674,12 @@ fn size_lower_bound_prunes_without_changing_inclusive_boundary() {
         SimilarityOverlapPolicy::All,
         None,
     );
-    assert_eq!(disabled.summary.possible_pairs, 1);
-    assert_eq!(disabled.summary.pruned_by_size, 0);
-    assert_eq!(disabled.summary.evaluated_pairs, 1);
+    assert_eq!(disabled.summary.possible_pairs(), 1);
+    assert_eq!(disabled.summary.pruned_by_size(), 0);
+    assert_eq!(disabled.summary.evaluated_pairs(), 1);
     assert_eq!(
-        disabled.summary.evaluated_pairs + disabled.summary.pruned_by_size,
-        disabled.summary.possible_pairs
+        disabled.summary.evaluated_pairs() + disabled.summary.pruned_by_size(),
+        disabled.summary.possible_pairs()
     );
 }
 
@@ -580,11 +702,11 @@ fn sequential_size_pruning_keeps_later_valid_pairs() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.possible_pairs, 3);
-    assert_eq!(report.summary.pruned_by_size, 2);
-    assert_eq!(report.summary.evaluated_pairs, 1);
+    assert_eq!(report.summary.possible_pairs(), 3);
+    assert_eq!(report.summary.pruned_by_size(), 2);
+    assert_eq!(report.summary.evaluated_pairs(), 1);
     assert_eq!(report.pairs.len(), 1);
-    assert_eq!(report.pairs[0].similarity, 1.0);
+    assert_eq!(report.pairs[0].similarity().as_f64(), 1.0);
 }
 
 #[test]
@@ -622,9 +744,9 @@ fn maximal_overlap_suppresses_only_strictly_contained_pairs() {
 
     let all = build_similarity_pairs(values.clone(), 0.0, SimilarityOverlapPolicy::All, None);
     let maximal = build_similarity_pairs(values, 0.0, SimilarityOverlapPolicy::Maximal, None);
-    assert_eq!(all.summary.suppressed_pairs, 0);
-    assert!(maximal.summary.suppressed_pairs > 0);
-    assert_eq!(maximal.summary.matched_pairs, all.summary.matched_pairs);
+    assert_eq!(all.summary.suppressed_pairs(), 0);
+    assert!(maximal.summary.suppressed_pairs() > 0);
+    assert_eq!(maximal.summary.matched_pairs(), all.summary.matched_pairs());
 
     let nested_pair = |report: &SimilarityReport| {
         report
@@ -668,19 +790,19 @@ fn maximal_overlap_normalizes_reversed_cross_file_pair_orientation() {
 
     assert!(nested_pair(&all));
     assert!(!nested_pair(&maximal));
-    assert!(maximal.summary.suppressed_pairs > 0);
+    assert!(maximal.summary.suppressed_pairs() > 0);
 }
 
 #[test]
 fn maximal_overlap_normalizes_reversed_same_file_pair_orientation() {
     let mut pairs = vec![
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             2.0,
             report_form("same.lisp", 0, 20),
             report_form("same.lisp", 30, 60),
         ),
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             1.0,
             report_form("same.lisp", 40, 50),
@@ -703,13 +825,13 @@ fn maximal_overlap_normalizes_reversed_same_file_pair_orientation() {
 #[test]
 fn maximal_overlap_retains_sibling_pairs() {
     let mut pairs = vec![
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             2.0,
             report_form("a.lisp", 0, 10),
             report_form("b.lisp", 0, 10),
         ),
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             1.0,
             report_form("a.lisp", 20, 30),
@@ -724,13 +846,13 @@ fn maximal_overlap_retains_sibling_pairs() {
 #[test]
 fn maximal_overlap_suppresses_when_only_one_side_is_strictly_contained() {
     let mut pairs = vec![
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             2.0,
             report_form("a.lisp", 10, 20),
             report_form("b.lisp", 0, 30),
         ),
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             1.0,
             report_form("a.lisp", 0, 30),
@@ -740,19 +862,19 @@ fn maximal_overlap_suppresses_when_only_one_side_is_strictly_contained() {
 
     assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 1);
     assert_eq!(pairs.len(), 1);
-    assert_eq!(pairs[0].score, 1.0);
+    assert_eq!(pairs[0].score().as_f64(), 1.0);
 }
 
 #[test]
 fn maximal_overlap_suppression_is_independent_of_score_order() {
     let mut pairs = vec![
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             10.0,
             report_form("a.lisp", 10, 20),
             report_form("b.lisp", 10, 20),
         ),
-        SimilarityPairReport::new(
+        similarity_pair_report(
             1.0,
             1.0,
             report_form("a.lisp", 0, 30),
@@ -762,12 +884,63 @@ fn maximal_overlap_suppression_is_independent_of_score_order() {
 
     assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 1);
     assert_eq!(pairs.len(), 1);
-    assert_eq!(pairs[0].score, 1.0);
+    assert_eq!(pairs[0].score().as_f64(), 1.0);
+}
+
+#[test]
+fn online_maximal_frontier_matches_offline_suppression() {
+    fn pairs() -> Vec<SimilarityPairReport> {
+        vec![
+            similarity_pair_report(
+                1.0,
+                10.0,
+                report_form("a.lisp", 10, 20),
+                report_form("b.lisp", 10, 20),
+            ),
+            similarity_pair_report(
+                0.9,
+                9.0,
+                report_form("a.lisp", 40, 50),
+                report_form("b.lisp", 40, 50),
+            ),
+            similarity_pair_report(
+                0.8,
+                8.0,
+                report_form("a.lisp", 0, 30),
+                report_form("b.lisp", 0, 30),
+            ),
+            similarity_pair_report(
+                0.7,
+                7.0,
+                report_form("a.lisp", 0, 60),
+                report_form("b.lisp", 0, 60),
+            ),
+        ]
+    }
+
+    for reverse in [false, true] {
+        let mut offline = pairs();
+        if reverse {
+            offline.reverse();
+        }
+        let mut online = pairs();
+        if reverse {
+            online.reverse();
+        }
+
+        let offline_suppressed = super::reports::suppress_contained_pairs(&mut offline);
+        let online_suppressed = super::reports::retain_maximal_frontier_for_test(&mut online);
+        offline.sort_by_key(|pair| pair.left.span.start());
+        online.sort_by_key(|pair| pair.left.span.start());
+
+        assert_eq!(online_suppressed, offline_suppressed);
+        assert_eq!(online, offline);
+    }
 }
 
 #[test]
 fn maximal_overlap_retains_duplicate_span_pairs() {
-    let pair = SimilarityPairReport::new(
+    let pair = similarity_pair_report(
         1.0,
         1.0,
         report_form("a.lisp", 0, 10),
@@ -785,7 +958,7 @@ fn maximal_overlap_handles_large_non_overlapping_group() {
     let mut pairs = (0..PAIR_COUNT)
         .map(|index| {
             let start = index * 2;
-            SimilarityPairReport::new(
+            similarity_pair_report(
                 1.0,
                 1.0,
                 report_form("a.lisp", start, start + 1),
@@ -802,9 +975,9 @@ fn maximal_overlap_handles_large_non_overlapping_group() {
 fn max_results_truncates_only_reported_pairs() {
     let values = candidates("a.lisp", "(foo a) (foo b) (foo c)", 2);
     let report = build_similarity_pairs(values, 0.0, SimilarityOverlapPolicy::All, Some(1));
-    assert_eq!(report.summary.matched_pairs, 3);
-    assert_eq!(report.summary.reported_pairs, 1);
-    assert!(report.summary.truncated);
+    assert_eq!(report.summary.matched_pairs(), 3);
+    assert_eq!(report.summary.reported_pairs(), 1);
+    assert!(report.summary.truncated());
     assert_eq!(report.pairs.len(), 1);
 
     let unlimited = build_similarity_pairs(
@@ -814,12 +987,15 @@ fn max_results_truncates_only_reported_pairs() {
         None,
     );
     assert_eq!(
-        report.summary.matched_pairs,
-        unlimited.summary.matched_pairs
+        report.summary.matched_pairs(),
+        unlimited.summary.matched_pairs()
     );
-    assert_eq!(unlimited.summary.reported_pairs, 3);
-    assert!(!unlimited.summary.truncated);
-    assert_eq!(report.pairs[0].score, unlimited.pairs[0].score);
+    assert_eq!(unlimited.summary.reported_pairs(), 3);
+    assert!(!unlimited.summary.truncated());
+    assert_eq!(
+        report.pairs[0].score().as_f64(),
+        unlimited.pairs[0].score().as_f64()
+    );
 }
 
 #[test]
@@ -874,9 +1050,9 @@ fn cross_file_groups_keep_comparing_after_the_single_result_slot_is_full() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.matched_pairs, 6);
-    assert_eq!(report.summary.reported_pairs, 1);
-    assert!(report.summary.truncated);
+    assert_eq!(report.summary.matched_pairs(), 6);
+    assert_eq!(report.summary.reported_pairs(), 1);
+    assert!(report.summary.truncated());
 }
 
 #[test]
@@ -962,17 +1138,17 @@ fn max_comparisons_stops_ted_evaluation_and_tracks_unprocessed_pairs() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.possible_pairs, 3);
-    assert_eq!(report.summary.evaluated_pairs, 1);
-    assert_eq!(report.summary.pruned_by_size, 0);
-    assert_eq!(report.summary.unprocessed_pairs, 2);
-    assert!(report.summary.comparison_limit_reached);
-    assert_eq!(report.summary.matched_pairs, 1);
+    assert_eq!(report.summary.possible_pairs(), 3);
+    assert_eq!(report.summary.evaluated_pairs(), 1);
+    assert_eq!(report.summary.pruned_by_size(), 0);
+    assert_eq!(report.summary.unprocessed_pairs(), 2);
+    assert!(report.summary.comparison_limit_reached());
+    assert_eq!(report.summary.matched_pairs(), 1);
     assert_eq!(
-        report.summary.possible_pairs,
-        report.summary.evaluated_pairs
-            + report.summary.pruned_by_size
-            + report.summary.unprocessed_pairs
+        report.summary.possible_pairs(),
+        report.summary.evaluated_pairs()
+            + report.summary.pruned_by_size()
+            + report.summary.unprocessed_pairs()
     );
 }
 
@@ -997,7 +1173,7 @@ fn same_file_comparison_limit_uses_stable_path_order() {
     for _ in 0..64 {
         let report = super::reports::build_similarity_pairs(values.clone(), &options).unwrap();
 
-        assert_eq!(report.summary.evaluated_pairs, 1);
+        assert_eq!(report.summary.evaluated_pairs(), 1);
         assert_eq!(report.pairs.len(), 1);
         assert_eq!(report.pairs[0].left.path, PathBuf::from("a.lisp"));
         assert_eq!(report.pairs[0].right.path, PathBuf::from("a.lisp"));
@@ -1022,11 +1198,11 @@ fn sufficient_max_comparisons_does_not_report_limit_reached() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.evaluated_pairs, 3);
-    assert_eq!(report.summary.unprocessed_pairs, 0);
-    assert!(!report.summary.comparison_limit_reached);
-    assert_eq!(report.summary.matched_pairs, 3);
-    assert_eq!(report.summary.reported_pairs, 1);
+    assert_eq!(report.summary.evaluated_pairs(), 3);
+    assert_eq!(report.summary.unprocessed_pairs(), 0);
+    assert!(!report.summary.comparison_limit_reached());
+    assert_eq!(report.summary.matched_pairs(), 3);
+    assert_eq!(report.summary.reported_pairs(), 1);
 }
 
 #[test]
@@ -1064,11 +1240,11 @@ fn max_comparisons_counts_size_pruned_pairs_as_inspected() {
         )
         .unwrap();
 
-        assert_eq!(report.summary.possible_pairs, 6);
-        assert_eq!(report.summary.evaluated_pairs, 0);
-        assert_eq!(report.summary.pruned_by_size, 1);
-        assert_eq!(report.summary.unprocessed_pairs, 5);
-        assert!(report.summary.comparison_limit_reached);
+        assert_eq!(report.summary.possible_pairs(), 6);
+        assert_eq!(report.summary.evaluated_pairs(), 0);
+        assert_eq!(report.summary.pruned_by_size(), 1);
+        assert_eq!(report.summary.unprocessed_pairs(), 5);
+        assert!(report.summary.comparison_limit_reached());
     }
 
     let mut cross_file_values = candidates("a.lisp", "(foo a)", 2);
@@ -1090,11 +1266,11 @@ fn max_comparisons_counts_size_pruned_pairs_as_inspected() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.possible_pairs, 3);
-    assert_eq!(report.summary.evaluated_pairs, 0);
-    assert_eq!(report.summary.pruned_by_size, 1);
-    assert_eq!(report.summary.unprocessed_pairs, 2);
-    assert!(report.summary.comparison_limit_reached);
+    assert_eq!(report.summary.possible_pairs(), 3);
+    assert_eq!(report.summary.evaluated_pairs(), 0);
+    assert_eq!(report.summary.pruned_by_size(), 1);
+    assert_eq!(report.summary.unprocessed_pairs(), 2);
+    assert!(report.summary.comparison_limit_reached());
 }
 
 #[test]
@@ -1116,8 +1292,8 @@ fn candidate_limit_is_preserved_when_building_the_report() {
     )
     .unwrap();
 
-    assert!(report.summary.candidate_limit_reached);
-    assert_eq!(report.summary.omitted_candidates, 1);
+    assert!(report.summary.candidate_limit_reached());
+    assert_eq!(report.summary.omitted_candidates(), 1);
 }
 
 #[test]
@@ -1139,8 +1315,8 @@ fn different_heads_do_not_share_a_comparison_bucket() {
     )
     .unwrap();
 
-    assert_eq!(report.summary.possible_pairs, 0);
-    assert_eq!(report.summary.evaluated_pairs, 0);
+    assert_eq!(report.summary.possible_pairs(), 0);
+    assert_eq!(report.summary.evaluated_pairs(), 0);
     assert!(report.pairs.is_empty());
 }
 

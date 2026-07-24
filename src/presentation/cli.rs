@@ -74,7 +74,10 @@ use std::path::{Path as FsPath, PathBuf};
 use std::process::ExitCode;
 
 use crate::application::refactor::execute::{
-    RefactorExecuteGateInputs, RefactorWriteRefusal, build_refactor_execute_decision,
+    RefactorExecuteGateInputs, RefactorExecuteMode, RefactorExecuteOutputParseResult,
+    RefactorExecutePolicyResult, RefactorExecutePreVerificationResult,
+    RefactorExecutePreflightInputs, RefactorWriteRefusal, build_refactor_execute_decision,
+    build_refactor_execute_preflight_decision,
 };
 use crate::application::refactor::plan::{
     RefactorOperation as ApplicationRefactorOperation, RefactorPlanGate, RefactorPlanPolicy,

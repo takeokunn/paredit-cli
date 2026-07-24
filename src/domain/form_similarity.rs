@@ -20,8 +20,16 @@ pub struct StructuralTree {
     /// `label_hashes` sorted, for merge-based multiset intersection in
     /// `similarity_upper_bound`.
     sorted_label_hashes: Vec<u64>,
+    leaf_count: usize,
     leftmost: Vec<usize>,
     keyroots: Vec<usize>,
+}
+
+impl StructuralTree {
+    /// Returns an index hint; callers must confirm equality after a hash match.
+    pub(crate) const fn fingerprint(&self) -> u64 {
+        self.tree_hash
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,17 +168,36 @@ impl TreeSimilarityOperationBudget {
     }
 
     #[inline]
-    fn consume(&self) -> Result<(), TreeSimilarityError> {
+    fn consume_many(&self, count: usize) -> Result<(), TreeSimilarityError> {
+        if count == 0 {
+            return Ok(());
+        }
+
+        if self.exhausted.load(AtomicOrdering::Acquire) {
+            let attempted = self
+                .operations
+                .load(AtomicOrdering::Acquire)
+                .saturating_add(count);
+            return Err(TreeSimilarityError::OperationBudgetExceeded {
+                operations: attempted.max(self.limit.saturating_add(1)),
+                limit: self.limit,
+            });
+        }
+
         match self.operations.fetch_update(
             AtomicOrdering::AcqRel,
             AtomicOrdering::Acquire,
-            |operations| operations.checked_add(1).filter(|&next| next <= self.limit),
+            |operations| {
+                operations
+                    .checked_add(count)
+                    .filter(|&next| next <= self.limit)
+            },
         ) {
             Ok(_) => Ok(()),
             Err(operations) => {
                 self.exhausted.store(true, AtomicOrdering::Release);
                 Err(TreeSimilarityError::OperationBudgetExceeded {
-                    operations: operations.saturating_add(1),
+                    operations: operations.saturating_add(count),
                     limit: self.limit,
                 })
             }
@@ -246,6 +273,7 @@ impl StructuralTree {
         }
 
         let mut labels = Vec::new();
+        let mut leaf_count = 0;
         let mut leftmost = Vec::new();
         let mut pending = vec![Visit::Enter(view)];
         while let Some(frame) = pending.pop() {
@@ -261,6 +289,9 @@ impl StructuralTree {
                     view,
                     descendant_start,
                 } => {
+                    if view.children.is_empty() {
+                        leaf_count += 1;
+                    }
                     let index = labels.len() + 1;
                     let leaf = leftmost.get(descendant_start).copied().unwrap_or(index);
                     labels.push(label(view));
@@ -293,6 +324,7 @@ impl StructuralTree {
                 labels,
                 label_hashes,
                 sorted_label_hashes,
+                leaf_count,
                 leftmost,
                 keyroots,
             },
@@ -371,23 +403,23 @@ fn sorted_intersection_count(left: &[u64], right: &[u64]) -> usize {
     shared
 }
 
-/// Cheap upper bound on `tree_similarity` derived from label multisets.
+/// Cheap upper bound on `tree_similarity` derived from label multisets and leaf counts.
 ///
-/// Any edit mapping matches `k <= min(n, m)` node pairs, deletes the other
-/// `n - k` left nodes, and inserts the other `m - k` right nodes. Matched
-/// pairs with identical labels cost 0, and there can be at most
-/// `|multiset intersection|` of those; every other matched pair costs at
-/// least `ATOM_RENAME_COST`. The bound below minimizes that total over `k`,
-/// so the true edit distance can never be smaller and the true similarity
-/// can never be larger. Distinct labels that collide in the hash only make
-/// the intersection look bigger, which loosens the bound but keeps it sound.
+/// The label bound accounts for unmatched nodes and renamed matched nodes. The
+/// leaf bound follows because a rename preserves the number of leaves and each
+/// insertion or deletion changes it by at most one. Taking the maximum of these
+/// independent distance lower bounds keeps the resulting similarity bound sound.
+/// Label hash collisions can only loosen the label bound.
 pub(crate) fn similarity_upper_bound(left: &StructuralTree, right: &StructuralTree) -> f64 {
     let left_count = left.labels.len();
     let right_count = right.labels.len();
     let matched = left_count.min(right_count);
     let shared = sorted_intersection_count(&left.sorted_label_hashes, &right.sorted_label_hashes);
-    let lower_bound_scaled = EDIT_COST_SCALE as f64 * left_count.abs_diff(right_count) as f64
+    let label_lower_bound_scaled = EDIT_COST_SCALE as f64 * left_count.abs_diff(right_count) as f64
         + ATOM_RENAME_COST as f64 * matched.saturating_sub(shared) as f64;
+    let leaf_lower_bound_scaled =
+        EDIT_COST_SCALE as f64 * left.leaf_count.abs_diff(right.leaf_count) as f64;
+    let lower_bound_scaled = label_lower_bound_scaled.max(leaf_lower_bound_scaled);
     1.0 - lower_bound_scaled / (EDIT_COST_SCALE as f64 * left_count.max(right_count) as f64)
 }
 
@@ -532,9 +564,9 @@ fn forest_distance(
     }
 
     for row in 1..row_count {
+        operation_budgets.consume_many(column_count - 1)?;
         let left_node = left_start + row - 1;
         for column in 1..column_count {
-            operation_budgets.consume()?;
             let right_node = right_start + column - 1;
             let delete = forest_distances[index(row - 1, column, width)] + EDIT_COST_SCALE;
             let insert = forest_distances[index(row, column - 1, width)] + EDIT_COST_SCALE;
@@ -578,11 +610,11 @@ struct TreeEditOperationBudgets<'a> {
 
 impl TreeEditOperationBudgets<'_> {
     #[inline]
-    fn consume(&mut self) -> Result<(), TreeSimilarityError> {
+    fn consume_many(&mut self, count: usize) -> Result<(), TreeSimilarityError> {
         if let Some(shared) = self.shared {
-            shared.consume()?;
+            shared.consume_many(count)?;
         }
-        self.local.consume()
+        self.local.consume_many(count)
     }
 }
 
@@ -595,14 +627,13 @@ impl TreeEditOperationBudget {
     }
 
     #[inline]
-    fn consume(&mut self) -> Result<(), TreeSimilarityError> {
-        let next =
-            self.operations
-                .checked_add(1)
-                .ok_or(TreeSimilarityError::OperationBudgetExceeded {
-                    operations: usize::MAX,
-                    limit: self.limit,
-                })?;
+    fn consume_many(&mut self, count: usize) -> Result<(), TreeSimilarityError> {
+        let next = self.operations.checked_add(count).ok_or(
+            TreeSimilarityError::OperationBudgetExceeded {
+                operations: usize::MAX,
+                limit: self.limit,
+            },
+        )?;
         if next > self.limit {
             return Err(TreeSimilarityError::OperationBudgetExceeded {
                 operations: next,
@@ -696,18 +727,33 @@ mod tests {
     #[test]
     fn tree_edit_operation_counter_fails_closed_at_budget() {
         let mut budget = TreeEditOperationBudget {
-            operations: MAX_TREE_EDIT_OPERATIONS,
+            operations: MAX_TREE_EDIT_OPERATIONS - 2,
             limit: MAX_TREE_EDIT_OPERATIONS,
         };
 
+        assert_eq!(budget.consume_many(2), Ok(()));
+        assert_eq!(budget.operations, MAX_TREE_EDIT_OPERATIONS);
         assert_eq!(
-            budget.consume(),
+            budget.consume_many(1),
             Err(TreeSimilarityError::OperationBudgetExceeded {
                 operations: MAX_TREE_EDIT_OPERATIONS + 1,
                 limit: MAX_TREE_EDIT_OPERATIONS,
             })
         );
         assert_eq!(budget.operations, MAX_TREE_EDIT_OPERATIONS);
+
+        let mut overflow_budget = TreeEditOperationBudget {
+            operations: usize::MAX - 1,
+            limit: usize::MAX,
+        };
+        assert_eq!(
+            overflow_budget.consume_many(2),
+            Err(TreeSimilarityError::OperationBudgetExceeded {
+                operations: usize::MAX,
+                limit: usize::MAX,
+            })
+        );
+        assert_eq!(overflow_budget.operations, usize::MAX - 1);
     }
 
     #[test]
@@ -718,19 +764,102 @@ mod tests {
         assert_eq!(left.sorted_label_hashes, right.sorted_label_hashes);
         assert_eq!(similarity_upper_bound(&left, &right), 1.0);
 
-        let budget = TreeSimilarityOperationBudget::new(1);
         let mut workspace = TreeSimilarityWorkspace::default();
+        let measuring_budget = TreeSimilarityOperationBudget::new(usize::MAX);
+        assert!(
+            tree_similarity_with_workspace_and_budget(
+                &left,
+                &right,
+                &mut workspace,
+                Some(&measuring_budget),
+            )
+            .is_ok()
+        );
+        let required_operations = measuring_budget.operations();
+        assert!(required_operations > 1);
+
+        let exact_budget = TreeSimilarityOperationBudget::new(required_operations);
+        assert!(
+            tree_similarity_with_workspace_and_budget(
+                &left,
+                &right,
+                &mut workspace,
+                Some(&exact_budget),
+            )
+            .is_ok()
+        );
+        assert_eq!(exact_budget.operations(), required_operations);
+        assert!(!exact_budget.exhausted());
+
+        let insufficient_budget = TreeSimilarityOperationBudget::new(required_operations - 1);
+        assert!(matches!(
+            tree_similarity_with_workspace_and_budget(
+                &left,
+                &right,
+                &mut workspace,
+                Some(&insufficient_budget),
+            ),
+            Err(TreeSimilarityError::OperationBudgetExceeded { limit, .. })
+                if limit == required_operations - 1
+        ));
+        assert!(insufficient_budget.operations() < required_operations);
+        assert!(insufficient_budget.exhausted());
+
+        let fail_closed_budget = TreeSimilarityOperationBudget::new(3);
+        assert_eq!(fail_closed_budget.consume_many(2), Ok(()));
         assert_eq!(
-            tree_similarity_with_workspace_and_budget(&left, &right, &mut workspace, Some(&budget),),
+            fail_closed_budget.consume_many(2),
             Err(TreeSimilarityError::OperationBudgetExceeded {
-                operations: 2,
-                limit: 1,
+                operations: 4,
+                limit: 3,
             })
         );
-        assert_eq!(budget.operations(), 1);
-        assert!(budget.exhausted());
+        assert_eq!(fail_closed_budget.operations(), 2);
+        assert!(fail_closed_budget.exhausted());
+        assert_eq!(
+            fail_closed_budget.consume_many(1),
+            Err(TreeSimilarityError::OperationBudgetExceeded {
+                operations: 4,
+                limit: 3,
+            })
+        );
+        assert_eq!(fail_closed_budget.operations(), 2);
 
         assert!(tree_similarity(&left, &right).is_ok());
+    }
+
+    #[test]
+    fn leaf_count_tightens_similarity_upper_bound_soundly() {
+        let left = form("((a) (b))");
+        let right = form("(() (a b))");
+        assert_eq!(left.node_count(), right.node_count());
+        assert_eq!(left.sorted_label_hashes, right.sorted_label_hashes);
+        assert_eq!((left.leaf_count, right.leaf_count), (2, 3));
+
+        let upper = similarity_upper_bound(&left, &right);
+        let reverse_upper = similarity_upper_bound(&right, &left);
+        let similarity = tree_similarity(&left, &right).unwrap();
+        let reverse_similarity = tree_similarity(&right, &left).unwrap();
+
+        assert!(upper < 1.0);
+        assert!((upper - 0.8).abs() < f64::EPSILON);
+        assert!(similarity <= upper + f64::EPSILON);
+        assert_eq!(upper, reverse_upper);
+        assert_eq!(similarity, reverse_similarity);
+    }
+
+    #[test]
+    fn leaf_count_upper_bound_is_sound_for_small_tree_set() {
+        let trees = ["a", "(a)", "((a))", "(a b)", "((a) (b))", "(() (a b))"].map(form);
+
+        for left in &trees {
+            for right in &trees {
+                let upper = similarity_upper_bound(left, right);
+                let similarity = tree_similarity(left, right).unwrap();
+                assert!(similarity <= upper + f64::EPSILON);
+                assert_eq!(upper, similarity_upper_bound(right, left));
+            }
+        }
     }
 
     #[test]

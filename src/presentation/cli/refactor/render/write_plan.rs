@@ -7,11 +7,14 @@ pub(super) fn print_refactor_write_plan(
     writable_files: &[String],
     refused_files: &[String],
 ) {
-    println!("write_plan_write_requested\t{}", write_plan.write_requested);
+    println!(
+        "write_plan_write_requested\t{}",
+        write_plan.write_requested()
+    );
     println!("write_plan_write_allowed\t{}", write_plan.write_allowed());
     println!(
         "write_plan_writable_file_count\t{}",
-        write_plan.writable_indexes.len()
+        write_plan.writable_indexes().len()
     );
     for path in writable_files {
         println!("write_plan_writable_file\t{}", safe_text!(path));
@@ -20,7 +23,7 @@ pub(super) fn print_refactor_write_plan(
     for path in refused_files {
         println!("write_plan_refused_file\t{}", safe_text!(path));
     }
-    match &write_plan.refusal {
+    match write_plan.refusal() {
         Some(refusal) => {
             println!("write_plan_refusal\t{}", refusal.label());
             println!(
@@ -47,13 +50,13 @@ pub(super) fn refactor_write_plan_json(
     refused_files: &[String],
 ) -> Value {
     json!({
-        "write_requested": write_plan.write_requested,
+        "write_requested": write_plan.write_requested(),
         "write_allowed": write_plan.write_allowed(),
-        "writable_file_count": write_plan.writable_indexes.len(),
+        "writable_file_count": write_plan.writable_indexes().len(),
         "writable_files": writable_files,
         "refused_file_count": refused_files.len(),
         "refused_files": refused_files,
-        "refusal": write_plan.refusal.as_ref().map(refactor_write_refusal_json),
+        "refusal": write_plan.refusal().map(refactor_write_refusal_json),
     })
 }
 

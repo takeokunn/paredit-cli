@@ -20,6 +20,7 @@ pub use tree::{
     AtomOccurrence, ExpressionKind, ExpressionView, OutlineEntry, ReaderPrefix, Selection,
     SyntaxTree,
 };
+pub(in crate::domain) use types::NonEmptyExpressionPath;
 pub use types::{
     ByteOffset, ByteSpan, ChildIndex, Delimiter, ExpressionPath, NodeId, Path, SymbolName,
 };

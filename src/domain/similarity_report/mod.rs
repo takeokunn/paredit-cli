@@ -10,8 +10,10 @@ pub use options::{
 };
 pub use reports::{build_similarity_pairs, build_similarity_pairs_with_omissions};
 pub use types::{
-    SharedFormText, SimilarityCandidate, SimilarityFormReport, SimilarityPairReport,
-    SimilarityReport, SimilarityReportSummary,
+    InvalidSimilarityRatio, InvalidSimilarityReport, InvalidSimilarityScore, PairProcessingCounts,
+    PairResultCounts, ReportLimit, SharedFormText, SimilarityCandidate, SimilarityFormReport,
+    SimilarityPairReport, SimilarityRatio, SimilarityReport, SimilarityReportSummary,
+    SimilarityScore,
 };
 
 #[cfg(test)]

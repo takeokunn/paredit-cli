@@ -45,3 +45,11 @@ The CLI is structure-aware rather than text-replacement based. Changes must
 preserve balanced S-expression syntax, avoid rewriting strings and comments
 unless the command explicitly targets them, and retain the read/preview/write
 separation documented in the project guides.
+
+The codebase is layered `domain` → `application` → `infrastructure` →
+`presentation`, with dependencies pointing only inward. Add a change in the
+innermost layer that owns it — parsing and safety rules in `domain`, workflow
+orchestration in `application` behind a source port, source discovery in
+`infrastructure`, and command wiring in `presentation`. The
+[architecture guide](docs/src/architecture.md) explains the boundaries and
+where each kind of change belongs.

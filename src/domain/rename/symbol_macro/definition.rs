@@ -3,7 +3,9 @@ use anyhow::Result;
 use crate::domain::common_lisp::{common_lisp_operator_head_eq, common_lisp_symbol_reference_eq};
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::{ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree};
+use crate::domain::sexpr::{
+    ExpressionKind, ExpressionView, NonEmptyExpressionPath, Path, SymbolName, SyntaxTree,
+};
 
 use super::super::RenameFunctionOccurrence;
 use super::super::reader::{
@@ -27,16 +29,15 @@ struct DefinitionPathArena {
 }
 
 impl DefinitionPathArena {
-    fn from_path(path: &Path) -> (Self, DefinitionPath) {
-        let indexes = path.to_raw_indexes();
-        let mut nodes = Vec::with_capacity(indexes.len());
+    fn from_path(path: NonEmptyExpressionPath<'_>) -> (Self, DefinitionPath) {
+        let mut nodes = Vec::with_capacity(path.indexes().len());
         let mut parent = None;
-        for index in indexes {
+        for index in path.indexes() {
             let node = nodes.len();
             nodes.push(DefinitionPathNode { parent, index });
             parent = Some(node);
         }
-        let current = parent.expect("definition traversal starts at a root child");
+        let current = parent.unwrap_or_else(|| unreachable!("non-empty path has a root node"));
         (
             Self {
                 nodes,
@@ -140,8 +141,9 @@ fn collect_definition_renames_from_view(
     to: &SymbolName,
     quasiquote_depth: usize,
     renames: &mut Vec<RenameFunctionOccurrence>,
-) -> DefinitionTraversalStats {
-    let (mut paths, root_path) = DefinitionPathArena::from_path(&path);
+) -> Option<DefinitionTraversalStats> {
+    let path = NonEmptyExpressionPath::try_from(&path).ok()?;
+    let (mut paths, root_path) = DefinitionPathArena::from_path(path);
     let mut stack = vec![DefinitionFrame {
         view,
         path: root_path,
@@ -185,11 +187,11 @@ fn collect_definition_renames_from_view(
         );
     }
 
-    DefinitionTraversalStats {
+    Some(DefinitionTraversalStats {
         visited_count,
         edge_count: paths.edge_count,
         materialized_index_count: paths.materialized_index_count,
-    }
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -337,7 +339,8 @@ mod tests {
             &to,
             0,
             &mut renames,
-        );
+        )
+        .expect("root-child path is non-empty");
 
         assert_eq!(renames.len(), 1);
         assert_eq!(stats.visited_count, depth + 4);

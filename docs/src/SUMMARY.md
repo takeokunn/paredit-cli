@@ -8,6 +8,7 @@
 - [Safety reference](safety.md)
 - [Agent interface](agents.md)
 - [Integrations](integrations.md)
+- [Architecture](architecture.md)
 - [Development](development.md)
 - [Releases and compatibility](releases.md)
 - [Repository documentation](repository.md)

@@ -6,7 +6,10 @@ pub struct RefactorWriteCandidate {
 
 pub use crate::domain::refactor_execute::{
     RefactorExecuteDecision, RefactorExecuteDecisionStatus, RefactorExecuteGateInputs,
-    RefactorExecuteStep, RefactorExecuteStepStatus,
+    RefactorExecuteMode, RefactorExecuteOutcome, RefactorExecuteOutputParseResult,
+    RefactorExecutePolicyResult, RefactorExecutePostVerificationResult,
+    RefactorExecutePreVerificationResult, RefactorExecutePreflightInputs, RefactorExecuteStep,
+    RefactorExecuteStepStatus,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,14 +38,55 @@ impl RefactorWriteRefusal {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum RefactorWritePlanState {
+    NotRequested,
+    Refused(RefactorWriteRefusal),
+    Allowed { writable_indexes: Vec<usize> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RefactorWritePlan {
-    pub write_requested: bool,
-    pub writable_indexes: Vec<usize>,
-    pub refusal: Option<RefactorWriteRefusal>,
+    state: RefactorWritePlanState,
 }
 
 impl RefactorWritePlan {
+    pub(super) fn not_requested() -> Self {
+        Self {
+            state: RefactorWritePlanState::NotRequested,
+        }
+    }
+
+    pub(super) fn refused(refusal: RefactorWriteRefusal) -> Self {
+        Self {
+            state: RefactorWritePlanState::Refused(refusal),
+        }
+    }
+
+    pub(super) fn allowed(writable_indexes: Vec<usize>) -> Self {
+        Self {
+            state: RefactorWritePlanState::Allowed { writable_indexes },
+        }
+    }
+
+    pub fn write_requested(&self) -> bool {
+        !matches!(self.state, RefactorWritePlanState::NotRequested)
+    }
+
     pub fn write_allowed(&self) -> bool {
-        self.write_requested && self.refusal.is_none()
+        matches!(self.state, RefactorWritePlanState::Allowed { .. })
+    }
+
+    pub fn writable_indexes(&self) -> &[usize] {
+        match &self.state {
+            RefactorWritePlanState::Allowed { writable_indexes } => writable_indexes,
+            RefactorWritePlanState::NotRequested | RefactorWritePlanState::Refused(_) => &[],
+        }
+    }
+
+    pub fn refusal(&self) -> Option<&RefactorWriteRefusal> {
+        match &self.state {
+            RefactorWritePlanState::Refused(refusal) => Some(refusal),
+            RefactorWritePlanState::NotRequested | RefactorWritePlanState::Allowed { .. } => None,
+        }
     }
 }

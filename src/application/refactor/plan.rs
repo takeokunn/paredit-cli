@@ -54,51 +54,34 @@ pub fn refactor_plan_automation_decision(
         .unwrap_or("review-plan");
 
     if !policy.passed {
-        return RefactorPlanAutomationDecision {
-            status: RefactorPlanAutomationStatus::PolicyFailed,
-            reason: policy
+        return RefactorPlanAutomationDecision::policy_failed(
+            policy
                 .violations
                 .first()
                 .cloned()
                 .unwrap_or_else(|| "refactor plan policy failed".to_owned()),
-            next_action: "resolve-policy-violations",
-            safe_to_automate: false,
-            policy_passed: false,
-            blocking_gate_count: policy.blocking_gate_count,
-        };
+            policy.blocking_gate_count,
+        );
     }
 
     if apply_action.starts_with("review-") {
-        return RefactorPlanAutomationDecision {
-            status: RefactorPlanAutomationStatus::ManualReview,
-            reason: format!("{apply_action} requires manual review before automated edits"),
-            next_action: apply_action,
-            safe_to_automate: false,
-            policy_passed: true,
-            blocking_gate_count: policy.blocking_gate_count,
-        };
+        return RefactorPlanAutomationDecision::manual_review(
+            format!("{apply_action} requires manual review before automated edits"),
+            apply_action,
+            policy.blocking_gate_count,
+        );
     }
 
     if policy.blocking_gate_count > 0 {
-        return RefactorPlanAutomationDecision {
-            status: RefactorPlanAutomationStatus::ManualReview,
-            reason: format!(
+        return RefactorPlanAutomationDecision::manual_review(
+            format!(
                 "{} blocking gate(s) require manual review before automated edits",
                 policy.blocking_gate_count
             ),
-            next_action: apply_action,
-            safe_to_automate: false,
-            policy_passed: true,
-            blocking_gate_count: policy.blocking_gate_count,
-        };
+            apply_action,
+            policy.blocking_gate_count,
+        );
     }
 
-    RefactorPlanAutomationDecision {
-        status: RefactorPlanAutomationStatus::Ready,
-        reason: "policy passed and no blocking gates were found".to_owned(),
-        next_action: apply_action,
-        safe_to_automate: true,
-        policy_passed: true,
-        blocking_gate_count: 0,
-    }
+    RefactorPlanAutomationDecision::ready(apply_action)
 }

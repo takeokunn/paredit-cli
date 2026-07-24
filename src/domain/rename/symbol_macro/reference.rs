@@ -7,7 +7,8 @@ use crate::domain::common_lisp::{
 use crate::domain::definition::definition_shape;
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, ReaderPrefix, SymbolName, SyntaxTree,
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, NonEmptyExpressionPath, Path,
+    ReaderPrefix, SymbolName, SyntaxTree,
 };
 
 use super::super::RenameFunctionOccurrence;
@@ -44,16 +45,15 @@ struct ReferencePathArena {
 }
 
 impl ReferencePathArena {
-    fn from_path(path: &Path) -> (Self, ReferencePath) {
-        let indexes = path.to_raw_indexes();
-        let mut nodes = Vec::with_capacity(indexes.len());
+    fn from_path(path: NonEmptyExpressionPath<'_>) -> (Self, ReferencePath) {
+        let mut nodes = Vec::with_capacity(path.indexes().len());
         let mut parent = None;
-        for index in indexes {
+        for index in path.indexes() {
             let node = nodes.len();
             nodes.push(ReferencePathNode { parent, index });
             parent = Some(node);
         }
-        let current = parent.expect("reference traversal starts at a root child");
+        let current = parent.unwrap_or_else(|| unreachable!("non-empty path has a root node"));
         (
             Self {
                 nodes,
@@ -142,7 +142,11 @@ fn collect_reference_renames_from_view(
     }
 
     let mut sites = Vec::new();
-    let mut paths = collect_symbol_reference_sites(view, path, false, dialect, from, &mut sites);
+    let Some(mut paths) =
+        collect_symbol_reference_sites(view, path, false, dialect, from, &mut sites)
+    else {
+        return;
+    };
 
     let (matching_site_indexes, _) = match_reference_spans_to_sites(&reference_spans, &mut sites);
     for site_index in matching_site_indexes {
@@ -421,14 +425,15 @@ fn collect_symbol_reference_sites(
     dialect: Dialect,
     from: &SymbolName,
     sites: &mut Vec<SymbolReferenceSite>,
-) -> ReferencePathArena {
+) -> Option<ReferencePathArena> {
     struct Frame<'a> {
         view: &'a ExpressionView,
         path: ReferencePath,
         is_head_position: bool,
     }
 
-    let (mut paths, root_path) = ReferencePathArena::from_path(&path);
+    let path = NonEmptyExpressionPath::try_from(&path).ok()?;
+    let (mut paths, root_path) = ReferencePathArena::from_path(path);
     let mut stack = vec![Frame {
         view,
         path: root_path,
@@ -462,7 +467,7 @@ fn collect_symbol_reference_sites(
         }
     }
 
-    paths
+    Some(paths)
 }
 
 #[cfg(test)]
@@ -539,7 +544,8 @@ mod tests {
             Dialect::CommonLisp,
             &from,
             &mut sites,
-        );
+        )
+        .expect("root-child path is non-empty");
 
         assert_eq!(sites.len(), 1);
         assert_eq!(paths.edge_count, depth);

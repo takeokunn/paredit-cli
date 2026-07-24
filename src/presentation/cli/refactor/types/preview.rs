@@ -4,6 +4,7 @@ use super::plan::WorkspaceRefactorPlanDiscovery;
 use crate::application::refactor::execute::{
     RefactorWriteCandidate, RefactorWritePlan, build_refactor_write_plan,
 };
+use crate::domain::refactor_preview::{RefactorPreviewDecisionStatus, decide_refactor_preview};
 
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct RefactorPreview {
@@ -36,7 +37,7 @@ impl RefactorPreview {
         write_plan: &RefactorWritePlan,
     ) -> Vec<String> {
         write_plan
-            .writable_indexes
+            .writable_indexes()
             .iter()
             .filter_map(|index| self.files.get(*index))
             .map(|file| file.path.display().to_string())
@@ -47,7 +48,7 @@ impl RefactorPreview {
         &self,
         write_plan: &RefactorWritePlan,
     ) -> Vec<String> {
-        if write_plan.refusal.is_none() {
+        if write_plan.refusal().is_none() {
             return Vec::new();
         }
 
@@ -62,22 +63,12 @@ impl RefactorPreview {
         &self,
         write_plan: &RefactorWritePlan,
     ) -> RefactorPreviewDecision {
-        let write_parse_refused = write_plan.refusal.is_some();
-        let apply_preview = self.write_requested && self.policy.passed && !write_parse_refused;
-        let status = if !self.policy.passed {
-            RefactorPreviewDecisionStatus::BlockedByPolicy
-        } else if write_parse_refused {
-            RefactorPreviewDecisionStatus::RefusedUnparsableOutput
-        } else if self.write_requested {
-            RefactorPreviewDecisionStatus::WriteApplied
-        } else {
-            RefactorPreviewDecisionStatus::DryRunReady
-        };
-
         RefactorPreviewDecision {
-            status,
-            write_parse_refused,
-            apply_preview,
+            status: decide_refactor_preview(
+                self.write_requested,
+                self.policy.passed(),
+                write_plan.refusal().is_some(),
+            ),
         }
     }
 }
@@ -85,11 +76,20 @@ impl RefactorPreview {
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct RefactorPreviewDecision {
     pub(in crate::presentation::cli) status: RefactorPreviewDecisionStatus,
-    pub(in crate::presentation::cli) write_parse_refused: bool,
-    pub(in crate::presentation::cli) apply_preview: bool,
 }
 
 impl RefactorPreviewDecision {
+    pub(in crate::presentation::cli) const fn write_parse_refused(&self) -> bool {
+        matches!(
+            self.status,
+            RefactorPreviewDecisionStatus::RefusedUnparsableOutput
+        )
+    }
+
+    pub(in crate::presentation::cli) const fn apply_preview(&self) -> bool {
+        matches!(self.status, RefactorPreviewDecisionStatus::WriteApplied)
+    }
+
     pub(in crate::presentation::cli) fn steps(&self) -> [RefactorPreviewDecisionStep; 3] {
         [
             RefactorPreviewDecisionStep {
@@ -129,43 +129,6 @@ impl RefactorPreviewDecision {
                 },
             },
         ]
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(in crate::presentation::cli) enum RefactorPreviewDecisionStatus {
-    BlockedByPolicy,
-    RefusedUnparsableOutput,
-    WriteApplied,
-    DryRunReady,
-}
-
-impl RefactorPreviewDecisionStatus {
-    pub(in crate::presentation::cli) fn label(&self) -> &'static str {
-        match self {
-            Self::BlockedByPolicy => "blocked-by-policy",
-            Self::RefusedUnparsableOutput => "refused-unparsable-output",
-            Self::WriteApplied => "write-applied",
-            Self::DryRunReady => "dry-run-ready",
-        }
-    }
-
-    pub(in crate::presentation::cli) fn reason(&self) -> &'static str {
-        match self {
-            Self::BlockedByPolicy => "preview-policy-failed",
-            Self::RefusedUnparsableOutput => "rewritten-output-did-not-parse",
-            Self::WriteApplied => "preview-write-applied",
-            Self::DryRunReady => "all-dry-run-gates-passed",
-        }
-    }
-
-    pub(in crate::presentation::cli) fn next_action(&self) -> &'static str {
-        match self {
-            Self::BlockedByPolicy => "review-policy-violations",
-            Self::RefusedUnparsableOutput => "inspect-preview-parse-errors",
-            Self::WriteApplied => "run-verification-or-review-diff",
-            Self::DryRunReady => "review-preview-or-rerun-with-write",
-        }
     }
 }
 
@@ -241,28 +204,12 @@ mod tests {
             to: "new-name".to_string(),
             write_requested,
             files,
-            summary: RefactorPreviewSummary {
-                file_count: 0,
-                changed_file_count: 0,
-                changed_files: Vec::new(),
-                unchanged_file_count: 0,
-                written_file_count: 0,
-                definition_count: 0,
-                target_occurrence_count: 0,
-                edit_count: 0,
-                parse_error_count: 0,
-                all_outputs_parse: true,
-            },
-            policy: RefactorPreviewPolicy {
-                fail_on_no_change: false,
-                fail_on_parse_error: false,
-                fail_on_target_conflict: false,
-                require_changed_files: None,
-                require_definitions: None,
-                require_edits: None,
-                passed: true,
-                violations: Vec::new(),
-            },
+            summary: RefactorPreviewSummary::new(Vec::new(), 0, 0, 0, 0, 0),
+            policy: evaluate_refactor_preview_policy(
+                DomainRefactorPreviewPolicyOptions::new(false, false, false, None, None, None)
+                    .expect("valid policy options"),
+                &RefactorPreviewSummary::new(Vec::new(), 0, 0, 0, 0, 0),
+            ),
         }
     }
 
@@ -326,7 +273,11 @@ mod tests {
     #[test]
     fn decision_steps_skip_apply_preview_when_policy_blocks() {
         let mut preview = preview(vec![preview_file("core.lisp", true, true)], true);
-        preview.policy.passed = false;
+        preview.policy = evaluate_refactor_preview_policy(
+            DomainRefactorPreviewPolicyOptions::new(true, false, false, None, None, None)
+                .expect("valid policy options"),
+            &preview.summary,
+        );
         let write_plan = preview.write_plan();
 
         let steps = preview.decision_for_write_plan(&write_plan).steps();

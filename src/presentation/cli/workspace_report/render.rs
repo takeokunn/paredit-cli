@@ -1,51 +1,29 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 use serde_json::json;
 
 use crate::application::usecase::workspace_report::types::{
-    WorkspaceFileMetrics, WorkspaceFileStatus, WorkspaceReportSummary,
+    WorkspaceFileStatus, WorkspaceReportPlan,
 };
-use crate::application::usecase::workspace_report::workflow::summarize_workspace_report;
-use crate::infrastructure::workspace::WorkspaceDiscovery;
 use crate::presentation::cli::OutputFormat;
 
-use super::types::WorkspaceFileReport;
-
 pub(super) fn print_workspace_report(
-    roots: &[PathBuf],
-    discovery: &WorkspaceDiscovery,
-    reports: &[WorkspaceFileReport],
+    plan: &WorkspaceReportPlan,
     output: OutputFormat,
 ) -> Result<()> {
-    let summary = summarize_workspace_report(reports.iter().map(|report| WorkspaceFileMetrics {
-        dialect: report.dialect,
-        status: &report.status,
-        byte_count: report.byte_count,
-        top_level_form_count: report.top_level_form_count,
-        atom_count: report.atom_count,
-        definition_count: report.definition_count,
-        call_count: report.call_count,
-    }));
-
     match output {
-        OutputFormat::Text => print_text_workspace_report(roots, discovery, reports, &summary),
-        OutputFormat::Json => print_json_workspace_report(roots, discovery, reports, &summary)?,
+        OutputFormat::Text => print_text_workspace_report(plan),
+        OutputFormat::Json => print_json_workspace_report(plan)?,
     }
 
     Ok(())
 }
 
-fn print_text_workspace_report(
-    roots: &[PathBuf],
-    discovery: &WorkspaceDiscovery,
-    reports: &[WorkspaceFileReport],
-    summary: &WorkspaceReportSummary,
-) {
+fn print_text_workspace_report(plan: &WorkspaceReportPlan) {
+    let summary = &plan.summary;
     println!(
         "roots\t{}",
         safe_text!(
-            roots
+            plan.roots
                 .iter()
                 .map(|root| root.display().to_string())
                 .collect::<Vec<_>>()
@@ -60,17 +38,17 @@ fn print_text_workspace_report(
     println!("atoms\t{}", summary.atom_count);
     println!("definitions\t{}", summary.definition_count);
     println!("calls\t{}", summary.call_count);
-    println!("skipped_unknown\t{}", discovery.skipped_unknown_count());
-    println!("skipped_hidden\t{}", discovery.skipped_hidden_count());
-    println!("skipped_generated\t{}", discovery.skipped_generated_count());
-    println!("skipped_symlink\t{}", discovery.skipped_symlink_count());
+    println!("skipped_unknown\t{}", plan.skipped_unknown_count);
+    println!("skipped_hidden\t{}", plan.skipped_hidden_count);
+    println!("skipped_generated\t{}", plan.skipped_generated_count);
+    println!("skipped_symlink\t{}", plan.skipped_symlink_count);
     for (dialect, count) in &summary.dialect_counts {
         println!("dialect\t{dialect}\t{count}");
     }
     for (status, count) in &summary.status_counts {
         println!("status\t{status}\t{count}");
     }
-    for report in reports {
+    for report in &plan.reports {
         println!(
             "{}\t{}\t{}\tdefinitions={}\tcalls={}",
             safe_text!(report.path.display()),
@@ -82,17 +60,13 @@ fn print_text_workspace_report(
     }
 }
 
-fn print_json_workspace_report(
-    roots: &[PathBuf],
-    discovery: &WorkspaceDiscovery,
-    reports: &[WorkspaceFileReport],
-    summary: &WorkspaceReportSummary,
-) -> Result<()> {
+fn print_json_workspace_report(plan: &WorkspaceReportPlan) -> Result<()> {
+    let summary = &plan.summary;
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
             "schema_version": 1,
-            "roots": roots
+            "roots": plan.roots
                 .iter()
                 .map(|root| root.display().to_string())
                 .collect::<Vec<_>>(),
@@ -119,12 +93,12 @@ fn print_json_workspace_report(
                 }))
                 .collect::<Vec<_>>(),
             "skipped": {
-                "unknown": discovery.skipped_unknown_count(),
-                "hidden": discovery.skipped_hidden_count(),
-                "generated": discovery.skipped_generated_count(),
-                "symlink": discovery.skipped_symlink_count(),
+                "unknown": plan.skipped_unknown_count,
+                "hidden": plan.skipped_hidden_count,
+                "generated": plan.skipped_generated_count,
+                "symlink": plan.skipped_symlink_count,
             },
-            "files": reports
+            "files": plan.reports
                 .iter()
                 .map(|report| json!({
                     "path": report.path.display().to_string(),

@@ -1,8 +1,8 @@
 use super::preview::RefactorPreview;
 use super::verification::RefactorVerification;
 use crate::application::refactor::execute::{
-    RefactorExecuteDecision, RefactorExecuteDecisionStatus, RefactorExecuteStep,
-    RefactorExecuteStepStatus,
+    RefactorExecuteDecision, RefactorExecuteOutcome, RefactorExecutePostVerificationResult,
+    RefactorExecuteStep, RefactorExecuteStepStatus,
 };
 
 #[derive(Debug)]
@@ -17,19 +17,17 @@ pub(in crate::presentation::cli) struct WorkspaceRefactorExecute {
 
 #[derive(Debug)]
 pub(in crate::presentation::cli) struct WorkspaceRefactorExecuteOutcome {
-    pub(in crate::presentation::cli) status: WorkspaceRefactorExecuteOutcomeStatus,
-    pub(in crate::presentation::cli) write_applied: bool,
-    pub(in crate::presentation::cli) post_verification_passed: Option<bool>,
+    status: WorkspaceRefactorExecuteOutcomeStatus,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::presentation::cli) struct WorkspaceRefactorExecuteOutcomeSummary {
-    pub(in crate::presentation::cli) passed_step_count: usize,
-    pub(in crate::presentation::cli) failed_step_count: usize,
-    pub(in crate::presentation::cli) skipped_step_count: usize,
-    pub(in crate::presentation::cli) scheduled_step_count: usize,
-    pub(in crate::presentation::cli) write_applied: bool,
-    pub(in crate::presentation::cli) post_verification_passed: Option<bool>,
+    passed_step_count: usize,
+    failed_step_count: usize,
+    skipped_step_count: usize,
+    scheduled_step_count: usize,
+    write_applied: bool,
+    post_verification_passed: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,41 +43,50 @@ pub(in crate::presentation::cli) enum WorkspaceRefactorExecuteOutcomeStatus {
 impl WorkspaceRefactorExecuteOutcome {
     pub(in crate::presentation::cli) fn from_decision(
         decision: RefactorExecuteDecision,
-        post_verification_passed: Option<bool>,
-    ) -> Self {
-        match decision.status {
-            RefactorExecuteDecisionStatus::BlockedByPolicy => Self {
-                status: WorkspaceRefactorExecuteOutcomeStatus::BlockedByPolicy,
-                write_applied: false,
-                post_verification_passed: None,
-            },
-            RefactorExecuteDecisionStatus::RefusedUnparsableOutput => Self {
-                status: WorkspaceRefactorExecuteOutcomeStatus::RefusedUnparsableOutput,
-                write_applied: false,
-                post_verification_passed: None,
-            },
-            RefactorExecuteDecisionStatus::BlockedByPreVerification => Self {
-                status: WorkspaceRefactorExecuteOutcomeStatus::BlockedByPreVerification,
-                write_applied: false,
-                post_verification_passed: None,
-            },
-            RefactorExecuteDecisionStatus::DryRunReady => Self {
-                status: WorkspaceRefactorExecuteOutcomeStatus::DryRunReady,
-                write_applied: false,
-                post_verification_passed: None,
-            },
-            RefactorExecuteDecisionStatus::ReadyToWrite => {
-                let post_passed = post_verification_passed.unwrap_or(false);
-                Self {
-                    status: if post_passed {
-                        WorkspaceRefactorExecuteOutcomeStatus::WriteApplied
-                    } else {
-                        WorkspaceRefactorExecuteOutcomeStatus::PostVerificationFailed
-                    },
-                    write_applied: true,
-                    post_verification_passed: Some(post_passed),
-                }
+        post_verification: Option<RefactorExecutePostVerificationResult>,
+    ) -> Result<Self, &'static str> {
+        let status = match RefactorExecuteOutcome::from_decision(decision, post_verification)? {
+            RefactorExecuteOutcome::BlockedByPolicy => {
+                WorkspaceRefactorExecuteOutcomeStatus::BlockedByPolicy
             }
+            RefactorExecuteOutcome::RefusedUnparsableOutput => {
+                WorkspaceRefactorExecuteOutcomeStatus::RefusedUnparsableOutput
+            }
+            RefactorExecuteOutcome::BlockedByPreVerification => {
+                WorkspaceRefactorExecuteOutcomeStatus::BlockedByPreVerification
+            }
+            RefactorExecuteOutcome::DryRunReady => {
+                WorkspaceRefactorExecuteOutcomeStatus::DryRunReady
+            }
+            RefactorExecuteOutcome::WriteApplied => {
+                WorkspaceRefactorExecuteOutcomeStatus::WriteApplied
+            }
+            RefactorExecuteOutcome::PostVerificationFailed => {
+                WorkspaceRefactorExecuteOutcomeStatus::PostVerificationFailed
+            }
+        };
+        Ok(Self { status })
+    }
+
+    pub(in crate::presentation::cli) const fn status(
+        &self,
+    ) -> WorkspaceRefactorExecuteOutcomeStatus {
+        self.status
+    }
+
+    pub(in crate::presentation::cli) const fn write_applied(&self) -> bool {
+        matches!(
+            self.status,
+            WorkspaceRefactorExecuteOutcomeStatus::WriteApplied
+                | WorkspaceRefactorExecuteOutcomeStatus::PostVerificationFailed
+        )
+    }
+
+    pub(in crate::presentation::cli) const fn post_verification_passed(&self) -> Option<bool> {
+        match self.status {
+            WorkspaceRefactorExecuteOutcomeStatus::WriteApplied => Some(true),
+            WorkspaceRefactorExecuteOutcomeStatus::PostVerificationFailed => Some(false),
+            _ => None,
         }
     }
 
@@ -151,8 +158,8 @@ impl WorkspaceRefactorExecuteOutcome {
             failed_step_count: 0,
             skipped_step_count: 0,
             scheduled_step_count: 0,
-            write_applied: self.write_applied,
-            post_verification_passed: self.post_verification_passed,
+            write_applied: self.write_applied(),
+            post_verification_passed: self.post_verification_passed(),
         };
 
         for step in self.steps() {
@@ -165,6 +172,27 @@ impl WorkspaceRefactorExecuteOutcome {
         }
 
         summary
+    }
+}
+
+impl WorkspaceRefactorExecuteOutcomeSummary {
+    pub(in crate::presentation::cli) const fn passed_step_count(self) -> usize {
+        self.passed_step_count
+    }
+    pub(in crate::presentation::cli) const fn failed_step_count(self) -> usize {
+        self.failed_step_count
+    }
+    pub(in crate::presentation::cli) const fn skipped_step_count(self) -> usize {
+        self.skipped_step_count
+    }
+    pub(in crate::presentation::cli) const fn scheduled_step_count(self) -> usize {
+        self.scheduled_step_count
+    }
+    pub(in crate::presentation::cli) const fn write_applied(self) -> bool {
+        self.write_applied
+    }
+    pub(in crate::presentation::cli) const fn post_verification_passed(self) -> Option<bool> {
+        self.post_verification_passed
     }
 }
 

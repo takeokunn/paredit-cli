@@ -3,49 +3,30 @@ use crate::domain::sexpr::{ByteOffset, ByteSpan};
 use proptest::prelude::*;
 
 fn summary() -> RefactorPreviewSummary {
-    RefactorPreviewSummary {
-        file_count: 2,
-        changed_file_count: 1,
-        changed_files: vec!["changed.lisp".to_string()],
-        unchanged_file_count: 1,
-        written_file_count: 0,
-        definition_count: 1,
-        target_occurrence_count: 0,
-        edit_count: 3,
-        parse_error_count: 0,
-        all_outputs_parse: true,
-    }
+    RefactorPreviewSummary::new(vec!["changed.lisp".to_string()], 1, 1, 0, 3, 0)
 }
 
 #[test]
 fn policy_reports_every_failed_preview_gate() {
-    let summary = RefactorPreviewSummary {
-        changed_file_count: 0,
-        definition_count: 1,
-        target_occurrence_count: 2,
-        edit_count: 1,
-        parse_error_count: 1,
-        all_outputs_parse: false,
-        ..summary()
-    };
+    let summary = RefactorPreviewSummary::new(Vec::new(), 2, 1, 2, 1, 1);
     let policy = evaluate_refactor_preview_policy(
         RefactorPreviewPolicyOptions::new(true, true, true, Some(2), Some(2), Some(4))
             .expect("valid policy options"),
         &summary,
     );
 
-    assert!(!policy.passed);
-    assert_eq!(policy.violations.len(), 6);
+    assert!(!policy.passed());
+    assert_eq!(policy.violations().len(), 6);
     assert!(
         policy
-            .violations
+            .violations()
             .iter()
             .any(|violation| violation == "--fail-on-no-change expected at least one changed file")
     );
-    assert!(policy.violations.iter().any(|violation| {
+    assert!(policy.violations().iter().any(|violation| {
         violation == "--fail-on-parse-error found 1 unparsable output file(s)"
     }));
-    assert!(policy.violations.iter().any(|violation| {
+    assert!(policy.violations().iter().any(|violation| {
         violation == "--fail-on-target-conflict found 2 existing replacement symbol occurrence(s)"
     }));
     assert_eq!(
@@ -92,20 +73,16 @@ proptest! {
         fail_on_target_conflict in any::<bool>(),
     ) {
         let all_outputs_parse = parse_errors == 0;
-        let summary = RefactorPreviewSummary {
-            file_count: changed + 1,
-            changed_file_count: changed,
-            changed_files: (0..changed)
+        let summary = RefactorPreviewSummary::new(
+            (0..changed)
                 .map(|index| format!("changed-{index}.lisp"))
                 .collect(),
-            unchanged_file_count: 1,
-            written_file_count: 0,
-            definition_count: definitions,
-            target_occurrence_count: target_occurrences,
-            edit_count: edits,
-            parse_error_count: parse_errors,
-            all_outputs_parse,
-        };
+            1,
+            definitions,
+            target_occurrences,
+            edits,
+            parse_errors,
+        );
         let options = RefactorPreviewPolicyOptions::new(
             fail_on_no_change,
             fail_on_parse_error,
@@ -126,8 +103,8 @@ proptest! {
             && require_definitions.is_none_or(|required| definitions == required)
             && require_edits.is_none_or(|required| edits >= required);
 
-        prop_assert_eq!(policy.passed, expected_passed);
-        prop_assert_eq!(policy.violations.is_empty(), expected_passed);
+        prop_assert_eq!(policy.passed(), expected_passed);
+        prop_assert_eq!(policy.violations().is_empty(), expected_passed);
     }
 
     #[test]
@@ -150,7 +127,7 @@ proptest! {
 
         prop_assert!(preview_edits
             .windows(2)
-            .all(|pair| (pair[0].start, pair[0].end) <= (pair[1].start, pair[1].end)));
+            .all(|pair| (pair[0].start(), pair[0].end()) <= (pair[1].start(), pair[1].end())));
         prop_assert_eq!(preview_edits.len(), raw_edits.len());
     }
 }

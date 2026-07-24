@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
+use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -163,18 +164,82 @@ impl SimilarityCandidate {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct SimilarityRatio(f64);
+
+impl SimilarityRatio {
+    pub fn new(value: f64) -> Option<Self> {
+        (value.is_finite() && (0.0..=1.0).contains(&value)).then_some(Self(value))
+    }
+
+    pub const fn as_f64(self) -> f64 {
+        self.0
+    }
+}
+
+impl TryFrom<f64> for SimilarityRatio {
+    type Error = InvalidSimilarityRatio;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::new(value).ok_or(InvalidSimilarityRatio)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidSimilarityRatio;
+
+impl std::fmt::Display for InvalidSimilarityRatio {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("similarity ratio must be finite and between 0 and 1")
+    }
+}
+
+impl std::error::Error for InvalidSimilarityRatio {}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct SimilarityScore(f64);
+
+impl SimilarityScore {
+    pub fn new(value: f64) -> Option<Self> {
+        (value.is_finite() && value >= 0.0).then_some(Self(value))
+    }
+
+    pub const fn as_f64(self) -> f64 {
+        self.0
+    }
+}
+
+impl TryFrom<f64> for SimilarityScore {
+    type Error = InvalidSimilarityScore;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::new(value).ok_or(InvalidSimilarityScore)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidSimilarityScore;
+
+impl std::fmt::Display for InvalidSimilarityScore {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("similarity score must be finite and non-negative")
+    }
+}
+
+impl std::error::Error for InvalidSimilarityScore {}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityPairReport {
-    pub similarity: f64,
-    pub score: f64,
+    similarity: SimilarityRatio,
+    score: SimilarityScore,
     pub left: Arc<SimilarityFormReport>,
     pub right: Arc<SimilarityFormReport>,
 }
 
 impl SimilarityPairReport {
     pub fn new(
-        similarity: f64,
-        score: f64,
+        similarity: SimilarityRatio,
+        score: SimilarityScore,
         left: SimilarityFormReport,
         right: SimilarityFormReport,
     ) -> Self {
@@ -187,8 +252,8 @@ impl SimilarityPairReport {
     }
 
     pub(crate) fn from_shared(
-        similarity: f64,
-        score: f64,
+        similarity: SimilarityRatio,
+        score: SimilarityScore,
         left: Arc<SimilarityFormReport>,
         right: Arc<SimilarityFormReport>,
     ) -> Self {
@@ -198,6 +263,14 @@ impl SimilarityPairReport {
             left,
             right,
         }
+    }
+
+    pub const fn similarity(&self) -> SimilarityRatio {
+        self.similarity
+    }
+
+    pub const fn score(&self) -> SimilarityScore {
+        self.score
     }
 
     pub fn strictly_contains_pair(&self, other: &Self) -> bool {
@@ -303,63 +376,265 @@ impl Display for FormHead {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportLimit {
+    Complete,
+    Limited(NonZeroUsize),
+}
+
+impl ReportLimit {
+    pub fn from_omitted(count: usize) -> Self {
+        NonZeroUsize::new(count).map_or(Self::Complete, Self::Limited)
+    }
+
+    pub fn reached(self) -> bool {
+        matches!(self, Self::Limited(_))
+    }
+
+    pub fn omitted(self) -> usize {
+        match self {
+            Self::Complete => 0,
+            Self::Limited(count) => count.get(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PairProcessingCounts {
+    possible: usize,
+    evaluated: usize,
+    pruned_by_size: usize,
+    resource_skipped: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvalidSimilarityReport {
+    ProcessingCountOverflow,
+    ProcessedPairsExceedPossible { possible: usize, processed: usize },
+    PairAccountingMismatch { possible: usize, accounted: usize },
+    SuppressedPairsExceedMatched { matched: usize, suppressed: usize },
+    ReportedPairsExceedAvailable { available: usize, reported: usize },
+    ReportedPairCountMismatch { reported: usize, actual: usize },
+}
+
+impl Display for InvalidSimilarityReport {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ProcessingCountOverflow => {
+                formatter.write_str("similarity pair processing counts overflow")
+            }
+            Self::ProcessedPairsExceedPossible {
+                possible,
+                processed,
+            } => write!(
+                formatter,
+                "processed similarity pairs ({processed}) exceed possible pairs ({possible})"
+            ),
+            Self::PairAccountingMismatch {
+                possible,
+                accounted,
+            } => write!(
+                formatter,
+                "similarity pair accounting mismatch: possible={possible}, accounted={accounted}"
+            ),
+            Self::SuppressedPairsExceedMatched {
+                matched,
+                suppressed,
+            } => write!(
+                formatter,
+                "suppressed similarity pairs ({suppressed}) exceed matched pairs ({matched})"
+            ),
+            Self::ReportedPairsExceedAvailable {
+                available,
+                reported,
+            } => write!(
+                formatter,
+                "reported similarity pairs ({reported}) exceed available pairs ({available})"
+            ),
+            Self::ReportedPairCountMismatch { reported, actual } => write!(
+                formatter,
+                "reported similarity pair count ({reported}) does not match actual pairs ({actual})"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for InvalidSimilarityReport {}
+
+impl PairProcessingCounts {
+    pub fn new(
+        possible: usize,
+        evaluated: usize,
+        pruned_by_size: usize,
+        resource_skipped: usize,
+    ) -> Result<Self, InvalidSimilarityReport> {
+        let processed = evaluated
+            .checked_add(pruned_by_size)
+            .and_then(|count| count.checked_add(resource_skipped))
+            .ok_or(InvalidSimilarityReport::ProcessingCountOverflow)?;
+        if processed > possible {
+            return Err(InvalidSimilarityReport::ProcessedPairsExceedPossible {
+                possible,
+                processed,
+            });
+        }
+        Ok(Self {
+            possible,
+            evaluated,
+            pruned_by_size,
+            resource_skipped,
+        })
+    }
+
+    fn validate_accounting(self, unprocessed: usize) -> Result<(), InvalidSimilarityReport> {
+        let accounted = self
+            .evaluated
+            .checked_add(self.pruned_by_size)
+            .and_then(|count| count.checked_add(self.resource_skipped))
+            .and_then(|count| count.checked_add(unprocessed))
+            .ok_or(InvalidSimilarityReport::ProcessingCountOverflow)?;
+        if accounted != self.possible {
+            return Err(InvalidSimilarityReport::PairAccountingMismatch {
+                possible: self.possible,
+                accounted,
+            });
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PairResultCounts {
+    matched: usize,
+    suppressed: usize,
+    reported: usize,
+}
+
+impl PairResultCounts {
+    pub fn new(
+        matched: usize,
+        suppressed: usize,
+        reported: usize,
+    ) -> Result<Self, InvalidSimilarityReport> {
+        if suppressed > matched {
+            return Err(InvalidSimilarityReport::SuppressedPairsExceedMatched {
+                matched,
+                suppressed,
+            });
+        }
+        let available = matched - suppressed;
+        if reported > available {
+            return Err(InvalidSimilarityReport::ReportedPairsExceedAvailable {
+                available,
+                reported,
+            });
+        }
+        Ok(Self {
+            matched,
+            suppressed,
+            reported,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityReportSummary {
-    pub candidate_limit_reached: bool,
-    pub omitted_candidates: usize,
-    pub possible_pairs: usize,
-    pub evaluated_pairs: usize,
-    pub pruned_by_size: usize,
-    pub resource_skipped_pairs: usize,
-    pub comparison_limit_reached: bool,
-    pub unprocessed_pairs: usize,
-    pub matched_pairs: usize,
-    pub suppressed_pairs: usize,
-    pub reported_pairs: usize,
-    pub truncated: bool,
+    candidate_limit: ReportLimit,
+    pair_processing: PairProcessingCounts,
+    comparison_limit: ReportLimit,
+    pair_results: PairResultCounts,
 }
 
 impl SimilarityReportSummary {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        candidate_limit_reached: bool,
-        omitted_candidates: usize,
-        possible_pairs: usize,
-        evaluated_pairs: usize,
-        pruned_by_size: usize,
-        resource_skipped_pairs: usize,
-        comparison_limit_reached: bool,
-        unprocessed_pairs: usize,
-        matched_pairs: usize,
-        suppressed_pairs: usize,
-        reported_pairs: usize,
-        truncated: bool,
-    ) -> Self {
-        Self {
-            candidate_limit_reached,
-            omitted_candidates,
-            possible_pairs,
-            evaluated_pairs,
-            pruned_by_size,
-            resource_skipped_pairs,
-            comparison_limit_reached,
-            unprocessed_pairs,
-            matched_pairs,
-            suppressed_pairs,
-            reported_pairs,
-            truncated,
-        }
+        candidate_limit: ReportLimit,
+        pair_processing: PairProcessingCounts,
+        comparison_limit: ReportLimit,
+        pair_results: PairResultCounts,
+    ) -> Result<Self, InvalidSimilarityReport> {
+        pair_processing.validate_accounting(comparison_limit.omitted())?;
+        Ok(Self {
+            candidate_limit,
+            pair_processing,
+            comparison_limit,
+            pair_results,
+        })
+    }
+
+    pub fn candidate_limit_reached(&self) -> bool {
+        self.candidate_limit.reached()
+    }
+
+    pub fn omitted_candidates(&self) -> usize {
+        self.candidate_limit.omitted()
+    }
+
+    pub fn possible_pairs(&self) -> usize {
+        self.pair_processing.possible
+    }
+
+    pub fn evaluated_pairs(&self) -> usize {
+        self.pair_processing.evaluated
+    }
+
+    pub fn pruned_by_size(&self) -> usize {
+        self.pair_processing.pruned_by_size
+    }
+
+    pub fn resource_skipped_pairs(&self) -> usize {
+        self.pair_processing.resource_skipped
+    }
+
+    pub fn comparison_limit_reached(&self) -> bool {
+        self.comparison_limit.reached()
+    }
+
+    pub fn unprocessed_pairs(&self) -> usize {
+        self.comparison_limit.omitted()
+    }
+
+    pub fn matched_pairs(&self) -> usize {
+        self.pair_results.matched
+    }
+
+    pub fn suppressed_pairs(&self) -> usize {
+        self.pair_results.suppressed
+    }
+
+    pub fn reported_pairs(&self) -> usize {
+        self.pair_results.reported
+    }
+
+    pub fn truncated(&self) -> bool {
+        self.reported_pairs() < self.matched_pairs().saturating_sub(self.suppressed_pairs())
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimilarityReport {
-    pub summary: SimilarityReportSummary,
-    pub pairs: Vec<SimilarityPairReport>,
+    pub(crate) summary: SimilarityReportSummary,
+    pub(crate) pairs: Vec<SimilarityPairReport>,
 }
 
 impl SimilarityReport {
-    pub fn new(summary: SimilarityReportSummary, pairs: Vec<SimilarityPairReport>) -> Self {
-        Self { summary, pairs }
+    pub fn new(
+        summary: SimilarityReportSummary,
+        pairs: Vec<SimilarityPairReport>,
+    ) -> Result<Self, InvalidSimilarityReport> {
+        if summary.reported_pairs() != pairs.len() {
+            return Err(InvalidSimilarityReport::ReportedPairCountMismatch {
+                reported: summary.reported_pairs(),
+                actual: pairs.len(),
+            });
+        }
+        Ok(Self { summary, pairs })
+    }
+
+    pub const fn summary(&self) -> &SimilarityReportSummary {
+        &self.summary
+    }
+
+    pub fn pairs(&self) -> &[SimilarityPairReport] {
+        &self.pairs
     }
 }

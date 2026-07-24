@@ -1,98 +1,67 @@
-use anyhow::{Context, Result};
+use std::path::Path;
 
-use crate::application::usecase::call_report::build_call_report;
-use crate::application::usecase::definition_report::collect_definition_forms;
-use crate::application::usecase::workspace_report::types::WorkspaceFileStatus;
+use anyhow::Result;
+
+use crate::application::usecase::workspace_report::types::{
+    LoadedWorkspaceFile, WorkspaceInventory, WorkspaceReportRequest, WorkspaceReportSourcePort,
+};
+use crate::application::usecase::workspace_report::workflow::build_workspace_report;
 use crate::domain::dialect::Dialect;
-use crate::domain::sexpr::SyntaxTree;
-use crate::infrastructure::workspace::{WorkspaceDiscoveryOptions, discover_workspace_files};
+use crate::infrastructure::workspace::{
+    WorkspaceDiscovery, WorkspaceDiscoveryOptions, discover_workspace_files,
+};
 
 use super::args::WorkspaceReportArgs;
 use super::render::print_workspace_report;
-use super::types::WorkspaceFileReport;
-
-fn parse_error_report(
-    path: std::path::PathBuf,
-    dialect: Dialect,
-    byte_count: usize,
-    error: impl std::fmt::Display,
-) -> WorkspaceFileReport {
-    WorkspaceFileReport {
-        path,
-        dialect,
-        status: WorkspaceFileStatus::ParseError(error.to_string()),
-        byte_count,
-        top_level_form_count: 0,
-        atom_count: 0,
-        definition_count: 0,
-        call_count: 0,
-        package: None,
-    }
-}
 
 pub(in crate::presentation::cli) fn workspace_report(args: WorkspaceReportArgs) -> Result<()> {
-    let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
-        roots: args.roots.clone(),
+    let output = args.output;
+    let request = WorkspaceReportRequest {
+        roots: args.roots,
         include_unknown: args.include_unknown,
         include_hidden: args.include_hidden,
         include_generated: args.include_generated,
         max_depth: args.max_depth,
-        exclude: Vec::new(),
-    })?;
-    let mut reports = Vec::with_capacity(discovery.files().len());
+    };
+    let mut source = CliWorkspaceReportSource::default();
+    let plan = build_workspace_report(&mut source, request)?;
+    print_workspace_report(&plan, output)
+}
 
-    for file in discovery.files() {
-        let dialect = Dialect::detect(Some(file.as_path()), None);
-        let bytes = match discovery.read_file(file) {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                reports.push(parse_error_report(file.clone(), dialect, 0, error));
-                continue;
-            }
+#[derive(Default)]
+struct CliWorkspaceReportSource {
+    discovery: Option<WorkspaceDiscovery>,
+}
+
+impl WorkspaceReportSourcePort for CliWorkspaceReportSource {
+    fn discover(&mut self, request: &WorkspaceReportRequest) -> Result<WorkspaceInventory> {
+        let discovery = discover_workspace_files(&WorkspaceDiscoveryOptions {
+            roots: request.roots.clone(),
+            include_unknown: request.include_unknown,
+            include_hidden: request.include_hidden,
+            include_generated: request.include_generated,
+            max_depth: request.max_depth,
+            exclude: Vec::new(),
+        })?;
+        let inventory = WorkspaceInventory {
+            files: discovery.files().to_vec(),
+            skipped_unknown_count: discovery.skipped_unknown_count(),
+            skipped_hidden_count: discovery.skipped_hidden_count(),
+            skipped_generated_count: discovery.skipped_generated_count(),
+            skipped_symlink_count: discovery.skipped_symlink_count(),
         };
-        let byte_count = bytes.len();
-        let text = match String::from_utf8(bytes) {
-            Ok(text) => text,
-            Err(error) => {
-                reports.push(parse_error_report(file.clone(), dialect, byte_count, error));
-                continue;
-            }
-        };
-
-        match SyntaxTree::parse_with_dialect(&text, dialect) {
-            Ok(tree) => {
-                let (package, definitions) = collect_definition_forms(&tree, dialect)
-                    .with_context(|| format!("failed to analyze {}", file.display()))?;
-                let calls = build_call_report(&tree, dialect, None, false)
-                    .with_context(|| format!("failed to collect calls in {}", file.display()))?;
-
-                reports.push(WorkspaceFileReport {
-                    path: file.clone(),
-                    dialect,
-                    status: WorkspaceFileStatus::Parsed,
-                    byte_count,
-                    top_level_form_count: tree.root_children().len(),
-                    atom_count: tree.atom_occurrence_count(),
-                    definition_count: definitions.len(),
-                    call_count: calls.len(),
-                    package,
-                });
-            }
-            Err(error) => {
-                reports.push(WorkspaceFileReport {
-                    path: file.clone(),
-                    dialect,
-                    status: WorkspaceFileStatus::ParseError(error.to_string()),
-                    byte_count,
-                    top_level_form_count: 0,
-                    atom_count: 0,
-                    definition_count: 0,
-                    call_count: 0,
-                    package: None,
-                });
-            }
-        }
+        self.discovery = Some(discovery);
+        Ok(inventory)
     }
 
-    print_workspace_report(&args.roots, &discovery, &reports, args.output)
+    fn load(&self, path: &Path) -> LoadedWorkspaceFile {
+        let dialect = Dialect::detect(Some(path), None);
+        let bytes = self
+            .discovery
+            .as_ref()
+            .expect("workspace discovery must precede file loading")
+            .read_file(path)
+            .map_err(|error| error.to_string());
+        LoadedWorkspaceFile { dialect, bytes }
+    }
 }

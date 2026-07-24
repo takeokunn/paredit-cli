@@ -61,11 +61,14 @@ fn automation_decision_prefers_policy_failure_over_manual_review() {
 
     let decision = refactor_plan_automation_decision(&policy, &steps);
 
-    assert_eq!(decision.status, RefactorPlanAutomationStatus::PolicyFailed);
-    assert_eq!(decision.next_action, "resolve-policy-violations");
-    assert!(!decision.safe_to_automate);
-    assert!(!decision.policy_passed);
-    assert_eq!(decision.blocking_gate_count, 1);
+    assert_eq!(
+        decision.status(),
+        RefactorPlanAutomationStatus::PolicyFailed
+    );
+    assert_eq!(decision.next_action(), "resolve-policy-violations");
+    assert!(!decision.safe_to_automate());
+    assert!(!decision.policy_passed());
+    assert_eq!(decision.blocking_gate_count(), 1);
     assert_eq!(
         decision.steps(),
         [
@@ -107,10 +110,10 @@ fn automation_decision_tracks_ready_and_manual_review_states() {
 
     let ready = refactor_plan_automation_decision(&ready_policy, &ready_steps);
 
-    assert_eq!(ready.status, RefactorPlanAutomationStatus::Ready);
-    assert_eq!(ready.next_action, "apply-rename");
-    assert!(ready.safe_to_automate);
-    assert!(ready.policy_passed);
+    assert_eq!(ready.status(), RefactorPlanAutomationStatus::Ready);
+    assert_eq!(ready.next_action(), "apply-rename");
+    assert!(ready.safe_to_automate());
+    assert!(ready.policy_passed());
     assert_eq!(
         ready.steps(),
         [
@@ -143,10 +146,10 @@ fn automation_decision_tracks_ready_and_manual_review_states() {
 
     let manual = refactor_plan_automation_decision(&manual_policy, &manual_steps);
 
-    assert_eq!(manual.status, RefactorPlanAutomationStatus::ManualReview);
-    assert_eq!(manual.next_action, "review-rename-scope");
-    assert!(!manual.safe_to_automate);
-    assert!(manual.policy_passed);
+    assert_eq!(manual.status(), RefactorPlanAutomationStatus::ManualReview);
+    assert_eq!(manual.next_action(), "review-rename-scope");
+    assert!(!manual.safe_to_automate());
+    assert!(manual.policy_passed());
     assert_eq!(
         manual.steps(),
         [
@@ -190,11 +193,11 @@ fn automation_decision_tracks_ready_and_manual_review_states() {
         );
         let manual = refactor_plan_automation_decision(&symbol_macro_policy, &steps);
 
-        assert_eq!(manual.status, RefactorPlanAutomationStatus::ManualReview);
-        assert_eq!(manual.next_action, "review-signature-scope");
-        assert!(!manual.safe_to_automate);
-        assert!(manual.policy_passed);
-        assert_eq!(manual.blocking_gate_count, 0);
+        assert_eq!(manual.status(), RefactorPlanAutomationStatus::ManualReview);
+        assert_eq!(manual.next_action(), "review-signature-scope");
+        assert!(!manual.safe_to_automate());
+        assert!(manual.policy_passed());
+        assert_eq!(manual.blocking_gate_count(), 0);
         assert_eq!(
             manual.steps(),
             [

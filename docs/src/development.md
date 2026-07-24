@@ -1,7 +1,10 @@
 # Development
 
 Everything a contributor needs is provided by the Nix flake; no manually
-installed Rust toolchain is required.
+installed Rust toolchain is required. Before changing code, read the
+[architecture guide](architecture.md) to know which of the four layers
+(`domain`, `application`, `infrastructure`, `presentation`) a change belongs
+in.
 
 ## Environment
 

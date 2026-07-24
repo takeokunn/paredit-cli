@@ -2,6 +2,9 @@ use crate::domain::sexpr::formatter::{Formatter, MAX_INLINE_WIDTH};
 use crate::domain::sexpr::tree::{NodeKind, SyntaxTree};
 use crate::domain::sexpr::types::NodeId;
 
+#[derive(Clone, Copy)]
+struct LastInlineChildPosition(Option<usize>);
+
 impl Formatter {
     /// Formats ASDF `defsystem` forms, whose body is a name followed by a
     /// keyword/value option plist rather than a lambda list plus body forms.
@@ -77,26 +80,13 @@ impl Formatter {
         depth: usize,
         output: &mut String,
     ) {
-        let node = tree.node(node_id);
-        let delimiter = self.list_delimiter(node);
-        output.push(delimiter.open());
-
-        for (position, child) in node.children.iter().enumerate() {
-            match position {
-                0 => self.format_node(tree, *child, depth + 1, output),
-                1 | 2 => {
-                    output.push(' ');
-                    self.format_inline_or_node(tree, *child, depth + 1, output);
-                }
-                _ => {
-                    output.push('\n');
-                    output.push_str(&self.indent(depth + 1));
-                    self.format_node(tree, *child, depth + 1, output);
-                }
-            }
-        }
-
-        output.push(delimiter.close());
+        self.format_definition_children(
+            tree,
+            node_id,
+            depth,
+            LastInlineChildPosition(Some(2)),
+            output,
+        );
     }
 
     pub(in crate::domain::sexpr::formatter) fn format_defmethod(
@@ -106,22 +96,44 @@ impl Formatter {
         depth: usize,
         output: &mut String,
     ) {
+        let last_inline_child_position = tree
+            .node(node_id)
+            .children
+            .iter()
+            .enumerate()
+            .skip(2)
+            .find_map(|(position, child)| {
+                (tree.node(*child).kind == NodeKind::List).then_some(position)
+            });
+
+        self.format_definition_children(
+            tree,
+            node_id,
+            depth,
+            LastInlineChildPosition(last_inline_child_position),
+            output,
+        );
+    }
+
+    fn format_definition_children(
+        &self,
+        tree: &SyntaxTree,
+        node_id: NodeId,
+        depth: usize,
+        last_inline_child_position: LastInlineChildPosition,
+        output: &mut String,
+    ) {
         let node = tree.node(node_id);
         let delimiter = self.list_delimiter(node);
-        let lambda_list_position =
-            node.children
-                .iter()
-                .enumerate()
-                .skip(2)
-                .find_map(|(position, child)| {
-                    (tree.node(*child).kind == NodeKind::List).then_some(position)
-                });
         output.push(delimiter.open());
 
         for (position, child) in node.children.iter().enumerate() {
             if position == 0 {
                 self.format_node(tree, *child, depth + 1, output);
-            } else if lambda_list_position.is_some_and(|lambda| position <= lambda) {
+            } else if last_inline_child_position
+                .0
+                .is_some_and(|last_inline| position <= last_inline)
+            {
                 output.push(' ');
                 self.format_inline_or_node(tree, *child, depth + 1, output);
             } else {

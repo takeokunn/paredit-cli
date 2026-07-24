@@ -133,9 +133,9 @@ fn emit_refactor_preview(request: RefactorPreviewEmission<'_>) -> Result<()> {
         policy_options,
         workspace,
     })?;
-    let policy_passed = preview.policy.passed;
-    let policy_message = preview.policy.violations.join("; ");
-    let write_parse_refused = write && !preview.summary.all_outputs_parse;
+    let policy_passed = preview.policy.passed();
+    let policy_message = preview.policy.violations().join("; ");
+    let write_parse_refused = write && !preview.summary.all_outputs_parse();
 
     if policy_passed && !write_parse_refused {
         write_refactor_preview(&mut preview)?;
@@ -170,9 +170,12 @@ fn write_manifest_and_print_summary(
         OutputFormat::Text => {
             println!("manifest_path\t{}", safe_text!(manifest_path.display()));
             println!("manifest_hash\t{manifest_hash}");
-            println!("changed_file_count\t{}", preview.summary.changed_file_count);
-            println!("edit_count\t{}", preview.summary.edit_count);
-            println!("policy_passed\t{}", preview.policy.passed);
+            println!(
+                "changed_file_count\t{}",
+                preview.summary.changed_file_count()
+            );
+            println!("edit_count\t{}", preview.summary.edit_count());
+            println!("policy_passed\t{}", preview.policy.passed());
         }
         OutputFormat::Json => println!(
             "{}",
@@ -181,14 +184,14 @@ fn write_manifest_and_print_summary(
                 "manifest_path": manifest_path.display().to_string(),
                 "manifest_hash": manifest_hash,
                 "summary": {
-                    "file_count": preview.summary.file_count,
-                    "changed_file_count": preview.summary.changed_file_count,
-                    "edit_count": preview.summary.edit_count,
-                    "all_outputs_parse": preview.summary.all_outputs_parse,
+                    "file_count": preview.summary.file_count(),
+                    "changed_file_count": preview.summary.changed_file_count(),
+                    "edit_count": preview.summary.edit_count(),
+                    "all_outputs_parse": preview.summary.all_outputs_parse(),
                 },
                 "policy": {
-                    "passed": preview.policy.passed,
-                    "violations": preview.policy.violations.as_slice(),
+                    "passed": preview.policy.passed(),
+                    "violations": preview.policy.violations(),
                 },
                 "next_actions": [
                     format!(

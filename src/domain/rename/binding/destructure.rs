@@ -41,60 +41,39 @@ enum LambdaListMode {
     Aux,
 }
 
+#[derive(Clone, Copy)]
+enum RequiredParameterStyle {
+    Plain,
+    Specialized,
+}
+
 fn collect_lambda_list_name_spans(
     parameter_form: &ExpressionView,
     output: &mut Vec<ParameterNameSpan>,
 ) {
-    let mut mode = LambdaListMode::Required;
-    let mut index = 0usize;
-
-    while index < parameter_form.children.len() {
-        let child = &parameter_form.children[index];
-        if let Some(marker) = atom_text(child) {
-            match marker {
-                "&optional" => {
-                    mode = LambdaListMode::Optional;
-                    index += 1;
-                    continue;
-                }
-                "&key" => {
-                    mode = LambdaListMode::Key;
-                    index += 1;
-                    continue;
-                }
-                "&aux" => {
-                    mode = LambdaListMode::Aux;
-                    index += 1;
-                    continue;
-                }
-                "&rest" | "&body" | "&whole" | "&environment" => {
-                    if let Some(next) = parameter_form.children.get(index + 1) {
-                        collect_binding_pattern_name_spans(next, output);
-                    }
-                    index += 2;
-                    continue;
-                }
-                "&allow-other-keys" => {
-                    index += 1;
-                    continue;
-                }
-                _ if marker.starts_with('&') => {
-                    index += 1;
-                    continue;
-                }
-                _ => {}
-            }
-        }
-
-        collect_lambda_list_parameter_spec_name_spans(child, mode, output);
-        index += 1;
-    }
+    collect_lambda_list_name_spans_with_style(
+        parameter_form,
+        RequiredParameterStyle::Plain,
+        output,
+    );
 }
 
 fn collect_specialized_lambda_list_name_spans(
     parameter_form: &ExpressionView,
     output: &mut Vec<ParameterNameSpan>,
 ) {
+    collect_lambda_list_name_spans_with_style(
+        parameter_form,
+        RequiredParameterStyle::Specialized,
+        output,
+    );
+}
+
+fn collect_lambda_list_name_spans_with_style(
+    parameter_form: &ExpressionView,
+    required_parameter_style: RequiredParameterStyle,
+    output: &mut Vec<ParameterNameSpan>,
+) {
     let mut mode = LambdaListMode::Required;
     let mut index = 0usize;
 
@@ -136,10 +115,11 @@ fn collect_specialized_lambda_list_name_spans(
             }
         }
 
-        if mode == LambdaListMode::Required {
-            collect_specialized_required_parameter_name_span(child, output);
-        } else {
-            collect_lambda_list_parameter_spec_name_spans(child, mode, output);
+        match (mode, required_parameter_style) {
+            (LambdaListMode::Required, RequiredParameterStyle::Specialized) => {
+                collect_specialized_required_parameter_name_span(child, output);
+            }
+            _ => collect_lambda_list_parameter_spec_name_spans(child, mode, output),
         }
         index += 1;
     }

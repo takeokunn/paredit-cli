@@ -51,25 +51,31 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
                     workspace.skipped_symlink_count
                 );
             }
-            println!("files\t{}", preview.summary.file_count);
-            println!("changed_file_count\t{}", preview.summary.changed_file_count);
-            for changed_file in &preview.summary.changed_files {
+            println!("files\t{}", preview.summary.file_count());
+            println!(
+                "changed_file_count\t{}",
+                preview.summary.changed_file_count()
+            );
+            for changed_file in preview.summary.changed_files() {
                 println!("changed_file\t{}", safe_text!(changed_file));
             }
             println!(
                 "unchanged_file_count\t{}",
-                preview.summary.unchanged_file_count
+                preview.summary.unchanged_file_count()
             );
-            println!("written_file_count\t{}", preview.summary.written_file_count);
-            println!("definition_count\t{}", preview.summary.definition_count);
+            println!(
+                "written_file_count\t{}",
+                preview.summary.written_file_count()
+            );
+            println!("definition_count\t{}", preview.summary.definition_count());
             println!(
                 "target_occurrence_count\t{}",
-                preview.summary.target_occurrence_count
+                preview.summary.target_occurrence_count()
             );
-            println!("edit_count\t{}", preview.summary.edit_count);
-            println!("parse_error_count\t{}", preview.summary.parse_error_count);
-            println!("all_outputs_parse\t{}", preview.summary.all_outputs_parse);
-            println!("policy_passed\t{}", preview.policy.passed);
+            println!("edit_count\t{}", preview.summary.edit_count());
+            println!("parse_error_count\t{}", preview.summary.parse_error_count());
+            println!("all_outputs_parse\t{}", preview.summary.all_outputs_parse());
+            println!("policy_passed\t{}", preview.policy.passed());
             let policy_summary = preview.policy.summary();
             println!("policy_violation_count\t{}", policy_summary.violation_count);
             println!("policy_write_blocked\t{}", policy_summary.write_blocked);
@@ -77,7 +83,7 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
                 "policy_next_action\t{}",
                 safe_text!(policy_summary.next_action)
             );
-            for violation in &preview.policy.violations {
+            for violation in preview.policy.violations() {
                 println!("policy_violation\t{}", safe_text!(violation));
             }
             for file in &preview.files {
@@ -96,9 +102,9 @@ pub(in crate::presentation::cli) fn print_refactor_preview(
                     println!(
                         "edit\t{}\tstart={}\tend={}\treplacement={}",
                         safe_text!(file.path.display()),
-                        edit.start,
-                        edit.end,
-                        safe_text!(edit.replacement)
+                        edit.start(),
+                        edit.end(),
+                        safe_text!(edit.replacement())
                     );
                 }
             }
@@ -151,27 +157,27 @@ pub(in crate::presentation::cli) fn refactor_preview_manifest_json(
                         },
                     })),
                     "summary": {
-                        "file_count": preview.summary.file_count,
-                        "changed_file_count": preview.summary.changed_file_count,
-                        "changed_files": &preview.summary.changed_files,
-                        "unchanged_file_count": preview.summary.unchanged_file_count,
-                        "written_file_count": preview.summary.written_file_count,
-                        "definition_count": preview.summary.definition_count,
-                        "target_occurrence_count": preview.summary.target_occurrence_count,
-                        "edit_count": preview.summary.edit_count,
-                        "parse_error_count": preview.summary.parse_error_count,
-                        "all_outputs_parse": preview.summary.all_outputs_parse,
+                        "file_count": preview.summary.file_count(),
+                        "changed_file_count": preview.summary.changed_file_count(),
+                        "changed_files": &preview.summary.changed_files(),
+                        "unchanged_file_count": preview.summary.unchanged_file_count(),
+                        "written_file_count": preview.summary.written_file_count(),
+                        "definition_count": preview.summary.definition_count(),
+                        "target_occurrence_count": preview.summary.target_occurrence_count(),
+                        "edit_count": preview.summary.edit_count(),
+                        "parse_error_count": preview.summary.parse_error_count(),
+                        "all_outputs_parse": preview.summary.all_outputs_parse(),
                     },
                     "policy": {
-                        "fail_on_no_change": preview.policy.fail_on_no_change,
-                        "fail_on_parse_error": preview.policy.fail_on_parse_error,
-                        "fail_on_target_conflict": preview.policy.fail_on_target_conflict,
-                        "require_changed_files": preview.policy.require_changed_files,
-                        "require_definitions": preview.policy.require_definitions,
-                        "require_edits": preview.policy.require_edits,
-                        "passed": preview.policy.passed,
+                        "fail_on_no_change": preview.policy.fail_on_no_change(),
+                        "fail_on_parse_error": preview.policy.fail_on_parse_error(),
+                        "fail_on_target_conflict": preview.policy.fail_on_target_conflict(),
+                        "require_changed_files": preview.policy.require_changed_files(),
+                        "require_definitions": preview.policy.require_definitions(),
+                        "require_edits": preview.policy.require_edits(),
+                        "passed": preview.policy.passed(),
                         "summary": refactor_preview_policy_summary_json(preview),
-                        "violations": preview.policy.violations.as_slice(),
+                        "violations": preview.policy.violations(),
                     },
         "files": preview
             .files
@@ -191,9 +197,9 @@ pub(in crate::presentation::cli) fn refactor_preview_manifest_json(
                     .edits
                     .iter()
                     .map(|edit| json!({
-                        "start": edit.start,
-                        "end": edit.end,
-                        "replacement": edit.replacement.as_str(),
+                        "start": edit.start(),
+                        "end": edit.end(),
+                        "replacement": edit.replacement(),
                     }))
                     .collect::<Vec<_>>(),
                 "preview": file.preview.as_str(),
@@ -221,9 +227,9 @@ fn print_refactor_preview_decision(decision: &RefactorPreviewDecision) {
     );
     println!(
         "decision_write_parse_refused\t{}",
-        decision.write_parse_refused
+        decision.write_parse_refused()
     );
-    println!("decision_apply_preview\t{}", decision.apply_preview);
+    println!("decision_apply_preview\t{}", decision.apply_preview());
     for step in decision.steps() {
         println!(
             "decision_step\t{}\tstatus={}",
@@ -238,8 +244,8 @@ fn refactor_preview_decision_json(decision: &RefactorPreviewDecision) -> Value {
         "status": decision.status.label(),
         "reason": decision.status.reason(),
         "next_action": decision.status.next_action(),
-        "write_parse_refused": decision.write_parse_refused,
-        "apply_preview": decision.apply_preview,
+        "write_parse_refused": decision.write_parse_refused(),
+        "apply_preview": decision.apply_preview(),
         "steps": decision
             .steps()
             .iter()

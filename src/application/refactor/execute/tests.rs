@@ -17,13 +17,14 @@ fn write_plan_refuses_all_writes_when_any_output_does_not_parse() {
         ],
     );
 
+    assert!(plan.write_requested());
     assert!(!plan.write_allowed());
-    assert_eq!(plan.writable_indexes, Vec::<usize>::new());
+    assert!(plan.writable_indexes().is_empty());
     assert_eq!(
-        plan.refusal,
-        Some(RefactorWriteRefusal::UnparsableOutputs { count: 1 })
+        plan.refusal(),
+        Some(&RefactorWriteRefusal::UnparsableOutputs { count: 1 })
     );
-    let refusal = plan.refusal.as_ref().expect("write refusal");
+    let refusal = plan.refusal().expect("write refusal");
     assert_eq!(refusal.label(), "unparsable-outputs");
     assert_eq!(refusal.reason(), "rewritten-output-did-not-parse");
     assert_eq!(refusal.next_action(), "inspect-preview-parse-errors");
@@ -31,21 +32,20 @@ fn write_plan_refuses_all_writes_when_any_output_does_not_parse() {
 
 #[test]
 fn execute_decision_refuses_write_parse_failures_before_preflight() {
-    let decision = build_refactor_execute_decision(RefactorExecuteGateInputs {
-        write_requested: true,
-        policy_passed: true,
-        outputs_parse: false,
-        preflight_passed: true,
-    });
+    let decision = build_refactor_execute_preflight_decision(RefactorExecutePreflightInputs::new(
+        RefactorExecuteMode::Write,
+        RefactorExecutePolicyResult::Passed,
+        RefactorExecuteOutputParseResult::Unparsable,
+    ));
 
-    assert!(decision.write_parse_refused);
+    assert!(decision.write_parse_refused());
     assert_eq!(
-        decision.status,
+        decision.status(),
         RefactorExecuteDecisionStatus::RefusedUnparsableOutput
     );
-    assert_eq!(decision.status.reason(), "rewritten-output-did-not-parse");
+    assert_eq!(decision.status().reason(), "rewritten-output-did-not-parse");
     assert_eq!(
-        decision.status.next_action(),
+        decision.status().next_action(),
         "inspect-preview-parse-errors"
     );
     let steps = decision.steps();
@@ -55,33 +55,35 @@ fn execute_decision_refuses_write_parse_failures_before_preflight() {
     assert_eq!(steps[1].status, RefactorExecuteStepStatus::Failed);
     assert_eq!(steps[2].status, RefactorExecuteStepStatus::Skipped);
     let summary = decision.summary();
-    assert_eq!(summary.passed_step_count, 1);
-    assert_eq!(summary.failed_step_count, 1);
-    assert_eq!(summary.skipped_step_count, 3);
-    assert_eq!(summary.scheduled_step_count, 0);
-    assert!(summary.write_parse_refused);
-    assert!(!summary.run_pre_verification);
-    assert!(!summary.apply_preview);
-    assert!(!summary.run_post_verification);
-    assert!(!decision.run_pre_verification);
-    assert!(!decision.apply_preview);
-    assert!(!decision.run_post_verification);
+    assert_eq!(summary.passed_step_count(), 1);
+    assert_eq!(summary.failed_step_count(), 1);
+    assert_eq!(summary.skipped_step_count(), 3);
+    assert_eq!(summary.scheduled_step_count(), 0);
+    assert!(summary.write_parse_refused());
+    assert!(!summary.run_pre_verification());
+    assert!(!summary.apply_preview());
+    assert!(!summary.run_post_verification());
+    assert!(!decision.run_pre_verification());
+    assert!(!decision.apply_preview());
+    assert!(!decision.run_post_verification());
 }
 
 #[test]
 fn execute_decision_allows_dry_run_preflight_without_post_verification() {
-    let decision = build_refactor_execute_decision(RefactorExecuteGateInputs {
-        write_requested: false,
-        policy_passed: true,
-        outputs_parse: false,
-        preflight_passed: true,
-    });
+    let decision = build_refactor_execute_preflight_decision(RefactorExecutePreflightInputs::new(
+        RefactorExecuteMode::DryRun,
+        RefactorExecutePolicyResult::Passed,
+        RefactorExecuteOutputParseResult::Unparsable,
+    ));
 
-    assert!(!decision.write_parse_refused);
-    assert_eq!(decision.status, RefactorExecuteDecisionStatus::DryRunReady);
-    assert_eq!(decision.status.reason(), "all-dry-run-gates-passed");
+    assert!(!decision.write_parse_refused());
     assert_eq!(
-        decision.status.next_action(),
+        decision.status(),
+        RefactorExecuteDecisionStatus::DryRunReady
+    );
+    assert_eq!(decision.status().reason(), "all-dry-run-gates-passed");
+    assert_eq!(
+        decision.status().next_action(),
         "review-preview-or-rerun-with-write"
     );
     let steps = decision.steps();
@@ -91,17 +93,17 @@ fn execute_decision_allows_dry_run_preflight_without_post_verification() {
     assert_eq!(steps[3].status, RefactorExecuteStepStatus::Scheduled);
     assert_eq!(steps[4].status, RefactorExecuteStepStatus::Skipped);
     let summary = decision.summary();
-    assert_eq!(summary.passed_step_count, 3);
-    assert_eq!(summary.failed_step_count, 0);
-    assert_eq!(summary.skipped_step_count, 1);
-    assert_eq!(summary.scheduled_step_count, 1);
-    assert!(!summary.write_parse_refused);
-    assert!(summary.run_pre_verification);
-    assert!(summary.apply_preview);
-    assert!(!summary.run_post_verification);
-    assert!(decision.run_pre_verification);
-    assert!(decision.apply_preview);
-    assert!(!decision.run_post_verification);
+    assert_eq!(summary.passed_step_count(), 3);
+    assert_eq!(summary.failed_step_count(), 0);
+    assert_eq!(summary.skipped_step_count(), 1);
+    assert_eq!(summary.scheduled_step_count(), 1);
+    assert!(!summary.write_parse_refused());
+    assert!(summary.run_pre_verification());
+    assert!(summary.apply_preview());
+    assert!(!summary.run_post_verification());
+    assert!(decision.run_pre_verification());
+    assert!(decision.apply_preview());
+    assert!(!decision.run_post_verification());
 }
 
 proptest! {
@@ -125,17 +127,15 @@ proptest! {
 
         if !write_requested {
             prop_assert!(!plan.write_allowed());
-            prop_assert!(plan.writable_indexes.is_empty());
-            prop_assert_eq!(plan.refusal, None);
+            prop_assert!(plan.writable_indexes().is_empty());
+            prop_assert_eq!(plan.refusal(), None);
         } else if parse_error_count > 0 {
+            let expected_refusal = RefactorWriteRefusal::UnparsableOutputs {
+                count: parse_error_count,
+            };
             prop_assert!(!plan.write_allowed());
-            prop_assert!(plan.writable_indexes.is_empty());
-            prop_assert_eq!(
-                plan.refusal,
-                Some(RefactorWriteRefusal::UnparsableOutputs {
-                    count: parse_error_count,
-                })
-            );
+            prop_assert!(plan.writable_indexes().is_empty());
+            prop_assert_eq!(plan.refusal(), Some(&expected_refusal));
         } else {
             let expected_indexes = candidates
                 .iter()
@@ -144,8 +144,8 @@ proptest! {
                 .collect::<Vec<_>>();
 
             prop_assert!(plan.write_allowed());
-            prop_assert_eq!(plan.writable_indexes, expected_indexes);
-            prop_assert_eq!(plan.refusal, None);
+            prop_assert_eq!(plan.writable_indexes(), expected_indexes);
+            prop_assert_eq!(plan.refusal(), None);
         }
     }
 
@@ -156,26 +156,42 @@ proptest! {
         outputs_parse in any::<bool>(),
         preflight_passed in any::<bool>(),
     ) {
-        let inputs = RefactorExecuteGateInputs {
-            write_requested,
-            policy_passed,
-            outputs_parse,
-            preflight_passed,
-        };
+        let inputs = RefactorExecuteGateInputs::new(
+            if write_requested {
+                RefactorExecuteMode::Write
+            } else {
+                RefactorExecuteMode::DryRun
+            },
+            if policy_passed {
+                RefactorExecutePolicyResult::Passed
+            } else {
+                RefactorExecutePolicyResult::Failed
+            },
+            if outputs_parse {
+                RefactorExecuteOutputParseResult::Parseable
+            } else {
+                RefactorExecuteOutputParseResult::Unparsable
+            },
+            if preflight_passed {
+                RefactorExecutePreVerificationResult::Passed
+            } else {
+                RefactorExecutePreVerificationResult::Failed
+            },
+        );
         let decision = build_refactor_execute_decision(inputs);
-        let write_parse_refused = write_requested && !outputs_parse;
+        let write_parse_refused = policy_passed && write_requested && !outputs_parse;
 
-        prop_assert_eq!(decision.write_parse_refused, write_parse_refused);
+        prop_assert_eq!(decision.write_parse_refused(), write_parse_refused);
         prop_assert_eq!(
-            decision.run_pre_verification,
+            decision.run_pre_verification(),
             policy_passed && !write_parse_refused,
         );
         prop_assert_eq!(
-            decision.apply_preview,
+            decision.apply_preview(),
             policy_passed && !write_parse_refused && preflight_passed,
         );
         prop_assert_eq!(
-            decision.run_post_verification,
+            decision.run_post_verification(),
             write_requested && policy_passed && !write_parse_refused && preflight_passed,
         );
         let expected_status = if !policy_passed {
@@ -189,7 +205,7 @@ proptest! {
         } else {
             RefactorExecuteDecisionStatus::DryRunReady
         };
-        prop_assert_eq!(decision.status, expected_status);
+        prop_assert_eq!(decision.status(), expected_status);
         let steps = decision.steps();
         prop_assert_eq!(steps[0].name, "preview-policy");
         prop_assert_eq!(steps[1].name, "write-output-parse");
@@ -218,7 +234,7 @@ proptest! {
             steps[2].status,
             if expected_status == RefactorExecuteDecisionStatus::BlockedByPreVerification {
                 RefactorExecuteStepStatus::Failed
-            } else if decision.run_pre_verification {
+            } else if decision.run_pre_verification() {
                 RefactorExecuteStepStatus::Passed
             } else {
                 RefactorExecuteStepStatus::Skipped
@@ -226,7 +242,7 @@ proptest! {
         );
         prop_assert_eq!(
             steps[3].status,
-            if decision.apply_preview {
+            if decision.apply_preview() {
                 RefactorExecuteStepStatus::Scheduled
             } else {
                 RefactorExecuteStepStatus::Skipped
@@ -234,7 +250,7 @@ proptest! {
         );
         prop_assert_eq!(
             steps[4].status,
-            if decision.run_post_verification {
+            if decision.run_post_verification() {
                 RefactorExecuteStepStatus::Scheduled
             } else {
                 RefactorExecuteStepStatus::Skipped
@@ -243,40 +259,40 @@ proptest! {
 
         let summary = decision.summary();
         prop_assert_eq!(
-            summary.passed_step_count,
+            summary.passed_step_count(),
             steps
                 .iter()
                 .filter(|step| step.status == RefactorExecuteStepStatus::Passed)
                 .count(),
         );
         prop_assert_eq!(
-            summary.failed_step_count,
+            summary.failed_step_count(),
             steps
                 .iter()
                 .filter(|step| step.status == RefactorExecuteStepStatus::Failed)
                 .count(),
         );
         prop_assert_eq!(
-            summary.skipped_step_count,
+            summary.skipped_step_count(),
             steps
                 .iter()
                 .filter(|step| step.status == RefactorExecuteStepStatus::Skipped)
                 .count(),
         );
         prop_assert_eq!(
-            summary.scheduled_step_count,
+            summary.scheduled_step_count(),
             steps
                 .iter()
                 .filter(|step| step.status == RefactorExecuteStepStatus::Scheduled)
                 .count(),
         );
-        prop_assert_eq!(summary.write_parse_refused, decision.write_parse_refused);
-        prop_assert_eq!(summary.run_pre_verification, decision.run_pre_verification);
-        prop_assert_eq!(summary.apply_preview, decision.apply_preview);
-        prop_assert_eq!(summary.run_post_verification, decision.run_post_verification);
+        prop_assert_eq!(summary.write_parse_refused(), decision.write_parse_refused());
+        prop_assert_eq!(summary.run_pre_verification(), decision.run_pre_verification());
+        prop_assert_eq!(summary.apply_preview(), decision.apply_preview());
+        prop_assert_eq!(summary.run_post_verification(), decision.run_post_verification());
 
-        prop_assert!(!decision.run_post_verification || decision.apply_preview);
-        prop_assert!(!decision.apply_preview || decision.run_pre_verification);
-        prop_assert!(!decision.run_pre_verification || !decision.write_parse_refused);
+        prop_assert!(!decision.run_post_verification() || decision.apply_preview());
+        prop_assert!(!decision.apply_preview() || decision.run_pre_verification());
+        prop_assert!(!decision.run_pre_verification() || !decision.write_parse_refused());
     }
 }

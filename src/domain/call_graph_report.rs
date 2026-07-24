@@ -10,7 +10,8 @@ use crate::domain::common_lisp::{
 use crate::domain::definition::{DefinitionCategory, definition_shape};
 use crate::domain::dialect::Dialect;
 use crate::domain::sexpr::{
-    ByteSpan, Delimiter, ExpressionKind, ExpressionView, Path, SymbolName, SyntaxTree,
+    ByteSpan, Delimiter, ExpressionKind, ExpressionView, NonEmptyExpressionPath, Path, SymbolName,
+    SyntaxTree,
 };
 
 #[derive(Debug)]
@@ -218,16 +219,15 @@ struct CallGraphDefinitionPathArena {
 }
 
 impl CallGraphDefinitionPathArena {
-    fn from_path(path: &Path) -> (Self, CallGraphDefinitionPath) {
-        let indexes = path.to_raw_indexes();
-        let mut nodes = Vec::with_capacity(indexes.len());
+    fn from_path(path: NonEmptyExpressionPath<'_>) -> (Self, CallGraphDefinitionPath) {
+        let mut nodes = Vec::with_capacity(path.indexes().len());
         let mut parent = None;
-        for index in indexes {
+        for index in path.indexes() {
             let node = nodes.len();
             nodes.push(CallGraphDefinitionPathNode { parent, index });
             parent = Some(node);
         }
-        let root = parent.expect("call-graph traversal starts at a root child");
+        let root = parent.unwrap_or_else(|| unreachable!("non-empty path has a root node"));
         (
             Self {
                 nodes,
@@ -274,8 +274,9 @@ fn collect_call_graph_definitions_from_view(
     dialect: Dialect,
     path: Path,
     items: &mut Vec<CallGraphDefinitionItem>,
-) -> CallGraphDefinitionTraversalStats {
-    let (mut paths, root_path) = CallGraphDefinitionPathArena::from_path(&path);
+) -> Option<CallGraphDefinitionTraversalStats> {
+    let path = NonEmptyExpressionPath::try_from(&path).ok()?;
+    let (mut paths, root_path) = CallGraphDefinitionPathArena::from_path(path);
     let mut stack = vec![(view, root_path)];
     let mut visited_count = 0;
 
@@ -305,11 +306,11 @@ fn collect_call_graph_definitions_from_view(
         }
     }
 
-    CallGraphDefinitionTraversalStats {
+    Some(CallGraphDefinitionTraversalStats {
         visited_count,
         edge_count: paths.edge_count,
         materialized_path_count: paths.materialized_path_count,
-    }
+    })
 }
 
 fn list_head(view: &ExpressionView) -> Option<&str> {
@@ -465,7 +466,8 @@ mod tests {
             Dialect::CommonLisp,
             path,
             &mut definitions,
-        );
+        )
+        .expect("root-child path is non-empty");
 
         assert!(definitions.is_empty());
         assert_eq!(stats.visited_count, DEPTH + 1);

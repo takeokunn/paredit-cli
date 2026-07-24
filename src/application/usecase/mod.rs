@@ -44,6 +44,7 @@ pub mod merge_nested_let_star;
 pub(crate) mod mutation_safety;
 pub mod package;
 pub mod package_report;
+pub mod remove_definition;
 pub mod remove_unused_binding;
 pub mod remove_unused_control;
 pub mod remove_unused_definition;
