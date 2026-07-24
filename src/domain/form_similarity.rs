@@ -25,13 +25,6 @@ pub struct StructuralTree {
     keyroots: Vec<usize>,
 }
 
-impl StructuralTree {
-    /// Returns an index hint; callers must confirm equality after a hash match.
-    pub(crate) const fn fingerprint(&self) -> u64 {
-        self.tree_hash
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum NodeLabel {
     Root(Vec<ReaderPrefix>),
@@ -174,12 +167,8 @@ impl TreeSimilarityOperationBudget {
         }
 
         if self.exhausted.load(AtomicOrdering::Acquire) {
-            let attempted = self
-                .operations
-                .load(AtomicOrdering::Acquire)
-                .saturating_add(count);
             return Err(TreeSimilarityError::OperationBudgetExceeded {
-                operations: attempted.max(self.limit.saturating_add(1)),
+                operations: self.operations.load(AtomicOrdering::Acquire),
                 limit: self.limit,
             });
         }
@@ -195,9 +184,13 @@ impl TreeSimilarityOperationBudget {
         ) {
             Ok(_) => Ok(()),
             Err(operations) => {
+                let attempted = operations
+                    .saturating_add(count)
+                    .max(self.limit.saturating_add(1));
+                self.operations.fetch_max(attempted, AtomicOrdering::AcqRel);
                 self.exhausted.store(true, AtomicOrdering::Release);
                 Err(TreeSimilarityError::OperationBudgetExceeded {
-                    operations: operations.saturating_add(count),
+                    operations: attempted,
                     limit: self.limit,
                 })
             }
@@ -334,6 +327,26 @@ impl StructuralTree {
 
     pub fn node_count(&self) -> usize {
         self.labels.len()
+    }
+
+    fn exact_same_topology_distance_scaled(&self, other: &Self) -> Option<usize> {
+        if self.leftmost != other.leftmost {
+            return None;
+        }
+
+        // Equal leftmost encodings uniquely determine the ordered topology. Any
+        // non-full mapping pays at least one delete plus one insert, so an
+        // identity rename at or below that boundary is exact.
+        let distance_limit = 2 * EDIT_COST_SCALE;
+        let mut distance = 0;
+        for node in 0..self.labels.len() {
+            let cost = rename_cost_scaled(self, node, other, node);
+            if cost > distance_limit - distance {
+                return None;
+            }
+            distance += cost;
+        }
+        Some(distance)
     }
 }
 
@@ -487,6 +500,19 @@ fn tree_edit_distance_scaled_with_workspace(
     workspace: &mut TreeSimilarityWorkspace,
     shared_operation_budget: Option<&TreeSimilarityOperationBudget>,
 ) -> Result<usize, TreeSimilarityError> {
+    if let Some(operation_budget) = shared_operation_budget {
+        if operation_budget.exhausted() {
+            return Err(TreeSimilarityError::OperationBudgetExceeded {
+                operations: operation_budget.operations(),
+                limit: operation_budget.limit(),
+            });
+        }
+    }
+
+    if let Some(distance) = left.exact_same_topology_distance_scaled(right) {
+        return Ok(distance);
+    }
+
     let left_len = left.labels.len();
     let right_len = right.labels.len();
     let (width, len, bytes) = distance_matrix_dimensions(left_len, right_len)?;
@@ -693,6 +719,317 @@ mod tests {
         forward
     }
 
+    fn synthetic_tree(leftmost: Vec<usize>, labels: Vec<NodeLabel>) -> StructuralTree {
+        assert_eq!(leftmost.len(), labels.len());
+
+        let mut keyroots = vec![0; labels.len() + 1];
+        for (offset, leaf) in leftmost.iter().copied().enumerate() {
+            keyroots[leaf] = offset + 1;
+        }
+        let mut keyroots = keyroots
+            .into_iter()
+            .skip(1)
+            .filter(|&node| node != 0)
+            .collect::<Vec<_>>();
+        keyroots.sort_unstable();
+
+        let leaf_count = leftmost
+            .iter()
+            .enumerate()
+            .filter(|&(offset, leaf)| *leaf == offset + 1)
+            .count();
+        let label_hashes = labels.iter().map(hash_label).collect::<Vec<_>>();
+        let mut sorted_label_hashes = label_hashes.clone();
+        sorted_label_hashes.sort_unstable();
+        let tree_hash = label_hashes
+            .iter()
+            .fold(FNV_OFFSET, |hash, &label| fnv_u64(hash, label));
+
+        StructuralTree {
+            tree_hash,
+            labels,
+            label_hashes,
+            sorted_label_hashes,
+            leaf_count,
+            leftmost,
+            keyroots,
+        }
+    }
+
+    fn tree_edit_distance_scaled_without_topology_fastpath(
+        left: &StructuralTree,
+        right: &StructuralTree,
+        workspace: &mut TreeSimilarityWorkspace,
+    ) -> Result<usize, TreeSimilarityError> {
+        let left_len = left.labels.len();
+        let right_len = right.labels.len();
+        let (width, len, bytes) = distance_matrix_dimensions(left_len, right_len)?;
+        workspace.try_reset(len, bytes)?;
+        let mut local_operation_budget = TreeEditOperationBudget::new(MAX_TREE_EDIT_OPERATIONS);
+        let mut operation_budgets = TreeEditOperationBudgets {
+            local: &mut local_operation_budget,
+            shared: None,
+        };
+
+        for &left_root in &left.keyroots {
+            for &right_root in &right.keyroots {
+                forest_distance(
+                    left,
+                    right,
+                    &mut workspace.tree_distances,
+                    &mut workspace.forest_distances,
+                    width,
+                    ForestRoots {
+                        left: left_root,
+                        right: right_root,
+                    },
+                    &mut operation_budgets,
+                )?;
+            }
+        }
+
+        Ok(workspace.tree_distances[index(left_len, right_len, width)])
+    }
+
+    fn renamed_atom_chain(count: usize) -> (StructuralTree, StructuralTree) {
+        let left = (0..count)
+            .map(|index| NodeLabel::Atom(format!("left-{index}"), Vec::new()))
+            .collect();
+        let right = (0..count)
+            .map(|index| NodeLabel::Atom(format!("right-{index}"), Vec::new()))
+            .collect();
+
+        (
+            synthetic_tree(vec![1; count], left),
+            synthetic_tree(vec![1; count], right),
+        )
+    }
+
+    fn assert_same_topology_distance_bidirectional(
+        left: &StructuralTree,
+        right: &StructuralTree,
+        expected_fastpath: Option<usize>,
+        expected_distance: usize,
+    ) {
+        for (first, second) in [(left, right), (right, left)] {
+            assert_eq!(
+                first.exact_same_topology_distance_scaled(second),
+                expected_fastpath
+            );
+
+            let mut fast_workspace = TreeSimilarityWorkspace::default();
+            let fast =
+                tree_edit_distance_scaled_with_workspace(first, second, &mut fast_workspace, None);
+            let mut full_workspace = TreeSimilarityWorkspace::default();
+            let full = tree_edit_distance_scaled_without_topology_fastpath(
+                first,
+                second,
+                &mut full_workspace,
+            );
+
+            assert_eq!(full, Ok(expected_distance));
+            assert_eq!(fast, full);
+        }
+    }
+
+    #[test]
+    fn same_topology_fastpath_matches_full_dp() {
+        let (left, right) = renamed_atom_chain(6);
+        let expected_distance = 6 * ATOM_RENAME_COST;
+
+        assert_same_topology_distance_bidirectional(
+            &left,
+            &right,
+            Some(expected_distance),
+            expected_distance,
+        );
+    }
+
+    #[test]
+    fn same_topology_fastpath_accepts_delete_insert_boundary() {
+        let exact_boundary_left = synthetic_tree(
+            vec![1, 1],
+            vec![NodeLabel::Root(Vec::new()), NodeLabel::Root(Vec::new())],
+        );
+        let exact_boundary_right = synthetic_tree(
+            vec![1, 1],
+            vec![
+                NodeLabel::List(None, Vec::new()),
+                NodeLabel::List(None, Vec::new()),
+            ],
+        );
+        assert_same_topology_distance_bidirectional(
+            &exact_boundary_left,
+            &exact_boundary_right,
+            Some(2 * EDIT_COST_SCALE),
+            2 * EDIT_COST_SCALE,
+        );
+
+        let mixed_left = synthetic_tree(
+            vec![1; 5],
+            vec![
+                NodeLabel::Atom("same".to_owned(), Vec::new()),
+                NodeLabel::Root(Vec::new()),
+                NodeLabel::Atom("left-1".to_owned(), Vec::new()),
+                NodeLabel::Atom("left-2".to_owned(), Vec::new()),
+                NodeLabel::Atom("left-3".to_owned(), Vec::new()),
+            ],
+        );
+        let mixed_right = synthetic_tree(
+            vec![1; 5],
+            vec![
+                NodeLabel::Atom("same".to_owned(), Vec::new()),
+                NodeLabel::List(None, Vec::new()),
+                NodeLabel::Atom("right-1".to_owned(), Vec::new()),
+                NodeLabel::Atom("right-2".to_owned(), Vec::new()),
+                NodeLabel::Atom("right-3".to_owned(), Vec::new()),
+            ],
+        );
+        let mixed_distance = EDIT_COST_SCALE + 3 * ATOM_RENAME_COST;
+        assert_same_topology_distance_bidirectional(
+            &mixed_left,
+            &mixed_right,
+            Some(mixed_distance),
+            mixed_distance,
+        );
+    }
+
+    #[test]
+    fn same_topology_fastpath_falls_back_above_boundary_and_for_different_topology() {
+        let (atom_left, atom_right) = renamed_atom_chain(7);
+        assert_same_topology_distance_bidirectional(
+            &atom_left,
+            &atom_right,
+            None,
+            7 * ATOM_RENAME_COST,
+        );
+
+        let mixed_left = synthetic_tree(
+            vec![1; 6],
+            vec![
+                NodeLabel::Atom("same".to_owned(), Vec::new()),
+                NodeLabel::Root(Vec::new()),
+                NodeLabel::Atom("left-1".to_owned(), Vec::new()),
+                NodeLabel::Atom("left-2".to_owned(), Vec::new()),
+                NodeLabel::Atom("left-3".to_owned(), Vec::new()),
+                NodeLabel::Atom("left-4".to_owned(), Vec::new()),
+            ],
+        );
+        let mixed_right = synthetic_tree(
+            vec![1; 6],
+            vec![
+                NodeLabel::Atom("same".to_owned(), Vec::new()),
+                NodeLabel::List(None, Vec::new()),
+                NodeLabel::Atom("right-1".to_owned(), Vec::new()),
+                NodeLabel::Atom("right-2".to_owned(), Vec::new()),
+                NodeLabel::Atom("right-3".to_owned(), Vec::new()),
+                NodeLabel::Atom("right-4".to_owned(), Vec::new()),
+            ],
+        );
+        assert_same_topology_distance_bidirectional(
+            &mixed_left,
+            &mixed_right,
+            None,
+            EDIT_COST_SCALE + 4 * ATOM_RENAME_COST,
+        );
+
+        let different_topology =
+            synthetic_tree(vec![1, 2, 1, 1, 1, 1, 1], atom_right.labels.clone());
+        assert_eq!(
+            atom_left.exact_same_topology_distance_scaled(&different_topology),
+            None
+        );
+        assert_eq!(
+            different_topology.exact_same_topology_distance_scaled(&atom_left),
+            None
+        );
+    }
+
+    #[test]
+    fn same_topology_fastpath_does_not_consume_shared_budget() {
+        let left = synthetic_tree(
+            vec![1, 1, 1],
+            vec![
+                NodeLabel::Atom("same".into(), Vec::new()),
+                NodeLabel::Atom("left".into(), Vec::new()),
+                NodeLabel::Root(Vec::new()),
+            ],
+        );
+        let right = synthetic_tree(
+            vec![1, 1, 1],
+            vec![
+                NodeLabel::Atom("same".into(), Vec::new()),
+                NodeLabel::Atom("right".into(), Vec::new()),
+                NodeLabel::Root(Vec::new()),
+            ],
+        );
+        let budget = TreeSimilarityOperationBudget::new(0);
+        let mut workspace = TreeSimilarityWorkspace::default();
+
+        assert!(tree_similarity_with_workspace_and_budget(
+            &left,
+            &right,
+            &mut workspace,
+            Some(&budget),
+        )
+        .is_ok());
+        assert_eq!(budget.operations(), 0);
+        assert!(!budget.exhausted());
+    }
+
+    #[test]
+    fn same_topology_fastpath_rejects_preexhausted_shared_budget() {
+        let operation_budget = TreeSimilarityOperationBudget::new(0);
+        let different_topology_left = synthetic_tree(
+            vec![1, 1, 1],
+            vec![
+                NodeLabel::Root(Vec::new()),
+                NodeLabel::Root(Vec::new()),
+                NodeLabel::Root(Vec::new()),
+            ],
+        );
+        let different_topology_right = synthetic_tree(
+            vec![1, 2, 1],
+            vec![
+                NodeLabel::Root(Vec::new()),
+                NodeLabel::Root(Vec::new()),
+                NodeLabel::Root(Vec::new()),
+            ],
+        );
+        let mut workspace = TreeSimilarityWorkspace::default();
+        let initial_error = tree_edit_distance_scaled_with_workspace(
+            &different_topology_left,
+            &different_topology_right,
+            &mut workspace,
+            Some(&operation_budget),
+        )
+        .unwrap_err();
+        let exhausted_operations = operation_budget.operations();
+
+        assert!(operation_budget.exhausted());
+        assert!(exhausted_operations > operation_budget.limit());
+        assert_eq!(
+            initial_error,
+            TreeSimilarityError::OperationBudgetExceeded {
+                operations: exhausted_operations,
+                limit: operation_budget.limit(),
+            }
+        );
+
+        let (same_topology_left, same_topology_right) = renamed_atom_chain(1);
+        let mut reused_workspace = TreeSimilarityWorkspace::default();
+        assert_eq!(
+            tree_edit_distance_scaled_with_workspace(
+                &same_topology_left,
+                &same_topology_right,
+                &mut reused_workspace,
+                Some(&operation_budget),
+            ),
+            Err(initial_error)
+        );
+        assert_eq!(operation_budget.operations(), exhausted_operations);
+    }
+
     #[test]
     fn workspace_limiter_blocks_until_a_reservation_is_released() {
         let limiter = TreeSimilarityWorkspaceLimiter::new(2);
@@ -761,6 +1098,7 @@ mod tests {
         let left = form("(foo (bar a) b)");
         let right = form("(foo bar (a b))");
         assert_ne!(left, right);
+        assert_ne!(left.leftmost, right.leftmost);
         assert_eq!(left.sorted_label_hashes, right.sorted_label_hashes);
         assert_eq!(similarity_upper_bound(&left, &right), 1.0);
 
@@ -802,7 +1140,7 @@ mod tests {
             Err(TreeSimilarityError::OperationBudgetExceeded { limit, .. })
                 if limit == required_operations - 1
         ));
-        assert!(insufficient_budget.operations() < required_operations);
+        assert!(insufficient_budget.operations() > required_operations - 1);
         assert!(insufficient_budget.exhausted());
 
         let fail_closed_budget = TreeSimilarityOperationBudget::new(3);
@@ -814,7 +1152,7 @@ mod tests {
                 limit: 3,
             })
         );
-        assert_eq!(fail_closed_budget.operations(), 2);
+        assert_eq!(fail_closed_budget.operations(), 4);
         assert!(fail_closed_budget.exhausted());
         assert_eq!(
             fail_closed_budget.consume_many(1),
@@ -823,7 +1161,19 @@ mod tests {
                 limit: 3,
             })
         );
-        assert_eq!(fail_closed_budget.operations(), 2);
+        assert_eq!(fail_closed_budget.operations(), 4);
+
+        let overflow_budget = TreeSimilarityOperationBudget::new(usize::MAX);
+        assert_eq!(overflow_budget.consume_many(usize::MAX - 1), Ok(()));
+        assert_eq!(
+            overflow_budget.consume_many(2),
+            Err(TreeSimilarityError::OperationBudgetExceeded {
+                operations: usize::MAX,
+                limit: usize::MAX,
+            })
+        );
+        assert_eq!(overflow_budget.operations(), usize::MAX);
+        assert!(overflow_budget.exhausted());
 
         assert!(tree_similarity(&left, &right).is_ok());
     }

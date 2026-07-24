@@ -63,15 +63,15 @@ fn collect_similarity_candidates_with_budgets(
     let line_index = (options.min_line_span() > 1).then_some(LineIndex::new(input));
     let collected_nodes = candidates
         .iter()
-        .map(|candidate| candidate.form.node_count)
+        .map(|candidate| candidate.form().node_count())
         .fold(0, usize::saturating_add);
     let mut retained_sources = HashSet::new();
     let collected_text_bytes = candidates
         .iter()
         .filter_map(|candidate| {
             retained_sources
-                .insert(candidate.form.text.source_identity())
-                .then_some(candidate.form.text.source_len())
+                .insert(candidate.form().text().source_identity())
+                .then_some(candidate.form().text().source_len())
         })
         .fold(0, usize::saturating_add);
     let mut collection = CandidateCollection {

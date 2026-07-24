@@ -88,8 +88,8 @@ fn print_text(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) {
             pair.similarity().as_f64(),
             pair.score().as_f64()
         );
-        print_text_form("left", &pair.left);
-        print_text_form("right", &pair.right);
+        print_text_form("left", pair.left());
+        print_text_form("right", pair.right());
     }
 }
 
@@ -150,8 +150,8 @@ fn json_report(plan: &SimilarityReportPlan, args: &SimilarityReportArgs) -> serd
         "pairs": report.pairs.iter().map(|pair| json!({
             "similarity": pair.similarity().as_f64(),
             "score": pair.score().as_f64(),
-            "left": form_json(&pair.left),
-            "right": form_json(&pair.right),
+            "left": form_json(pair.left()),
+            "right": form_json(pair.right()),
         })).collect::<Vec<_>>(),
     })
 }
@@ -170,24 +170,24 @@ const fn cli_stage_label(stage: SimilarityProcessingStage) -> &'static str {
 fn print_text_form(side: &str, form: &SimilarityFormReport) {
     println!(
         "\t{side}\t{}\t{}\t{}\t{}..{}\tnodes={}\thead={}",
-        safe_text!(form.path.display()),
-        form.dialect.label(),
-        safe_text!(form.form_path),
-        form.span.start().get(),
-        form.span.end().get(),
-        form.node_count,
-        safe_text!(form.head.as_deref().unwrap_or(""))
+        safe_text!(form.path().display()),
+        form.dialect().label(),
+        safe_text!(form.form_path()),
+        form.span().start().get(),
+        form.span().end().get(),
+        form.node_count(),
+        safe_text!(form.head().map_or("", |head| head.as_str()))
     );
 }
 
 fn form_json(form: &SimilarityFormReport) -> serde_json::Value {
     json!({
-        "path": form.path.display().to_string(),
-        "dialect": form.dialect.label(),
-        "form_path": form.form_path.to_string(),
-        "span": { "start": form.span.start().get(), "end": form.span.end().get() },
-        "node_count": form.node_count,
-        "head": form.head.as_deref(),
-        "text": form.text.as_ref(),
+        "path": form.path().display().to_string(),
+        "dialect": form.dialect().label(),
+        "form_path": form.form_path().to_string(),
+        "span": { "start": form.span().start().get(), "end": form.span().end().get() },
+        "node_count": form.node_count(),
+        "head": form.head().map(|head| head.as_str()),
+        "text": form.text().as_ref(),
     })
 }

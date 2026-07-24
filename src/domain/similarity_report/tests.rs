@@ -287,13 +287,30 @@ fn report_tree_edit_budget_is_exact_and_shared_across_workers() {
         sequential.0.as_deref(),
         Some("tree similarity operation budget exceeded (2 operations, limit 1)")
     );
-    assert_eq!((sequential.1, parallel.1), (1, 1));
+    assert_eq!((sequential.1, parallel.1), (2, 2));
     assert!(sequential.2 && parallel.2);
     assert_eq!(sequential.3, 1);
     assert_eq!(parallel.3, 2);
 
     let repeated = super::reports::tree_edit_operation_budget_execution_for_test(&values, 1, 2);
     assert_eq!(repeated, parallel);
+}
+
+#[test]
+fn report_leaf_count_upper_bound_prunes_before_tree_edit() {
+    let values = [
+        structural_similarity_candidate("left.lisp", "((a) (b))", 0),
+        structural_similarity_candidate("right.lisp", "(() (a b))", 1),
+    ];
+
+    assert_eq!(
+        super::reports::pruning_execution_for_test(&values, 0.9),
+        (1, 0, 0)
+    );
+    assert_eq!(
+        super::reports::pruning_execution_for_test(&values, 0.8),
+        (1, 0, 1)
+    );
 }
 
 #[test]
@@ -338,7 +355,7 @@ fn similarity_pair_containment_is_span_based_per_side() {
 fn similarity_candidate_comparison_bucket_uses_head_identity() {
     let left = similarity_candidate("a.lisp", 3);
     let matching = left.clone();
-    let missing_head = SimilarityCandidate::new(left.form.clone(), left.tree.clone(), None);
+    let missing_head = SimilarityCandidate::new(left.form().clone(), left.tree().clone(), None);
 
     assert!(left.same_comparison_bucket(&matching));
     assert!(!left.same_comparison_bucket(&missing_head));
@@ -370,7 +387,7 @@ fn form_scope_top_level_excludes_nested_forms() {
     .unwrap();
 
     assert_eq!(values.len(), 1);
-    assert_eq!(values[0].form.text, "(outer (inner value))");
+    assert_eq!(values[0].form().text(), "(outer (inner value))");
 }
 
 #[test]
@@ -399,7 +416,7 @@ fn minimum_line_span_uses_inclusive_one_based_length() {
     .unwrap();
 
     assert_eq!(values.len(), 1);
-    assert_eq!(values[0].form.text, "(multi\n value)");
+    assert_eq!(values[0].form().text(), "(multi\n value)");
 }
 
 #[test]
@@ -428,7 +445,7 @@ fn candidate_limit_counts_only_eligible_omissions() {
     .unwrap();
 
     assert_eq!(values.len(), 1);
-    assert_eq!(values[0].form.text, "(omit\n value)");
+    assert_eq!(values[0].form().text(), "(omit\n value)");
     assert_eq!(omitted, 0);
 
     let input = "(keep\n value) (too-small) (omit\n value) (single-line value)";
@@ -455,7 +472,7 @@ fn candidate_limit_counts_only_eligible_omissions() {
     .unwrap();
 
     assert_eq!(values.len(), 1);
-    assert_eq!(values[0].form.text, "(keep\n value)");
+    assert_eq!(values[0].form().text(), "(keep\n value)");
     assert_eq!(omitted, 1);
 }
 
@@ -538,10 +555,10 @@ fn large_scoped_groups_are_split_at_file_boundaries() {
         values.extend((0..40).map(|_| similarity_candidate(path, 3)));
     }
     values.sort_unstable_by(|left, right| {
-        left.form
-            .node_count
-            .cmp(&right.form.node_count)
-            .then_with(|| left.form.path.cmp(&right.form.path))
+        left.form()
+            .node_count()
+            .cmp(&right.form().node_count())
+            .then_with(|| left.form().path().cmp(right.form().path()))
     });
     let groups = [values.as_slice()];
 
@@ -617,7 +634,8 @@ fn split_scoped_comparisons_match_the_sequential_path() {
 fn threshold_is_inclusive() {
     let values = candidates("a.lisp", "(foo a b) (foo x y)", 2);
     let similarity =
-        crate::domain::form_similarity::tree_similarity(&values[0].tree, &values[1].tree).unwrap();
+        crate::domain::form_similarity::tree_similarity(values[0].tree(), values[1].tree())
+            .unwrap();
     let report = build_similarity_pairs(values, similarity, SimilarityOverlapPolicy::All, None);
     assert_eq!(report.pairs.len(), 1);
     assert_eq!(report.summary.evaluated_pairs(), 1);
@@ -752,7 +770,7 @@ fn maximal_overlap_suppresses_only_strictly_contained_pairs() {
         report
             .pairs
             .iter()
-            .any(|pair| pair.left.text == "(same x)" && pair.right.text == "(same y)")
+            .any(|pair| pair.left().text() == "(same x)" && pair.right().text() == "(same y)")
     };
     assert!(nested_pair(&all));
     assert!(!nested_pair(&maximal));
@@ -766,11 +784,11 @@ fn maximal_overlap_normalizes_reversed_cross_file_pair_orientation() {
         values
             .iter()
             .find(|candidate| {
-                candidate.form.path == FsPath::new(path) && candidate.form.text == text
+                candidate.form().path() == FsPath::new(path) && candidate.form().text() == text
             })
             .unwrap()
-            .form
-            .node_count
+            .form()
+            .node_count()
     };
 
     assert!(
@@ -783,8 +801,8 @@ fn maximal_overlap_normalizes_reversed_cross_file_pair_orientation() {
     let maximal = build_similarity_pairs(values, 0.0, SimilarityOverlapPolicy::Maximal, None);
     let nested_pair = |report: &SimilarityReport| {
         report.pairs.iter().any(|pair| {
-            (pair.left.text == "(same x extra)" && pair.right.text == "(same y)")
-                || (pair.left.text == "(same y)" && pair.right.text == "(same x extra)")
+            (pair.left().text() == "(same x extra)" && pair.right().text() == "(same y)")
+                || (pair.left().text() == "(same y)" && pair.right().text() == "(same x extra)")
         })
     };
 
@@ -813,11 +831,11 @@ fn maximal_overlap_normalizes_reversed_same_file_pair_orientation() {
     assert_eq!(super::reports::suppress_contained_pairs(&mut pairs), 1);
     assert_eq!(pairs.len(), 1);
     assert_eq!(
-        pairs[0].left.span,
+        pairs[0].left().span(),
         ByteSpan::new(ByteOffset::new(0), ByteOffset::new(20))
     );
     assert_eq!(
-        pairs[0].right.span,
+        pairs[0].right().span(),
         ByteSpan::new(ByteOffset::new(30), ByteOffset::new(60))
     );
 }
@@ -930,8 +948,8 @@ fn online_maximal_frontier_matches_offline_suppression() {
 
         let offline_suppressed = super::reports::suppress_contained_pairs(&mut offline);
         let online_suppressed = super::reports::retain_maximal_frontier_for_test(&mut online);
-        offline.sort_by_key(|pair| pair.left.span.start());
-        online.sort_by_key(|pair| pair.left.span.start());
+        offline.sort_by_key(|pair| pair.left().span().start());
+        online.sort_by_key(|pair| pair.left().span().start());
 
         assert_eq!(online_suppressed, offline_suppressed);
         assert_eq!(online, offline);
@@ -1175,8 +1193,8 @@ fn same_file_comparison_limit_uses_stable_path_order() {
 
         assert_eq!(report.summary.evaluated_pairs(), 1);
         assert_eq!(report.pairs.len(), 1);
-        assert_eq!(report.pairs[0].left.path, PathBuf::from("a.lisp"));
-        assert_eq!(report.pairs[0].right.path, PathBuf::from("a.lisp"));
+        assert_eq!(report.pairs[0].left().path(), PathBuf::from("a.lisp"));
+        assert_eq!(report.pairs[0].right().path(), PathBuf::from("a.lisp"));
     }
 }
 
@@ -1381,7 +1399,7 @@ fn candidate_collection_shares_input_and_applies_cumulative_budgets() {
     .unwrap();
 
     assert_eq!(values.len(), 1);
-    assert_eq!(values[0].form.text, "(outer (inner value))");
+    assert_eq!(values[0].form().text(), "(outer (inner value))");
     assert!(omitted >= 2);
 
     let mut all_values = Vec::new();
@@ -1396,9 +1414,9 @@ fn candidate_collection_shares_input_and_applies_cumulative_budgets() {
     .unwrap();
     assert!(
         all_values[0]
-            .form
-            .text
-            .shares_source(&all_values[1].form.text)
+            .form()
+            .text()
+            .shares_source(all_values[1].form().text())
     );
 }
 
@@ -1484,5 +1502,10 @@ fn candidate_text_budget_counts_each_retained_source_once() {
     assert_eq!(retained_after_first, 2);
     assert_eq!(values.len(), retained_after_first);
     assert_eq!(second_omitted, 2);
-    assert!(values[0].form.text.shares_source(&values[1].form.text));
+    assert!(
+        values[0]
+            .form()
+            .text()
+            .shares_source(values[1].form().text())
+    );
 }

@@ -275,7 +275,7 @@ pub enum SimilarityReportWorkflowError {
 impl std::fmt::Display for SimilarityReportWorkflowError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Source(error) => write!(formatter, "{error}"),
+            Self::Source(_) => formatter.write_str("similarity report source failed"),
             Self::Processing(error) => write!(
                 formatter,
                 "failed to {} {}: {}",
@@ -284,7 +284,7 @@ impl std::fmt::Display for SimilarityReportWorkflowError {
                 error.message
             ),
             Self::WorkerPanicked => formatter.write_str("similarity-report worker thread panicked"),
-            Self::Analysis(error) => write!(formatter, "{error}"),
+            Self::Analysis(_) => formatter.write_str("similarity report analysis failed"),
             Self::InvalidPlan(error) => {
                 write!(formatter, "invalid similarity report plan: {error}")
             }
@@ -299,5 +299,49 @@ impl std::error::Error for SimilarityReportWorkflowError {
             Self::InvalidPlan(error) => Some(error),
             Self::Processing(_) | Self::WorkerPanicked => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod workflow_error_tests {
+    use std::error::Error as _;
+
+    use super::SimilarityReportWorkflowError;
+
+    #[test]
+    fn source_display_adds_boundary_context_without_repeating_cause() {
+        let error = SimilarityReportWorkflowError::Source(
+            anyhow::anyhow!("filesystem unavailable").context("could not discover inputs"),
+        );
+
+        assert_eq!(error.to_string(), "similarity report source failed");
+        let source = error.source().expect("source error must be retained");
+        assert_eq!(source.to_string(), "could not discover inputs");
+        assert_eq!(
+            source
+                .source()
+                .expect("root cause must be retained")
+                .to_string(),
+            "filesystem unavailable"
+        );
+    }
+
+    #[test]
+    fn analysis_display_adds_boundary_context_without_repeating_cause() {
+        let error = SimilarityReportWorkflowError::Analysis(
+            anyhow::anyhow!("tree similarity budget exceeded")
+                .context("could not compare candidates"),
+        );
+
+        assert_eq!(error.to_string(), "similarity report analysis failed");
+        let source = error.source().expect("analysis error must be retained");
+        assert_eq!(source.to_string(), "could not compare candidates");
+        assert_eq!(
+            source
+                .source()
+                .expect("root cause must be retained")
+                .to_string(),
+            "tree similarity budget exceeded"
+        );
     }
 }

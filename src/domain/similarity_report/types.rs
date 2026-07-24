@@ -76,13 +76,13 @@ impl PartialEq<&str> for SharedFormText {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityFormReport {
-    pub path: PathBuf,
-    pub dialect: Dialect,
-    pub form_path: Path,
-    pub span: ByteSpan,
-    pub node_count: usize,
-    pub head: Option<FormHead>,
-    pub text: SharedFormText,
+    path: PathBuf,
+    dialect: Dialect,
+    form_path: Path,
+    span: ByteSpan,
+    node_count: usize,
+    head: Option<FormHead>,
+    text: SharedFormText,
 }
 
 impl SimilarityFormReport {
@@ -126,6 +126,34 @@ impl SimilarityFormReport {
         }
     }
 
+    pub fn path(&self) -> &std::path::Path {
+        self.path.as_path()
+    }
+
+    pub const fn dialect(&self) -> Dialect {
+        self.dialect
+    }
+
+    pub const fn form_path(&self) -> &Path {
+        &self.form_path
+    }
+
+    pub const fn span(&self) -> ByteSpan {
+        self.span
+    }
+
+    pub const fn node_count(&self) -> usize {
+        self.node_count
+    }
+
+    pub fn head(&self) -> Option<&FormHead> {
+        self.head.as_ref()
+    }
+
+    pub const fn text(&self) -> &SharedFormText {
+        &self.text
+    }
+
     pub fn contains_span(&self, other: &Self) -> bool {
         self.span.contains_span(other.span)
     }
@@ -137,9 +165,9 @@ impl SimilarityFormReport {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimilarityCandidate {
-    pub form: Arc<SimilarityFormReport>,
-    pub tree: StructuralTree,
-    pub comparison_head: Option<ComparisonHead>,
+    form: Arc<SimilarityFormReport>,
+    tree: StructuralTree,
+    comparison_head: Option<ComparisonHead>,
 }
 
 impl SimilarityCandidate {
@@ -153,6 +181,18 @@ impl SimilarityCandidate {
             tree,
             comparison_head,
         }
+    }
+
+    pub fn form(&self) -> &Arc<SimilarityFormReport> {
+        &self.form
+    }
+
+    pub const fn tree(&self) -> &StructuralTree {
+        &self.tree
+    }
+
+    pub fn comparison_head(&self) -> Option<&ComparisonHead> {
+        self.comparison_head.as_ref()
     }
 
     pub fn same_comparison_bucket(&self, other: &Self) -> bool {
@@ -232,8 +272,8 @@ impl std::error::Error for InvalidSimilarityScore {}
 pub struct SimilarityPairReport {
     similarity: SimilarityRatio,
     score: SimilarityScore,
-    pub left: Arc<SimilarityFormReport>,
-    pub right: Arc<SimilarityFormReport>,
+    left: Arc<SimilarityFormReport>,
+    right: Arc<SimilarityFormReport>,
 }
 
 impl SimilarityPairReport {
@@ -271,6 +311,14 @@ impl SimilarityPairReport {
 
     pub const fn score(&self) -> SimilarityScore {
         self.score
+    }
+
+    pub fn left(&self) -> &SimilarityFormReport {
+        &self.left
+    }
+
+    pub fn right(&self) -> &SimilarityFormReport {
+        &self.right
     }
 
     pub fn strictly_contains_pair(&self, other: &Self) -> bool {

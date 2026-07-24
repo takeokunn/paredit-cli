@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use paredit_cli::application::usecase::similarity_report::{
     DiscoveredSimilarityFile, SimilarityComparisonScope, SimilarityDuplicatePolicy,
     SimilarityErrorPolicy, SimilarityFormScope, SimilarityInventory, SimilarityOverlapPolicy,
@@ -43,14 +43,16 @@ impl SimilarityReportSourcePort for FixtureSource {
 #[derive(Clone, Copy)]
 enum Scenario {
     RepeatedShape,
-    SizePruned,
+    NodeCountPruned,
+    LeafCountPruned,
 }
 
 impl Scenario {
     const fn label(self) -> &'static str {
         match self {
             Self::RepeatedShape => "repeated-shape",
-            Self::SizePruned => "size-pruned",
+            Self::NodeCountPruned => "node-count-pruned",
+            Self::LeafCountPruned => "leaf-count-pruned",
         }
     }
 
@@ -58,14 +60,18 @@ impl Scenario {
         assert_eq!(
             candidate_count % 2,
             0,
-            "size-pruned fixtures require two equal groups"
+            "pruning fixtures require two equal groups"
         );
 
         let entries = (0..candidate_count).map(|index| {
             let body = match self {
                 Self::RepeatedShape => "(defun shared (x) (+ x 1))".to_owned(),
-                Self::SizePruned if index < candidate_count / 2 => sized_defun(4),
-                Self::SizePruned => sized_defun(128),
+                Self::NodeCountPruned if index < candidate_count / 2 => sized_defun(4),
+                Self::NodeCountPruned => sized_defun(128),
+                Self::LeafCountPruned if index < candidate_count / 2 => {
+                    "(defun shared () ((a) (b)))".to_owned()
+                }
+                Self::LeafCountPruned => "(defun shared () (() (a b)))".to_owned(),
             };
             (
                 PathBuf::from(format!("fixture-{index:03}.lisp")),
@@ -108,13 +114,21 @@ impl Scenario {
                 assert_eq!(summary.matched_pairs(), possible_pairs);
                 possible_pairs
             }
-            Self::SizePruned => {
+            Self::NodeCountPruned => {
                 let group_size = candidate_count / 2;
                 let evaluated_pairs = 2 * pair_count(group_size);
                 assert_eq!(summary.evaluated_pairs(), evaluated_pairs);
                 assert_eq!(summary.pruned_by_size(), group_size * group_size);
                 assert_eq!(summary.matched_pairs(), evaluated_pairs);
                 evaluated_pairs
+            }
+            Self::LeafCountPruned => {
+                let group_size = candidate_count / 2;
+                let matched_pairs = 2 * pair_count(group_size);
+                assert_eq!(summary.evaluated_pairs(), possible_pairs);
+                assert_eq!(summary.pruned_by_size(), 0);
+                assert_eq!(summary.matched_pairs(), matched_pairs);
+                matched_pairs
             }
         };
         let (reported_pairs, suppressed_pairs, truncated) = match max_results {
@@ -173,16 +187,15 @@ fn run(mut source: FixtureSource, max_results: Option<usize>) -> SimilarityRepor
 }
 
 fn benchmark_similarity_report(c: &mut Criterion) {
-    for scenario in [Scenario::RepeatedShape, Scenario::SizePruned] {
+    for scenario in [
+        Scenario::RepeatedShape,
+        Scenario::NodeCountPruned,
+        Scenario::LeafCountPruned,
+    ] {
         let mut group = c.benchmark_group(scenario.label());
         for candidate_count in INPUT_SIZES {
             let fixture = scenario.source(candidate_count);
 
-            group.throughput(Throughput::Elements(
-                pair_count(candidate_count)
-                    .try_into()
-                    .expect("pair count fits into u64"),
-            ));
             for &(max_results, retention_label) in &RETENTION_MODES {
                 scenario.assert_contract(
                     candidate_count,
